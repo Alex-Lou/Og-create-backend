@@ -3,7 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
-const morgan = require('morgan'); // Ajout de morgan pour les logs
+const morgan = require('morgan');
 require('dotenv').config({ path: path.resolve(process.cwd(), '.env') });
 
 // Importer la vérification de la clé JWT
@@ -15,7 +15,7 @@ ensureJWTSecret();
 const app = express();
 
 // Middleware de logging
-app.use(morgan('dev')); // Ajout des logs de requêtes
+app.use(morgan('dev'));
 
 // Middleware de sécurité
 app.use(helmet({
@@ -41,8 +41,8 @@ app.use(cors(corsOptions));
 
 // Limite de requêtes pour prévenir les attaques par force brute
 const limiter = rateLimit({
-    windowMs: process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000, // 15 minutes par défaut
-    max: process.env.RATE_LIMIT_MAX_REQUESTS || 100, // 100 requêtes par défaut
+    windowMs: process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000,
+    max: process.env.RATE_LIMIT_MAX_REQUESTS || 100,
     message: 'Trop de requêtes, veuillez réessayer plus tard',
     standardHeaders: true,
     legacyHeaders: false
@@ -61,9 +61,11 @@ app.use(express.urlencoded({
 // Routes
 const authRoutes = require('./routes/auth');
 const progressRoutes = require('./routes/progress');
+const contactRoutes = require('./routes/contactRoutes'); // Nouvelle ligne
 
 app.use('/api/auth', authRoutes);
 app.use('/api/progress', progressRoutes);
+app.use('/api/contact', contactRoutes); // Nouvelle ligne
 
 // Route de santé pour vérifier l'état du serveur
 app.get('/api/health', (req, res) => {
