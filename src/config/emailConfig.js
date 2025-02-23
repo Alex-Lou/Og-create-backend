@@ -16,7 +16,7 @@ transporter.verify(function(error, success) {
     if (error) {
         console.error('Erreur de configuration email:', error);
     } else {
-        console.log('Serveur email prêt à envoyer des messages');
+        
     }
 });
 

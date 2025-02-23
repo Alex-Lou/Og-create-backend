@@ -8,13 +8,12 @@ router.post('/achievement', authMiddleware, async (req, res) => {
    try {
        const userId = req.user.id;
        const { achievement } = req.body;
+       console.log('Achievement reçu:', achievement);
 
-       // Vérifier si l'achievement est présent dans la requête
        if (!achievement || !achievement.name) {
            return res.status(400).json({ message: 'Données de succès invalides ou manquantes' });
        }
 
-       // Récupérer la progression existante
        const existingProgress = await db.query(
            'SELECT achievements FROM progress WHERE user_id = $1',
            [userId]
@@ -24,7 +23,6 @@ router.post('/achievement', authMiddleware, async (req, res) => {
 
        if (existingProgress.rows.length > 0) {
            try {
-               // Convertir les achievements existants en objet
                currentAchievements = existingProgress.rows[0].achievements 
                    ? (typeof existingProgress.rows[0].achievements === 'string' 
                        ? JSON.parse(existingProgress.rows[0].achievements) 
@@ -36,15 +34,12 @@ router.post('/achievement', authMiddleware, async (req, res) => {
            }
        }
 
-       // Ajouter ou mettre à jour l'achievement
        currentAchievements[achievement.name] = {
            unlocked: true,
            unlockedAt: new Date().toISOString()
        };
 
-       // Stocker les achievements mis à jour
        if (existingProgress.rows.length > 0) {
-           // Mise à jour des achievements existants
            await db.query(
                `UPDATE progress 
                SET 
@@ -54,7 +49,6 @@ router.post('/achievement', authMiddleware, async (req, res) => {
                [JSON.stringify(currentAchievements), userId]
            );
        } else {
-           // Création d'une nouvelle progression
            await db.query(
                `INSERT INTO progress (
                    user_id,
@@ -62,14 +56,26 @@ router.post('/achievement', authMiddleware, async (req, res) => {
                    discovered_elements,
                    discovered_categories,
                    category_progress,
+                   coins,
+                   timer_progress,
                    last_saved
-               ) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
+               ) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)`,
                [
                    userId,
                    JSON.stringify(currentAchievements),
                    JSON.stringify(["Eau", "Feu", "Terre", "Air"]),
                    ["Elements Fondamentaux"],
-                   JSON.stringify({})
+                   JSON.stringify({}),
+                   0,
+                   JSON.stringify({
+                       completedQuestions: {},
+                       unlockedCategories: {},
+                       bestScores: {
+                           Facile: 0,
+                           Moyen: 0,
+                           Difficile: 0
+                       }
+                   })
                ]
            );
        }
@@ -89,21 +95,50 @@ router.post('/achievement', authMiddleware, async (req, res) => {
 router.post('/save', authMiddleware, async (req, res) => {
    try {
        const userId = req.user.id;
+       console.log('Requête /save reçue pour userId:', userId);
+       console.log('Corps de la requête:', req.body);
+
        const { 
            discoveredElements = ["Eau", "Feu", "Terre", "Air"], 
            discoveredCategories = ["Elements Fondamentaux"], 
            achievements = {}, 
-           categoryProgress = {} 
+           categoryProgress = {},
+           coins = 0,
+           timerProgress = {
+               completedQuestions: {},
+               unlockedCategories: {},
+               bestScores: {
+                   Facile: 0,
+                   Moyen: 0,
+                   Difficile: 0
+               }
+           }
        } = req.body;
 
-       // Rechercher si une progression existe déjà
+       console.log('Données extraites:', {
+           discoveredElements,
+           discoveredCategories,
+           achievements,
+           categoryProgress,
+           coins,
+           timerProgress
+       });
+
        const existingProgress = await db.query(
            'SELECT id FROM progress WHERE user_id = $1',
            [userId]
        );
 
+       const timerProgressToSave = JSON.stringify(timerProgress || {
+           completedQuestions: {},
+           unlockedCategories: {},
+           bestScores: { Facile: 0, Moyen: 0, Difficile: 0 }
+       });
+
+       console.log('Timer Progress à sauvegarder:', timerProgressToSave);
+
        if (existingProgress.rows.length > 0) {
-           // Mise à jour de la progression existante
+           console.log('Mise à jour de la progression existante');
            await db.query(
                `UPDATE progress 
                SET 
@@ -111,18 +146,22 @@ router.post('/save', authMiddleware, async (req, res) => {
                    discovered_categories = $2,
                    achievements = $3,
                    category_progress = $4,
+                   coins = $5,
+                   timer_progress = $6,
                    last_saved = CURRENT_TIMESTAMP
-               WHERE user_id = $5`,
+               WHERE user_id = $7`,
                [
                    JSON.stringify(discoveredElements),
                    discoveredCategories,
                    JSON.stringify(achievements),
                    JSON.stringify(categoryProgress),
+                   coins,
+                   timerProgressToSave,
                    userId
                ]
            );
        } else {
-           // Création d'une nouvelle progression
+           console.log('Création d\'une nouvelle progression');
            await db.query(
                `INSERT INTO progress (
                    user_id,
@@ -130,26 +169,34 @@ router.post('/save', authMiddleware, async (req, res) => {
                    discovered_categories,
                    achievements,
                    category_progress,
+                   coins,
+                   timer_progress,
                    last_saved
-               ) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
+               ) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)`,
                [
                    userId,
                    JSON.stringify(discoveredElements),
                    discoveredCategories,
                    JSON.stringify(achievements),
-                   JSON.stringify(categoryProgress)
+                   JSON.stringify(categoryProgress),
+                   coins,
+                   timerProgressToSave
                ]
            );
        }
 
+       console.log('Sauvegarde réussie');
        res.status(200).json({
            message: 'Progression sauvegardée avec succès',
            lastSaved: new Date().toISOString()
        });
 
    } catch (error) {
-       console.error('Erreur lors de la sauvegarde de la progression:', error);
-       res.status(500).json({ message: 'Erreur lors de la sauvegarde de la progression' });
+       console.error('Erreur détaillée lors de la sauvegarde de la progression:', error);
+       res.status(500).json({ 
+           message: 'Erreur lors de la sauvegarde de la progression',
+           error: error.message
+       });
    }
 });
 
@@ -157,6 +204,7 @@ router.post('/save', authMiddleware, async (req, res) => {
 router.get('/load', authMiddleware, async (req, res) => {
    try {
        const userId = req.user.id;
+       console.log('Chargement de la progression pour userId:', userId);
 
        const result = await db.query(
            `SELECT 
@@ -164,6 +212,8 @@ router.get('/load', authMiddleware, async (req, res) => {
                discovered_categories,
                achievements,
                category_progress,
+               coins,
+               timer_progress,
                last_saved
            FROM progress 
            WHERE user_id = $1`,
@@ -171,21 +221,44 @@ router.get('/load', authMiddleware, async (req, res) => {
        );
 
        if (result.rows.length === 0) {
+           console.log('Aucune progression trouvée, renvoi des valeurs par défaut');
            return res.status(200).json({
                discoveredElements: ["Eau", "Feu", "Terre", "Air"],
                discoveredCategories: ["Elements Fondamentaux"],
                achievements: {},
                categoryProgress: {},
+               coins: 0,
+               timerProgress: {
+                   completedQuestions: {},
+                   unlockedCategories: {},
+                   bestScores: {
+                       Facile: 0,
+                       Moyen: 0,
+                       Difficile: 0
+                   }
+               },
                lastSaved: null
            });
        }
 
        const progress = result.rows[0];
+       console.log('Progression brute chargée:', progress);
+
        let parsedProgress = {
            discoveredElements: ["Eau", "Feu", "Terre", "Air"],
            discoveredCategories: ["Elements Fondamentaux"],
            achievements: {},
            categoryProgress: {},
+           coins: progress.coins || 0,
+           timerProgress: {
+               completedQuestions: {},
+               unlockedCategories: {},
+               bestScores: {
+                   Facile: 0,
+                   Moyen: 0,
+                   Difficile: 0
+               }
+           },
            lastSaved: progress.last_saved
        };
 
@@ -211,6 +284,24 @@ router.get('/load', authMiddleware, async (req, res) => {
                    ? JSON.parse(progress.category_progress)
                    : progress.category_progress;
            }
+
+           if (progress.timer_progress) {
+               const parsedTimerProgress = typeof progress.timer_progress === 'string'
+                   ? JSON.parse(progress.timer_progress)
+                   : progress.timer_progress;
+
+               parsedProgress.timerProgress = {
+                   completedQuestions: parsedTimerProgress.completedQuestions || {},
+                   unlockedCategories: parsedTimerProgress.unlockedCategories || {},
+                   bestScores: parsedTimerProgress.bestScores || {
+                       Facile: 0,
+                       Moyen: 0,
+                       Difficile: 0
+                   }
+               };
+           }
+
+           console.log('Progression parsée:', parsedProgress);
        } catch (error) {
            console.error('Erreur lors du parsing des données JSON:', error);
        }
@@ -219,8 +310,100 @@ router.get('/load', authMiddleware, async (req, res) => {
 
    } catch (error) {
        console.error('Erreur lors du chargement de la progression:', error);
-       res.status(500).json({ message: 'Erreur lors du chargement de la progression' });
+       res.status(500).json({ 
+           message: 'Erreur lors du chargement de la progression',
+           error: error.message 
+       });
    }
+});
+
+// Route pour mettre à jour les pièces uniquement
+router.post('/update-coins', authMiddleware, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { coins } = req.body;
+        console.log('Mise à jour des pièces pour userId:', userId, 'Nouveau montant:', coins);
+
+        if (typeof coins !== 'number') {
+            return res.status(400).json({ message: 'Le montant des pièces doit être un nombre' });
+        }
+
+        await db.query(
+            `UPDATE progress 
+            SET 
+                coins = $1,
+                last_saved = CURRENT_TIMESTAMP
+            WHERE user_id = $2`,
+            [coins, userId]
+        );
+
+        console.log('Mise à jour des pièces réussie');
+        res.status(200).json({
+            message: 'Pièces mises à jour avec succès',
+            coins: coins
+        });
+
+    } catch (error) {
+        console.error('Erreur lors de la mise à jour des pièces:', error);
+        res.status(500).json({ 
+            message: 'Erreur lors de la mise à jour des pièces',
+            error: error.message 
+        });
+    }
+});
+
+// Route pour mettre à jour la progression du timer uniquement
+router.post('/update-timer-progress', authMiddleware, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { timerProgress } = req.body;
+        
+        console.log('Route /update-timer-progress appelée');
+        console.log('userId:', userId);
+        console.log('Request body complet:', req.body);
+        console.log('Timer Progress reçu:', JSON.stringify(timerProgress, null, 2));
+
+        if (!timerProgress || typeof timerProgress !== 'object') {
+            console.log('ERREUR : Progression du timer invalide');
+            return res.status(400).json({ message: 'La progression du timer est invalide' });
+        }
+
+        // Vérification plus détaillée de la structure
+        const safeTimerProgress = {
+            completedQuestions: timerProgress.completedQuestions || {},
+            unlockedCategories: timerProgress.unlockedCategories || {},
+            bestScores: {
+                Facile: timerProgress.bestScores?.Facile || 0,
+                Moyen: timerProgress.bestScores?.Moyen || 0,
+                Difficile: timerProgress.bestScores?.Difficile || 0
+            }
+        };
+
+        console.log('Timer Progress à sauvegarder:', JSON.stringify(safeTimerProgress, null, 2));
+
+        const result = await db.query(
+            `UPDATE progress 
+            SET 
+                timer_progress = $1,
+                last_saved = CURRENT_TIMESTAMP
+            WHERE user_id = $2
+            RETURNING timer_progress`,
+            [JSON.stringify(safeTimerProgress), userId]
+        );
+
+        console.log('Mise à jour effectuée, données retournées:', result.rows[0]);
+
+        res.status(200).json({
+            message: 'Progression du timer mise à jour avec succès',
+            timerProgress: safeTimerProgress
+        });
+    } catch (error) {
+        console.error('ERREUR lors de la mise à jour:', error);
+        res.status(500).json({ 
+            message: 'Erreur lors de la mise à jour de la progression du timer',
+            error: error.message 
+        });
+    }
 });
 
 module.exports = router;
