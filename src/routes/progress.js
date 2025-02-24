@@ -202,153 +202,175 @@ router.post('/save', authMiddleware, async (req, res) => {
 
 // Route pour charger la progression
 router.get('/load', authMiddleware, async (req, res) => {
-   try {
-       const userId = req.user.id;
-       console.log('Chargement de la progression pour userId:', userId);
+    try {
+        const userId = req.user.id;
+        console.log('=== LOAD PROGRESS DEBUG ===');
+        console.log('Chargement pour userId:', userId);
+ 
+        const result = await db.query(
+            `SELECT 
+                discovered_elements,
+                discovered_categories,
+                achievements,
+                category_progress,
+                coins,
+                timer_progress,
+                last_saved
+            FROM progress 
+            WHERE user_id = $1`,
+            [userId]
+        );
+ 
+        if (result.rows.length === 0) {
+            console.log('Aucune progression trouvée, renvoi des valeurs par défaut');
+            return res.status(200).json({
+                discoveredElements: ["Eau", "Feu", "Terre", "Air"],
+                discoveredCategories: ["Elements Fondamentaux"],
+                achievements: {},
+                categoryProgress: {},
+                coins: 0,
+                timerProgress: {
+                    completedQuestions: {},
+                    unlockedCategories: {},
+                    bestScores: {
+                        Facile: 0,
+                        Moyen: 0,
+                        Difficile: 0
+                    }
+                },
+                lastSaved: null
+            });
+        }
+ 
+        const progress = result.rows[0];
+        console.log('=== Progression chargée pour userId:', userId, ' ===');
+        console.log('Coins en BDD:', progress.coins);
+        console.log('Dernier enregistrement:', progress.last_saved);
+        console.log('Éléments découverts:', progress.discovered_elements);
+ 
+        let parsedProgress = {
+            discoveredElements: ["Eau", "Feu", "Terre", "Air"],
+            discoveredCategories: ["Elements Fondamentaux"],
+            achievements: {},
+            categoryProgress: {},
+            coins: progress.coins || 0,
+            timerProgress: {
+                completedQuestions: {},
+                unlockedCategories: {},
+                bestScores: {
+                    Facile: 0,
+                    Moyen: 0,
+                    Difficile: 0
+                }
+            },
+            lastSaved: progress.last_saved
+        };
+ 
+        try {
+            if (progress.discovered_elements && progress.discovered_elements !== '{}') {
+                parsedProgress.discoveredElements = typeof progress.discovered_elements === 'string'
+                    ? JSON.parse(progress.discovered_elements)
+                    : progress.discovered_elements;
+            }
+ 
+            if (progress.discovered_categories && progress.discovered_categories.length > 0) {
+                parsedProgress.discoveredCategories = progress.discovered_categories;
+            }
+ 
+            if (progress.achievements) {
+                parsedProgress.achievements = typeof progress.achievements === 'string'
+                    ? JSON.parse(progress.achievements)
+                    : progress.achievements;
+            }
+ 
+            if (progress.category_progress) {
+                parsedProgress.categoryProgress = typeof progress.category_progress === 'string'
+                    ? JSON.parse(progress.category_progress)
+                    : progress.category_progress;
+            }
+ 
+            if (progress.timer_progress) {
+                const parsedTimerProgress = typeof progress.timer_progress === 'string'
+                    ? JSON.parse(progress.timer_progress)
+                    : progress.timer_progress;
+ 
+                parsedProgress.timerProgress = {
+                    completedQuestions: parsedTimerProgress.completedQuestions || {},
+                    unlockedCategories: parsedTimerProgress.unlockedCategories || {},
+                    bestScores: parsedTimerProgress.bestScores || {
+                        Facile: 0,
+                        Moyen: 0,
+                        Difficile: 0
+                    }
+                };
+            }
+ 
+            console.log('=== Progression parsée ===');
+            console.log('Coins après parsing:', parsedProgress.coins);
+            console.log('Elements après parsing:', parsedProgress.discoveredElements.length);
+            console.log('Achievements après parsing:', Object.keys(parsedProgress.achievements).length);
+        } catch (error) {
+            console.error('Erreur lors du parsing des données JSON:', error);
+        }
+ 
+        res.status(200).json(parsedProgress);
+ 
+    } catch (error) {
+        console.error('Erreur lors du chargement de la progression:', error);
+        res.status(500).json({ 
+            message: 'Erreur lors du chargement de la progression',
+            error: error.message 
+        });
+    }
+ });
 
-       const result = await db.query(
-           `SELECT 
-               discovered_elements,
-               discovered_categories,
-               achievements,
-               category_progress,
-               coins,
-               timer_progress,
-               last_saved
-           FROM progress 
-           WHERE user_id = $1`,
-           [userId]
-       );
-
-       if (result.rows.length === 0) {
-           console.log('Aucune progression trouvée, renvoi des valeurs par défaut');
-           return res.status(200).json({
-               discoveredElements: ["Eau", "Feu", "Terre", "Air"],
-               discoveredCategories: ["Elements Fondamentaux"],
-               achievements: {},
-               categoryProgress: {},
-               coins: 0,
-               timerProgress: {
-                   completedQuestions: {},
-                   unlockedCategories: {},
-                   bestScores: {
-                       Facile: 0,
-                       Moyen: 0,
-                       Difficile: 0
-                   }
-               },
-               lastSaved: null
-           });
-       }
-
-       const progress = result.rows[0];
-       console.log('Progression brute chargée:', progress);
-
-       let parsedProgress = {
-           discoveredElements: ["Eau", "Feu", "Terre", "Air"],
-           discoveredCategories: ["Elements Fondamentaux"],
-           achievements: {},
-           categoryProgress: {},
-           coins: progress.coins || 0,
-           timerProgress: {
-               completedQuestions: {},
-               unlockedCategories: {},
-               bestScores: {
-                   Facile: 0,
-                   Moyen: 0,
-                   Difficile: 0
-               }
-           },
-           lastSaved: progress.last_saved
-       };
-
-       try {
-           if (progress.discovered_elements && progress.discovered_elements !== '{}') {
-               parsedProgress.discoveredElements = typeof progress.discovered_elements === 'string'
-                   ? JSON.parse(progress.discovered_elements)
-                   : progress.discovered_elements;
-           }
-
-           if (progress.discovered_categories && progress.discovered_categories.length > 0) {
-               parsedProgress.discoveredCategories = progress.discovered_categories;
-           }
-
-           if (progress.achievements) {
-               parsedProgress.achievements = typeof progress.achievements === 'string'
-                   ? JSON.parse(progress.achievements)
-                   : progress.achievements;
-           }
-
-           if (progress.category_progress) {
-               parsedProgress.categoryProgress = typeof progress.category_progress === 'string'
-                   ? JSON.parse(progress.category_progress)
-                   : progress.category_progress;
-           }
-
-           if (progress.timer_progress) {
-               const parsedTimerProgress = typeof progress.timer_progress === 'string'
-                   ? JSON.parse(progress.timer_progress)
-                   : progress.timer_progress;
-
-               parsedProgress.timerProgress = {
-                   completedQuestions: parsedTimerProgress.completedQuestions || {},
-                   unlockedCategories: parsedTimerProgress.unlockedCategories || {},
-                   bestScores: parsedTimerProgress.bestScores || {
-                       Facile: 0,
-                       Moyen: 0,
-                       Difficile: 0
-                   }
-               };
-           }
-
-           console.log('Progression parsée:', parsedProgress);
-       } catch (error) {
-           console.error('Erreur lors du parsing des données JSON:', error);
-       }
-
-       res.status(200).json(parsedProgress);
-
-   } catch (error) {
-       console.error('Erreur lors du chargement de la progression:', error);
-       res.status(500).json({ 
-           message: 'Erreur lors du chargement de la progression',
-           error: error.message 
-       });
-   }
-});
-
-// Route pour mettre à jour les pièces uniquement
 router.post('/update-coins', authMiddleware, async (req, res) => {
     try {
         const userId = req.user.id;
         const { coins } = req.body;
-        console.log('Mise à jour des pièces pour userId:', userId, 'Nouveau montant:', coins);
-
-        if (typeof coins !== 'number') {
-            return res.status(400).json({ message: 'Le montant des pièces doit être un nombre' });
+        
+        console.log('=== UPDATE COINS DEBUG ===');
+        console.log('UserId:', userId);
+        console.log('Nouvelle valeur coins:', coins);
+        
+        // Vérifier d'abord les pièces existantes
+        const currentProgress = await db.query(
+            'SELECT coins, last_saved FROM progress WHERE user_id = $1',
+            [userId]
+        );
+        
+        console.log('Valeur actuelle en BDD:', currentProgress.rows[0]?.coins);
+        console.log('Dernier enregistrement:', currentProgress.rows[0]?.last_saved);
+        
+        // Si aucune progression n'existe, créer une nouvelle entrée
+        if (currentProgress.rows.length === 0) {
+            console.log('Création nouvelle entrée progress');
+            await db.query(
+                `INSERT INTO progress (user_id, coins, last_saved)
+                 VALUES ($1, $2, CURRENT_TIMESTAMP)`,
+                [userId, coins]
+            );
+        } else {
+            console.log('Mise à jour coins existants');
+            await db.query(
+                `UPDATE progress 
+                 SET coins = $1, last_saved = CURRENT_TIMESTAMP
+                 WHERE user_id = $2
+                 RETURNING coins, last_saved`,
+                [coins, userId]
+            ).then(result => {
+                console.log('Mise à jour effectuée:', result.rows[0]);
+            });
         }
 
-        await db.query(
-            `UPDATE progress 
-            SET 
-                coins = $1,
-                last_saved = CURRENT_TIMESTAMP
-            WHERE user_id = $2`,
-            [coins, userId]
-        );
-
-        console.log('Mise à jour des pièces réussie');
         res.status(200).json({
             message: 'Pièces mises à jour avec succès',
-            coins: coins
+            coins: coins,
+            timestamp: new Date().toISOString()
         });
-
     } catch (error) {
         console.error('Erreur lors de la mise à jour des pièces:', error);
-        res.status(500).json({ 
-            message: 'Erreur lors de la mise à jour des pièces',
-            error: error.message 
-        });
+        res.status(500).json({ message: 'Erreur lors de la mise à jour des pièces' });
     }
 });
 
