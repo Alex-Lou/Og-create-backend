@@ -374,6 +374,101 @@ router.post('/update-coins', authMiddleware, async (req, res) => {
     }
 });
 
+
+router.post('/update-discovered-elements', authMiddleware, async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const { discoveredElements } = req.body;
+      
+      console.log('=== UPDATE DISCOVERED ELEMENTS DEBUG ===');
+      console.log('UserId:', userId);
+      console.log('Nouveaux éléments découverts:', discoveredElements);
+      
+      // Vérifier d'abord si la progression existe
+      const currentProgress = await db.query(
+        'SELECT discovered_elements FROM progress WHERE user_id = $1',
+        [userId]
+      );
+      
+      // Si aucune progression n'existe, créer une nouvelle entrée
+      if (currentProgress.rows.length === 0) {
+        console.log('Création nouvelle entrée progress pour éléments découverts');
+        await db.query(
+          `INSERT INTO progress (user_id, discovered_elements, last_saved)
+           VALUES ($1, $2, CURRENT_TIMESTAMP)`,
+          [userId, JSON.stringify(discoveredElements)]
+        );
+      } else {
+        console.log('Mise à jour éléments découverts existants');
+        await db.query(
+          `UPDATE progress 
+           SET discovered_elements = $1, last_saved = CURRENT_TIMESTAMP
+           WHERE user_id = $2
+           RETURNING discovered_elements, last_saved`,
+          [JSON.stringify(discoveredElements), userId]
+        ).then(result => {
+          console.log('Mise à jour effectuée:', result.rows[0]);
+        });
+      }
+  
+      res.status(200).json({
+        message: 'Éléments découverts mis à jour avec succès',
+        discoveredElements: discoveredElements,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour des éléments découverts:', error);
+      res.status(500).json({ message: 'Erreur lors de la mise à jour des éléments découverts' });
+    }
+  });
+
+
+  router.post('/update-achievements', authMiddleware, async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const { achievements } = req.body;
+      
+      console.log('=== UPDATE ACHIEVEMENTS DEBUG ===');
+      console.log('UserId:', userId);
+      
+      // Vérifier d'abord si la progression existe
+      const currentProgress = await db.query(
+        'SELECT achievements FROM progress WHERE user_id = $1',
+        [userId]
+      );
+      
+      // Si aucune progression n'existe, créer une nouvelle entrée
+      if (currentProgress.rows.length === 0) {
+        console.log('Création nouvelle entrée progress pour achievements');
+        await db.query(
+          `INSERT INTO progress (user_id, achievements, last_saved)
+           VALUES ($1, $2, CURRENT_TIMESTAMP)`,
+          [userId, JSON.stringify(achievements)]
+        );
+      } else {
+        console.log('Mise à jour achievements existants');
+        await db.query(
+          `UPDATE progress 
+           SET achievements = $1, last_saved = CURRENT_TIMESTAMP
+           WHERE user_id = $2
+           RETURNING achievements, last_saved`,
+          [JSON.stringify(achievements), userId]
+        ).then(result => {
+          console.log('Mise à jour effectuée:', result.rows[0]);
+        });
+      }
+  
+      res.status(200).json({
+        message: 'Achievements mis à jour avec succès',
+        achievements: achievements,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour des achievements:', error);
+      res.status(500).json({ message: 'Erreur lors de la mise à jour des achievements' });
+    }
+  });
+
 // Route pour mettre à jour la progression du timer uniquement
 router.post('/update-timer-progress', authMiddleware, async (req, res) => {
     try {

@@ -23,6 +23,15 @@ const generateUsername = (email) => {
     return `${baseUsername}_${randomSuffix}`;
 };
 
+// Fonction pour générer un token JWT
+const generateToken = (userData) => {
+    return jwt.sign(
+        userData,
+        process.env.JWT_SECRET,
+        { expiresIn: '24h' }
+    );
+};
+
 // Route d'inscription
 router.post('/register', async (req, res) => {
     console.log('===== DÉBUT DE L\'INSCRIPTION =====');
@@ -79,15 +88,12 @@ router.post('/register', async (req, res) => {
 
         // Génération du token JWT
         console.log('Génération du token JWT');
-        const token = jwt.sign(
-            { 
-                userId: result.rows[0].id, 
-                email: result.rows[0].email,
-                username: result.rows[0].username
-            },
-            process.env.JWT_SECRET,
-            { expiresIn: '24h' }
-        );
+        const userData = { 
+            userId: result.rows[0].id, 
+            email: result.rows[0].email,
+            username: result.rows[0].username
+        };
+        const token = generateToken(userData);
 
         console.log('===== INSCRIPTION RÉUSSIE =====');
         res.status(201).json({
@@ -149,15 +155,12 @@ router.post('/login', async (req, res) => {
 
         // Génération du token
         console.log('Génération du token JWT');
-        const token = jwt.sign(
-            { 
-                userId: user.id, 
-                email: user.email,
-                username: user.username
-            },
-            process.env.JWT_SECRET,
-            { expiresIn: '24h' }
-        );
+        const userData = { 
+            userId: user.id, 
+            email: user.email,
+            username: user.username
+        };
+        const token = generateToken(userData);
 
         console.log('===== CONNEXION RÉUSSIE =====');
         res.status(200).json({
@@ -170,6 +173,63 @@ router.post('/login', async (req, res) => {
         console.error('Erreur détaillée:', error);
         res.status(500).json({ 
             message: 'Erreur lors de la connexion',
+            errorDetails: process.env.NODE_ENV === 'development' ? error.message : null
+        });
+    }
+});
+
+// Nouvelle route pour rafraîchir le token
+router.post('/refresh-token', async (req, res) => {
+    console.log('===== DÉBUT DU RAFRAÎCHISSEMENT DE TOKEN =====');
+    console.log('Données reçues:', JSON.stringify(req.body, null, 2));
+
+    try {
+        const { token } = req.body;
+
+        if (!token) {
+            console.log('ERREUR : Token manquant');
+            return res.status(400).json({ message: 'Token requis' });
+        }
+
+        // Vérifier le token expiré sans vérifier l'expiration
+        const decoded = jwt.verify(token, process.env.JWT_SECRET, { ignoreExpiration: true });
+        console.log('Token décodé (ignorant l\'expiration):', decoded);
+
+        // Vérifier si l'utilisateur existe toujours dans la base de données
+        const userResult = await db.query(
+            'SELECT * FROM users WHERE id = $1 AND email = $2',
+            [decoded.userId, decoded.email]
+        );
+
+        if (userResult.rows.length === 0) {
+            console.log('ERREUR : Utilisateur non trouvé lors du rafraîchissement');
+            return res.status(401).json({ message: 'Utilisateur non trouvé, veuillez vous reconnecter' });
+        }
+
+        // Générer un nouveau token
+        const userData = {
+            userId: decoded.userId,
+            email: decoded.email,
+            username: decoded.username
+        };
+        
+        console.log('Génération d\'un nouveau token JWT');
+        const newToken = generateToken(userData);
+
+        console.log('===== RAFRAÎCHISSEMENT DE TOKEN RÉUSSI =====');
+        res.status(200).json({
+            token: newToken,
+            userId: decoded.userId,
+            username: decoded.username
+        });
+    } catch (error) {
+        console.error('===== ERREUR COMPLÈTE DE RAFRAÎCHISSEMENT DE TOKEN =====');
+        console.error('Type d\'erreur:', error.name);
+        console.error('Message d\'erreur:', error.message);
+        console.error('Stack trace:', error.stack);
+
+        res.status(401).json({ 
+            message: 'Erreur lors du rafraîchissement du token',
             errorDetails: process.env.NODE_ENV === 'development' ? error.message : null
         });
     }
