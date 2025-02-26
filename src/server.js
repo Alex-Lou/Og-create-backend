@@ -61,11 +61,13 @@ app.use(express.urlencoded({
 // Routes
 const authRoutes = require('./routes/auth');
 const progressRoutes = require('./routes/progress');
-const contactRoutes = require('./routes/contactRoutes'); // Nouvelle ligne
+const contactRoutes = require('./routes/contactRoutes');
+const customizationRoutes = require('./routes/customization'); // Nouvelle route pour la personnalisation
 
 app.use('/api/auth', authRoutes);
 app.use('/api/progress', progressRoutes);
-app.use('/api/contact', contactRoutes); // Nouvelle ligne
+app.use('/api/contact', contactRoutes);
+app.use('/api/customization', customizationRoutes); // Nouvelle route pour la personnalisation
 
 // Route de santé pour vérifier l'état du serveur
 app.get('/api/health', (req, res) => {
