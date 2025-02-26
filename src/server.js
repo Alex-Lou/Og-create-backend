@@ -63,11 +63,13 @@ const authRoutes = require('./routes/auth');
 const progressRoutes = require('./routes/progress');
 const contactRoutes = require('./routes/contactRoutes');
 const customizationRoutes = require('./routes/customization'); // Nouvelle route pour la personnalisation
+const explorerRoutes = require('./routes/explorer'); // Ajout de la route Explorer
 
 app.use('/api/auth', authRoutes);
 app.use('/api/progress', progressRoutes);
 app.use('/api/contact', contactRoutes);
-app.use('/api/customization', customizationRoutes); // Nouvelle route pour la personnalisation
+app.use('/api/customization', customizationRoutes);
+app.use('/api/explorer', explorerRoutes);
 
 // Route de santé pour vérifier l'état du serveur
 app.get('/api/health', (req, res) => {
