@@ -34,4 +34,6 @@ module.exports = {
             throw error;
         }
     },
+    // Ajout du pool pour permettre l'utilisation des transactions
+    pool: pool
 };

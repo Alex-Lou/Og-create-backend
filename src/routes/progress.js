@@ -3,201 +3,192 @@ const router = express.Router();
 const db = require('../config/db');
 const authMiddleware = require('../middleware/auth');
 
-// Route pour sauvegarder un achievement spécifique
-router.post('/achievement', authMiddleware, async (req, res) => {
-   try {
-       const userId = req.user.id;
-       const { achievement } = req.body;
-       console.log('Achievement reçu:', achievement);
-
-       if (!achievement || !achievement.name) {
-           return res.status(400).json({ message: 'Données de succès invalides ou manquantes' });
-       }
-
-       const existingProgress = await db.query(
-           'SELECT achievements FROM progress WHERE user_id = $1',
-           [userId]
-       );
-
-       let currentAchievements = {};
-
-       if (existingProgress.rows.length > 0) {
-           try {
-               currentAchievements = existingProgress.rows[0].achievements 
-                   ? (typeof existingProgress.rows[0].achievements === 'string' 
-                       ? JSON.parse(existingProgress.rows[0].achievements) 
-                       : existingProgress.rows[0].achievements)
-                   : {};
-           } catch (error) {
-               console.error('Erreur lors du parsing des achievements existants:', error);
-               currentAchievements = {};
-           }
-       }
-
-       currentAchievements[achievement.name] = {
-           unlocked: true,
-           unlockedAt: new Date().toISOString()
-       };
-
-       if (existingProgress.rows.length > 0) {
-           await db.query(
-               `UPDATE progress 
-               SET 
-                   achievements = $1,
-                   last_saved = CURRENT_TIMESTAMP
-               WHERE user_id = $2`,
-               [JSON.stringify(currentAchievements), userId]
-           );
-       } else {
-           await db.query(
-               `INSERT INTO progress (
-                   user_id,
-                   achievements,
-                   discovered_elements,
-                   discovered_categories,
-                   category_progress,
-                   coins,
-                   timer_progress,
-                   last_saved
-               ) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)`,
-               [
-                   userId,
-                   JSON.stringify(currentAchievements),
-                   JSON.stringify(["Eau", "Feu", "Terre", "Air"]),
-                   ["Elements Fondamentaux"],
-                   JSON.stringify({}),
-                   0,
-                   JSON.stringify({
-                       completedQuestions: {},
-                       unlockedCategories: {},
-                       bestScores: {
-                           Facile: 0,
-                           Moyen: 0,
-                           Difficile: 0
-                       }
-                   })
-               ]
-           );
-       }
-
-       res.status(200).json({
-           message: 'Achievement sauvegardé avec succès',
-           achievements: currentAchievements
-       });
-
-   } catch (error) {
-       console.error('Erreur lors de la sauvegarde de l\'achievement:', error);
-       res.status(500).json({ message: 'Erreur lors de la sauvegarde de l\'achievement' });
-   }
-});
+router.post('/update-achievements', authMiddleware, async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const { achievements } = req.body;
+      
+      console.log('=== UPDATE ACHIEVEMENTS DEBUG ===');
+      console.log('UserId:', userId);
+      console.log('Achievements reçus:', JSON.stringify(achievements, null, 2));
+      
+      // Vérifier immédiatement avant toute opération
+      if (!achievements || Object.keys(achievements).length === 0) {
+        return res.status(400).json({ 
+          message: 'Aucun achievement à mettre à jour' 
+        });
+      }
+  
+      // Récupérer rapidement les achievements existants
+      const currentProgress = await db.query(
+        'SELECT achievements FROM progress WHERE user_id = $1',
+        [userId]
+      );
+      
+      // Parser les achievements existants de manière plus robuste
+      let currentAchievements = {};
+      if (currentProgress.rows.length > 0) {
+        try {
+          currentAchievements = currentProgress.rows[0].achievements 
+            ? (typeof currentProgress.rows[0].achievements === 'string' 
+                ? JSON.parse(currentProgress.rows[0].achievements) 
+                : currentProgress.rows[0].achievements)
+            : {};
+        } catch (error) {
+          console.error('Erreur lors du parsing des achievements existants:', error);
+        }
+      }
+  
+      // Fusionner immédiatement les nouveaux achievements
+      const updatedAchievements = { 
+        ...currentAchievements, 
+        ...achievements 
+      };
+  
+      // Sauvegarder immédiatement et de manière atomique
+      const updateQuery = `
+        UPDATE progress 
+        SET 
+          achievements = $1, 
+          last_saved = CURRENT_TIMESTAMP
+        WHERE user_id = $2
+      `;
+  
+      await db.query(updateQuery, [
+        JSON.stringify(updatedAchievements), 
+        userId
+      ]);
+      
+      // Répondre rapidement
+      res.status(200).json({
+        message: 'Achievements mis à jour avec succès',
+        achievements: updatedAchievements,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour des achievements:', error);
+      res.status(500).json({ 
+        message: 'Erreur lors de la mise à jour des achievements',
+        error: error.message 
+      });
+    }
+  });
 
 // Route pour sauvegarder la progression complète
 router.post('/save', authMiddleware, async (req, res) => {
-   try {
-       const userId = req.user.id;
-       console.log('Requête /save reçue pour userId:', userId);
-       console.log('Corps de la requête:', req.body);
-
-       const { 
-           discoveredElements = ["Eau", "Feu", "Terre", "Air"], 
-           discoveredCategories = ["Elements Fondamentaux"], 
-           achievements = {}, 
-           categoryProgress = {},
-           coins = 0,
-           timerProgress = {
-               completedQuestions: {},
-               unlockedCategories: {},
-               bestScores: {
-                   Facile: 0,
-                   Moyen: 0,
-                   Difficile: 0
-               }
-           }
-       } = req.body;
-
-       console.log('Données extraites:', {
-           discoveredElements,
-           discoveredCategories,
-           achievements,
-           categoryProgress,
-           coins,
-           timerProgress
-       });
-
-       const existingProgress = await db.query(
-           'SELECT id FROM progress WHERE user_id = $1',
-           [userId]
-       );
-
-       const timerProgressToSave = JSON.stringify(timerProgress || {
-           completedQuestions: {},
-           unlockedCategories: {},
-           bestScores: { Facile: 0, Moyen: 0, Difficile: 0 }
-       });
-
-       console.log('Timer Progress à sauvegarder:', timerProgressToSave);
-
-       if (existingProgress.rows.length > 0) {
-           console.log('Mise à jour de la progression existante');
-           await db.query(
-               `UPDATE progress 
-               SET 
-                   discovered_elements = $1,
-                   discovered_categories = $2,
-                   achievements = $3,
-                   category_progress = $4,
-                   coins = $5,
-                   timer_progress = $6,
-                   last_saved = CURRENT_TIMESTAMP
-               WHERE user_id = $7`,
-               [
-                   JSON.stringify(discoveredElements),
-                   discoveredCategories,
-                   JSON.stringify(achievements),
-                   JSON.stringify(categoryProgress),
-                   coins,
-                   timerProgressToSave,
-                   userId
-               ]
-           );
-       } else {
-           console.log('Création d\'une nouvelle progression');
-           await db.query(
-               `INSERT INTO progress (
-                   user_id,
-                   discovered_elements,
-                   discovered_categories,
-                   achievements,
-                   category_progress,
-                   coins,
-                   timer_progress,
-                   last_saved
-               ) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)`,
-               [
-                   userId,
-                   JSON.stringify(discoveredElements),
-                   discoveredCategories,
-                   JSON.stringify(achievements),
-                   JSON.stringify(categoryProgress),
-                   coins,
-                   timerProgressToSave
-               ]
-           );
-       }
-
-       console.log('Sauvegarde réussie');
-       res.status(200).json({
-           message: 'Progression sauvegardée avec succès',
-           lastSaved: new Date().toISOString()
-       });
-
-   } catch (error) {
-       console.error('Erreur détaillée lors de la sauvegarde de la progression:', error);
-       res.status(500).json({ 
-           message: 'Erreur lors de la sauvegarde de la progression',
-           error: error.message
-       });
-   }
+    try {
+        const userId = req.user.id;
+        console.log('Requête /save reçue pour userId:', userId);
+        
+        // Extraire les données avec valeurs par défaut
+        const { 
+            discoveredElements = ["Eau", "Feu", "Terre", "Air"], 
+            discoveredCategories = ["Elements Fondamentaux"], 
+            achievements = {}, 
+            categoryProgress = {},
+            coins = 0,
+            timerProgress = {
+                completedQuestions: {},
+                unlockedCategories: {},
+                bestScores: {
+                    Facile: 0,
+                    Moyen: 0,
+                    Difficile: 0
+                }
+            }
+        } = req.body;
+        
+        // Vérifier si une entrée existe déjà
+        const existingProgress = await db.query(
+            'SELECT id, discovered_elements, achievements FROM progress WHERE user_id = $1',
+            [userId]
+        );
+        
+        // Préparer les données
+        const timerProgressToSave = JSON.stringify(timerProgress || {
+            completedQuestions: {},
+            unlockedCategories: {},
+            bestScores: { Facile: 0, Moyen: 0, Difficile: 0 }
+        });
+        
+        // Fusion pour les éléments découverts
+        let elementsToSave = discoveredElements;
+        let achievementsToSave = achievements;
+        
+        if (existingProgress.rows.length > 0) {
+            // Fusionner les éléments découverts existants
+            const existingElements = typeof existingProgress.rows[0].discovered_elements === 'string'
+                ? JSON.parse(existingProgress.rows[0].discovered_elements)
+                : existingProgress.rows[0].discovered_elements || [];
+            
+            elementsToSave = [...new Set([...existingElements, ...discoveredElements])];
+            
+            // Fusionner les achievements existants
+            const existingAchievements = typeof existingProgress.rows[0].achievements === 'string'
+                ? JSON.parse(existingProgress.rows[0].achievements)
+                : existingProgress.rows[0].achievements || {};
+            
+            achievementsToSave = { ...existingAchievements, ...achievements };
+        }
+        
+        // Mise à jour ou insertion
+        if (existingProgress.rows.length > 0) {
+            await db.query(
+                `UPDATE progress 
+                SET 
+                    discovered_elements = $1,
+                    discovered_categories = $2,
+                    achievements = $3,
+                    category_progress = $4,
+                    coins = $5,
+                    timer_progress = $6,
+                    last_saved = CURRENT_TIMESTAMP
+                WHERE user_id = $7`,
+                [
+                    JSON.stringify(elementsToSave),
+                    discoveredCategories,
+                    JSON.stringify(achievementsToSave),
+                    JSON.stringify(categoryProgress),
+                    coins,
+                    timerProgressToSave,
+                    userId
+                ]
+            );
+        } else {
+            await db.query(
+                `INSERT INTO progress (
+                    user_id,
+                    discovered_elements,
+                    discovered_categories,
+                    achievements,
+                    category_progress,
+                    coins,
+                    timer_progress,
+                    last_saved
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)`,
+                [
+                    userId,
+                    JSON.stringify(elementsToSave),
+                    discoveredCategories,
+                    JSON.stringify(achievementsToSave),
+                    JSON.stringify(categoryProgress),
+                    coins,
+                    timerProgressToSave
+                ]
+            );
+        }
+        
+        res.status(200).json({
+            message: 'Progression sauvegardée avec succès',
+            lastSaved: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('Erreur détaillée lors de la sauvegarde de la progression:', error);
+        res.status(500).json({ 
+            message: 'Erreur lors de la sauvegarde de la progression',
+            error: error.message
+        });
+    }
 });
 
 // Route pour charger la progression

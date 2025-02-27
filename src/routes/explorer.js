@@ -327,4 +327,61 @@ router.post('/buy-energy', authMiddleware, async (req, res) => {
   }
 });
 
+// Route pour marquer une région comme complétée
+router.post('/complete/:regionId', authMiddleware, async (req, res) => {
+    const userId = req.user.id;
+    const regionId = req.params.regionId;
+    
+    try {
+      // Vérifier si l'utilisateur a déjà visité cette région
+      const userRegionResult = await db.query(
+        'SELECT * FROM user_regions WHERE user_id = $1 AND region_id = $2',
+        [userId, regionId]
+      );
+      
+      if (userRegionResult.rows.length === 0 || !userRegionResult.rows[0].visited) {
+        return res.status(403).json({ message: "Vous devez d'abord visiter cette région" });
+      }
+      
+      // Marquer la région comme complétée
+      await db.query(`
+        UPDATE user_regions
+        SET completed = TRUE, progress = 100
+        WHERE user_id = $1 AND region_id = $2
+      `, [userId, regionId]);
+      
+      // Accorder des récompenses (pièces et XP)
+      const rewardCoins = 50;
+      const rewardXp = 100;
+      
+      await db.query(`
+        UPDATE progress
+        SET coins = coins + $1, xp = xp + $2
+        WHERE user_id = $3
+      `, [rewardCoins, rewardXp, userId]);
+      
+      // Vérifier si cela débloque des régions enfants
+      const childRegionsResult = await db.query(
+        'SELECT id FROM explorer_regions WHERE parent_region_id = $1',
+        [regionId]
+      );
+      
+      res.status(200).json({
+        message: "Région complétée avec succès",
+        completed: true,
+        rewards: {
+          coins: rewardCoins,
+          xp: rewardXp
+        },
+        unlockedRegions: childRegionsResult.rows.map(row => row.id)
+      });
+    } catch (error) {
+      console.error("Erreur lors de la complétion de la région:", error);
+      res.status(500).json({
+        message: "Erreur lors de la complétion de la région",
+        errorDetails: process.env.NODE_ENV === 'development' ? error.message : null
+      });
+    }
+  });
+
 module.exports = router;
