@@ -133,7 +133,7 @@ router.post('/visit/:regionId', authMiddleware, async (req, res) => {
       return res.status(404).json({ message: "Progression non trouvée" });
     }
     
-    const currentEnergy = progressResult.rows[0].energy;
+    const currentEnergy = progressResult.rows[0].explorer_energy;
     
     if (currentEnergy < energyCost) {
       return res.status(400).json({ 
@@ -174,7 +174,7 @@ router.post('/visit/:regionId', authMiddleware, async (req, res) => {
     // Retourner l'énergie restante et les informations de la région
     return res.status(200).json({
       message: "Région visitée avec succès",
-      energy: currentEnergy - energyCost,
+      energy: currentEnergy - energyCost,  // Garde le nom 'energy' ici car c'est le nom attendu par le frontend
       region: regionResult.rows[0]
     });
   } catch (error) {
@@ -330,60 +330,86 @@ router.post('/buy-energy', authMiddleware, async (req, res) => {
 });
 
 // Route pour marquer une région comme complétée
+// Route pour marquer une région comme complétée
 router.post('/complete/:regionId', authMiddleware, async (req, res) => {
-    const userId = req.user.id;
-    const regionId = req.params.regionId;
+  const userId = req.user.id;
+  const regionId = req.params.regionId;
+  const { coins = 0, energy = 0, xp = 0 } = req.body;
+  
+  try {
+    // Vérifier si l'utilisateur a déjà visité cette région
+    const userRegionResult = await db.query(
+      'SELECT * FROM user_regions WHERE user_id = $1 AND region_id = $2',
+      [userId, regionId]
+    );
     
-    try {
-      // Vérifier si l'utilisateur a déjà visité cette région
-      const userRegionResult = await db.query(
-        'SELECT * FROM user_regions WHERE user_id = $1 AND region_id = $2',
-        [userId, regionId]
-      );
-      
-      if (userRegionResult.rows.length === 0 || !userRegionResult.rows[0].visited) {
-        return res.status(403).json({ message: "Vous devez d'abord visiter cette région" });
-      }
-      
-      // Marquer la région comme complétée
-      await db.query(`
-        UPDATE user_regions
-        SET completed = TRUE, progress = 100
-        WHERE user_id = $1 AND region_id = $2
-      `, [userId, regionId]);
-      
-      // Accorder des récompenses (pièces et XP)
-      const rewardCoins = 50;
-      const rewardXp = 100;
-      
-      await db.query(`
-        UPDATE progress
-        SET coins = coins + $1, xp = xp + $2
-        WHERE user_id = $3
-      `, [rewardCoins, rewardXp, userId]);
-      
-      // Vérifier si cela débloque des régions enfants
-      const childRegionsResult = await db.query(
-        'SELECT id FROM explorer_regions WHERE parent_region_id = $1',
-        [regionId]
-      );
-      
-      res.status(200).json({
-        message: "Région complétée avec succès",
-        completed: true,
-        rewards: {
-          coins: rewardCoins,
-          xp: rewardXp
-        },
-        unlockedRegions: childRegionsResult.rows.map(row => row.id)
-      });
-    } catch (error) {
-      console.error("Erreur lors de la complétion de la région:", error);
-      res.status(500).json({
-        message: "Erreur lors de la complétion de la région",
-        errorDetails: process.env.NODE_ENV === 'development' ? error.message : null
-      });
+    if (userRegionResult.rows.length === 0 || !userRegionResult.rows[0].visited) {
+      return res.status(403).json({ message: "Vous devez d'abord visiter cette région" });
     }
-  });
+    
+    // 1. Récupérer l'état actuel de l'utilisateur
+    const userProgressResult = await db.query(
+      `SELECT coins, explorer_energy FROM progress WHERE user_id = $1`,
+      [userId]
+    );
+    
+    let currentCoins = 0;
+    let currentEnergy = 0;
+    const maxEnergy = 20; // Défini comme constante
+    
+    if (userProgressResult.rows.length > 0) {
+      currentCoins = userProgressResult.rows[0].coins || 0;
+      currentEnergy = userProgressResult.rows[0].explorer_energy || 0;
+    }
+    
+    console.log('Avant mise à jour - currentCoins:', currentCoins, 'currentEnergy:', currentEnergy);
+    
+    // 2. Calculer les nouvelles valeurs
+    const newCoins = currentCoins + coins;
+    const newEnergy = Math.min(currentEnergy + energy, maxEnergy);
+    
+    console.log('Après mise à jour - newCoins:', newCoins, 'newEnergy:', newEnergy);
+    
+    // Marquer la région comme complétée
+    await db.query(`
+      UPDATE user_regions
+      SET completed = TRUE, progress = 100
+      WHERE user_id = $1 AND region_id = $2
+    `, [userId, regionId]);
+    
+    // Mettre à jour les statistiques (coins, energy, xp)
+    await db.query(`
+      UPDATE progress
+      SET coins = $1, explorer_energy = $2, last_saved = CURRENT_TIMESTAMP
+      WHERE user_id = $3
+      RETURNING coins, explorer_energy
+    `, [newCoins, newEnergy, userId]).then(result => {
+      console.log('Mise à jour effectuée:', result.rows[0]);
+    });
+    
+    // Vérifier si cela débloque des régions enfants
+    const childRegionsResult = await db.query(
+      'SELECT id FROM explorer_regions WHERE parent_region_id = $1',
+      [regionId]
+    );
+    
+    res.status(200).json({
+      message: "Région complétée avec succès",
+      completed: true,
+      rewards: {
+        coins: newCoins,
+        energy: newEnergy,
+        xp: xp
+      },
+      unlockedRegions: childRegionsResult.rows.map(row => row.id)
+    });
+  } catch (error) {
+    console.error("Erreur lors de la complétion de la région:", error);
+    res.status(500).json({
+      message: "Erreur lors de la complétion de la région",
+      errorDetails: process.env.NODE_ENV === 'development' ? error.message : null
+    });
+  }
+});
 
 module.exports = router;

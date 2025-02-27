@@ -515,81 +515,8 @@ router.post('/update-timer-progress', authMiddleware, async (req, res) => {
 });
 
 
-// Ajouter cette route à ton fichier routes/progress.js
-
-// Route pour compléter une région en mode Explorer
-router.post('/explorer/regions/:id/complete', authMiddleware, async (req, res) => {
-    try {
-      const regionId = req.params.id;
-      const userId = req.user.id;
-      const { coins = 0, energy = 0, xp = 0 } = req.body;
-      
-      console.log(`Complétion de la région ${regionId} pour l'utilisateur ${userId}`);
-      console.log('Récompenses:', { coins, energy, xp });
-      
-      // 1. Récupérer l'état actuel de l'utilisateur
-      const userProgressResult = await db.query(
-        `SELECT coins, explorer_energy FROM progress WHERE user_id = $1`,
-        [userId]
-      );
-      
-      let currentCoins = 0;
-      let currentEnergy = 0;
-      const maxEnergy = 20; // Défini comme constante
-      
-      if (userProgressResult.rows.length > 0) {
-        currentCoins = userProgressResult.rows[0].coins || 0;
-        currentEnergy = userProgressResult.rows[0].explorer_energy || 0;
-      }
-      
-      // 2. Calculer les nouvelles valeurs
-      const newCoins = currentCoins + coins;
-      const newEnergy = Math.min(currentEnergy + energy, maxEnergy);
-      
-      // 3. Mettre à jour la base de données
-      // Si tu as une table explorer_regions, tu peux marquer la région comme complétée
-      // try {
-      //   await db.query(
-      //     `UPDATE explorer_regions 
-      //     SET completed = true, completed_at = CURRENT_TIMESTAMP
-      //     WHERE region_id = $1 AND user_id = $2`,
-      //     [regionId, userId]
-      //   );
-      // } catch (error) {
-      //   // Si la table n'existe pas ou l'entrée n'existe pas, on ignore cette étape
-      //   console.warn(`Impossible de mettre à jour explorer_regions: ${error.message}`);
-      // }
-      
-      // 4. Mettre à jour les statistiques (coins, energy) dans la progression
-      await db.query(
-        `UPDATE progress 
-         SET coins = $1, 
-             explorer_energy = $2, 
-             last_saved = CURRENT_TIMESTAMP
-         WHERE user_id = $3`,
-        [newCoins, newEnergy, userId]
-      );
-      
-      // 5. Répondre avec les nouvelles valeurs
-      res.status(200).json({
-        message: 'Région complétée avec succès',
-        rewards: {
-          coins: newCoins, 
-          energy: newEnergy,
-          xp: xp
-        }
-      });
-    } catch (error) {
-      console.error('Erreur lors de la complétion de la région:', error);
-      res.status(500).json({ 
-        message: 'Erreur lors de la complétion de la région',
-        error: error.message
-      });
-    }
-  });
-  
-  // Route pour initialiser/récupérer l'état du mode Explorer
-  router.get('/explorer/init', authMiddleware, async (req, res) => {
+ // Route pour initialiser/récupérer l'état du mode Explorer
+router.get('/explorer/init', authMiddleware, async (req, res) => {
     try {
       const userId = req.user.id;
       
@@ -755,5 +682,5 @@ router.post('/explorer/regions/:id/complete', authMiddleware, async (req, res) =
       });
     }
   });
-  
+
 module.exports = router;
