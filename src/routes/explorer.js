@@ -127,7 +127,8 @@ router.post('/visit/:regionId', authMiddleware, async (req, res) => {
     }
     
     // Vérifier l'énergie disponible
-    const progressResult = await db.query('SELECT energy FROM progress WHERE user_id = $1', [userId]);
+    // Vérifier l'énergie disponible
+    const progressResult = await db.query('SELECT explorer_energy FROM progress WHERE user_id = $1', [userId]);
     if (progressResult.rows.length === 0) {
       return res.status(404).json({ message: "Progression non trouvée" });
     }
@@ -142,8 +143,9 @@ router.post('/visit/:regionId', authMiddleware, async (req, res) => {
     }
     
     // Débiter l'énergie
-    await db.query('UPDATE progress SET energy = energy - $1 WHERE user_id = $2', 
-      [energyCost, userId]);
+    // Débiter l'énergie
+  await db.query('UPDATE progress SET explorer_energy = explorer_energy - $1 WHERE user_id = $2', 
+  [energyCost, userId]);
     
     // Enregistrer la visite
     const now = new Date();
@@ -281,7 +283,7 @@ router.post('/buy-energy', authMiddleware, async (req, res) => {
   
   try {
     // Vérifier si l'utilisateur a assez de pièces
-    const progressResult = await db.query('SELECT coins, energy FROM progress WHERE user_id = $1', [userId]);
+    const progressResult = await db.query('SELECT coins, explorer_energy FROM progress WHERE user_id = $1', [userId]);
     
     if (progressResult.rows.length === 0) {
       return res.status(404).json({ message: "Progression non trouvée" });
@@ -307,7 +309,7 @@ router.post('/buy-energy', authMiddleware, async (req, res) => {
     // Mettre à jour l'énergie et les pièces
     await db.query(`
       UPDATE progress
-      SET energy = $1, coins = coins - $2
+      SET explorer_energy = $1, coins = coins - $2
       WHERE user_id = $3
     `, [newEnergy, actualCost, userId]);
     

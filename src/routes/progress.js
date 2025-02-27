@@ -514,4 +514,246 @@ router.post('/update-timer-progress', authMiddleware, async (req, res) => {
     }
 });
 
+
+// Ajouter cette route à ton fichier routes/progress.js
+
+// Route pour compléter une région en mode Explorer
+router.post('/explorer/regions/:id/complete', authMiddleware, async (req, res) => {
+    try {
+      const regionId = req.params.id;
+      const userId = req.user.id;
+      const { coins = 0, energy = 0, xp = 0 } = req.body;
+      
+      console.log(`Complétion de la région ${regionId} pour l'utilisateur ${userId}`);
+      console.log('Récompenses:', { coins, energy, xp });
+      
+      // 1. Récupérer l'état actuel de l'utilisateur
+      const userProgressResult = await db.query(
+        `SELECT coins, explorer_energy FROM progress WHERE user_id = $1`,
+        [userId]
+      );
+      
+      let currentCoins = 0;
+      let currentEnergy = 0;
+      const maxEnergy = 20; // Défini comme constante
+      
+      if (userProgressResult.rows.length > 0) {
+        currentCoins = userProgressResult.rows[0].coins || 0;
+        currentEnergy = userProgressResult.rows[0].explorer_energy || 0;
+      }
+      
+      // 2. Calculer les nouvelles valeurs
+      const newCoins = currentCoins + coins;
+      const newEnergy = Math.min(currentEnergy + energy, maxEnergy);
+      
+      // 3. Mettre à jour la base de données
+      // Si tu as une table explorer_regions, tu peux marquer la région comme complétée
+      // try {
+      //   await db.query(
+      //     `UPDATE explorer_regions 
+      //     SET completed = true, completed_at = CURRENT_TIMESTAMP
+      //     WHERE region_id = $1 AND user_id = $2`,
+      //     [regionId, userId]
+      //   );
+      // } catch (error) {
+      //   // Si la table n'existe pas ou l'entrée n'existe pas, on ignore cette étape
+      //   console.warn(`Impossible de mettre à jour explorer_regions: ${error.message}`);
+      // }
+      
+      // 4. Mettre à jour les statistiques (coins, energy) dans la progression
+      await db.query(
+        `UPDATE progress 
+         SET coins = $1, 
+             explorer_energy = $2, 
+             last_saved = CURRENT_TIMESTAMP
+         WHERE user_id = $3`,
+        [newCoins, newEnergy, userId]
+      );
+      
+      // 5. Répondre avec les nouvelles valeurs
+      res.status(200).json({
+        message: 'Région complétée avec succès',
+        rewards: {
+          coins: newCoins, 
+          energy: newEnergy,
+          xp: xp
+        }
+      });
+    } catch (error) {
+      console.error('Erreur lors de la complétion de la région:', error);
+      res.status(500).json({ 
+        message: 'Erreur lors de la complétion de la région',
+        error: error.message
+      });
+    }
+  });
+  
+  // Route pour initialiser/récupérer l'état du mode Explorer
+  router.get('/explorer/init', authMiddleware, async (req, res) => {
+    try {
+      const userId = req.user.id;
+      
+      // Vérifier si l'utilisateur a déjà des données Explorer
+      const userResult = await db.query(
+        `SELECT explorer_energy, last_energy_update FROM progress WHERE user_id = $1`,
+        [userId]
+      );
+      
+      let energy = 10; // Énergie par défaut
+      const maxEnergy = 20; // Énergie maximale
+      let nextEnergyIn = 0; // Minutes jusqu'à la prochaine énergie
+      
+      if (userResult.rows.length > 0) {
+        // Si l'utilisateur existe, récupérer son énergie actuelle
+        energy = userResult.rows[0].explorer_energy || energy;
+        
+        // Calculer le temps jusqu'à la prochaine énergie
+        const lastUpdate = userResult.rows[0].last_energy_update;
+        if (lastUpdate && energy < maxEnergy) {
+          const lastUpdateTime = new Date(lastUpdate).getTime();
+          const now = new Date().getTime();
+          const timeDiff = Math.floor((now - lastUpdateTime) / (1000 * 60)); // Différence en minutes
+          
+          // Si le temps écoulé est suffisant pour gagner de l'énergie
+          if (timeDiff >= 30) {
+            const energyToAdd = Math.floor(timeDiff / 30); // Une énergie toutes les 30 minutes
+            energy = Math.min(energy + energyToAdd, maxEnergy);
+            
+            // Mettre à jour l'énergie dans la base de données
+            await db.query(
+              `UPDATE progress 
+               SET explorer_energy = $1, 
+                   last_energy_update = CURRENT_TIMESTAMP
+               WHERE user_id = $2`,
+              [energy, userId]
+            );
+          }
+          
+          // Calculer le temps restant jusqu'à la prochaine énergie
+          nextEnergyIn = 30 - (timeDiff % 30);
+        }
+      } else {
+        // Si l'utilisateur n'existe pas dans la table progress, le créer
+        await db.query(
+          `INSERT INTO progress 
+           (user_id, explorer_energy, last_energy_update)
+           VALUES ($1, $2, CURRENT_TIMESTAMP)`,
+          [userId, energy]
+        );
+      }
+      
+      // Répondre avec l'état actuel
+      res.status(200).json({
+        energy: energy,
+        max_energy: maxEnergy,
+        next_energy_in: nextEnergyIn
+      });
+    } catch (error) {
+      console.error('Erreur lors de l\'initialisation du mode Explorer:', error);
+      res.status(500).json({ 
+        message: 'Erreur lors de l\'initialisation du mode Explorer',
+        error: error.message
+      });
+    }
+  });
+  
+ // Route pour compléter une région en mode Explorer
+router.post('/explorer/regions/:id/complete', authMiddleware, async (req, res) => {
+    try {
+      const regionId = req.params.id;
+      const userId = req.user.id;
+      const { coins = 0, energy = 0, xp = 0 } = req.body;
+      
+      console.log(`Complétion de la région ${regionId} pour l'utilisateur ${userId}`);
+      console.log('Récompenses:', { coins, energy, xp });
+      
+      // 1. Récupérer l'état actuel de l'utilisateur
+      const userProgressResult = await db.query(
+        `SELECT coins, explorer_energy FROM progress WHERE user_id = $1`,
+        [userId]
+      );
+      
+      let currentCoins = 0;
+      let currentEnergy = 0;
+      const maxEnergy = 20; // Défini comme constante
+      
+      if (userProgressResult.rows.length > 0) {
+        currentCoins = userProgressResult.rows[0].coins || 0;
+        currentEnergy = userProgressResult.rows[0].explorer_energy || 0;
+      }
+      
+      console.log('Avant mise à jour - currentCoins:', currentCoins, 'currentEnergy:', currentEnergy);
+      
+      // 2. Calculer les nouvelles valeurs
+      const newCoins = currentCoins + coins;
+      const newEnergy = Math.min(currentEnergy + energy, maxEnergy);
+      
+      console.log('Après mise à jour - newCoins:', newCoins, 'newEnergy:', newEnergy);
+      
+      // 3. Mettre à jour la base de données user_regions
+      try {
+        // Vérifier si l'entrée existe déjà
+        const regionResult = await db.query(
+          `SELECT * FROM user_regions WHERE region_id = $1 AND user_id = $2`,
+          [regionId, userId]
+        );
+        
+        if (regionResult.rows.length === 0) {
+          // Si l'entrée n'existe pas, la créer
+          console.log(`Création d'une nouvelle entrée user_regions pour la région ${regionId}`);
+          await db.query(
+            `INSERT INTO user_regions 
+             (region_id, user_id, visited, completed, progress, last_visited)
+             VALUES ($1, $2, true, true, 100, CURRENT_TIMESTAMP)`,
+            [regionId, userId]
+          );
+        } else {
+          // Sinon, mettre à jour l'entrée existante
+          console.log(`Mise à jour de l'entrée user_regions pour la région ${regionId}`);
+          await db.query(
+            `UPDATE user_regions 
+             SET visited = true, 
+                 completed = true,
+                 progress = 100,
+                 last_visited = CURRENT_TIMESTAMP
+             WHERE region_id = $1 AND user_id = $2`,
+            [regionId, userId]
+          );
+        }
+      } catch (error) {
+        console.error(`⚠️ Erreur lors de la mise à jour de user_regions: ${error.message}`);
+        // Ne pas échouer la requête complètement, on peut encore mettre à jour l'énergie
+      }
+      
+      // 4. Mettre à jour les statistiques (coins, energy) dans la progression
+      await db.query(
+        `UPDATE progress 
+         SET coins = $1, 
+             explorer_energy = $2, 
+             last_saved = CURRENT_TIMESTAMP
+         WHERE user_id = $3
+         RETURNING coins, explorer_energy`,
+        [newCoins, newEnergy, userId]
+      ).then(result => {
+        console.log('Mise à jour des statistiques effectuée:', result.rows[0]);
+      });
+      
+      // 5. Répondre avec les nouvelles valeurs
+      res.status(200).json({
+        message: 'Région complétée avec succès',
+        rewards: {
+          coins: newCoins, 
+          energy: newEnergy,
+          xp: xp
+        }
+      });
+    } catch (error) {
+      console.error('Erreur lors de la complétion de la région:', error);
+      res.status(500).json({ 
+        message: 'Erreur lors de la complétion de la région',
+        error: error.message
+      });
+    }
+  });
+  
 module.exports = router;
