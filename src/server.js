@@ -9,6 +9,9 @@ require('dotenv').config({ path: path.resolve(process.cwd(), '.env') });
 // Importer la vérification de la clé JWT
 const { ensureJWTSecret } = require('./utils/jwt');
 
+// Importer la fonction d'initialisation des régions
+const { initRegions } = require('./initRegions');
+
 // Vérifier et générer la clé JWT si nécessaire
 ensureJWTSecret();
 
@@ -104,13 +107,26 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 3000;
 
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, async () => {
     console.log(`
     🚀 Serveur démarré
     • Port: ${PORT}
     • Environnement: ${process.env.NODE_ENV}
     • Heure: ${new Date().toLocaleString()}
     `);
+
+    // Initialiser les régions au démarrage du serveur
+    try {
+        const result = await initRegions();
+        if (result.success) {
+            console.log('✅ Régions initialisées avec succès');
+        } else {
+            console.warn('⚠️ Erreur lors de l\'initialisation des régions, le serveur continue de fonctionner');
+        }
+    } catch (error) {
+        console.error('❌ Erreur critique lors de l\'initialisation des régions:', error);
+        // Ne pas arrêter le serveur, mais loguer l'erreur
+    }
 });
 
 // Gestion des erreurs non capturées

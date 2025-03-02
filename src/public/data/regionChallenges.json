@@ -1,0 +1,175 @@
+{
+  "regions": [
+    {
+      "id": 1,
+      "name": "Forêt Primordiale",
+      "parent_region_id": null,
+      "is_default": true,
+      "npcImage": "npc1.png",
+      "npcPosition": "left",
+      "background": "forrest-bg.gif",
+      "dialog": [
+        "Bienvenue dans la Forêt Primordiale, voyageur !",
+        "Notre forêt regorge de vie et d'énergie, mais elle est menacée par un déséquilibre mystérieux.",
+        "Pour restaurer l'harmonie, tu dois créer l'essence de la forêt en combinant les éléments fondamentaux.",
+        "Essaie de combiner les 4 éléments fondamentaux pour créer la Vie."
+      ],
+      "requiredElements": ["Vie"],
+      "availableElements": ["Eau", "Feu", "Terre", "Air"],
+      "elementsWithGifs": ["Eau", "Feu", "Terre", "Air"],
+      "actionText": "Relever le défi",
+      "rewardCoins": 50,
+      "rewardXp": 100,
+      "unlockHint": "Combinez l'Eau, la Terre et l'Air avec soin pour former la Vie"
+    },
+    {
+      "id": 2,
+      "name": "Rivière Cristalline",
+      "parent_region_id": 1,
+      "is_default": false,
+      "npcImage": "npc1.png",
+      "npcPosition": "left",
+      "background": "forrest-bg.gif",
+      "dialog": [
+        "Ah, tu as trouvé la Rivière Cristalline !",
+        "Ces eaux contiennent une énergie pure et régénératrice."
+      ],
+      "interactions": [
+        {
+          "npcImage": "npc1.png",
+          "position": "right",
+          "text": "Voici notre rivière sacrée, voyageur. C'est ici que nous puisons notre magie élémentaire."
+        },
+        {
+          "npcImage": "npc2.png",
+          "position": "left",
+          "text": "Sage gardien! Les eaux de la rivière s'assombrissent chaque jour davantage. C'est une catastrophe!"
+        },
+        {
+          "npcImage": "npc1.png",
+          "position": "right",
+          "text": "Calme-toi, jeune apprenti. Nous avons de la chance, ce voyageur semble maîtriser l'art de la combinaison des éléments."
+        },
+        {
+          "npcImage": "npc2.png",
+          "position": "left",
+          "text": "Vraiment? Pouvez-vous nous aider? Notre rivière a besoin d'un cristal purificateur."
+        },
+        {
+          "npcImage": "npc1.png",
+          "position": "right",
+          "text": "Si tu pouvais créer un cristal en combinant la Terre et l'Eau de manière spéciale, cela nous aiderait beaucoup. Essaie de combiner différents éléments pour découvrir le secret."
+        }
+      ],
+      "requiredElements": ["Boue"],
+      "availableElements": ["Eau", "Feu", "Terre", "Air", "Vie"],
+      "elementsWithGifs": ["Eau", "Feu", "Terre", "Air"],
+      "actionText": "Accepter la mission",
+      "rewardCoins": 75,
+      "rewardXp": 150,
+      "unlockHint": "Recherchez la pureté parfaite en combinant l'Eau avec la Terre sous pression"
+    },
+    {
+      "id": 3,
+      "name": "Montagne Eternelle",
+      "parent_region_id": 2,
+      "is_default": false,
+      "npcImage": "npc1.png",
+      "npcPosition": "left",
+      "background": "forrest-bg.gif",
+      "dialog": [
+        "La Montagne Eternelle... peu de gens osent s'y aventurer.",
+        "Les anciens racontent qu'un métal rare se trouve à son sommet.",
+        "Pour le forger, tu devras combiner la Terre et le Feu d'une façon unique.",
+        "Es-tu prêt à découvrir ce minerai légendaire ?"
+      ],
+      "requiredElements": ["Boue"],
+      "availableElements": ["Eau", "Feu", "Terre", "Air", "Vie", "Boue"],
+      "elementsWithGifs": ["Eau", "Feu", "Terre", "Air"],
+      "actionText": "Commencer la forge",
+      "rewardCoins": 100,
+      "rewardXp": 200,
+      "unlockHint": "La chaleur extrême transforme la terre en quelque chose de précieux"
+    },
+    {
+      "id": 4,
+      "name": "Caverne Mystique",
+      "parent_region_id": 3,
+      "is_default": false,
+      "npcImage": "npc1.png",
+      "npcPosition": "right",
+      "background": "entree-grotte.png",
+      "dialog": [
+        "La Caverne Mystique recèle de secrets ancestraux.",
+        "Seuls ceux qui ont prouvé leur valeur peuvent espérer en percer les mystères.",
+        "Es-tu prêt à affronter l'inconnu et à découvrir ses secrets ?"
+      ],
+      "requiredElements": ["Boue"],
+      "availableElements": [
+        "Eau", "Feu", "Terre", "Air", "Magie", "Héros", "Orbe", "Pouvoir", "Anneau",
+        "Mana", "Vie", "Énergie", "Esprit"
+      ],
+      "elementsWithGifs": ["Eau", "Feu", "Terre", "Air"],
+      "actionText": "Explorer la caverne",
+      "rewardCoins": 125,
+      "rewardXp": 250,
+      "unlockHint": "Les ombres recèlent plus que ce que l'œil peut voir"
+    }
+  ],
+  "bosses": [
+    {
+      "id": 1,
+      "name": "Gardien des Ténèbres",
+      "trigger_after_region": 4,
+      "background": "interieur-grotte.png",
+      "bossImage": "boss-1-anim.gif",
+      "bossPosition": "center",
+      "maxHealth": 100,
+      "dialog": [
+        "Mortel! Comment osez vous tenter de vous emparer du joyeau de Ignasius avant moi ?!",
+        "Vous avez osé pénétrer dans mon domaine...",
+        "Battez-vous ou périssez!"
+      ],
+      "requiredElements": ["Feu Magique", "Vie", "Anneau de Pouvoir", "Brasier"],
+      "availableElements": ["Eau", "Feu", "Terre", "Air", "Magie", "Héros", "Orbe", "Pouvoir", "Anneau", "Baguette"],
+      "elementsWithGifs": ["Eau", "Feu", "Terre", "Air"],
+      "actionText": "Affronter le gardien",
+      "damagePerElement": {
+        "Feu Magique": 20,
+        "Anneau de Pouvoir": 50,
+        "Vie": 25,
+        "Brasier": 15,
+        "Sort de Feu": 30
+      },
+      "bossCombatRules": {
+        "defaultElementDamage": 3,
+        "criticalElementMultiplier": 2,
+        "baseElementDamage": {
+          "Magie": 4,
+          "Héros": 3,
+          "Orbe": 2,
+          "Pouvoir": 4,
+          "Anneau": 3,
+          "Mana": 3,
+          "Énergie": 3,
+          "Esprit": 2
+        },
+        "bossCounterAttack": {
+          "baseDamage": 5,
+          "damageMultipliers": {
+            "weakElement": 0.5,
+            "neutralElement": 1,
+            "strongElement": 1.5
+          },
+          "elementTypes": {
+            "weakElements": ["Air", "Esprit"],
+            "strongElements": ["Feu", "Magie", "Pouvoir"]
+          }
+        }
+      },
+      "rewardCoins": 500, 
+      "rewardXp": 1000,
+      "unlockHint": "Le feu affecte sa carapace, tandis que le métal peut percer ses défenses"
+    }
+  ]
+}
