@@ -22,6 +22,8 @@
       "availableElements": ["Eau", "Feu", "Terre", "Air"],
       "elementsWithGifs": ["Eau", "Feu", "Terre", "Air"],
       "actionText": "Relever le défi",
+      "energyCost": 2,
+      "energyReward": 5,
       "rewardCoins": 50,
       "rewardXp": 100,
       "unlockHint": "Combinez l'Eau, la Terre et l'Air avec soin pour former la Vie"
@@ -73,6 +75,8 @@
       "availableElements": ["Eau", "Feu", "Terre", "Air", "Vie"],
       "elementsWithGifs": ["Eau", "Feu", "Terre", "Air"],
       "actionText": "Accepter la mission",
+      "energyCost": 3,
+      "energyReward": 6,
       "rewardCoins": 75,
       "rewardXp": 150,
       "unlockHint": "Recherchez la pureté parfaite en combinant l'Eau avec la Terre sous pression"
@@ -99,6 +103,8 @@
       "availableElements": ["Eau", "Feu", "Terre", "Air", "Vie", "Boue"],
       "elementsWithGifs": ["Eau", "Feu", "Terre", "Air"],
       "actionText": "Commencer la forge",
+      "energyCost": 4,
+      "energyReward": 7,
       "rewardCoins": 100,
       "rewardXp": 200,
       "unlockHint": "La chaleur extrême transforme la terre en quelque chose de précieux"
@@ -127,6 +133,8 @@
       ],
       "elementsWithGifs": ["Eau", "Feu", "Terre", "Air"],
       "actionText": "Explorer la caverne",
+      "energyCost": 5,
+      "energyReward": 8,
       "rewardCoins": 125,
       "rewardXp": 250,
       "unlockHint": "Les ombres recèlent plus que ce que l'œil peut voir"
@@ -157,6 +165,8 @@
       "availableElements": ["Eau", "Feu", "Terre", "Air", "Magie", "Héros", "Orbe", "Pouvoir", "Anneau", "Baguette"],
       "elementsWithGifs": ["Eau", "Feu", "Terre", "Air"],
       "actionText": "Affronter le gardien",
+      "energyCost": 0,
+      "energyReward": 10,
       "damagePerElement": {
         "Feu Magique": 20,
         "Anneau de Pouvoir": 50,
@@ -240,10 +250,12 @@
           "text": "Voyageur, combine l'Eau avec le pouvoir du Feu et un fragment du Joyau d'Ignasius. L'Élixir de Vision te révélera le chemin à travers les mirages du désert."
         }
       ],
-      "requiredElements": ["Élixir de Vision"],
+      "requiredElements": ["Boue"],
       "availableElements": ["Eau", "Feu", "Terre", "Air", "Magie", "Joyau d'Ignasius", "Sable", "Lumière"],
       "elementsWithGifs": ["Eau", "Feu", "Terre", "Air", "Sable", "Lumière"],
       "actionText": "Préparer l'élixir",
+      "energyCost": 6,
+      "energyReward": 9,
       "rewardCoins": 150,
       "rewardXp": 300,
       "unlockHint": "L'eau claire doit rencontrer la chaleur et la lumière du joyau pour révéler la vérité"
@@ -292,10 +304,12 @@
           "text": "Voyageur, l'Oasis est contaminée par une énergie sombre. Combine l'Eau de l'Oasis avec ton Élixir de Vision et un élément purifiant pour créer l'Essence Purificatrice."
         }
       ],
-      "requiredElements": ["Essence Purificatrice"],
+      "requiredElements": ["Boue"],
       "availableElements": ["Eau", "Feu", "Terre", "Air", "Magie", "Joyau d'Ignasius", "Élixir de Vision", "Lumière", "Cristal"],
       "elementsWithGifs": ["Eau", "Feu", "Terre", "Air", "Lumière", "Cristal"],
       "actionText": "Purifier l'Oasis",
+      "energyCost": 7,
+      "energyReward": 10,
       "rewardCoins": 200,
       "rewardXp": 350,
       "unlockHint": "L'eau de l'Oasis doit être combinée avec le pouvoir de vision et un élément qui purifie naturellement"
@@ -310,7 +324,7 @@
       "position_y": 15,
       "npcImage": "npc7.png",
       "npcPosition": "center",
-      "background": "temple-bg.gif",
+      "background": "temple-bg.png",
       "explorerMapBackground": "world-map2.png",
       "dialog": [
         "Le Temple des Anciens... Peu de mortels sont dignes d'y pénétrer.",
@@ -339,10 +353,12 @@
           "text": "Combine l'essence des quatre éléments fondamentaux en une harmonie parfaite, puis infuse-la avec l'énergie du Joyau et la pureté de l'Essence."
         }
       ],
-      "requiredElements": ["Clé Élémentaire"],
+      "requiredElements": ["Boue"],
       "availableElements": ["Eau", "Feu", "Terre", "Air", "Magie", "Joyau d'Ignasius", "Élixir de Vision", "Essence Purificatrice", "Équilibre", "Temps"],
       "elementsWithGifs": ["Eau", "Feu", "Terre", "Air", "Temps", "Équilibre"],
       "actionText": "Forger la clé",
+      "energyCost": 8,
+      "energyReward": 11,
       "rewardCoins": 250,
       "rewardXp": 400,
       "unlockHint": "L'équilibre parfait entre les quatre éléments, renforcé par la puissance des artefacts"
@@ -357,7 +373,7 @@
       "position_y": 35,
       "npcImage": "npc8.png",
       "npcPosition": "left",
-      "background": "chamber-bg.gif",
+      "background": "chamber-bg.png",
       "explorerMapBackground": "world-map2.png",
       "dialog": [
         "Bienvenue dans la Chambre des Prophéties, voyageur.",
@@ -392,10 +408,12 @@
           "text": "Le temps nous le dira. Voyageur, pour affronter ce qui t'attend, tu dois forger l'Arme de Lumière. Combine l'énergie pure du Joyau d'Ignasius avec le pouvoir de l'Équilibre et le métal le plus rare de ce monde."
         }
       ],
-      "requiredElements": ["Arme de Lumière"],
+      "requiredElements": ["Boue"],
       "availableElements": ["Eau", "Feu", "Terre", "Air", "Magie", "Joyau d'Ignasius", "Élixir de Vision", "Essence Purificatrice", "Clé Élémentaire", "Équilibre", "Métal Céleste", "Lumière"],
       "elementsWithGifs": ["Eau", "Feu", "Terre", "Air", "Lumière", "Métal Céleste"],
       "actionText": "Forger l'arme",
+      "energyCost": 9,
+      "energyReward": 12,
       "rewardCoins": 300,
       "rewardXp": 450,
       "unlockHint": "La puissance de la lumière doit être focalisée à travers le métal rare et l'énergie pure du Joyau"
@@ -427,6 +445,8 @@
       "availableElements": ["Eau", "Feu", "Terre", "Air", "Magie", "Joyau d'Ignasius", "Élixir de Vision", "Essence Purificatrice", "Clé Élémentaire", "Arme de Lumière", "Équilibre", "Lumière", "Bannissement", "Bouclier Élémentaire", "Frappe Divine"],
       "elementsWithGifs": ["Eau", "Feu", "Terre", "Air", "Lumière", "Bannissement", "Bouclier Élémentaire"],
       "actionText": "Affronter le Champion",
+      "energyCost": 0,
+      "energyReward": 15,
       "damagePerElement": {
         "Arme de Lumière": 35,
         "Bouclier Élémentaire": 20,

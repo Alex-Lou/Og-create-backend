@@ -103,18 +103,61 @@ router.get('/regions', authMiddleware, async (req, res) => {
 router.post('/visit/:regionId', authMiddleware, async (req, res) => {
   const userId = req.user.id;
   const regionId = req.params.regionId;
-  const energyCost = 2; // Coût en énergie pour visiter une région
+  // Obtenir le coût d'énergie depuis le corps de la requête ou utiliser le coût dynamique de la base de données
+  const clientEnergyCost = req.body.energyCost;
   
   try {
-    // Vérifier que la région existe
-    const regionResult = await db.query('SELECT * FROM explorer_regions WHERE id = $1', [regionId]);
+    // Vérifier que la région existe et récupérer ses propriétés
+    const regionResult = await db.query(
+      'SELECT *, energy_cost, is_boss FROM explorer_regions WHERE id = $1', 
+      [regionId]
+    );
+    
     if (regionResult.rows.length === 0) {
       return res.status(404).json({ message: "Région non trouvée" });
     }
     
-    // Vérifier si la région est débloquée
-    if (!regionResult.rows[0].is_default) {
-      const parentRegionId = regionResult.rows[0].parent_region_id;
+    const region = regionResult.rows[0];
+    
+    // Si c'est un boss, on ne consomme pas d'énergie
+    if (region.is_boss) {
+      // Pour un boss, pas de coût d'énergie
+      // Marquer comme visité sans réduire l'énergie
+      const userRegionResult = await db.query(
+        'SELECT * FROM user_regions WHERE user_id = $1 AND region_id = $2',
+        [userId, regionId]
+      );
+      
+      const now = new Date();
+      
+      if (userRegionResult.rows.length === 0) {
+        // Première visite du boss
+        await db.query(`
+          INSERT INTO user_regions (user_id, region_id, visited, last_visited, is_boss)
+          VALUES ($1, $2, TRUE, $3, TRUE)
+        `, [userId, regionId, now]);
+      } else {
+        // Visite répétée du boss
+        await db.query(`
+          UPDATE user_regions 
+          SET visited = TRUE, last_visited = $3, is_boss = TRUE
+          WHERE user_id = $1 AND region_id = $2
+        `, [userId, regionId, now]);
+      }
+      
+      return res.status(200).json({
+        message: "Combat de boss commencé",
+        energy: req.body.currentEnergy || 0,  // Retourner l'énergie actuelle inchangée
+        region: region
+      });
+    }
+    
+    // Pour une région normale, utiliser le coût d'énergie de la base de données
+    const energyCost = clientEnergyCost || region.energy_cost || 2;
+    
+    // Vérifier que la région est débloquée
+    if (!region.is_default) {
+      const parentRegionId = region.parent_region_id;
       if (parentRegionId) {
         const parentResult = await db.query(
           'SELECT completed FROM user_regions WHERE user_id = $1 AND region_id = $2',
@@ -128,8 +171,11 @@ router.post('/visit/:regionId', authMiddleware, async (req, res) => {
     }
     
     // Vérifier l'énergie disponible
-    // Vérifier l'énergie disponible
-    const progressResult = await db.query('SELECT explorer_energy FROM progress WHERE user_id = $1', [userId]);
+    const progressResult = await db.query(
+      'SELECT explorer_energy FROM progress WHERE user_id = $1', 
+      [userId]
+    );
+    
     if (progressResult.rows.length === 0) {
       return res.status(404).json({ message: "Progression non trouvée" });
     }
@@ -144,9 +190,10 @@ router.post('/visit/:regionId', authMiddleware, async (req, res) => {
     }
     
     // Débiter l'énergie
-    // Débiter l'énergie
-  await db.query('UPDATE progress SET explorer_energy = explorer_energy - $1 WHERE user_id = $2', 
-  [energyCost, userId]);
+    await db.query(
+      'UPDATE progress SET explorer_energy = explorer_energy - $1 WHERE user_id = $2', 
+      [energyCost, userId]
+    );
     
     // Enregistrer la visite
     const now = new Date();
@@ -175,8 +222,8 @@ router.post('/visit/:regionId', authMiddleware, async (req, res) => {
     // Retourner l'énergie restante et les informations de la région
     return res.status(200).json({
       message: "Région visitée avec succès",
-      energy: currentEnergy - energyCost,  // Garde le nom 'energy' ici car c'est le nom attendu par le frontend
-      region: regionResult.rows[0]
+      energy: currentEnergy - energyCost,
+      region: region
     });
   } catch (error) {
     console.error("Erreur lors de la visite de la région:", error);
@@ -334,7 +381,7 @@ router.post('/buy-energy', authMiddleware, async (req, res) => {
 router.post('/complete/:regionId', authMiddleware, async (req, res) => {
   const userId = req.user.id;
   const regionId = req.params.regionId;
-  const { coins = 0, energy = 0, xp = 0, isBossVictory = false, bossId = null } = req.body;
+  const { coins = 0, energy, xp = 0, isBossVictory = false, bossId = null } = req.body;
   
   try {
     // Vérifier si l'utilisateur a déjà visité cette région
@@ -345,6 +392,22 @@ router.post('/complete/:regionId', authMiddleware, async (req, res) => {
     
     if (userRegionResult.rows.length === 0 || !userRegionResult.rows[0].visited) {
       return res.status(403).json({ message: "Vous devez d'abord visiter cette région" });
+    }
+    
+    // Récupérer les informations de la région pour obtenir les récompenses dynamiques
+    const regionInfoResult = await db.query(
+      'SELECT energy_reward, is_boss FROM explorer_regions WHERE id = $1',
+      [regionId]
+    );
+    
+    // Valeur par défaut ou valeur spécifiée ou valeur depuis la base de données
+    let energyReward = energy;
+    if (energyReward === undefined) {
+      if (regionInfoResult.rows.length > 0) {
+        energyReward = regionInfoResult.rows[0].energy_reward || (isBossVictory ? 10 : 5);
+      } else {
+        energyReward = isBossVictory ? 10 : 5; // Valeur par défaut
+      }
     }
     
     // 1. Récupérer l'état actuel de l'utilisateur
@@ -366,9 +429,9 @@ router.post('/complete/:regionId', authMiddleware, async (req, res) => {
     
     // 2. Calculer les nouvelles valeurs
     const newCoins = currentCoins + coins;
-    const newEnergy = Math.min(currentEnergy + energy, maxEnergy);
+    const newEnergy = Math.min(currentEnergy + energyReward, maxEnergy);
     
-    console.log('Après mise à jour - newCoins:', newCoins, 'newEnergy:', newEnergy);
+    console.log('Après mise à jour - newCoins:', newCoins, 'newEnergy:', newEnergy, 'energyReward:', energyReward);
     
     // Distinguer les cas entre une victoire de boss, une région de boss, et une région normale
     if (isBossVictory && bossId) {
@@ -405,8 +468,8 @@ router.post('/complete/:regionId', authMiddleware, async (req, res) => {
       }
       
       console.log(`Région du boss (${bossRegionId}) marquée comme vaincue`);
-    } else if (regionId == 5) {
-      // Cas 2: C'est la région du boss elle-même (ID 5)
+    } else if (regionId == 5 || regionId == 10) {
+      // Cas 2: C'est la région du boss elle-même (ID 5 ou 10)
       await db.query(`
         UPDATE user_regions
         SET completed = TRUE, progress = 100, is_boss = TRUE, boss_defeated = TRUE
@@ -443,11 +506,12 @@ router.post('/complete/:regionId', authMiddleware, async (req, res) => {
       rewards: {
         coins: newCoins,
         energy: newEnergy,
+        energyReward: energyReward,
         xp: xp
       },
       unlockedRegions: childRegionsResult.rows.map(row => row.id),
       isBossVictory: isBossVictory,
-      bossDefeated: isBossVictory && regionId == 5
+      bossDefeated: isBossVictory && (regionId == 5 || regionId == 10)
     });
   } catch (error) {
     console.error("Erreur lors de la complétion de la région:", error);
@@ -487,15 +551,19 @@ router.post('/sync-regions', authMiddleware, async (req, res) => {
       // Choix de l'image: pour un boss, utiliser bossImage, sinon background
       const imagePath = isBoss ? region.bossImage : region.background;
       
+      // Récupérer les coûts et récompenses d'énergie
+      const energyCost = isBoss ? 0 : (region.energyCost || 2);
+      const energyReward = region.energyReward || (isBoss ? 10 : 5);
+      
       if (existingRegion.rows.length === 0) {
         // Si la région n'existe pas, l'insérer
         await db.query(`
           INSERT INTO explorer_regions (
             id, name, description, image_path, is_default, required_level, 
             parent_region_id, required_elements, unlocked_elements, 
-            position_x, position_y, is_boss
+            position_x, position_y, is_boss, energy_cost, energy_reward
           ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
           )
         `, [
           region.id,
@@ -509,7 +577,9 @@ router.post('/sync-regions', authMiddleware, async (req, res) => {
           availableElements,
           region.position_x || 50,
           region.position_y || 50,
-          isBoss // Utiliser la propriété is_boss du JSON
+          isBoss,
+          energyCost,
+          energyReward
         ]);
       } else {
         // Si la région existe, la mettre à jour
@@ -525,7 +595,9 @@ router.post('/sync-regions', authMiddleware, async (req, res) => {
             unlocked_elements = $9,
             position_x = $10,
             position_y = $11,
-            is_boss = $12
+            is_boss = $12,
+            energy_cost = $13,
+            energy_reward = $14
           WHERE id = $1
         `, [
           region.id,
@@ -539,7 +611,9 @@ router.post('/sync-regions', authMiddleware, async (req, res) => {
           availableElements,
           region.position_x || 50,
           region.position_y || 50,
-          isBoss // Utiliser la propriété is_boss du JSON
+          isBoss,
+          energyCost,
+          energyReward
         ]);
       }
     }
