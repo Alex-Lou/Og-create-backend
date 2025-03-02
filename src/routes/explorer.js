@@ -469,7 +469,7 @@ router.post('/sync-regions', authMiddleware, async (req, res) => {
     const jsonPath = path.join(__dirname, '../public/data/regionChallenges.json');
     const regionsData = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
     
-    // 2. Synchroniser les régions normales
+    // 2. Synchroniser toutes les régions (normales et boss)
     for (const region of regionsData.regions) {
       // Vérifier si la région existe déjà
       const existingRegion = await db.query(
@@ -480,6 +480,12 @@ router.post('/sync-regions', authMiddleware, async (req, res) => {
       // Préparer les éléments requis et disponibles
       const requiredElements = region.requiredElements || [];
       const availableElements = region.availableElements || [];
+      
+      // Déterminer si c'est un boss
+      const isBoss = region.is_boss || false;
+      
+      // Choix de l'image: pour un boss, utiliser bossImage, sinon background
+      const imagePath = isBoss ? region.bossImage : region.background;
       
       if (existingRegion.rows.length === 0) {
         // Si la région n'existe pas, l'insérer
@@ -495,7 +501,7 @@ router.post('/sync-regions', authMiddleware, async (req, res) => {
           region.id,
           region.name,
           region.description || '',
-          region.background || null,
+          imagePath || null,
           region.is_default || false,
           region.id, // Utiliser l'ID comme niveau requis par défaut
           region.parent_region_id || null,
@@ -503,7 +509,7 @@ router.post('/sync-regions', authMiddleware, async (req, res) => {
           availableElements,
           region.position_x || 50,
           region.position_y || 50,
-          false // Les régions normales ne sont pas des boss
+          isBoss // Utiliser la propriété is_boss du JSON
         ]);
       } else {
         // Si la région existe, la mettre à jour
@@ -525,7 +531,7 @@ router.post('/sync-regions', authMiddleware, async (req, res) => {
           region.id,
           region.name,
           region.description || '',
-          region.background || null,
+          imagePath || null,
           region.is_default || false,
           region.id, // Utiliser l'ID comme niveau requis par défaut
           region.parent_region_id || null,
@@ -533,90 +539,14 @@ router.post('/sync-regions', authMiddleware, async (req, res) => {
           availableElements,
           region.position_x || 50,
           region.position_y || 50,
-          false // Les régions normales ne sont pas des boss
+          isBoss // Utiliser la propriété is_boss du JSON
         ]);
-      }
-    }
-    
-    // 3. Synchroniser les boss
-    if (regionsData.bosses && regionsData.bosses.length > 0) {
-      for (const boss of regionsData.bosses) {
-        // Pour chaque boss, nous devons créer ou mettre à jour une entrée dans explorer_regions
-        // Généralement, le boss est une région à part entière
-        const bossRegionId = boss.regionId || 5; // L'ID 5 semble être réservé au boss
-        
-        // Vérifier si la région du boss existe déjà
-        const existingBossRegion = await db.query(
-          'SELECT id FROM explorer_regions WHERE id = $1',
-          [bossRegionId]
-        );
-        
-        // Préparer les éléments requis et disponibles pour le boss
-        const requiredElements = boss.requiredElements || [];
-        const availableElements = boss.availableElements || [];
-        
-        if (existingBossRegion.rows.length === 0) {
-          // Si la région du boss n'existe pas, l'insérer
-          await db.query(`
-            INSERT INTO explorer_regions (
-              id, name, description, image_path, is_default, required_level, 
-              parent_region_id, required_elements, unlocked_elements, 
-              position_x, position_y, is_boss
-            ) VALUES (
-              $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
-            )
-          `, [
-            bossRegionId,
-            boss.name,
-            boss.description || 'Région de boss',
-            boss.bossImage || null,
-            false, // Un boss n'est jamais une région par défaut
-            boss.requiredLevel || bossRegionId, // Utiliser l'ID comme niveau requis par défaut
-            boss.trigger_after_region || null,
-            requiredElements,
-            availableElements,
-            boss.position_x || 70,
-            boss.position_y || 45,
-            true // C'est un boss
-          ]);
-        } else {
-          // Si la région du boss existe, la mettre à jour
-          await db.query(`
-            UPDATE explorer_regions SET
-              name = $2,
-              description = $3,
-              image_path = $4,
-              is_default = $5,
-              required_level = $6,
-              parent_region_id = $7,
-              required_elements = $8,
-              unlocked_elements = $9,
-              position_x = $10,
-              position_y = $11,
-              is_boss = $12
-            WHERE id = $1
-          `, [
-            bossRegionId,
-            boss.name,
-            boss.description || 'Région de boss',
-            boss.bossImage || null,
-            false, // Un boss n'est jamais une région par défaut
-            boss.requiredLevel || bossRegionId, // Utiliser l'ID comme niveau requis par défaut
-            boss.trigger_after_region || null,
-            requiredElements,
-            availableElements,
-            boss.position_x || 70,
-            boss.position_y || 45,
-            true // C'est un boss
-          ]);
-        }
       }
     }
     
     res.status(200).json({
       message: "Synchronisation des régions réussie",
-      regionsCount: regionsData.regions.length,
-      bossesCount: regionsData.bosses ? regionsData.bosses.length : 0
+      regionsCount: regionsData.regions.length
     });
   } catch (error) {
     console.error("Erreur lors de la synchronisation des régions:", error);

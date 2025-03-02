@@ -5,6 +5,9 @@
       "name": "Forêt Primordiale",
       "parent_region_id": null,
       "is_default": true,
+      "is_boss": false,
+      "position_x": 25,
+      "position_y": 30,
       "npcImage": "npc1.png",
       "npcPosition": "left",
       "background": "forrest-bg.gif",
@@ -27,6 +30,9 @@
       "name": "Rivière Cristalline",
       "parent_region_id": 1,
       "is_default": false,
+      "is_boss": false,
+      "position_x": 45,
+      "position_y": 35,
       "npcImage": "npc1.png",
       "npcPosition": "left",
       "background": "forrest-bg.gif",
@@ -74,6 +80,9 @@
       "name": "Montagne Eternelle",
       "parent_region_id": 2,
       "is_default": false,
+      "is_boss": false,
+      "position_x": 65,
+      "position_y": 20,
       "npcImage": "npc1.png",
       "npcPosition": "left",
       "background": "forrest-bg.gif",
@@ -96,6 +105,9 @@
       "name": "Caverne Mystique",
       "parent_region_id": 3,
       "is_default": false,
+      "is_boss": false,
+      "position_x": 70,
+      "position_y": 40,
       "npcImage": "npc1.png",
       "npcPosition": "right",
       "background": "entree-grotte.png",
@@ -114,13 +126,18 @@
       "rewardCoins": 125,
       "rewardXp": 250,
       "unlockHint": "Les ombres recèlent plus que ce que l'œil peut voir"
-    }
-  ],
-  "bosses": [
+    },
     {
-      "id": 1,
+      "id": 5,
       "name": "Gardien des Ténèbres",
+      "parent_region_id": 4,
+      "is_default": false,
+      "is_boss": true,
       "trigger_after_region": 4,
+      "position_x": 70,
+      "position_y": 45,
+      "npcImage": "boss-1-anim.gif",
+      "npcPosition": "center",
       "background": "interieur-grotte.png",
       "bossImage": "boss-1-anim.gif",
       "bossPosition": "center",
@@ -167,7 +184,7 @@
           }
         }
       },
-      "rewardCoins": 500, 
+      "rewardCoins": 500,
       "rewardXp": 1000,
       "unlockHint": "Le feu affecte sa carapace, tandis que le métal peut percer ses défenses"
     }
