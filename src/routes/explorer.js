@@ -627,4 +627,24 @@ router.post('/sync-regions', authMiddleware, async (req, res) => {
   }
 });
 
+
+// Route pour synchroniser les éléments découverts par les utilisateurs
+router.post('/sync-discovered-elements', authMiddleware, async (req, res) => {
+  // Cette route devrait idéalement être limitée aux administrateurs
+  try {
+    const { syncUserDiscoveredElements } = require('../initRegions');
+    await syncUserDiscoveredElements();
+    
+    res.status(200).json({
+      message: "Synchronisation des éléments découverts réussie"
+    });
+  } catch (error) {
+    console.error("Erreur lors de la synchronisation des éléments découverts:", error);
+    res.status(500).json({
+      message: "Erreur lors de la synchronisation des éléments découverts",
+      errorDetails: process.env.NODE_ENV === 'development' ? error.message : null
+    });
+  }
+});
+
 module.exports = router;
