@@ -11,6 +11,7 @@
       "npcImage": "npc1.png",
       "npcPosition": "left",
       "background": "forrest-bg.gif",
+      "explorerMapBackground": "world-map.png",
       "dialog": [
         "Bienvenue dans la Forêt Primordiale, voyageur !",
         "Notre forêt regorge de vie et d'énergie, mais elle est menacée par un déséquilibre mystérieux.",
@@ -36,6 +37,7 @@
       "npcImage": "npc1.png",
       "npcPosition": "left",
       "background": "forrest-bg.gif",
+      "explorerMapBackground": "world-map.png",
       "dialog": [
         "Ah, tu as trouvé la Rivière Cristalline !",
         "Ces eaux contiennent une énergie pure et régénératrice."
@@ -86,6 +88,7 @@
       "npcImage": "npc1.png",
       "npcPosition": "left",
       "background": "forrest-bg.gif",
+      "explorerMapBackground": "world-map.png",
       "dialog": [
         "La Montagne Eternelle... peu de gens osent s'y aventurer.",
         "Les anciens racontent qu'un métal rare se trouve à son sommet.",
@@ -111,6 +114,7 @@
       "npcImage": "npc1.png",
       "npcPosition": "right",
       "background": "entree-grotte.png",
+      "explorerMapBackground": "world-map.png",
       "dialog": [
         "La Caverne Mystique recèle de secrets ancestraux.",
         "Seuls ceux qui ont prouvé leur valeur peuvent espérer en percer les mystères.",
@@ -139,7 +143,9 @@
       "npcImage": "boss-1-anim.gif",
       "npcPosition": "center",
       "background": "interieur-grotte.png",
+      "explorerMapBackground": "world-map.png",
       "bossImage": "boss-1-anim.gif",
+      "bossDefeatedImage": "boss-1-dead.png",
       "bossPosition": "center",
       "maxHealth": 100,
       "dialog": [
@@ -187,6 +193,276 @@
       "rewardCoins": 500,
       "rewardXp": 1000,
       "unlockHint": "Le feu affecte sa carapace, tandis que le métal peut percer ses défenses"
+    },
+    
+    {
+      "id": 6,
+      "name": "Désert des Illusions",
+      "parent_region_id": 5,
+      "is_default": false,
+      "is_boss": false,
+      "position_x": 30,
+      "position_y": 25,
+      "npcImage": "npc3.png",
+      "npcPosition": "right",
+      "background": "desert-bg.gif",
+      "explorerMapBackground": "world-map2.png",
+      "dialog": [
+        "Bienvenue dans le Désert des Illusions, voyageur intrépide!",
+        "Tu as vaincu le Gardien des Ténèbres et obtenu le Joyau d'Ignasius.",
+        "Mais ton aventure ne fait que commencer. Ici, la réalité et l'illusion se mêlent.",
+        "Pour progresser, tu devras créer un Élixir de Vision qui te permettra de percer les mirages."
+      ],
+      "interactions": [
+        {
+          "npcImage": "npc3.png",
+          "position": "right",
+          "text": "Je suis Miragus, gardien des sables mouvants. Rares sont ceux qui parviennent jusqu'ici."
+        },
+        {
+          "npcImage": "npc4.png",
+          "position": "left",
+          "text": "Maître, les visions sont de plus en plus fortes depuis l'arrivée de ce voyageur. Le joyau qu'il porte..."
+        },
+        {
+          "npcImage": "npc3.png",
+          "position": "right",
+          "text": "En effet, l'artefact d'Ignasius réagit aux énergies du désert. C'est un signe prometteur."
+        },
+        {
+          "npcImage": "npc4.png",
+          "position": "left",
+          "text": "Pensez-vous qu'il pourrait créer l'Élixir de Vision? Nul n'y est parvenu depuis des siècles."
+        },
+        {
+          "npcImage": "npc3.png",
+          "position": "right",
+          "text": "Voyageur, combine l'Eau avec le pouvoir du Feu et un fragment du Joyau d'Ignasius. L'Élixir de Vision te révélera le chemin à travers les mirages du désert."
+        }
+      ],
+      "requiredElements": ["Élixir de Vision"],
+      "availableElements": ["Eau", "Feu", "Terre", "Air", "Magie", "Joyau d'Ignasius", "Sable", "Lumière"],
+      "elementsWithGifs": ["Eau", "Feu", "Terre", "Air", "Sable", "Lumière"],
+      "actionText": "Préparer l'élixir",
+      "rewardCoins": 150,
+      "rewardXp": 300,
+      "unlockHint": "L'eau claire doit rencontrer la chaleur et la lumière du joyau pour révéler la vérité"
+    },
+    {
+      "id": 7,
+      "name": "Oasis Éternelle",
+      "parent_region_id": 6,
+      "is_default": false,
+      "is_boss": false,
+      "position_x": 50,
+      "position_y": 20,
+      "npcImage": "npc5.png",
+      "npcPosition": "left",
+      "background": "oasis-bg.gif",
+      "explorerMapBackground": "world-map2.png",
+      "dialog": [
+        "Tu as découvert l'Oasis Éternelle, source de vie au cœur du désert.",
+        "Ces eaux ancestrales abritent des formes de vie uniques et des énergies primordiales.",
+        "Les esprits de l'eau sont agités depuis quelque temps... quelque chose perturbe l'équilibre."
+      ],
+      "interactions": [
+        {
+          "npcImage": "npc5.png",
+          "position": "left",
+          "text": "Je suis Aqualia, gardienne de l'Oasis. Je veille sur ces eaux depuis des millénaires."
+        },
+        {
+          "npcImage": "npc6.png",
+          "position": "right",
+          "text": "Dame Aqualia! Les créatures des profondeurs deviennent de plus en plus agressives!"
+        },
+        {
+          "npcImage": "npc5.png",
+          "position": "left",
+          "text": "Oui, je le sens aussi. La présence maléfique s'intensifie... Ce voyageur porte le Joyau d'Ignasius!"
+        },
+        {
+          "npcImage": "npc6.png",
+          "position": "right",
+          "text": "Alors la prophétie était vraie! Peut-être pourrait-il créer l'Essence Purificatrice?"
+        },
+        {
+          "npcImage": "npc5.png",
+          "position": "left",
+          "text": "Voyageur, l'Oasis est contaminée par une énergie sombre. Combine l'Eau de l'Oasis avec ton Élixir de Vision et un élément purifiant pour créer l'Essence Purificatrice."
+        }
+      ],
+      "requiredElements": ["Essence Purificatrice"],
+      "availableElements": ["Eau", "Feu", "Terre", "Air", "Magie", "Joyau d'Ignasius", "Élixir de Vision", "Lumière", "Cristal"],
+      "elementsWithGifs": ["Eau", "Feu", "Terre", "Air", "Lumière", "Cristal"],
+      "actionText": "Purifier l'Oasis",
+      "rewardCoins": 200,
+      "rewardXp": 350,
+      "unlockHint": "L'eau de l'Oasis doit être combinée avec le pouvoir de vision et un élément qui purifie naturellement"
+    },
+    {
+      "id": 8,
+      "name": "Temple des Anciens",
+      "parent_region_id": 7,
+      "is_default": false,
+      "is_boss": false,
+      "position_x": 70,
+      "position_y": 15,
+      "npcImage": "npc7.png",
+      "npcPosition": "center",
+      "background": "temple-bg.gif",
+      "explorerMapBackground": "world-map2.png",
+      "dialog": [
+        "Le Temple des Anciens... Peu de mortels sont dignes d'y pénétrer.",
+        "Ces murs racontent l'histoire des premiers élémentalistes qui ont façonné notre monde.",
+        "Si tu souhaites accéder aux connaissances ancestrales, tu devras prouver ta maîtrise des éléments."
+      ],
+      "interactions": [
+        {
+          "npcImage": "npc7.png",
+          "position": "center",
+          "text": "Je suis Chronos, gardien du savoir et du temps. Ces ruines renferment les secrets des premiers âges."
+        },
+        {
+          "npcImage": "npc7.png",
+          "position": "center",
+          "text": "Le Joyau d'Ignasius et l'Essence Purificatrice... Voilà bien longtemps que ces artefacts n'ont été réunis."
+        },
+        {
+          "npcImage": "npc7.png",
+          "position": "center",
+          "text": "Pour accéder à la chambre des secrets, tu devras créer la Clé Élémentaire. Elle seule peut ouvrir les portes scellées par les Anciens."
+        },
+        {
+          "npcImage": "npc7.png",
+          "position": "center",
+          "text": "Combine l'essence des quatre éléments fondamentaux en une harmonie parfaite, puis infuse-la avec l'énergie du Joyau et la pureté de l'Essence."
+        }
+      ],
+      "requiredElements": ["Clé Élémentaire"],
+      "availableElements": ["Eau", "Feu", "Terre", "Air", "Magie", "Joyau d'Ignasius", "Élixir de Vision", "Essence Purificatrice", "Équilibre", "Temps"],
+      "elementsWithGifs": ["Eau", "Feu", "Terre", "Air", "Temps", "Équilibre"],
+      "actionText": "Forger la clé",
+      "rewardCoins": 250,
+      "rewardXp": 400,
+      "unlockHint": "L'équilibre parfait entre les quatre éléments, renforcé par la puissance des artefacts"
+    },
+    {
+      "id": 9,
+      "name": "Chambre des Prophéties",
+      "parent_region_id": 8,
+      "is_default": false,
+      "is_boss": false,
+      "position_x": 60,
+      "position_y": 35,
+      "npcImage": "npc8.png",
+      "npcPosition": "left",
+      "background": "chamber-bg.gif",
+      "explorerMapBackground": "world-map2.png",
+      "dialog": [
+        "Bienvenue dans la Chambre des Prophéties, voyageur.",
+        "Ici sont inscrites les visions du futur et les destins possibles de notre monde.",
+        "Les inscriptions parlent d'une ombre grandissante et d'un héros porteur de lumière.",
+        "Pour affronter le mal qui approche, tu devras forger l'Arme de Lumière."
+      ],
+      "interactions": [
+        {
+          "npcImage": "npc8.png",
+          "position": "left",
+          "text": "Je suis Lumina, gardienne des prophéties. Ces murs racontent l'avenir de notre monde."
+        },
+        {
+          "npcImage": "npc9.png",
+          "position": "right",
+          "text": "Oracle Lumina! Les signes s'intensifient. Les étoiles s'assombrissent et la terre tremble."
+        },
+        {
+          "npcImage": "npc8.png",
+          "position": "left",
+          "text": "Oui, l'heure approche. Le Champion des Ténèbres émerge de son sommeil millénaire."
+        },
+        {
+          "npcImage": "npc9.png",
+          "position": "right",
+          "text": "Alors ce voyageur... Est-il celui dont parlent les prophéties?"
+        },
+        {
+          "npcImage": "npc8.png",
+          "position": "left",
+          "text": "Le temps nous le dira. Voyageur, pour affronter ce qui t'attend, tu dois forger l'Arme de Lumière. Combine l'énergie pure du Joyau d'Ignasius avec le pouvoir de l'Équilibre et le métal le plus rare de ce monde."
+        }
+      ],
+      "requiredElements": ["Arme de Lumière"],
+      "availableElements": ["Eau", "Feu", "Terre", "Air", "Magie", "Joyau d'Ignasius", "Élixir de Vision", "Essence Purificatrice", "Clé Élémentaire", "Équilibre", "Métal Céleste", "Lumière"],
+      "elementsWithGifs": ["Eau", "Feu", "Terre", "Air", "Lumière", "Métal Céleste"],
+      "actionText": "Forger l'arme",
+      "rewardCoins": 300,
+      "rewardXp": 450,
+      "unlockHint": "La puissance de la lumière doit être focalisée à travers le métal rare et l'énergie pure du Joyau"
+    },
+    {
+      "id": 10,
+      "name": "Champion des Ténèbres",
+      "parent_region_id": 9,
+      "is_default": false,
+      "is_boss": true,
+      "trigger_after_region": 9,
+      "position_x": 45,
+      "position_y": 45,
+      "npcImage": "boss-2-anim.gif",
+      "npcPosition": "center",
+      "background": "void-bg.gif",
+      "explorerMapBackground": "world-map2.png",
+      "bossImage": "boss-2-anim.gif",
+      "bossDefeatedImage": "boss-2-dead.png",
+      "bossPosition": "center",
+      "maxHealth": 200,
+      "dialog": [
+        "Alors c'est toi, le prétendu héros de la prophétie?",
+        "J'ai dévoré des mondes entiers et absorbé l'essence de mille soleils.",
+        "Ton arme de lumière n'est qu'un jouet face à mon pouvoir absolu!",
+        "Je suis Umbra, Champion des Ténèbres, et ton voyage s'achève ici!"
+      ],
+      "requiredElements": ["Arme de Lumière", "Bouclier Élémentaire", "Frappe Divine", "Essence Purificatrice", "Bannissement"],
+      "availableElements": ["Eau", "Feu", "Terre", "Air", "Magie", "Joyau d'Ignasius", "Élixir de Vision", "Essence Purificatrice", "Clé Élémentaire", "Arme de Lumière", "Équilibre", "Lumière", "Bannissement", "Bouclier Élémentaire", "Frappe Divine"],
+      "elementsWithGifs": ["Eau", "Feu", "Terre", "Air", "Lumière", "Bannissement", "Bouclier Élémentaire"],
+      "actionText": "Affronter le Champion",
+      "damagePerElement": {
+        "Arme de Lumière": 35,
+        "Bouclier Élémentaire": 20,
+        "Frappe Divine": 45,
+        "Essence Purificatrice": 30,
+        "Bannissement": 50
+      },
+      "bossCombatRules": {
+        "defaultElementDamage": 5,
+        "criticalElementMultiplier": 2.5,
+        "baseElementDamage": {
+          "Magie": 6,
+          "Équilibre": 7,
+          "Lumière": 8,
+          "Joyau d'Ignasius": 7,
+          "Arme de Lumière": 10,
+          "Bannissement": 12,
+          "Frappe Divine": 9,
+          "Bouclier Élémentaire": 5
+        },
+        "bossCounterAttack": {
+          "baseDamage": 8,
+          "damageMultipliers": {
+            "weakElement": 0.5,
+            "neutralElement": 1,
+            "strongElement": 2
+          },
+          "elementTypes": {
+            "weakElements": ["Lumière", "Essence Purificatrice", "Bannissement"],
+            "strongElements": ["Ténèbres", "Chaos", "Corruption"]
+          }
+        }
+      },
+      "rewardCoins": 1000,
+      "rewardXp": 2000,
+      "unlockHint": "Sa forme ténébreuse est vulnérable à la lumière pure et au bannissement. Le bouclier peut absorber ses attaques chaotiques."
     }
   ]
 }
