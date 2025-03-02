@@ -82,7 +82,8 @@ router.get('/init', authMiddleware, async (req, res) => {
 router.get('/regions', authMiddleware, async (req, res) => {
   try {
     const result = await db.query(`
-      SELECT r.*, ur.visited, ur.completed, ur.progress, ur.discovered_elements
+      SELECT r.*, ur.visited, ur.completed, ur.progress, ur.discovered_elements, 
+             ur.is_boss, ur.boss_defeated
       FROM explorer_regions r
       LEFT JOIN user_regions ur ON r.id = ur.region_id AND ur.user_id = $1
       ORDER BY r.required_level ASC, r.name ASC
@@ -330,11 +331,10 @@ router.post('/buy-energy', authMiddleware, async (req, res) => {
 });
 
 // Route pour marquer une région comme complétée
-// Route pour marquer une région comme complétée
 router.post('/complete/:regionId', authMiddleware, async (req, res) => {
   const userId = req.user.id;
   const regionId = req.params.regionId;
-  const { coins = 0, energy = 0, xp = 0 } = req.body;
+  const { coins = 0, energy = 0, xp = 0, isBossVictory = false, bossId = null } = req.body;
   
   try {
     // Vérifier si l'utilisateur a déjà visité cette région
@@ -370,12 +370,56 @@ router.post('/complete/:regionId', authMiddleware, async (req, res) => {
     
     console.log('Après mise à jour - newCoins:', newCoins, 'newEnergy:', newEnergy);
     
-    // Marquer la région comme complétée
-    await db.query(`
-      UPDATE user_regions
-      SET completed = TRUE, progress = 100
-      WHERE user_id = $1 AND region_id = $2
-    `, [userId, regionId]);
+    // Distinguer les cas entre une victoire de boss, une région de boss, et une région normale
+    if (isBossVictory && bossId) {
+      // Cas 1: Région normale mais qui a une victoire de boss associée
+      // (c'est typiquement la région qui a déclenché le boss, comme la région 4)
+      await db.query(`
+        UPDATE user_regions
+        SET completed = TRUE, progress = 100, is_boss = FALSE, boss_defeated = FALSE
+        WHERE user_id = $1 AND region_id = $2
+      `, [userId, regionId]);
+      
+      // Traitons maintenant la région du boss elle-même
+      const bossRegionId = req.body.bossRegionId || 5; // 5 est l'ID de la région du boss
+      
+      // Vérifier si l'entrée existe déjà pour la région du boss
+      const bossRegionResult = await db.query(
+        'SELECT * FROM user_regions WHERE user_id = $1 AND region_id = $2',
+        [userId, bossRegionId]
+      );
+      
+      if (bossRegionResult.rows.length === 0) {
+        // Créer une nouvelle entrée pour la région du boss
+        await db.query(`
+          INSERT INTO user_regions (user_id, region_id, visited, completed, progress, is_boss, boss_defeated, last_visited)
+          VALUES ($1, $2, TRUE, TRUE, 100, TRUE, TRUE, CURRENT_TIMESTAMP)
+        `, [userId, bossRegionId]);
+      } else {
+        // Mettre à jour l'entrée existante
+        await db.query(`
+          UPDATE user_regions
+          SET completed = TRUE, progress = 100, is_boss = TRUE, boss_defeated = TRUE
+          WHERE user_id = $1 AND region_id = $2
+        `, [userId, bossRegionId]);
+      }
+      
+      console.log(`Région du boss (${bossRegionId}) marquée comme vaincue`);
+    } else if (regionId == 5) {
+      // Cas 2: C'est la région du boss elle-même (ID 5)
+      await db.query(`
+        UPDATE user_regions
+        SET completed = TRUE, progress = 100, is_boss = TRUE, boss_defeated = TRUE
+        WHERE user_id = $1 AND region_id = $2
+      `, [userId, regionId]);
+    } else {
+      // Cas 3: C'est une région normale
+      await db.query(`
+        UPDATE user_regions
+        SET completed = TRUE, progress = 100, is_boss = FALSE, boss_defeated = FALSE
+        WHERE user_id = $1 AND region_id = $2
+      `, [userId, regionId]);
+    }
     
     // Mettre à jour les statistiques (coins, energy, xp)
     await db.query(`
@@ -401,7 +445,9 @@ router.post('/complete/:regionId', authMiddleware, async (req, res) => {
         energy: newEnergy,
         xp: xp
       },
-      unlockedRegions: childRegionsResult.rows.map(row => row.id)
+      unlockedRegions: childRegionsResult.rows.map(row => row.id),
+      isBossVictory: isBossVictory,
+      bossDefeated: isBossVictory && regionId == 5
     });
   } catch (error) {
     console.error("Erreur lors de la complétion de la région:", error);
