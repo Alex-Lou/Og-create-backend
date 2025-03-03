@@ -2,6 +2,7 @@
   "regions": [
     {
       "id": 1,
+      "map_id": 1,
       "name": "Forêt Primordiale",
       "parent_region_id": null,
       "is_default": true,
@@ -30,6 +31,7 @@
     },
     {
       "id": 2,
+      "map_id": 1,
       "name": "Rivière Cristalline",
       "parent_region_id": 1,
       "is_default": false,
@@ -83,6 +85,7 @@
     },
     {
       "id": 3,
+      "map_id": 1,
       "name": "Montagne Eternelle",
       "parent_region_id": 2,
       "is_default": false,
@@ -111,6 +114,7 @@
     },
     {
       "id": 4,
+      "map_id": 1,
       "name": "Caverne Mystique",
       "parent_region_id": 3,
       "is_default": false,
@@ -141,6 +145,7 @@
     },
     {
       "id": 5,
+      "map_id": 1,
       "name": "Gardien des Ténèbres",
       "parent_region_id": 4,
       "is_default": false,
@@ -207,6 +212,7 @@
     
     {
       "id": 6,
+      "map_id": 2,
       "name": "Désert des Illusions",
       "parent_region_id": 5,
       "is_default": false,
@@ -262,6 +268,7 @@
     },
     {
       "id": 7,
+      "map_id": 2,
       "name": "Oasis Éternelle",
       "parent_region_id": 6,
       "is_default": false,
@@ -316,6 +323,7 @@
     },
     {
       "id": 8,
+      "map_id": 2,
       "name": "Temple des Anciens",
       "parent_region_id": 7,
       "is_default": false,
@@ -365,6 +373,7 @@
     },
     {
       "id": 9,
+      "map_id": 2,
       "name": "Chambre des Prophéties",
       "parent_region_id": 8,
       "is_default": false,
@@ -420,6 +429,7 @@
     },
     {
       "id": 10,
+      "map_id": 2,
       "name": "Champion des Ténèbres",
       "parent_region_id": 9,
       "is_default": false,
@@ -427,12 +437,12 @@
       "trigger_after_region": 9,
       "position_x": 45,
       "position_y": 45,
-      "npcImage": "boss-2-anim.gif",
+      "npcImage": "boss-2-anim.png",
       "npcPosition": "center",
       "background": "void-bg.gif",
       "explorerMapBackground": "world-map2.png",
-      "bossImage": "boss-2-anim.gif",
-      "bossDefeatedImage": "boss-2-dead.png",
+      "bossImage": "boss-2-anim.png",
+      "bossDefeatedImage": "boss-2-anim.png",
       "bossPosition": "center",
       "maxHealth": 200,
       "dialog": [
@@ -441,15 +451,15 @@
         "Ton arme de lumière n'est qu'un jouet face à mon pouvoir absolu!",
         "Je suis Umbra, Champion des Ténèbres, et ton voyage s'achève ici!"
       ],
-      "requiredElements": ["Arme de Lumière", "Bouclier Élémentaire", "Frappe Divine", "Essence Purificatrice", "Bannissement"],
+      "requiredElements": ["Boue", "Feu Magique"],
       "availableElements": ["Eau", "Feu", "Terre", "Air", "Magie", "Joyau d'Ignasius", "Élixir de Vision", "Essence Purificatrice", "Clé Élémentaire", "Arme de Lumière", "Équilibre", "Lumière", "Bannissement", "Bouclier Élémentaire", "Frappe Divine"],
       "elementsWithGifs": ["Eau", "Feu", "Terre", "Air", "Lumière", "Bannissement", "Bouclier Élémentaire"],
       "actionText": "Affronter le Champion",
       "energyCost": 0,
       "energyReward": 15,
       "damagePerElement": {
-        "Arme de Lumière": 35,
-        "Bouclier Élémentaire": 20,
+        "Feu Magique": 50,
+        "Boue": 50,
         "Frappe Divine": 45,
         "Essence Purificatrice": 30,
         "Bannissement": 50
