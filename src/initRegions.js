@@ -3,6 +3,17 @@ const fs = require('fs');
 const path = require('path');
 const db = require('./config/db');
 
+// Configuration centralisée des valeurs par défaut
+// Permet d'avoir toutes les constantes à un seul endroit au lieu d'être éparpillées dans le code
+const DEFAULT_SETTINGS = {
+  defaultEnergyCost: 2,
+  regionEnergyReward: 5,
+  bossEnergyReward: 10,
+  defaultPositionX: 50,
+  defaultPositionY: 50,
+  defaultMapId: 1
+};
+
 /**
  * Fonction pour initialiser ou mettre à jour les régions depuis le fichier JSON
  */
@@ -36,9 +47,10 @@ async function initRegions() {
       // Image à utiliser (background pour régions normales, bossImage pour boss)
       const imagePath = isBoss ? (region.bossImage || null) : (region.background || null);
       
-      // Récupérer les coûts et récompenses d'énergie
-      const energyCost = isBoss ? 0 : (region.energyCost || 2);
-      const energyReward = region.energyReward || (isBoss ? 10 : 5);
+      // Récupérer les coûts et récompenses d'énergie depuis le JSON ou utiliser les valeurs par défaut
+      const energyCost = isBoss ? 0 : (region.energyCost !== undefined ? region.energyCost : DEFAULT_SETTINGS.defaultEnergyCost);
+      const energyReward = region.energyReward !== undefined ? region.energyReward : 
+                          (isBoss ? DEFAULT_SETTINGS.bossEnergyReward : DEFAULT_SETTINGS.regionEnergyReward);
       
       if (existingRegion.rows.length === 0) {
         // Si la région n'existe pas, l'insérer
@@ -46,9 +58,9 @@ async function initRegions() {
           INSERT INTO explorer_regions (
             id, name, description, image_path, is_default, required_level, 
             parent_region_id, required_elements, unlocked_elements, 
-            position_x, position_y, is_boss, energy_cost, energy_reward
+            position_x, position_y, is_boss, energy_cost, energy_reward, map_id
           ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
           )
         `, [
           region.id,
@@ -56,15 +68,16 @@ async function initRegions() {
           region.description || '',
           imagePath,
           region.is_default || false,
-          region.id, // Utiliser l'ID comme niveau requis par défaut
+          region.required_level || region.id, // Utiliser required_level s'il existe, sinon l'ID
           region.parent_region_id || null,
           requiredElements,
           availableElements,
-          region.position_x || 50,
-          region.position_y || 50,
+          region.position_x || DEFAULT_SETTINGS.defaultPositionX,
+          region.position_y || DEFAULT_SETTINGS.defaultPositionY,
           isBoss,
           energyCost,
-          energyReward
+          energyReward,
+          region.map_id || DEFAULT_SETTINGS.defaultMapId
         ]);
         
         console.log(`Région ${region.name} (ID: ${region.id}) créée. Énergie: coût=${energyCost}, récompense=${energyReward}`);
@@ -85,7 +98,8 @@ async function initRegions() {
             position_y = $11,
             is_boss = $12,
             energy_cost = $13,
-            energy_reward = $14
+            energy_reward = $14,
+            map_id = $15
           WHERE id = $1
         `, [
           region.id,
@@ -93,15 +107,16 @@ async function initRegions() {
           region.description || '',
           imagePath,
           region.is_default || false,
-          region.id, // Utiliser l'ID comme niveau requis par défaut
+          region.required_level || region.id,
           region.parent_region_id || null,
           requiredElements,
           availableElements,
-          region.position_x || 50,
-          region.position_y || 50,
+          region.position_x || DEFAULT_SETTINGS.defaultPositionX,
+          region.position_y || DEFAULT_SETTINGS.defaultPositionY,
           isBoss,
           energyCost,
-          energyReward
+          energyReward,
+          region.map_id || DEFAULT_SETTINGS.defaultMapId
         ]);
       }
     }
@@ -119,7 +134,7 @@ async function initRegions() {
 
 /**
  * Synchroniser les éléments découverts pour les utilisateurs
- * Cette fonction va vérifié tous les utilisateurs qui ont des régions complétées
+ * Cette fonction va vérifier tous les utilisateurs qui ont des régions complétées
  * et s'assurer qu'ils ont les éléments découverts correspondants
  */
 async function syncUserDiscoveredElements() {

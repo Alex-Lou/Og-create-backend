@@ -42,15 +42,31 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-// Limite de requêtes pour prévenir les attaques par force brute
-const limiter = rateLimit({
-    windowMs: process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000,
-    max: process.env.RATE_LIMIT_MAX_REQUESTS || 100,
+// Configuration des limiteurs de requêtes par route
+// Limiteur global plus souple
+const globalLimiter = rateLimit({
+    windowMs: process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000, // 15 minutes par défaut
+    max: process.env.RATE_LIMIT_MAX_REQUESTS || 1000, // 1000 requêtes par fenêtre
     message: 'Trop de requêtes, veuillez réessayer plus tard',
     standardHeaders: true,
-    legacyHeaders: false
+    legacyHeaders: false,
+    // Ignorer les requêtes OPTIONS pour éviter les problèmes avec CORS
+    skip: (req) => req.method === 'OPTIONS'
 });
-app.use(limiter);
+
+// Limiteur spécifique pour les routes de progression et explorer
+// Ces routes sont appelées plus fréquemment dans l'application
+const gameLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: 200, // 200 requêtes par minute
+    message: 'Trop de requêtes de jeu, veuillez réessayer plus tard',
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: (req) => req.method === 'OPTIONS'
+});
+
+// Appliquer le limiteur global à toutes les routes
+app.use(globalLimiter);
 
 // Middlewares de parsing
 app.use(express.json({ 
@@ -65,14 +81,15 @@ app.use(express.urlencoded({
 const authRoutes = require('./routes/auth');
 const progressRoutes = require('./routes/progress');
 const contactRoutes = require('./routes/contactRoutes');
-const customizationRoutes = require('./routes/customization'); // Nouvelle route pour la personnalisation
-const explorerRoutes = require('./routes/explorer'); // Ajout de la route Explorer
+const customizationRoutes = require('./routes/customization');
+const explorerRoutes = require('./routes/explorer');
 
 app.use('/api/auth', authRoutes);
-app.use('/api/progress', progressRoutes);
+// Appliquer le limiteur spécifique aux routes de jeu
+app.use('/api/progress', gameLimiter, progressRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/customization', customizationRoutes);
-app.use('/api/explorer', explorerRoutes);
+app.use('/api/explorer', gameLimiter, explorerRoutes);
 
 // Route de santé pour vérifier l'état du serveur
 app.get('/api/health', (req, res) => {

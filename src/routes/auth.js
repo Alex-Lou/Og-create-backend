@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
+const { generateAccessToken, generateRefreshToken, verifyRefreshToken } = require('../utils/tokenManager');
 
 // Validation des entrées
 const validateEmail = (email) => {
@@ -21,15 +22,6 @@ const generateUsername = (email) => {
     const baseUsername = email.split('@')[0];
     const randomSuffix = Math.floor(Math.random() * 9000) + 1000;
     return `${baseUsername}_${randomSuffix}`;
-};
-
-// Fonction pour générer un token JWT
-const generateToken = (userData) => {
-    return jwt.sign(
-        userData,
-        process.env.JWT_SECRET,
-        { expiresIn: '24h' }
-    );
 };
 
 // Route d'inscription
@@ -86,21 +78,31 @@ router.post('/register', async (req, res) => {
             [email, hashedPassword, username]
         );
 
-        // Génération du token JWT
-        console.log('Génération du token JWT');
+        // Génération des tokens
+        console.log('Génération des tokens');
         const userData = { 
             userId: result.rows[0].id, 
             email: result.rows[0].email,
             username: result.rows[0].username
         };
-        const token = generateToken(userData);
+        
+        const accessToken = generateAccessToken(userData);
+        const refreshToken = generateRefreshToken(userData);
+        
+        // Stocker le refreshToken dans la base de données
+        await db.query(
+            'INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, NOW() + INTERVAL \'7 days\')',
+            [result.rows[0].id, refreshToken]
+        );
 
         console.log('===== INSCRIPTION RÉUSSIE =====');
         res.status(201).json({
             message: 'Utilisateur créé avec succès',
-            token,
+            token: accessToken,
+            refreshToken,
             userId: result.rows[0].id,
-            username: result.rows[0].username
+            username: result.rows[0].username,
+            expiresIn: 3600 // 1 heure en secondes
         });
     } catch (error) {
         console.error('===== ERREUR COMPLÈTE D\'INSCRIPTION =====');
@@ -153,20 +155,36 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ message: 'Authentification échouée' });
         }
 
-        // Génération du token
-        console.log('Génération du token JWT');
+        // Génération des tokens
+        console.log('Génération des tokens');
         const userData = { 
             userId: user.id, 
             email: user.email,
             username: user.username
         };
-        const token = generateToken(userData);
+        
+        const accessToken = generateAccessToken(userData);
+        const refreshToken = generateRefreshToken(userData);
+        
+        // Supprimer les anciens refresh tokens de cet utilisateur (optionnel)
+        await db.query(
+            'DELETE FROM refresh_tokens WHERE user_id = $1',
+            [user.id]
+        );
+        
+        // Stocker le nouveau refresh token
+        await db.query(
+            'INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, NOW() + INTERVAL \'7 days\')',
+            [user.id, refreshToken]
+        );
 
         console.log('===== CONNEXION RÉUSSIE =====');
         res.status(200).json({
-            token,
+            token: accessToken,
+            refreshToken,
             userId: user.id,
-            username: user.username
+            username: user.username,
+            expiresIn: 3600 // 1 heure en secondes
         });
     } catch (error) {
         console.error('===== ERREUR COMPLÈTE DE CONNEXION =====');
@@ -178,49 +196,69 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// Nouvelle route pour rafraîchir le token
+// Route pour rafraîchir le token
 router.post('/refresh-token', async (req, res) => {
     console.log('===== DÉBUT DU RAFRAÎCHISSEMENT DE TOKEN =====');
     console.log('Données reçues:', JSON.stringify(req.body, null, 2));
 
     try {
-        const { token } = req.body;
+        const { refreshToken } = req.body;
 
-        if (!token) {
-            console.log('ERREUR : Token manquant');
-            return res.status(400).json({ message: 'Token requis' });
+        if (!refreshToken) {
+            console.log('ERREUR : Refresh token manquant');
+            return res.status(400).json({ message: 'Refresh token requis' });
         }
 
-        // Vérifier le token expiré sans vérifier l'expiration
-        const decoded = jwt.verify(token, process.env.JWT_SECRET, { ignoreExpiration: true });
-        console.log('Token décodé (ignorant l\'expiration):', decoded);
+        // Vérifier le refresh token
+        const decoded = verifyRefreshToken(refreshToken);
+        
+        if (!decoded) {
+            console.log('ERREUR : Refresh token invalide');
+            return res.status(401).json({ message: 'Refresh token invalide ou expiré' });
+        }
+        
+        console.log('Refresh token décodé:', decoded);
+        
+        // Vérifier si le refresh token existe dans la base de données
+        const tokenResult = await db.query(
+            'SELECT * FROM refresh_tokens WHERE token = $1 AND user_id = $2 AND expires_at > NOW()',
+            [refreshToken, decoded.userId]
+        );
+        
+        if (tokenResult.rows.length === 0) {
+            console.log('ERREUR : Refresh token non trouvé ou expiré en BDD');
+            return res.status(401).json({ message: 'Session expirée, veuillez vous reconnecter' });
+        }
 
-        // Vérifier si l'utilisateur existe toujours dans la base de données
+        // Récupérer les données complètes de l'utilisateur
         const userResult = await db.query(
-            'SELECT * FROM users WHERE id = $1 AND email = $2',
-            [decoded.userId, decoded.email]
+            'SELECT id, email, username FROM users WHERE id = $1',
+            [decoded.userId]
         );
 
         if (userResult.rows.length === 0) {
             console.log('ERREUR : Utilisateur non trouvé lors du rafraîchissement');
             return res.status(401).json({ message: 'Utilisateur non trouvé, veuillez vous reconnecter' });
         }
+        
+        const user = userResult.rows[0];
 
-        // Générer un nouveau token
+        // Générer un nouveau token d'accès
         const userData = {
-            userId: decoded.userId,
-            email: decoded.email,
-            username: decoded.username
+            userId: user.id,
+            email: user.email,
+            username: user.username
         };
         
-        console.log('Génération d\'un nouveau token JWT');
-        const newToken = generateToken(userData);
+        console.log('Génération d\'un nouveau token d\'accès');
+        const newAccessToken = generateAccessToken(userData);
 
         console.log('===== RAFRAÎCHISSEMENT DE TOKEN RÉUSSI =====');
         res.status(200).json({
-            token: newToken,
-            userId: decoded.userId,
-            username: decoded.username
+            token: newAccessToken,
+            userId: user.id,
+            username: user.username,
+            expiresIn: 3600 // 1 heure en secondes
         });
     } catch (error) {
         console.error('===== ERREUR COMPLÈTE DE RAFRAÎCHISSEMENT DE TOKEN =====');
@@ -230,6 +268,35 @@ router.post('/refresh-token', async (req, res) => {
 
         res.status(401).json({ 
             message: 'Erreur lors du rafraîchissement du token',
+            errorDetails: process.env.NODE_ENV === 'development' ? error.message : null
+        });
+    }
+});
+
+// Route de déconnexion
+router.post('/logout', async (req, res) => {
+    try {
+        const { refreshToken, userId } = req.body;
+        
+        if (refreshToken) {
+            // Supprimer le refresh token spécifique
+            await db.query(
+                'DELETE FROM refresh_tokens WHERE token = $1',
+                [refreshToken]
+            );
+        } else if (userId) {
+            // Supprimer tous les refresh tokens de l'utilisateur
+            await db.query(
+                'DELETE FROM refresh_tokens WHERE user_id = $1',
+                [userId]
+            );
+        }
+        
+        res.status(200).json({ message: 'Déconnexion réussie' });
+    } catch (error) {
+        console.error('Erreur lors de la déconnexion:', error);
+        res.status(500).json({
+            message: 'Erreur lors de la déconnexion',
             errorDetails: process.env.NODE_ENV === 'development' ? error.message : null
         });
     }

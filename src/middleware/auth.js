@@ -28,7 +28,7 @@ const authMiddleware = (req, res, next) => {
         // Vérifier et décoder le token
         const decoded = jwt.verify(token, process.env.JWT_SECRET, {
             algorithms: ['HS256'],
-            maxAge: '24h'
+            maxAge: '1h' // Réduit à 1 heure en correspondance avec generateAccessToken
         });
         
         console.log('Token décodé :', decoded);
@@ -47,14 +47,16 @@ const authMiddleware = (req, res, next) => {
         if (error.name === 'TokenExpiredError') {
             console.log('Erreur : Token expiré');
             return res.status(401).json({
-                message: 'Le token a expiré. Veuillez vous reconnecter.'
+                message: 'Le token a expiré. Veuillez vous reconnecter.',
+                code: 'TOKEN_EXPIRED'
             });
         }
         
         if (error.name === 'JsonWebTokenError') {
             console.log('Erreur : Token invalide');
             return res.status(401).json({
-                message: 'Token invalide. Authentification échouée.'
+                message: 'Token invalide. Authentification échouée.',
+                code: 'INVALID_TOKEN'
             });
         }
         
