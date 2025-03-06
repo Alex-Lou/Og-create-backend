@@ -3,8 +3,10 @@ const fs = require('fs');
 const path = require('path');
 const db = require('./config/db');
 
+// Configuration pour contrôler le niveau de verbosité des logs
+const VERBOSE = process.env.VERBOSE_LOGS === 'true';
+
 // Configuration centralisée des valeurs par défaut
-// Permet d'avoir toutes les constantes à un seul endroit au lieu d'être éparpillées dans le code
 const DEFAULT_SETTINGS = {
   defaultEnergyCost: 2,
   regionEnergyReward: 5,
@@ -19,7 +21,11 @@ const DEFAULT_SETTINGS = {
  */
 async function initRegions() {
   try {
-    console.log('Initialisation des régions...');
+    // Message de début minimal
+    if (VERBOSE) {
+      console.log('Initialisation des régions...');
+    }
+    
     const jsonPath = path.join(__dirname, 'public/data/regionChallenges.json');
     
     if (!fs.existsSync(jsonPath)) {
@@ -28,6 +34,8 @@ async function initRegions() {
     }
     
     const regionsData = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+    let regionsCreated = 0;
+    let regionsUpdated = 0;
     
     // Initialiser les régions (normales et boss ensemble maintenant)
     for (const region of regionsData.regions) {
@@ -80,9 +88,14 @@ async function initRegions() {
           region.map_id || DEFAULT_SETTINGS.defaultMapId
         ]);
         
-        console.log(`Région ${region.name} (ID: ${region.id}) créée. Énergie: coût=${energyCost}, récompense=${energyReward}`);
+        regionsCreated++;
+        if (VERBOSE) {
+          console.log(`Région ${region.name} (ID: ${region.id}) créée. Énergie: coût=${energyCost}, récompense=${energyReward}`);
+        }
       } else {
-        console.log(`Région ${region.id} existe déjà, mise à jour...`);
+        if (VERBOSE) {
+          console.log(`Région ${region.id} existe déjà, mise à jour...`);
+        }
         // Si la région existe, la mettre à jour avec les dernières informations
         await db.query(`
           UPDATE explorer_regions SET
@@ -118,13 +131,20 @@ async function initRegions() {
           energyReward,
           region.map_id || DEFAULT_SETTINGS.defaultMapId
         ]);
+        
+        regionsUpdated++;
       }
     }
     
-    // Optionnel: Synchroniser les éléments découverts pour les utilisateurs
+    if (VERBOSE) {
+      console.log(`Traitement des régions terminé: ${regionsCreated} créées, ${regionsUpdated} mises à jour`);
+    }
+    
+    // Synchroniser les éléments découverts pour les utilisateurs
     await syncUserDiscoveredElements();
     
-    console.log('Initialisation des régions terminée avec succès.');
+    // Message de succès simple
+    console.log("Tout roule! :)");
     return { success: true };
   } catch (error) {
     console.error('Erreur lors de l\'initialisation des régions:', error);
@@ -134,12 +154,12 @@ async function initRegions() {
 
 /**
  * Synchroniser les éléments découverts pour les utilisateurs
- * Cette fonction va vérifier tous les utilisateurs qui ont des régions complétées
- * et s'assurer qu'ils ont les éléments découverts correspondants
  */
 async function syncUserDiscoveredElements() {
   try {
-    console.log('Synchronisation des éléments découverts par utilisateur...');
+    if (VERBOSE) {
+      console.log('Synchronisation des éléments découverts par utilisateur...');
+    }
     
     // Récupérer tous les utilisateurs qui ont des régions
     const userResult = await db.query(
@@ -147,20 +167,27 @@ async function syncUserDiscoveredElements() {
     );
     
     if (userResult.rows.length === 0) {
-      console.log('Aucun utilisateur avec des régions trouvé.');
+      if (VERBOSE) {
+        console.log('Aucun utilisateur avec des régions trouvé.');
+      }
       return;
     }
+    
+    let totalRegionsUpdated = 0;
     
     // Pour chaque utilisateur
     for (const userRow of userResult.rows) {
       const userId = userRow.user_id;
-      console.log(`Synchronisation des éléments pour l'utilisateur ${userId}...`);
       
       // Récupérer toutes les régions complétées par cet utilisateur
       const completedRegionsResult = await db.query(
         'SELECT region_id FROM user_regions WHERE user_id = $1 AND completed = TRUE',
         [userId]
       );
+      
+      if (VERBOSE) {
+        console.log(`Utilisateur ${userId}: ${completedRegionsResult.rows.length} régions complétées`);
+      }
       
       // Pour chaque région complétée
       for (const regionRow of completedRegionsResult.rows) {
@@ -180,15 +207,15 @@ async function syncUserDiscoveredElements() {
         
         // Récupérer les éléments déjà découverts par l'utilisateur pour cette région
         const userRegionResult = await db.query(
-          'SELECT discovered_elements FROM user_regions WHERE user_id = $1 AND region_id = $2',
+          'SELECT required_elements FROM user_regions WHERE user_id = $1 AND region_id = $2',
           [userId, regionId]
         );
         
         // Si la région est complétée, tous les éléments requis devraient être découverts
         if (userRegionResult.rows.length > 0) {
-          let discoveredElements = userRegionResult.rows[0].discovered_elements || [];
+          let discoveredElements = userRegionResult.rows[0].required_elements || [];
           
-          // Si la région est complétée mais que discovered_elements est vide ou ne contient pas tous les éléments requis
+          // Si la région est complétée mais que required_elements est vide ou ne contient pas tous les éléments requis
           const needsUpdate = requiredElements.some(element => !discoveredElements.includes(element));
           
           if (needsUpdate) {
@@ -201,17 +228,19 @@ async function syncUserDiscoveredElements() {
             
             // Mettre à jour les éléments découverts
             await db.query(
-              'UPDATE user_regions SET discovered_elements = $1 WHERE user_id = $2 AND region_id = $3',
+              'UPDATE user_regions SET required_elements = $1 WHERE user_id = $2 AND region_id = $3',
               [discoveredElements, userId, regionId]
             );
             
-            console.log(`Éléments découverts mis à jour pour l'utilisateur ${userId}, région ${regionId}.`);
+            totalRegionsUpdated++;
           }
         }
       }
     }
     
-    console.log('Synchronisation des éléments découverts terminée.');
+    if (VERBOSE && totalRegionsUpdated > 0) {
+      console.log(`Synchronisation terminée: ${totalRegionsUpdated} régions mises à jour`);
+    }
   } catch (error) {
     console.error('Erreur lors de la synchronisation des éléments découverts:', error);
   }

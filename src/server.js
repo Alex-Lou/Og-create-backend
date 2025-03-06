@@ -83,13 +83,25 @@ const progressRoutes = require('./routes/progress');
 const contactRoutes = require('./routes/contactRoutes');
 const customizationRoutes = require('./routes/customization');
 const explorerRoutes = require('./routes/explorer');
+const gameDataController = require('./routes/gameDataController');  // Ajouté ici
 
 app.use('/api/auth', authRoutes);
-// Appliquer le limiteur spécifique aux routes de jeu
 app.use('/api/progress', gameLimiter, progressRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/customization', customizationRoutes);
 app.use('/api/explorer', gameLimiter, explorerRoutes);
+app.use('/api/game-data', gameLimiter, gameDataController);  // Ajouté ici avec le limiteur gameLimiter
+
+// Bloquer l'accès direct aux fichiers JSON du dossier data
+app.use('/data', (req, res, next) => {
+    if (req.path.endsWith('.json')) {
+        return res.status(403).send('Accès direct aux fichiers JSON interdit');
+    }
+    next();
+});
+
+// Servir les fichiers statiques
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Route de santé pour vérifier l'état du serveur
 app.get('/api/health', (req, res) => {

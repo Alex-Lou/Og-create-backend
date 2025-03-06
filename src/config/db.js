@@ -1,6 +1,11 @@
+// config/db.js
 const { Pool } = require('pg');
 require('dotenv').config();
 
+// Configuration du niveau de log
+const LOG_LEVEL = process.env.DB_LOG_LEVEL || 'INFO'; // Valeurs possibles: 'ERROR', 'INFO', 'DEBUG'
+
+// Affichage des infos de connexion uniquement au démarrage
 console.log('Configuration de la base de données :');
 console.log('Utilisateur :', process.env.DB_USER);
 console.log('Hôte :', process.env.DB_HOST);
@@ -22,15 +27,48 @@ pool.on('error', (err, client) => {
 
 module.exports = {
     query: async (text, params) => {
-        console.log('Requête SQL :', text);
-        console.log('Paramètres :', params);
+        // En mode DEBUG, on log les détails de la requête
+        if (LOG_LEVEL === 'DEBUG') {
+            console.log('Requête SQL :', text);
+            if (params) console.log('Paramètres :', params);
+        } else if (LOG_LEVEL === 'INFO') {
+            // En mode INFO, on log juste la première partie de la requête pour identifier son type
+            const queryType = text.trim().split(' ')[0];
+            console.log(`Exécution ${queryType}${params ? ` avec ${params.length} paramètres` : ''}`);
+        }
         
         try {
+            const start = Date.now();
             const result = await pool.query(text, params);
-            console.log('Résultat de la requête :', result.rows);
+            const duration = Date.now() - start;
+            
+            // En mode INFO ou DEBUG, on log des informations sur le résultat
+            if (LOG_LEVEL === 'INFO' || LOG_LEVEL === 'DEBUG') {
+                console.log(`Requête exécutée en ${duration}ms, ${result.rowCount} lignes affectées`);
+            }
+            
+            // En mode DEBUG seulement, on log les résultats
+            if (LOG_LEVEL === 'DEBUG') {
+                if (result.rows && result.rows.length <= 5) {
+                    // Limiter l'affichage pour éviter de surcharger la console
+                    console.log('Résultat de la requête :', result.rows);
+                } else if (result.rows) {
+                    console.log(`Résultat: ${result.rows.length} lignes retournées (détails omis)`);
+                }
+            }
+            
             return result;
         } catch (error) {
-            console.error('Erreur lors de l\'exécution de la requête :', error);
+            // On log toujours les erreurs, quel que soit le niveau de log
+            console.error('Erreur lors de l\'exécution de la requête :', error.message);
+            
+            // Plus de détails en mode DEBUG
+            if (LOG_LEVEL === 'DEBUG') {
+                console.error('Requête en échec :', text);
+                console.error('Paramètres :', params);
+                console.error('Détails de l\'erreur :', error);
+            }
+            
             throw error;
         }
     },

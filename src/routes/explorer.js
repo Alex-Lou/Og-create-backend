@@ -20,7 +20,6 @@ function calculateCurrentEnergy(baseEnergy, lastUpdate, maxEnergy) {
 
 
 // Route d'initialisation du mode Explorer
-// Route d'initialisation du mode Explorer
 router.get('/init', authMiddleware, async (req, res) => {
   const userId = req.user.id;
   try {
@@ -100,7 +99,7 @@ router.get('/regions', authMiddleware, async (req, res) => {
         ur.visited, 
         ur.completed, 
         ur.progress, 
-        ur.discovered_elements, 
+        ur.required_elements, 
         ur.is_boss, 
         ur.boss_defeated
       FROM explorer_regions r
@@ -119,7 +118,6 @@ router.get('/regions', authMiddleware, async (req, res) => {
   }
 });
 
-// Visiter une région (consomme de l'énergie)
 // Visiter une région (consomme de l'énergie)
 router.post('/visit/:regionId', authMiddleware, async (req, res) => {
   const userId = req.user.id;
@@ -271,7 +269,6 @@ router.post('/visit/:regionId', authMiddleware, async (req, res) => {
   }
 });
 
-// Route pour marquer une région comme complétée
 // Route pour marquer une région comme complétée
 router.post('/complete/:regionId', authMiddleware, async (req, res) => {
   const userId = req.user.id;
@@ -491,7 +488,7 @@ router.get('/regions/:regionId', authMiddleware, async (req, res) => {
   
   try {
     const result = await db.query(`
-      SELECT r.*, ur.visited, ur.completed, ur.progress, ur.discovered_elements, ur.boss_defeated
+      SELECT r.*, ur.visited, ur.completed, ur.progress, ur.required_elements, ur.boss_defeated
       FROM explorer_regions r
       LEFT JOIN user_regions ur ON r.id = ur.region_id AND ur.user_id = $1
       WHERE r.id = $2
@@ -529,37 +526,37 @@ router.post('/discover/:regionId/:elementName', authMiddleware, async (req, res)
     }
     
     // Récupérer les éléments déjà découverts
-    let discoveredElements = userRegionResult.rows[0].discovered_elements || [];
+    let requiredElements = userRegionResult.rows[0].required_elements || [];
     
     // Vérifier si l'élément est déjà découvert
-    if (discoveredElements.includes(elementName)) {
+    if (requiredElements.includes(elementName)) {
       return res.status(200).json({ 
         message: "Cet élément a déjà été découvert dans cette région",
-        discovered_elements: discoveredElements 
+        required_elements: requiredElements 
       });
     }
     
     // Ajouter l'élément aux découvertes
-    discoveredElements.push(elementName);
+    requiredElements.push(elementName);
     
     // Calculer la progression (% d'éléments découverts sur le total possible)
     const regionResult = await db.query('SELECT unlocked_elements FROM explorer_regions WHERE id = $1', [regionId]);
     const totalElements = regionResult.rows[0].unlocked_elements || [];
-    const progress = Math.floor((discoveredElements.length / Math.max(totalElements.length, 1)) * 100);
+    const progress = Math.floor((requiredElements.length / Math.max(totalElements.length, 1)) * 100);
     
     // Vérifier si la région est complétée (tous les éléments découverts)
-    const completed = discoveredElements.length >= totalElements.length && totalElements.length > 0;
+    const completed = requiredElements.length >= totalElements.length && totalElements.length > 0;
     
     // Mettre à jour la progression
     await db.query(`
       UPDATE user_regions
-      SET discovered_elements = $1, progress = $2, completed = $3
+      SET required_elements = $1, progress = $2, completed = $3
       WHERE user_id = $4 AND region_id = $5
-    `, [discoveredElements, progress, completed, userId, regionId]);
+    `, [requiredElements, progress, completed, userId, regionId]);
     
     res.status(200).json({
       message: "Élément découvert avec succès",
-      discovered_elements: discoveredElements,
+      required_elements: requiredElements,
       progress,
       completed
     });
