@@ -4,6 +4,34 @@ const db = require('../config/db');
 const authMiddleware = require('../middleware/auth');
 const rateLimit = require('express-rate-limit');
 
+// Configuration des niveaux de log
+const LOG_LEVELS = {
+    debug: 0,
+    info: 1,
+    warn: 2,
+    error: 3
+};
+
+// Niveau de log par défaut, peut être remplacé par une variable d'environnement
+const logLevel = process.env.LOG_LEVEL || 'warn';
+
+/**
+ * Fonction de logging avec niveau
+ * @param {string} level - Niveau de log (debug, info, warn, error)
+ * @param {string} message - Message à logger
+ * @param {any} data - Données additionnelles (optionnel)
+ */
+function log(level, message, data) {
+    // Ne logger que si le niveau est supérieur ou égal au niveau configuré
+    if (LOG_LEVELS[level] >= LOG_LEVELS[logLevel]) {
+        if (data !== undefined) {
+            console[level](`[${level.toUpperCase()}] ${message}`, 
+                typeof data === 'object' ? JSON.stringify(data, null, 2) : data);
+        } else {
+            console[level](`[${level.toUpperCase()}] ${message}`);
+        }
+    }
+}
 
 // Configuration du rate limiting spécifique pour les routes de progression
 const progressRateLimiter = rateLimit({
@@ -129,7 +157,7 @@ const processSaveQueue = async (userId) => {
           lastSaved: new Date().toISOString()
       });
     } catch (error) {
-      console.error('Erreur lors du traitement de la queue:', error);
+      log('error', 'Erreur lors du traitement de la queue', error);
       reject(error);
     } finally {
       // Traiter la prochaine requête dans la queue s'il y en a
@@ -145,9 +173,7 @@ router.post('/update-achievements', authMiddleware, async (req, res) => {
       const userId = req.user.id;
       const { achievements } = req.body;
       
-      console.log('=== UPDATE ACHIEVEMENTS DEBUG ===');
-      console.log('UserId:', userId);
-      console.log('Achievements reçus:', JSON.stringify(achievements, null, 2));
+      log('debug', 'Mise à jour des achievements', { userId });
       
       // Vérifier immédiatement avant toute opération
       if (!achievements || Object.keys(achievements).length === 0) {
@@ -172,7 +198,7 @@ router.post('/update-achievements', authMiddleware, async (req, res) => {
                 : currentProgress.rows[0].achievements)
             : {};
         } catch (error) {
-          console.error('Erreur lors du parsing des achievements existants:', error);
+          log('error', 'Erreur lors du parsing des achievements existants', error);
         }
       }
   
@@ -203,20 +229,19 @@ router.post('/update-achievements', authMiddleware, async (req, res) => {
         timestamp: new Date().toISOString()
       });
     } catch (error) {
-      console.error('Erreur lors de la mise à jour des achievements:', error);
+      log('error', 'Erreur lors de la mise à jour des achievements', error);
       res.status(500).json({ 
         message: 'Erreur lors de la mise à jour des achievements',
         error: error.message 
       });
     }
-  });
+});
 
-// Route pour sauvegarder la progression complète
 // Route pour sauvegarder la progression complète
 router.post('/save', authMiddleware, progressRateLimiter, async (req, res) => {
   try {
       const userId = req.user.id;
-      console.log('Requête /save reçue pour userId:', userId);
+      log('info', 'Requête de sauvegarde reçue', { userId });
       
       // Créer une promesse qui sera résolue quand la sauvegarde sera traitée
       const savePromise = new Promise((resolve, reject) => {
@@ -241,7 +266,7 @@ router.post('/save', authMiddleware, progressRateLimiter, async (req, res) => {
       const result = await savePromise;
       res.status(200).json(result);
   } catch (error) {
-      console.error('Erreur détaillée lors de la sauvegarde de la progression:', error);
+      log('error', 'Erreur lors de la sauvegarde de la progression', error);
       res.status(500).json({ 
           message: 'Erreur lors de la sauvegarde de la progression',
           error: error.message
@@ -253,8 +278,7 @@ router.post('/save', authMiddleware, progressRateLimiter, async (req, res) => {
 router.get('/load', authMiddleware, progressRateLimiter, async (req, res) => {
   try {
       const userId = req.user.id;
-      console.log('=== LOAD PROGRESS DEBUG ===');
-      console.log('Chargement pour userId:', userId);
+      log('debug', 'Chargement de la progression', { userId });
 
       const result = await db.query(
           `SELECT 
@@ -271,7 +295,7 @@ router.get('/load', authMiddleware, progressRateLimiter, async (req, res) => {
       );
 
       if (result.rows.length === 0) {
-          console.log('Aucune progression trouvée, renvoi des valeurs par défaut');
+          log('info', 'Aucune progression trouvée, renvoi des valeurs par défaut', { userId });
           return res.status(200).json({
               discoveredElements: ["Eau", "Feu", "Terre", "Air"],
               discoveredCategories: ["Elements Fondamentaux"],
@@ -292,10 +316,13 @@ router.get('/load', authMiddleware, progressRateLimiter, async (req, res) => {
       }
 
       const progress = result.rows[0];
-      console.log('=== Progression chargée pour userId:', userId, ' ===');
-      console.log('Coins en BDD:', progress.coins);
-      console.log('Dernier enregistrement:', progress.last_saved);
-      console.log('Éléments découverts:', progress.discovered_elements);
+      log('debug', 'Progression chargée', { 
+        userId,
+        coins: progress.coins,
+        elementsCount: progress.discovered_elements ? 
+          (typeof progress.discovered_elements === 'string' ? 
+            JSON.parse(progress.discovered_elements).length : progress.discovered_elements.length) : 0
+      });
 
       let parsedProgress = {
           discoveredElements: ["Eau", "Feu", "Terre", "Air"],
@@ -354,18 +381,19 @@ router.get('/load', authMiddleware, progressRateLimiter, async (req, res) => {
               };
           }
 
-          console.log('=== Progression parsée ===');
-          console.log('Coins après parsing:', parsedProgress.coins);
-          console.log('Elements après parsing:', parsedProgress.discoveredElements.length);
-          console.log('Achievements après parsing:', Object.keys(parsedProgress.achievements).length);
+          log('debug', 'Progression parsée', {
+            coins: parsedProgress.coins,
+            elementsCount: parsedProgress.discoveredElements.length,
+            achievementsCount: Object.keys(parsedProgress.achievements).length
+          });
       } catch (error) {
-          console.error('Erreur lors du parsing des données JSON:', error);
+          log('error', 'Erreur lors du parsing des données JSON', error);
       }
 
       res.status(200).json(parsedProgress);
 
   } catch (error) {
-      console.error('Erreur lors du chargement de la progression:', error);
+      log('error', 'Erreur lors du chargement de la progression', error);
       res.status(500).json({ 
           message: 'Erreur lors du chargement de la progression',
           error: error.message 
@@ -378,9 +406,7 @@ router.post('/update-coins', authMiddleware, progressRateLimiter, async (req, re
         const userId = req.user.id;
         const { coins } = req.body;
         
-        console.log('=== UPDATE COINS DEBUG ===');
-        console.log('UserId:', userId);
-        console.log('Nouvelle valeur coins:', coins);
+        log('debug', 'Mise à jour des pièces', { userId, coins });
         
         // Vérifier d'abord les pièces existantes
         const currentProgress = await db.query(
@@ -388,28 +414,28 @@ router.post('/update-coins', authMiddleware, progressRateLimiter, async (req, re
             [userId]
         );
         
-        console.log('Valeur actuelle en BDD:', currentProgress.rows[0]?.coins);
-        console.log('Dernier enregistrement:', currentProgress.rows[0]?.last_saved);
+        log('debug', 'Valeurs actuelles', { 
+            currentCoins: currentProgress.rows[0]?.coins,
+            lastSaved: currentProgress.rows[0]?.last_saved
+        });
         
         // Si aucune progression n'existe, créer une nouvelle entrée
         if (currentProgress.rows.length === 0) {
-            console.log('Création nouvelle entrée progress');
+            log('info', 'Création nouvelle entrée progress pour les pièces', { userId });
             await db.query(
                 `INSERT INTO progress (user_id, coins, last_saved)
                  VALUES ($1, $2, CURRENT_TIMESTAMP)`,
                 [userId, coins]
             );
         } else {
-            console.log('Mise à jour coins existants');
+            log('debug', 'Mise à jour coins existants', { userId });
             await db.query(
                 `UPDATE progress 
                  SET coins = $1, last_saved = CURRENT_TIMESTAMP
                  WHERE user_id = $2
                  RETURNING coins, last_saved`,
                 [coins, userId]
-            ).then(result => {
-                console.log('Mise à jour effectuée:', result.rows[0]);
-            });
+            );
         }
 
         res.status(200).json({
@@ -418,20 +444,20 @@ router.post('/update-coins', authMiddleware, progressRateLimiter, async (req, re
             timestamp: new Date().toISOString()
         });
     } catch (error) {
-        console.error('Erreur lors de la mise à jour des pièces:', error);
+        log('error', 'Erreur lors de la mise à jour des pièces', error);
         res.status(500).json({ message: 'Erreur lors de la mise à jour des pièces' });
     }
 });
-
 
 router.post('/update-discovered-elements', authMiddleware, progressRateLimiter, async (req, res) => {
     try {
       const userId = req.user.id;
       const { discoveredElements } = req.body;
       
-      console.log('=== UPDATE DISCOVERED ELEMENTS DEBUG ===');
-      console.log('UserId:', userId);
-      console.log('Nouveaux éléments découverts:', discoveredElements);
+      log('debug', 'Mise à jour des éléments découverts', { 
+        userId, 
+        elementsCount: discoveredElements ? discoveredElements.length : 0 
+      });
       
       // Vérifier d'abord si la progression existe
       const currentProgress = await db.query(
@@ -441,23 +467,20 @@ router.post('/update-discovered-elements', authMiddleware, progressRateLimiter, 
       
       // Si aucune progression n'existe, créer une nouvelle entrée
       if (currentProgress.rows.length === 0) {
-        console.log('Création nouvelle entrée progress pour éléments découverts');
+        log('info', 'Création nouvelle entrée progress pour éléments découverts', { userId });
         await db.query(
           `INSERT INTO progress (user_id, discovered_elements, last_saved)
            VALUES ($1, $2, CURRENT_TIMESTAMP)`,
           [userId, JSON.stringify(discoveredElements)]
         );
       } else {
-        console.log('Mise à jour éléments découverts existants');
+        log('debug', 'Mise à jour éléments découverts existants', { userId });
         await db.query(
           `UPDATE progress 
            SET discovered_elements = $1, last_saved = CURRENT_TIMESTAMP
-           WHERE user_id = $2
-           RETURNING discovered_elements, last_saved`,
+           WHERE user_id = $2`,
           [JSON.stringify(discoveredElements), userId]
-        ).then(result => {
-          console.log('Mise à jour effectuée:', result.rows[0]);
-        });
+        );
       }
   
       res.status(200).json({
@@ -466,57 +489,12 @@ router.post('/update-discovered-elements', authMiddleware, progressRateLimiter, 
         timestamp: new Date().toISOString()
       });
     } catch (error) {
-      console.error('Erreur lors de la mise à jour des éléments découverts:', error);
+      log('error', 'Erreur lors de la mise à jour des éléments découverts', error);
       res.status(500).json({ message: 'Erreur lors de la mise à jour des éléments découverts' });
     }
-  });
+});
 
-
-  router.post('/update-achievements', authMiddleware, progressRateLimiter, async (req, res) => {
-    try {
-      const userId = req.user.id;
-      const { achievements } = req.body;
-      
-      console.log('=== UPDATE ACHIEVEMENTS DEBUG ===');
-      console.log('UserId:', userId);
-      
-      // Vérifier d'abord si la progression existe
-      const currentProgress = await db.query(
-        'SELECT achievements FROM progress WHERE user_id = $1',
-        [userId]
-      );
-      
-      // Si aucune progression n'existe, créer une nouvelle entrée
-      if (currentProgress.rows.length === 0) {
-        console.log('Création nouvelle entrée progress pour achievements');
-        await db.query(
-          `INSERT INTO progress (user_id, achievements, last_saved)
-           VALUES ($1, $2, CURRENT_TIMESTAMP)`,
-          [userId, JSON.stringify(achievements)]
-        );
-      } else {
-        console.log('Mise à jour achievements existants');
-        await db.query(
-          `UPDATE progress 
-           SET achievements = $1, last_saved = CURRENT_TIMESTAMP
-           WHERE user_id = $2
-           RETURNING achievements, last_saved`,
-          [JSON.stringify(achievements), userId]
-        ).then(result => {
-          console.log('Mise à jour effectuée:', result.rows[0]);
-        });
-      }
-  
-      res.status(200).json({
-        message: 'Achievements mis à jour avec succès',
-        achievements: achievements,
-        timestamp: new Date().toISOString()
-      });
-    } catch (error) {
-      console.error('Erreur lors de la mise à jour des achievements:', error);
-      res.status(500).json({ message: 'Erreur lors de la mise à jour des achievements' });
-    }
-  });
+// Il y a une route update-achievements dupliquée dans le code original - j'ai supprimé la deuxième instance
 
 // Route pour mettre à jour la progression du timer uniquement
 router.post('/update-timer-progress', authMiddleware, async (req, res) => {
@@ -524,13 +502,10 @@ router.post('/update-timer-progress', authMiddleware, async (req, res) => {
         const userId = req.user.id;
         const { timerProgress } = req.body;
         
-        console.log('Route /update-timer-progress appelée');
-        console.log('userId:', userId);
-        console.log('Request body complet:', req.body);
-        console.log('Timer Progress reçu:', JSON.stringify(timerProgress, null, 2));
-
+        log('debug', 'Mise à jour de la progression du timer', { userId });
+        
         if (!timerProgress || typeof timerProgress !== 'object') {
-            console.log('ERREUR : Progression du timer invalide');
+            log('warn', 'Progression du timer invalide', { userId });
             return res.status(400).json({ message: 'La progression du timer est invalide' });
         }
 
@@ -545,7 +520,7 @@ router.post('/update-timer-progress', authMiddleware, async (req, res) => {
             }
         };
 
-        console.log('Timer Progress à sauvegarder:', JSON.stringify(safeTimerProgress, null, 2));
+        log('debug', 'Timer Progress à sauvegarder', safeTimerProgress);
 
         const result = await db.query(
             `UPDATE progress 
@@ -557,14 +532,12 @@ router.post('/update-timer-progress', authMiddleware, async (req, res) => {
             [JSON.stringify(safeTimerProgress), userId]
         );
 
-        console.log('Mise à jour effectuée, données retournées:', result.rows[0]);
-
         res.status(200).json({
             message: 'Progression du timer mise à jour avec succès',
             timerProgress: safeTimerProgress
         });
     } catch (error) {
-        console.error('ERREUR lors de la mise à jour:', error);
+        log('error', 'Erreur lors de la mise à jour de la progression du timer', error);
         res.status(500).json({ 
             message: 'Erreur lors de la mise à jour de la progression du timer',
             error: error.message 
@@ -572,11 +545,11 @@ router.post('/update-timer-progress', authMiddleware, async (req, res) => {
     }
 });
 
-
- // Route pour initialiser/récupérer l'état du mode Explorer
+// Route pour initialiser/récupérer l'état du mode Explorer
 router.get('/explorer/init', authMiddleware, async (req, res) => {
     try {
       const userId = req.user.id;
+      log('debug', 'Initialisation du mode Explorer', { userId });
       
       // Vérifier si l'utilisateur a déjà des données Explorer
       const userResult = await db.query(
@@ -619,6 +592,7 @@ router.get('/explorer/init', authMiddleware, async (req, res) => {
         }
       } else {
         // Si l'utilisateur n'existe pas dans la table progress, le créer
+        log('info', 'Création d\'un nouvel utilisateur pour le mode Explorer', { userId });
         await db.query(
           `INSERT INTO progress 
            (user_id, explorer_energy, last_energy_update)
@@ -634,23 +608,22 @@ router.get('/explorer/init', authMiddleware, async (req, res) => {
         next_energy_in: nextEnergyIn
       });
     } catch (error) {
-      console.error('Erreur lors de l\'initialisation du mode Explorer:', error);
+      log('error', 'Erreur lors de l\'initialisation du mode Explorer', error);
       res.status(500).json({ 
         message: 'Erreur lors de l\'initialisation du mode Explorer',
         error: error.message
       });
     }
-  });
+});
   
- // Route pour compléter une région en mode Explorer
+// Route pour compléter une région en mode Explorer
 router.post('/explorer/regions/:id/complete', authMiddleware, async (req, res) => {
     try {
       const regionId = req.params.id;
       const userId = req.user.id;
       const { coins = 0, energy = 0, xp = 0 } = req.body;
       
-      console.log(`Complétion de la région ${regionId} pour l'utilisateur ${userId}`);
-      console.log('Récompenses:', { coins, energy, xp });
+      log('info', `Complétion de la région ${regionId}`, { userId, rewards: { coins, energy, xp } });
       
       // 1. Récupérer l'état actuel de l'utilisateur
       const userProgressResult = await db.query(
@@ -667,13 +640,13 @@ router.post('/explorer/regions/:id/complete', authMiddleware, async (req, res) =
         currentEnergy = userProgressResult.rows[0].explorer_energy || 0;
       }
       
-      console.log('Avant mise à jour - currentCoins:', currentCoins, 'currentEnergy:', currentEnergy);
+      log('debug', 'État actuel avant mise à jour', { currentCoins, currentEnergy });
       
       // 2. Calculer les nouvelles valeurs
       const newCoins = currentCoins + coins;
       const newEnergy = Math.min(currentEnergy + energy, maxEnergy);
       
-      console.log('Après mise à jour - newCoins:', newCoins, 'newEnergy:', newEnergy);
+      log('debug', 'Nouvelles valeurs après calcul', { newCoins, newEnergy });
       
       // 3. Mettre à jour la base de données user_regions
       try {
@@ -685,7 +658,7 @@ router.post('/explorer/regions/:id/complete', authMiddleware, async (req, res) =
         
         if (regionResult.rows.length === 0) {
           // Si l'entrée n'existe pas, la créer
-          console.log(`Création d'une nouvelle entrée user_regions pour la région ${regionId}`);
+          log('info', `Création d'une nouvelle entrée user_regions`, { regionId, userId });
           await db.query(
             `INSERT INTO user_regions 
              (region_id, user_id, visited, completed, progress, last_visited)
@@ -694,7 +667,7 @@ router.post('/explorer/regions/:id/complete', authMiddleware, async (req, res) =
           );
         } else {
           // Sinon, mettre à jour l'entrée existante
-          console.log(`Mise à jour de l'entrée user_regions pour la région ${regionId}`);
+          log('debug', `Mise à jour de l'entrée user_regions`, { regionId, userId });
           await db.query(
             `UPDATE user_regions 
              SET visited = true, 
@@ -706,7 +679,7 @@ router.post('/explorer/regions/:id/complete', authMiddleware, async (req, res) =
           );
         }
       } catch (error) {
-        console.error(`⚠️ Erreur lors de la mise à jour de user_regions: ${error.message}`);
+        log('warn', `Erreur lors de la mise à jour de user_regions`, { error: error.message });
         // Ne pas échouer la requête complètement, on peut encore mettre à jour l'énergie
       }
       
@@ -716,12 +689,9 @@ router.post('/explorer/regions/:id/complete', authMiddleware, async (req, res) =
          SET coins = $1, 
              explorer_energy = $2, 
              last_saved = CURRENT_TIMESTAMP
-         WHERE user_id = $3
-         RETURNING coins, explorer_energy`,
+         WHERE user_id = $3`,
         [newCoins, newEnergy, userId]
-      ).then(result => {
-        console.log('Mise à jour des statistiques effectuée:', result.rows[0]);
-      });
+      );
       
       // 5. Répondre avec les nouvelles valeurs
       res.status(200).json({
@@ -733,12 +703,12 @@ router.post('/explorer/regions/:id/complete', authMiddleware, async (req, res) =
         }
       });
     } catch (error) {
-      console.error('Erreur lors de la complétion de la région:', error);
+      log('error', 'Erreur lors de la complétion de la région', error);
       res.status(500).json({ 
         message: 'Erreur lors de la complétion de la région',
         error: error.message
       });
     }
-  });
+});
 
 module.exports = router;

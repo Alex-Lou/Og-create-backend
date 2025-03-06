@@ -5,6 +5,35 @@ const jwt = require('jsonwebtoken');
 const db = require('../config/db');
 const { generateAccessToken, generateRefreshToken, verifyRefreshToken } = require('../utils/tokenManager');
 
+// Configuration des niveaux de log
+const LOG_LEVELS = {
+    debug: 0,
+    info: 1,
+    warn: 2,
+    error: 3
+};
+
+// Niveau de log par défaut, peut être remplacé par une variable d'environnement
+const logLevel = process.env.LOG_LEVEL || 'warn';
+
+/**
+ * Fonction de logging avec niveau
+ * @param {string} level - Niveau de log (debug, info, warn, error)
+ * @param {string} message - Message à logger
+ * @param {any} data - Données additionnelles (optionnel)
+ */
+function log(level, message, data) {
+    // Ne logger que si le niveau est supérieur ou égal au niveau configuré
+    if (LOG_LEVELS[level] >= LOG_LEVELS[logLevel]) {
+        if (data !== undefined) {
+            console[level](`[${level.toUpperCase()}] ${message}`, 
+                typeof data === 'object' ? JSON.stringify(data, null, 2) : data);
+        } else {
+            console[level](`[${level.toUpperCase()}] ${message}`);
+        }
+    }
+}
+
 // Validation des entrées
 const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -26,26 +55,24 @@ const generateUsername = (email) => {
 
 // Route d'inscription
 router.post('/register', async (req, res) => {
-    console.log('===== DÉBUT DE L\'INSCRIPTION =====');
-    console.log('Données reçues:', JSON.stringify(req.body, null, 2));
-    console.log('En-têtes de la requête:', JSON.stringify(req.headers, null, 2));
-
+    log('info', 'Nouvelle demande d\'inscription');
+    
     try {
         const { email, password } = req.body;
 
         // Validation des données d'entrée
         if (!email || !password) {
-            console.log('ERREUR : Email ou mot de passe manquant');
+            log('warn', 'Données d\'inscription incomplètes');
             return res.status(400).json({ message: 'Email et mot de passe requis' });
         }
 
         if (!validateEmail(email)) {
-            console.log('ERREUR : Format d\'email invalide');
+            log('warn', 'Format d\'email invalide', { email });
             return res.status(400).json({ message: 'Format d\'email invalide' });
         }
 
         if (!validatePassword(password)) {
-            console.log('ERREUR : Mot de passe ne respectant pas les critères de sécurité');
+            log('warn', 'Mot de passe ne respectant pas les critères de sécurité');
             return res.status(400).json({ 
                 message: 'Mot de passe invalide. Doit contenir au moins 8 caractères' 
             });
@@ -53,33 +80,33 @@ router.post('/register', async (req, res) => {
 
         // Génération du username
         const username = generateUsername(email);
-        console.log(`Username généré : ${username}`);
+        log('debug', 'Username généré', { username });
 
         // Vérifier si l'utilisateur existe déjà
-        console.log('Vérification de l\'existence de l\'utilisateur');
+        log('debug', 'Vérification de l\'existence de l\'utilisateur');
         const userExists = await db.query(
             'SELECT * FROM users WHERE email = $1 OR username = $2',
             [email, username]
         );
 
         if (userExists.rows.length > 0) {
-            console.log('ERREUR : Email ou username déjà utilisé');
+            log('warn', 'Email ou username déjà utilisé', { email });
             return res.status(400).json({ message: 'Email ou username déjà utilisé' });
         }
 
         // Hasher le mot de passe
-        console.log('Hashage du mot de passe');
+        log('debug', 'Hashage du mot de passe');
         const hashedPassword = await bcrypt.hash(password, 12);
 
         // Créer l'utilisateur
-        console.log('Création de l\'utilisateur en base de données');
+        log('debug', 'Création de l\'utilisateur en base de données');
         const result = await db.query(
             'INSERT INTO users (email, password_hash, username, created_at) VALUES ($1, $2, $3, NOW()) RETURNING id, email, username',
             [email, hashedPassword, username]
         );
 
         // Génération des tokens
-        console.log('Génération des tokens');
+        log('debug', 'Génération des tokens');
         const userData = { 
             userId: result.rows[0].id, 
             email: result.rows[0].email,
@@ -95,7 +122,7 @@ router.post('/register', async (req, res) => {
             [result.rows[0].id, refreshToken]
         );
 
-        console.log('===== INSCRIPTION RÉUSSIE =====');
+        log('info', 'Inscription réussie', { userId: result.rows[0].id, username });
         res.status(201).json({
             message: 'Utilisateur créé avec succès',
             token: accessToken,
@@ -105,11 +132,11 @@ router.post('/register', async (req, res) => {
             expiresIn: 3600 // 1 heure en secondes
         });
     } catch (error) {
-        console.error('===== ERREUR COMPLÈTE D\'INSCRIPTION =====');
-        console.error('Type d\'erreur:', error.name);
-        console.error('Message d\'erreur:', error.message);
-        console.error('Code d\'erreur PostgreSQL:', error.code);
-        console.error('Stack trace:', error.stack);
+        log('error', 'Erreur lors de l\'inscription', { 
+            errorType: error.name,
+            errorMessage: error.message,
+            pgErrorCode: error.code
+        });
         
         res.status(500).json({ 
             message: 'Erreur lors de l\'inscription',
@@ -120,43 +147,41 @@ router.post('/register', async (req, res) => {
 
 // Route de connexion
 router.post('/login', async (req, res) => {
-    console.log('===== DÉBUT DE LA CONNEXION =====');
-    console.log('Données reçues:', JSON.stringify(req.body, null, 2));
-    console.log('En-têtes de la requête:', JSON.stringify(req.headers, null, 2));
+    log('info', 'Tentative de connexion');
 
     try {
         const { email, password } = req.body;
 
         if (!email || !password) {
-            console.log('ERREUR : Email ou mot de passe manquant');
+            log('warn', 'Email ou mot de passe manquant');
             return res.status(400).json({ message: 'Email et mot de passe requis' });
         }
 
         // Recherche de l'utilisateur
-        console.log(`Recherche de l'utilisateur avec l'email : ${email}`);
+        log('debug', 'Recherche de l\'utilisateur', { email });
         const result = await db.query(
             'SELECT * FROM users WHERE email = $1',
             [email]
         );
 
         if (result.rows.length === 0) {
-            console.log('ERREUR : Utilisateur non trouvé');
+            log('warn', 'Utilisateur non trouvé', { email });
             return res.status(401).json({ message: 'Authentification échouée' });
         }
 
         const user = result.rows[0];
-        console.log('Utilisateur trouvé:', JSON.stringify(user, null, 2));
+        log('debug', 'Utilisateur trouvé', { userId: user.id, username: user.username });
 
         // Vérification du mot de passe
         const validPassword = await bcrypt.compare(password, user.password_hash);
 
         if (!validPassword) {
-            console.log('ERREUR : Mot de passe incorrect');
+            log('warn', 'Mot de passe incorrect', { userId: user.id });
             return res.status(401).json({ message: 'Authentification échouée' });
         }
 
         // Génération des tokens
-        console.log('Génération des tokens');
+        log('debug', 'Génération des tokens');
         const userData = { 
             userId: user.id, 
             email: user.email,
@@ -178,7 +203,7 @@ router.post('/login', async (req, res) => {
             [user.id, refreshToken]
         );
 
-        console.log('===== CONNEXION RÉUSSIE =====');
+        log('info', 'Connexion réussie', { userId: user.id });
         res.status(200).json({
             token: accessToken,
             refreshToken,
@@ -187,8 +212,11 @@ router.post('/login', async (req, res) => {
             expiresIn: 3600 // 1 heure en secondes
         });
     } catch (error) {
-        console.error('===== ERREUR COMPLÈTE DE CONNEXION =====');
-        console.error('Erreur détaillée:', error);
+        log('error', 'Erreur lors de la connexion', { 
+            errorType: error.name,
+            errorMessage: error.message
+        });
+        
         res.status(500).json({ 
             message: 'Erreur lors de la connexion',
             errorDetails: process.env.NODE_ENV === 'development' ? error.message : null
@@ -198,14 +226,13 @@ router.post('/login', async (req, res) => {
 
 // Route pour rafraîchir le token
 router.post('/refresh-token', async (req, res) => {
-    console.log('===== DÉBUT DU RAFRAÎCHISSEMENT DE TOKEN =====');
-    console.log('Données reçues:', JSON.stringify(req.body, null, 2));
+    log('debug', 'Demande de rafraîchissement de token');
 
     try {
         const { refreshToken } = req.body;
 
         if (!refreshToken) {
-            console.log('ERREUR : Refresh token manquant');
+            log('warn', 'Refresh token manquant');
             return res.status(400).json({ message: 'Refresh token requis' });
         }
 
@@ -213,11 +240,11 @@ router.post('/refresh-token', async (req, res) => {
         const decoded = verifyRefreshToken(refreshToken);
         
         if (!decoded) {
-            console.log('ERREUR : Refresh token invalide');
+            log('warn', 'Refresh token invalide');
             return res.status(401).json({ message: 'Refresh token invalide ou expiré' });
         }
         
-        console.log('Refresh token décodé:', decoded);
+        log('debug', 'Refresh token décodé', { userId: decoded.userId });
         
         // Vérifier si le refresh token existe dans la base de données
         const tokenResult = await db.query(
@@ -226,7 +253,7 @@ router.post('/refresh-token', async (req, res) => {
         );
         
         if (tokenResult.rows.length === 0) {
-            console.log('ERREUR : Refresh token non trouvé ou expiré en BDD');
+            log('warn', 'Refresh token non trouvé ou expiré en BDD', { userId: decoded.userId });
             return res.status(401).json({ message: 'Session expirée, veuillez vous reconnecter' });
         }
 
@@ -237,7 +264,7 @@ router.post('/refresh-token', async (req, res) => {
         );
 
         if (userResult.rows.length === 0) {
-            console.log('ERREUR : Utilisateur non trouvé lors du rafraîchissement');
+            log('warn', 'Utilisateur non trouvé lors du rafraîchissement', { userId: decoded.userId });
             return res.status(401).json({ message: 'Utilisateur non trouvé, veuillez vous reconnecter' });
         }
         
@@ -250,10 +277,10 @@ router.post('/refresh-token', async (req, res) => {
             username: user.username
         };
         
-        console.log('Génération d\'un nouveau token d\'accès');
+        log('debug', 'Génération d\'un nouveau token d\'accès');
         const newAccessToken = generateAccessToken(userData);
 
-        console.log('===== RAFRAÎCHISSEMENT DE TOKEN RÉUSSI =====');
+        log('info', 'Rafraîchissement de token réussi', { userId: user.id });
         res.status(200).json({
             token: newAccessToken,
             userId: user.id,
@@ -261,10 +288,10 @@ router.post('/refresh-token', async (req, res) => {
             expiresIn: 3600 // 1 heure en secondes
         });
     } catch (error) {
-        console.error('===== ERREUR COMPLÈTE DE RAFRAÎCHISSEMENT DE TOKEN =====');
-        console.error('Type d\'erreur:', error.name);
-        console.error('Message d\'erreur:', error.message);
-        console.error('Stack trace:', error.stack);
+        log('error', 'Erreur lors du rafraîchissement du token', { 
+            errorType: error.name,
+            errorMessage: error.message
+        });
 
         res.status(401).json({ 
             message: 'Erreur lors du rafraîchissement du token',
@@ -278,23 +305,31 @@ router.post('/logout', async (req, res) => {
     try {
         const { refreshToken, userId } = req.body;
         
+        log('info', 'Demande de déconnexion', { userId });
+        
         if (refreshToken) {
             // Supprimer le refresh token spécifique
             await db.query(
                 'DELETE FROM refresh_tokens WHERE token = $1',
                 [refreshToken]
             );
+            log('debug', 'Refresh token supprimé');
         } else if (userId) {
             // Supprimer tous les refresh tokens de l'utilisateur
             await db.query(
                 'DELETE FROM refresh_tokens WHERE user_id = $1',
                 [userId]
             );
+            log('debug', 'Tous les refresh tokens de l\'utilisateur supprimés', { userId });
         }
         
         res.status(200).json({ message: 'Déconnexion réussie' });
     } catch (error) {
-        console.error('Erreur lors de la déconnexion:', error);
+        log('error', 'Erreur lors de la déconnexion', { 
+            errorType: error.name,
+            errorMessage: error.message
+        });
+        
         res.status(500).json({
             message: 'Erreur lors de la déconnexion',
             errorDetails: process.env.NODE_ENV === 'development' ? error.message : null
