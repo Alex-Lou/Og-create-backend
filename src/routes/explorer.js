@@ -570,7 +570,6 @@ router.post('/discover/:regionId/:elementName', authMiddleware, async (req, res)
 });
 
 // Acheter de l'énergie avec des pièces
-// Acheter de l'énergie avec des pièces
 router.post('/buy-energy', authMiddleware, async (req, res) => {
   const userId = req.user.id;
   const energyAmount = req.body.amount || 5;
@@ -595,13 +594,24 @@ router.post('/buy-energy', authMiddleware, async (req, res) => {
     const currentEnergy = progressResult.rows[0].explorer_energy;
     const maxEnergy = progressResult.rows[0].max_energy || 20;
     
+    // Validation 1: Vérifier l'énergie maximale
+    if (currentEnergy >= maxEnergy) {
+      await db.query('ROLLBACK');
+      return res.status(400).json({ 
+        message: "Votre énergie est déjà au maximum",
+        energy: currentEnergy,
+        max_energy: maxEnergy
+      });
+    }
+    
     // Calcul du coût total
     const totalCost = energyAmount * costPerUnit;
     
+    // Validation 2: Vérifier les pièces
     if (userCoins < totalCost) {
       await db.query('ROLLBACK');
       return res.status(400).json({ 
-        message: "Vous n'avez pas assez de pièces",
+        message: `Vous n'avez pas assez de pièces ! ${totalCost} pièces sont nécessaires pour acheter ${energyAmount} point(s) d'énergie.`,
         coins: userCoins,
         cost: totalCost
       });
@@ -612,16 +622,6 @@ router.post('/buy-energy', authMiddleware, async (req, res) => {
     const actualEnergyAdded = newEnergy - currentEnergy;
     const actualCost = actualEnergyAdded * costPerUnit;
     
-    // Si l'énergie est déjà au maximum, annuler
-    if (actualEnergyAdded === 0) {
-      await db.query('ROLLBACK');
-      return res.status(400).json({ 
-        message: "Votre énergie est déjà au maximum",
-        energy: currentEnergy,
-        max_energy: maxEnergy
-      });
-    }
-    
     // Mettre à jour l'énergie et les pièces
     await db.query(
       'UPDATE progress SET explorer_energy = $1, coins = coins - $2, last_energy_update = NOW() WHERE user_id = $3',
@@ -631,7 +631,7 @@ router.post('/buy-energy', authMiddleware, async (req, res) => {
     await db.query('COMMIT');
     
     res.status(200).json({
-      message: "Énergie achetée avec succès",
+      message: `Vous avez acheté ${actualEnergyAdded} point(s) d'énergie pour ${actualCost} pièces.`,
       energy: newEnergy,
       energy_added: actualEnergyAdded,
       coins_spent: actualCost,
