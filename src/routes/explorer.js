@@ -570,25 +570,36 @@ router.post('/discover/:regionId/:elementName', authMiddleware, async (req, res)
 });
 
 // Acheter de l'énergie avec des pièces
+// Acheter de l'énergie avec des pièces
 router.post('/buy-energy', authMiddleware, async (req, res) => {
   const userId = req.user.id;
   const energyAmount = req.body.amount || 5;
   const costPerUnit = 10; // 10 pièces par point d'énergie
-  const totalCost = energyAmount * costPerUnit;
   
   try {
-    // Vérifier si l'utilisateur a assez de pièces
-    const progressResult = await db.query('SELECT coins, explorer_energy FROM progress WHERE user_id = $1', [userId]);
+    // Utiliser une transaction pour garantir la cohérence des données
+    await db.query('BEGIN');
+    
+    // Toujours récupérer les données les plus à jour DANS la transaction
+    const progressResult = await db.query(
+      'SELECT coins, explorer_energy, max_energy FROM progress WHERE user_id = $1 FOR UPDATE', 
+      [userId]
+    );
     
     if (progressResult.rows.length === 0) {
+      await db.query('ROLLBACK');
       return res.status(404).json({ message: "Progression non trouvée" });
     }
     
     const userCoins = progressResult.rows[0].coins;
     const currentEnergy = progressResult.rows[0].explorer_energy;
-    const maxEnergy = 20;
+    const maxEnergy = progressResult.rows[0].max_energy || 20;
+    
+    // Calcul du coût total
+    const totalCost = energyAmount * costPerUnit;
     
     if (userCoins < totalCost) {
+      await db.query('ROLLBACK');
       return res.status(400).json({ 
         message: "Vous n'avez pas assez de pièces",
         coins: userCoins,
@@ -601,21 +612,35 @@ router.post('/buy-energy', authMiddleware, async (req, res) => {
     const actualEnergyAdded = newEnergy - currentEnergy;
     const actualCost = actualEnergyAdded * costPerUnit;
     
+    // Si l'énergie est déjà au maximum, annuler
+    if (actualEnergyAdded === 0) {
+      await db.query('ROLLBACK');
+      return res.status(400).json({ 
+        message: "Votre énergie est déjà au maximum",
+        energy: currentEnergy,
+        max_energy: maxEnergy
+      });
+    }
+    
     // Mettre à jour l'énergie et les pièces
-    await db.query(`
-      UPDATE progress
-      SET explorer_energy = $1, coins = coins - $2
-      WHERE user_id = $3
-    `, [newEnergy, actualCost, userId]);
+    await db.query(
+      'UPDATE progress SET explorer_energy = $1, coins = coins - $2, last_energy_update = NOW() WHERE user_id = $3',
+      [newEnergy, actualCost, userId]
+    );
+    
+    await db.query('COMMIT');
     
     res.status(200).json({
       message: "Énergie achetée avec succès",
       energy: newEnergy,
       energy_added: actualEnergyAdded,
       coins_spent: actualCost,
-      coins_remaining: userCoins - actualCost
+      coins_remaining: userCoins - actualCost,
+      max_energy: maxEnergy,
+      transaction_id: Date.now() // Identifiant unique pour éviter les doublons côté frontend
     });
   } catch (error) {
+    await db.query('ROLLBACK');
     console.error("Erreur lors de l'achat d'énergie:", error);
     res.status(500).json({
       message: "Erreur lors de l'achat d'énergie",
@@ -750,6 +775,80 @@ router.post('/sync-discovered-elements', authMiddleware, async (req, res) => {
     console.error("Erreur lors de la synchronisation des éléments découverts:", error);
     res.status(500).json({
       message: "Erreur lors de la synchronisation des éléments découverts",
+      errorDetails: process.env.NODE_ENV === 'development' ? error.message : null
+    });
+  }
+});
+
+
+// Route pour abandonner un défi (assure que l'énergie est déduite)
+router.post('/abandon/:regionId', authMiddleware, async (req, res) => {
+  const userId = req.user.id;
+  const regionId = req.params.regionId;
+  const energyCost = req.body.energyCost || 0;
+  
+  try {
+    // Vérifier si la région existe
+    const regionResult = await db.query(
+      'SELECT * FROM explorer_regions WHERE id = $1', 
+      [regionId]
+    );
+    
+    if (regionResult.rows.length === 0) {
+      return res.status(404).json({ message: "Région non trouvée" });
+    }
+    
+    const region = regionResult.rows[0];
+    
+    // Si c'est un boss, pas de coût d'énergie
+    if (region.is_boss) {
+      return res.status(200).json({ 
+        message: "Abandon sans coût d'énergie",
+        region: region,
+        energy: req.user.energy
+      });
+    }
+    
+    // Vérifier l'état actuel de l'énergie
+    const progressResult = await db.query(
+      'SELECT explorer_energy FROM progress WHERE user_id = $1', 
+      [userId]
+    );
+    
+    if (progressResult.rows.length === 0) {
+      return res.status(404).json({ message: "Progression non trouvée" });
+    }
+    
+    const currentEnergy = progressResult.rows[0].explorer_energy;
+    
+    // Déduire l'énergie si un coût valide est fourni
+    if (energyCost > 0) {
+      // S'assurer que l'énergie ne devient pas négative
+      const newEnergy = Math.max(0, currentEnergy - energyCost);
+      
+      await db.query(
+        'UPDATE progress SET explorer_energy = $1, last_energy_update = CURRENT_TIMESTAMP WHERE user_id = $2', 
+        [newEnergy, userId]
+      );
+      
+      return res.status(200).json({
+        message: "Défi abandonné avec déduction d'énergie",
+        energy: newEnergy,
+        region: region,
+        energyCost: energyCost
+      });
+    } else {
+      // Si aucun coût n'est spécifié, ne pas déduire d'énergie
+      return res.status(200).json({
+        message: "Défi abandonné sans déduction d'énergie",
+        energy: currentEnergy,
+        region: region
+      });
+    }
+  } catch (error) {
+    console.error("Erreur lors de l'abandon du défi:", error);
+    return res.status(500).json({ 
+      message: "Erreur lors de l'abandon du défi",
       errorDetails: process.env.NODE_ENV === 'development' ? error.message : null
     });
   }

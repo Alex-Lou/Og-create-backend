@@ -36,14 +36,11 @@ function log(level, message, data) {
 // Configuration du rate limiting spécifique pour les routes de progression
 const progressRateLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 30, // 30 requêtes maximum par minute par utilisateur
+  max: 120, // 120 requêtes par minute (2 requêtes/sec, raisonnable)
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: 'Trop de requêtes, veuillez réessayer plus tard' },
-  keyGenerator: (req) => {
-    // Utiliser l'ID utilisateur comme clé si disponible, sinon l'IP
-    return req.user ? req.user.id : req.ip;
-  }
+  keyGenerator: (req) => req.user ? req.user.id : req.ip
 });
 
 // Ajouter une queue pour les sauvegardes par utilisateur
