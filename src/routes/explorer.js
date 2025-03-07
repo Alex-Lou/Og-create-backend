@@ -781,7 +781,6 @@ router.post('/sync-discovered-elements', authMiddleware, async (req, res) => {
 });
 
 
-// Route pour abandonner un défi (assure que l'énergie est déduite)
 router.post('/abandon/:regionId', authMiddleware, async (req, res) => {
   const userId = req.user.id;
   const regionId = req.params.regionId;
@@ -826,17 +825,27 @@ router.post('/abandon/:regionId', authMiddleware, async (req, res) => {
       // S'assurer que l'énergie ne devient pas négative
       const newEnergy = Math.max(0, currentEnergy - energyCost);
       
-      await db.query(
-        'UPDATE progress SET explorer_energy = $1, last_energy_update = CURRENT_TIMESTAMP WHERE user_id = $2', 
-        [newEnergy, userId]
-      );
+      // Utiliser une transaction pour garantir la cohérence des données
+      await db.query('BEGIN');
       
-      return res.status(200).json({
-        message: "Défi abandonné avec déduction d'énergie",
-        energy: newEnergy,
-        region: region,
-        energyCost: energyCost
-      });
+      try {
+        await db.query(
+          'UPDATE progress SET explorer_energy = $1, last_energy_update = CURRENT_TIMESTAMP WHERE user_id = $2', 
+          [newEnergy, userId]
+        );
+        
+        await db.query('COMMIT');
+        
+        return res.status(200).json({
+          message: "Défi abandonné avec déduction d'énergie",
+          energy: newEnergy,
+          energyCost: energyCost,
+          region: region
+        });
+      } catch (updateError) {
+        await db.query('ROLLBACK');
+        throw updateError;
+      }
     } else {
       // Si aucun coût n'est spécifié, ne pas déduire d'énergie
       return res.status(200).json({
