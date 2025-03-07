@@ -277,6 +277,10 @@ router.get('/load', authMiddleware, progressRateLimiter, async (req, res) => {
       const userId = req.user.id;
       log('debug', 'Chargement de la progression', { userId });
 
+      // Éléments fondamentaux qui doivent toujours être présents
+      const fundamentalElements = ["Eau", "Feu", "Terre", "Air"];
+      const fundamentalCategory = "Elements Fondamentaux";
+
       const result = await db.query(
           `SELECT 
               discovered_elements,
@@ -285,6 +289,9 @@ router.get('/load', authMiddleware, progressRateLimiter, async (req, res) => {
               category_progress,
               coins,
               timer_progress,
+              infinite_elements,
+              explorer_elements,
+              timer_elements,
               last_saved
           FROM progress 
           WHERE user_id = $1`,
@@ -292,12 +299,52 @@ router.get('/load', authMiddleware, progressRateLimiter, async (req, res) => {
       );
 
       if (result.rows.length === 0) {
-          log('info', 'Aucune progression trouvée, renvoi des valeurs par défaut', { userId });
+          log('info', 'Aucune progression trouvée, création d\'une nouvelle entrée avec les valeurs par défaut', { userId });
+          
+          // Créer un objet category_progress avec Elements Fondamentaux à 100%
+          const defaultCategoryProgress = {
+              "Elements Fondamentaux": 100
+          };
+          
+          // Créer une nouvelle entrée avec les éléments fondamentaux
+          const newProgress = await db.query(
+              `INSERT INTO progress (
+                  user_id,
+                  discovered_elements,
+                  discovered_categories,
+                  achievements,
+                  category_progress,
+                  coins,
+                  timer_progress,
+                  infinite_elements,
+                  explorer_elements,
+                  timer_elements,
+                  last_saved
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)
+              RETURNING *`,
+              [
+                  userId,
+                  JSON.stringify(fundamentalElements),
+                  [fundamentalCategory],
+                  JSON.stringify({}),
+                  JSON.stringify(defaultCategoryProgress),
+                  0,
+                  JSON.stringify({
+                      completedQuestions: {},
+                      unlockedCategories: {},
+                      bestScores: { Facile: 0, Moyen: 0, Difficile: 0 }
+                  }),
+                  JSON.stringify(fundamentalElements), // infinite_elements avec les éléments fondamentaux
+                  JSON.stringify([]), // explorer_elements
+                  JSON.stringify([]) // timer_elements
+              ]
+          );
+
           return res.status(200).json({
-              discoveredElements: ["Eau", "Feu", "Terre", "Air"],
-              discoveredCategories: ["Elements Fondamentaux"],
+              discoveredElements: fundamentalElements,
+              discoveredCategories: [fundamentalCategory],
               achievements: {},
-              categoryProgress: {},
+              categoryProgress: defaultCategoryProgress,
               coins: 0,
               timerProgress: {
                   completedQuestions: {},
@@ -308,7 +355,10 @@ router.get('/load', authMiddleware, progressRateLimiter, async (req, res) => {
                       Difficile: 0
                   }
               },
-              lastSaved: null
+              infiniteElements: fundamentalElements,
+              explorerElements: [],
+              timerElements: [],
+              lastSaved: newProgress.rows[0].last_saved
           });
       }
 
@@ -322,8 +372,8 @@ router.get('/load', authMiddleware, progressRateLimiter, async (req, res) => {
       });
 
       let parsedProgress = {
-          discoveredElements: ["Eau", "Feu", "Terre", "Air"],
-          discoveredCategories: ["Elements Fondamentaux"],
+          discoveredElements: [],
+          discoveredCategories: [],
           achievements: {},
           categoryProgress: {},
           coins: progress.coins || 0,
@@ -336,30 +386,149 @@ router.get('/load', authMiddleware, progressRateLimiter, async (req, res) => {
                   Difficile: 0
               }
           },
+          infiniteElements: [],
+          explorerElements: [],
+          timerElements: [],
           lastSaved: progress.last_saved
       };
 
+      let elementsUpdated = false;
+      let categoriesUpdated = false;
+      let categoryProgressUpdated = false;
+      let infiniteElementsUpdated = false;
+
       try {
-          if (progress.discovered_elements && progress.discovered_elements !== '{}') {
-              parsedProgress.discoveredElements = typeof progress.discovered_elements === 'string'
+          // Traitement des éléments découverts
+          if (progress.discovered_elements) {
+              let elements = typeof progress.discovered_elements === 'string'
                   ? JSON.parse(progress.discovered_elements)
                   : progress.discovered_elements;
+              
+              // Vérifier si les éléments fondamentaux sont présents, sinon les ajouter
+              let missingElements = [];
+              fundamentalElements.forEach(element => {
+                  if (!elements.includes(element)) {
+                      elements.push(element);
+                      missingElements.push(element);
+                      elementsUpdated = true;
+                  }
+              });
+              
+              if (missingElements.length > 0) {
+                  log('info', `Ajout des éléments fondamentaux manquants: ${missingElements.join(', ')}`, { userId });
+              }
+              
+              parsedProgress.discoveredElements = elements;
+          } else {
+              // Si le champ est null ou undefined, utiliser les éléments fondamentaux
+              parsedProgress.discoveredElements = fundamentalElements;
+              elementsUpdated = true;
           }
 
+          // Traitement des catégories découvertes
           if (progress.discovered_categories && progress.discovered_categories.length > 0) {
               parsedProgress.discoveredCategories = progress.discovered_categories;
+              
+              // S'assurer que la catégorie "Elements Fondamentaux" est toujours présente
+              if (!parsedProgress.discoveredCategories.includes(fundamentalCategory)) {
+                  parsedProgress.discoveredCategories.push(fundamentalCategory);
+                  categoriesUpdated = true;
+                  log('info', `Ajout de la catégorie fondamentale manquante: ${fundamentalCategory}`, { userId });
+              }
+          } else {
+              // Si le champ est null, undefined ou vide, ajouter la catégorie fondamentale
+              parsedProgress.discoveredCategories = [fundamentalCategory];
+              categoriesUpdated = true;
           }
 
+          // Traitement de la progression des catégories
+          if (progress.category_progress) {
+              let categoryProgress = typeof progress.category_progress === 'string'
+                  ? JSON.parse(progress.category_progress)
+                  : progress.category_progress;
+              
+              // S'assurer que Elements Fondamentaux est toujours à 100%
+              if (categoryProgress[fundamentalCategory] !== 100) {
+                  categoryProgress[fundamentalCategory] = 100;
+                  categoryProgressUpdated = true;
+                  log('info', `Mise à jour de la progression des Elements Fondamentaux à 100%`, { userId });
+              }
+              
+              parsedProgress.categoryProgress = categoryProgress;
+          } else {
+              // Si le champ est null ou undefined, créer un objet avec Elements Fondamentaux à 100%
+              parsedProgress.categoryProgress = { [fundamentalCategory]: 100 };
+              categoryProgressUpdated = true;
+          }
+
+          // Traitement des éléments du mode infini (infinite_elements)
+          if (progress.infinite_elements) {
+              let infiniteElements = typeof progress.infinite_elements === 'string'
+                  ? JSON.parse(progress.infinite_elements)
+                  : progress.infinite_elements;
+              
+              // Vérifier si les éléments fondamentaux sont présents, sinon les ajouter
+              fundamentalElements.forEach(element => {
+                  if (!infiniteElements.includes(element)) {
+                      infiniteElements.push(element);
+                      infiniteElementsUpdated = true;
+                  }
+              });
+              
+              // Synchroniser avec tous les éléments découverts
+              parsedProgress.discoveredElements.forEach(element => {
+                  if (!infiniteElements.includes(element)) {
+                      infiniteElements.push(element);
+                      infiniteElementsUpdated = true;
+                  }
+              });
+              
+              parsedProgress.infiniteElements = infiniteElements;
+          } else {
+              // Si le champ est null, undefined ou vide, utiliser les éléments découverts
+              parsedProgress.infiniteElements = [...parsedProgress.discoveredElements];
+              infiniteElementsUpdated = true;
+          }
+
+          // Traitement des éléments des autres modes
+          if (progress.explorer_elements) {
+              parsedProgress.explorerElements = typeof progress.explorer_elements === 'string'
+                  ? JSON.parse(progress.explorer_elements)
+                  : progress.explorer_elements;
+          }
+
+          if (progress.timer_elements) {
+              parsedProgress.timerElements = typeof progress.timer_elements === 'string'
+                  ? JSON.parse(progress.timer_elements)
+                  : progress.timer_elements;
+          }
+
+          // Mettre à jour la base de données si des changements ont été faits
+          if (elementsUpdated || categoriesUpdated || categoryProgressUpdated || infiniteElementsUpdated) {
+              log('info', 'Mise à jour des données fondamentales dans la base de données', { userId });
+              await db.query(
+                  `UPDATE progress 
+                   SET discovered_elements = $1, 
+                       discovered_categories = $2,
+                       category_progress = $3,
+                       infinite_elements = $4,
+                       last_saved = CURRENT_TIMESTAMP
+                   WHERE user_id = $5`,
+                  [
+                      JSON.stringify(parsedProgress.discoveredElements),
+                      parsedProgress.discoveredCategories,
+                      JSON.stringify(parsedProgress.categoryProgress),
+                      JSON.stringify(parsedProgress.infiniteElements),
+                      userId
+                  ]
+              );
+          }
+
+          // Autres traitements (achievements, timerProgress)...
           if (progress.achievements) {
               parsedProgress.achievements = typeof progress.achievements === 'string'
                   ? JSON.parse(progress.achievements)
                   : progress.achievements;
-          }
-
-          if (progress.category_progress) {
-              parsedProgress.categoryProgress = typeof progress.category_progress === 'string'
-                  ? JSON.parse(progress.category_progress)
-                  : progress.category_progress;
           }
 
           if (progress.timer_progress) {
@@ -381,6 +550,7 @@ router.get('/load', authMiddleware, progressRateLimiter, async (req, res) => {
           log('debug', 'Progression parsée', {
             coins: parsedProgress.coins,
             elementsCount: parsedProgress.discoveredElements.length,
+            infiniteElementsCount: parsedProgress.infiniteElements.length,
             achievementsCount: Object.keys(parsedProgress.achievements).length
           });
       } catch (error) {
@@ -447,51 +617,181 @@ router.post('/update-coins', authMiddleware, progressRateLimiter, async (req, re
 });
 
 router.post('/update-discovered-elements', authMiddleware, progressRateLimiter, async (req, res) => {
-    try {
-      const userId = req.user.id;
-      const { discoveredElements } = req.body;
-      
-      log('debug', 'Mise à jour des éléments découverts', { 
-        userId, 
-        elementsCount: discoveredElements ? discoveredElements.length : 0 
-      });
-      
-      // Vérifier d'abord si la progression existe
-      const currentProgress = await db.query(
-        'SELECT discovered_elements FROM progress WHERE user_id = $1',
-        [userId]
-      );
-      
-      // Si aucune progression n'existe, créer une nouvelle entrée
-      if (currentProgress.rows.length === 0) {
-        log('info', 'Création nouvelle entrée progress pour éléments découverts', { userId });
-        await db.query(
-          `INSERT INTO progress (user_id, discovered_elements, last_saved)
-           VALUES ($1, $2, CURRENT_TIMESTAMP)`,
-          [userId, JSON.stringify(discoveredElements)]
-        );
-      } else {
-        log('debug', 'Mise à jour éléments découverts existants', { userId });
-        await db.query(
-          `UPDATE progress 
-           SET discovered_elements = $1, last_saved = CURRENT_TIMESTAMP
-           WHERE user_id = $2`,
-          [JSON.stringify(discoveredElements), userId]
-        );
+  try {
+    const userId = req.user.id;
+    const { discoveredElements, gameMode = 'infinite' } = req.body;
+    
+    log('debug', 'Mise à jour des éléments découverts', { 
+      userId, 
+      elementsCount: discoveredElements ? discoveredElements.length : 0,
+      gameMode
+    });
+    
+    // Éléments fondamentaux qui doivent toujours être présents
+    const fundamentalElements = ["Eau", "Feu", "Terre", "Air"];
+    const fundamentalCategory = "Elements Fondamentaux";
+    
+    // Vérifier d'abord si la progression existe
+    const currentProgress = await db.query(
+      `SELECT 
+         discovered_elements, 
+         infinite_elements, 
+         explorer_elements, 
+         timer_elements,
+         category_progress
+       FROM progress WHERE user_id = $1`,
+      [userId]
+    );
+    
+    // S'assurer que les éléments fondamentaux sont inclus
+    let elementsToSave = Array.isArray(discoveredElements) ? [...discoveredElements] : [];
+    fundamentalElements.forEach(element => {
+      if (!elementsToSave.includes(element)) {
+        elementsToSave.push(element);
       }
-  
-      res.status(200).json({
-        message: 'Éléments découverts mis à jour avec succès',
-        discoveredElements: discoveredElements,
-        timestamp: new Date().toISOString()
+    });
+    
+    // Si aucune progression n'existe, créer une nouvelle entrée
+    if (currentProgress.rows.length === 0) {
+      log('info', 'Création nouvelle entrée progress pour éléments découverts', { userId });
+      
+      // Initialiser les éléments spécifiques au mode de jeu
+      let infiniteElements = gameMode === 'infinite' ? elementsToSave : fundamentalElements;
+      let explorerElements = gameMode === 'explorer' ? elementsToSave : [];
+      let timerElements = gameMode === 'timer' ? elementsToSave : [];
+      
+      // Catégorie fondamentale à 100%
+      const categoryProgress = { [fundamentalCategory]: 100 };
+      
+      await db.query(
+        `INSERT INTO progress (
+           user_id, 
+           discovered_elements, 
+           discovered_categories,
+           category_progress,
+           infinite_elements,
+           explorer_elements,
+           timer_elements,
+           last_saved
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)`,
+        [
+          userId, 
+          JSON.stringify(elementsToSave),
+          [fundamentalCategory],
+          JSON.stringify(categoryProgress),
+          JSON.stringify(infiniteElements),
+          JSON.stringify(explorerElements),
+          JSON.stringify(timerElements)
+        ]
+      );
+    } else {
+      log('debug', 'Mise à jour éléments découverts existants', { userId });
+      
+      // Récupérer les éléments existants
+      let currentDiscoveredElements = currentProgress.rows[0].discovered_elements 
+        ? (typeof currentProgress.rows[0].discovered_elements === 'string'
+           ? JSON.parse(currentProgress.rows[0].discovered_elements)
+           : currentProgress.rows[0].discovered_elements)
+        : [];
+      
+      let currentInfiniteElements = currentProgress.rows[0].infinite_elements
+        ? (typeof currentProgress.rows[0].infinite_elements === 'string'
+           ? JSON.parse(currentProgress.rows[0].infinite_elements)
+           : currentProgress.rows[0].infinite_elements)
+        : [];
+      
+      let currentExplorerElements = currentProgress.rows[0].explorer_elements
+        ? (typeof currentProgress.rows[0].explorer_elements === 'string'
+           ? JSON.parse(currentProgress.rows[0].explorer_elements)
+           : currentProgress.rows[0].explorer_elements)
+        : [];
+      
+      let currentTimerElements = currentProgress.rows[0].timer_elements
+        ? (typeof currentProgress.rows[0].timer_elements === 'string'
+           ? JSON.parse(currentProgress.rows[0].timer_elements)
+           : currentProgress.rows[0].timer_elements)
+        : [];
+      
+      let categoryProgress = currentProgress.rows[0].category_progress
+        ? (typeof currentProgress.rows[0].category_progress === 'string'
+           ? JSON.parse(currentProgress.rows[0].category_progress)
+           : currentProgress.rows[0].category_progress)
+        : { [fundamentalCategory]: 100 };
+      
+      // Fusionner les éléments
+      elementsToSave = [...new Set([...currentDiscoveredElements, ...elementsToSave])];
+      
+      // Mettre à jour les éléments du mode de jeu correspondant
+      let infiniteElementsToSave = currentInfiniteElements;
+      let explorerElementsToSave = currentExplorerElements;
+      let timerElementsToSave = currentTimerElements;
+      
+      // Synchroniser les éléments selon le mode de jeu
+      if (gameMode === 'infinite') {
+        infiniteElementsToSave = [...new Set([...currentInfiniteElements, ...elementsToSave])];
+      } else if (gameMode === 'explorer') {
+        explorerElementsToSave = [...new Set([...currentExplorerElements, ...elementsToSave])];
+      } else if (gameMode === 'timer') {
+        timerElementsToSave = [...new Set([...currentTimerElements, ...elementsToSave])];
+      }
+      
+      // S'assurer que les éléments fondamentaux sont dans le mode infini
+      fundamentalElements.forEach(element => {
+        if (!infiniteElementsToSave.includes(element)) {
+          infiniteElementsToSave.push(element);
+        }
       });
-    } catch (error) {
-      log('error', 'Erreur lors de la mise à jour des éléments découverts', error);
-      res.status(500).json({ message: 'Erreur lors de la mise à jour des éléments découverts' });
+      
+      // S'assurer que Elements Fondamentaux est à 100%
+      categoryProgress[fundamentalCategory] = 100;
+      
+      await db.query(
+        `UPDATE progress 
+         SET 
+           discovered_elements = $1,
+           category_progress = $2,
+           infinite_elements = $3,
+           explorer_elements = $4,
+           timer_elements = $5,
+           last_saved = CURRENT_TIMESTAMP
+         WHERE user_id = $6`,
+        [
+          JSON.stringify(elementsToSave),
+          JSON.stringify(categoryProgress),
+          JSON.stringify(infiniteElementsToSave),
+          JSON.stringify(explorerElementsToSave),
+          JSON.stringify(timerElementsToSave),
+          userId
+        ]
+      );
     }
+
+    // Préparation de la réponse
+    let responseData = {
+      message: 'Éléments découverts mis à jour avec succès',
+      discoveredElements: elementsToSave,
+      timestamp: new Date().toISOString()
+    };
+    
+    // Ajouter des informations supplémentaires selon le mode
+    if (gameMode === 'infinite') {
+      responseData.infiniteElements = elementsToSave;
+    } else if (gameMode === 'explorer') {
+      responseData.explorerElements = elementsToSave;
+    } else if (gameMode === 'timer') {
+      responseData.timerElements = elementsToSave;
+    }
+    
+    res.status(200).json(responseData);
+  } catch (error) {
+    log('error', 'Erreur lors de la mise à jour des éléments découverts', error);
+    res.status(500).json({ 
+      message: 'Erreur lors de la mise à jour des éléments découverts',
+      error: error.message
+    });
+  }
 });
 
-// Il y a une route update-achievements dupliquée dans le code original - j'ai supprimé la deuxième instance
 
 // Route pour mettre à jour la progression du timer uniquement
 router.post('/update-timer-progress', authMiddleware, async (req, res) => {
