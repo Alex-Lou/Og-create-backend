@@ -97,12 +97,19 @@ const customizationRoutes = require('./routes/customization');
 const explorerRoutes = require('./routes/explorer');
 const gameDataController = require('./routes/gameDataController');
 
+const timerService = require('./routes/timerService');
+
 app.use('/api/auth', authRoutes);
 app.use('/api/progress', gameLimiter, progressRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/customization', customizationRoutes);
 app.use('/api/explorer', gameLimiter, explorerRoutes);
 app.use('/api/game-data', gameLimiter, gameDataController);
+
+
+app.use('/api/timer', timerService);
+
+
 
 // Bloquer l'accès direct aux fichiers JSON du dossier data
 app.use('/data', (req, res, next) => {
