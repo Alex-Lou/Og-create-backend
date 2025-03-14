@@ -1,12 +1,10 @@
-// routes/timerService.js
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const authMiddleware = require('../middleware/auth');
 const rateLimit = require('express-rate-limit');
-const { log } = require('../utils/logger')
+const { log } = require('../utils/logger');
 
-// Configuration du rate limiting
 const timerRateLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 120,
@@ -16,7 +14,6 @@ const timerRateLimiter = rateLimit({
   keyGenerator: (req) => req.user ? req.user.id : req.ip
 });
 
-// Route pour sauvegarder les éléments du mode Timer
 router.post('/save-elements', authMiddleware, timerRateLimiter, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -27,17 +24,14 @@ router.post('/save-elements', authMiddleware, timerRateLimiter, async (req, res)
       elementsCount: elements.length 
     });
     
-    // Vérifier si la progression existe
     const existingProgress = await db.query(
       'SELECT timer_elements FROM progress WHERE user_id = $1',
       [userId]
     );
     
-    // Assurer que les éléments fondamentaux sont inclus
     const fundamentalElements = ["Eau", "Feu", "Terre", "Air"];
     let elementsToSave = Array.isArray(elements) ? [...elements] : [];
     
-    // Fusionner avec les éléments existants
     if (existingProgress.rows.length > 0) {
       let existingElements;
       try {
@@ -47,26 +41,19 @@ router.post('/save-elements', authMiddleware, timerRateLimiter, async (req, res)
       } catch (e) {
         existingElements = [];
       }
-      
-      // Combiner et dédupliquer
       elementsToSave = [...new Set([...existingElements, ...elementsToSave])];
     }
     
-    // S'assurer que la progression existe
     if (existingProgress.rows.length === 0) {
       await db.query(
         `INSERT INTO progress (
           user_id, 
           timer_elements,
-          discovered_elements,
-          discovered_categories,
           last_saved
-        ) VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)`,
+        ) VALUES ($1, $2, CURRENT_TIMESTAMP)`,
         [
           userId, 
-          JSON.stringify(elementsToSave),
-          JSON.stringify(fundamentalElements),
-          JSON.stringify(["Elements Fondamentaux"])
+          JSON.stringify(elementsToSave)
         ]
       );
     } else {
@@ -93,7 +80,6 @@ router.post('/save-elements', authMiddleware, timerRateLimiter, async (req, res)
   }
 });
 
-// Route pour mettre à jour la progression du timer uniquement
 router.post('/update-timer-progress', authMiddleware, async (req, res) => {
   try {
       const userId = req.user.id;
@@ -106,7 +92,6 @@ router.post('/update-timer-progress', authMiddleware, async (req, res) => {
           return res.status(400).json({ message: 'La progression du timer est invalide' });
       }
 
-      // Vérification plus détaillée de la structure
       const safeTimerProgress = {
           completedQuestions: timerProgress.completedQuestions || {},
           unlockedCategories: timerProgress.unlockedCategories || {},
@@ -142,7 +127,6 @@ router.post('/update-timer-progress', authMiddleware, async (req, res) => {
   }
 });
 
-// Route pour charger spécifiquement les éléments du mode Timer
 router.get('/load-elements', authMiddleware, timerRateLimiter, async (req, res) => {
   try {
     const userId = req.user.id;
