@@ -4,26 +4,7 @@ const router = express.Router();
 const db = require('../config/db');
 const authMiddleware = require('../middleware/auth');
 const rateLimit = require('express-rate-limit');
-
-// Configuration des niveaux de log (copier depuis progress.js)
-const LOG_LEVELS = {
-    debug: 0,
-    info: 1,
-    warn: 2,
-    error: 3
-};
-const logLevel = process.env.LOG_LEVEL || 'warn';
-
-function log(level, message, data) {
-    if (LOG_LEVELS[level] >= LOG_LEVELS[logLevel]) {
-        if (data !== undefined) {
-            console[level](`[${level.toUpperCase()}] ${message}`, 
-                typeof data === 'object' ? JSON.stringify(data, null, 2) : data);
-        } else {
-            console[level](`[${level.toUpperCase()}] ${message}`);
-        }
-    }
-}
+const { log } = require('../utils/logger')
 
 // Configuration du rate limiting
 const timerRateLimiter = rateLimit({
@@ -109,6 +90,55 @@ router.post('/save-elements', authMiddleware, timerRateLimiter, async (req, res)
       message: 'Erreur lors de la sauvegarde des éléments du mode Timer',
       error: error.message 
     });
+  }
+});
+
+// Route pour mettre à jour la progression du timer uniquement
+router.post('/update-timer-progress', authMiddleware, async (req, res) => {
+  try {
+      const userId = req.user.id;
+      const { timerProgress } = req.body;
+      
+      log('debug', 'Mise à jour de la progression du timer', { userId });
+      
+      if (!timerProgress || typeof timerProgress !== 'object') {
+          log('warn', 'Progression du timer invalide', { userId });
+          return res.status(400).json({ message: 'La progression du timer est invalide' });
+      }
+
+      // Vérification plus détaillée de la structure
+      const safeTimerProgress = {
+          completedQuestions: timerProgress.completedQuestions || {},
+          unlockedCategories: timerProgress.unlockedCategories || {},
+          bestScores: {
+              Facile: timerProgress.bestScores?.Facile || 0,
+              Moyen: timerProgress.bestScores?.Moyen || 0,
+              Difficile: timerProgress.bestScores?.Difficile || 0
+          }
+      };
+
+      log('debug', 'Timer Progress à sauvegarder', safeTimerProgress);
+
+      const result = await db.query(
+          `UPDATE progress 
+          SET 
+              timer_progress = $1,
+              last_saved = CURRENT_TIMESTAMP
+          WHERE user_id = $2
+          RETURNING timer_progress`,
+          [JSON.stringify(safeTimerProgress), userId]
+      );
+
+      res.status(200).json({
+          message: 'Progression du timer mise à jour avec succès',
+          timerProgress: safeTimerProgress
+      });
+  } catch (error) {
+      log('error', 'Erreur lors de la mise à jour de la progression du timer', error);
+      res.status(500).json({ 
+          message: 'Erreur lors de la mise à jour de la progression du timer',
+          error: error.message 
+      });
   }
 });
 
