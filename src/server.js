@@ -92,6 +92,48 @@ app.use('/api/progress/elements', gameLimiter, elementsRouter);
 app.use('/api/contact', contactRoutes);
 app.use('/api/customization', customizationRoutes);
 app.use('/api/explorer', gameLimiter, explorerRoutes);
+
+// Middleware pour gérer les fichiers manquants connus sans générer de 404
+app.use('/api/game-data/:filename', (req, res, next) => {
+  // Liste des fichiers qu'on sait ne pas exister dans la BD
+  const knownMissing = [
+    'animaux', 
+    'biologie', 
+    'créations_humaines',
+    'elements_data', 
+    'geologie', 
+    'magie', 
+    'timer-questions'
+    // 'achievements' retiré car il existe et doit être chargé normalement
+  ];
+  
+  // Si c'est un fichier connu comme manquant, retourner une réponse vide mais valide
+  // avec un statut 200 plutôt qu'un 404
+  if (knownMissing.includes(req.params.filename)) {
+    // Structure de retour spécifique selon le fichier demandé
+    if (req.params.filename === 'achievements') {
+      // Pour les achievements, on retourne un tableau vide car la fonction map() est utilisée
+      return res.status(200).json([]);
+    } else if (req.params.filename === 'elements_data' || req.params.filename === 'elements') {
+      // Pour les éléments, structure appropriée
+      return res.status(200).json({
+        elements: {},
+        categories: {},
+        rules: {}
+      });
+    } else {
+      // Pour les autres fichiers, structure par défaut
+      return res.status(200).json({
+        elements: {},
+        rules: {}
+      });
+    }
+  }
+  
+  // Sinon, passer au prochain middleware
+  next();
+});
+
 app.use('/api/game-data', gameLimiter, gameDataController);
 app.use('/api/timer', timerService);
 
