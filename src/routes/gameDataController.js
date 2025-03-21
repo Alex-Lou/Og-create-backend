@@ -1,55 +1,65 @@
 // routes/gameDataController.js
 const express = require('express');
 const router = express.Router();
-const path = require('path');
-const fs = require('fs');
 const authMiddleware = require('../middleware/auth');
 const { log } = require('../utils/logger');
+const db = require('../config/db');
 
-// Répertoire contenant tous les fichiers JSON
-const DATA_DIR = path.join(__dirname, '../public/data');
-
-// Cache pour éviter de relire les fichiers à chaque requête
+// Cache pour éviter de requêter la base de données à chaque fois
 const dataCache = {
   timestamp: 0,
   data: {},
-  // Durée de validité du cache en millisecondes (5 minutes)
   cacheDuration: 5 * 60 * 1000
 };
 
-// Lire et traiter un fichier JSON
-function readJsonFile(filename) {
+// Fonction pour récupérer une donnée par son nom depuis la base de données
+async function fetchGameDataByName(name) {
   try {
-    const filePath = path.join(DATA_DIR, filename);
-    const content = fs.readFileSync(filePath, 'utf8');
-    return JSON.parse(content);
+    log('debug', `Récupération des données pour ${name} depuis la base de données`);
+    
+    // Normaliser le nom pour la recherche
+    const normalizedName = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    
+    const result = await db.query(
+      'SELECT name, elements, rules, metadata FROM game_data WHERE name = $1 AND active = true',
+      [normalizedName]
+    );
+    
+    if (result.rows.length === 0) {
+      log('warn', `Aucune donnée trouvée pour ${name}`);
+      return null;
+    }
+    
+    const row = result.rows[0];
+    
+    // Combiner les données des colonnes JSONB
+    return {
+      ...(row.elements || {}),
+      ...(row.rules || {}),
+      ...(row.metadata || {})
+    };
   } catch (error) {
-    log('error', `Erreur lors de la lecture du fichier ${filename}`, error);
+    log('error', `Erreur lors de la récupération de ${name} depuis la base de données`, error);
     return null;
   }
 }
 
 // Purger les données sensibles des éléments
 function sanitizeElementsData(data) {
-  // Fonction récursive pour parcourir l'objet et supprimer les formules
   function sanitizeObject(obj) {
     if (!obj || typeof obj !== 'object') return obj;
     
-    // Si c'est un tableau, nettoyer chaque élément
     if (Array.isArray(obj)) {
       return obj.map(item => sanitizeObject(item));
     }
     
-    // Si c'est un objet
     const result = { ...obj };
     
-    // Supprimer les propriétés sensibles
     delete result.formula;
     delete result.secretFormula;
     delete result.calculationMethod;
     delete result.secretInfo;
     
-    // Parcourir récursivement toutes les propriétés
     for (const key in result) {
       if (typeof result[key] === 'object' && result[key] !== null) {
         result[key] = sanitizeObject(result[key]);
@@ -74,25 +84,38 @@ router.get('/load', authMiddleware, async (req, res) => {
       return res.status(200).json(dataCache.data);
     }
     
-    // Lister tous les fichiers JSON dans le répertoire
-    const files = fs.readdirSync(DATA_DIR).filter(file => file.endsWith('.json'));
+    // Récupérer toutes les données depuis la base de données
+    const result = await db.query(
+      'SELECT name, elements, rules, metadata FROM game_data WHERE active = true'
+    );
+    
+    if (result.rows.length === 0) {
+      log('warn', 'Aucune donnée trouvée dans la base');
+      return res.status(404).json({
+        message: 'Aucune donnée de jeu trouvée'
+      });
+    }
     
     // Objet pour stocker toutes les données
     const allData = {};
     
-    // Lire chaque fichier
-    for (const file of files) {
-      const baseName = path.basename(file, '.json');
-      const data = readJsonFile(file);
+    // Traiter chaque ligne de la base de données
+    for (const row of result.rows) {
+      const baseName = row.name;
       
-      if (data) {
-        // Nettoyer les données sensibles si nécessaire
-        if (baseName.includes('elements') || baseName.includes('formations') || 
-            baseName.includes('animaux') || baseName.includes('phenomenes')) {
-          allData[baseName] = sanitizeElementsData(data);
-        } else {
-          allData[baseName] = data;
-        }
+      // Combiner les données
+      const data = {
+        ...(row.elements || {}),
+        ...(row.rules || {}),
+        ...(row.metadata || {})
+      };
+      
+      // Nettoyer les données sensibles si nécessaire
+      if (baseName.includes('elements') || baseName.includes('formations') || 
+          baseName.includes('animaux') || baseName.includes('phenomenes')) {
+        allData[baseName] = sanitizeElementsData(data);
+      } else {
+        allData[baseName] = data;
       }
     }
     
@@ -100,8 +123,8 @@ router.get('/load', authMiddleware, async (req, res) => {
     dataCache.data = allData;
     dataCache.timestamp = now;
     
-    log('debug', 'Données du jeu chargées avec succès', { 
-      filesCount: files.length,
+    log('debug', 'Données du jeu chargées avec succès depuis la base de données', { 
+      dataCount: Object.keys(allData).length,
       cacheTimestamp: now
     });
     
@@ -117,11 +140,11 @@ router.get('/load', authMiddleware, async (req, res) => {
 });
 
 // Route spécifique pour les éléments
-router.get('/elements', authMiddleware, (req, res) => {
+router.get('/elements', authMiddleware, async (req, res) => {
   try {
     log('debug', 'Demande de chargement des éléments');
     
-    // Répondre avec la liste des éléments par défaut si le fichier n'existe pas
+    // Répondre avec la liste des éléments par défaut si aucune donnée n'est trouvée
     const defaultElements = {
       elements: [
         { name: "Eau", category: "Element Fondamental" },
@@ -131,32 +154,24 @@ router.get('/elements', authMiddleware, (req, res) => {
       ]
     };
     
-    // Essayer de charger le fichier elements_data.json à la place
-    const elementsDataPath = path.join(DATA_DIR, 'elements_data.json');
+    // Essayer de charger les données 'elements_data' de la base de données
+    let data = await fetchGameDataByName('elements_data');
     
-    if (fs.existsSync(elementsDataPath)) {
-      log('debug', 'Utilisation du fichier elements_data.json');
-      const data = readJsonFile('elements_data.json');
-      
-      if (data) {
-        return res.status(200).json(sanitizeElementsData(data));
-      }
+    if (data) {
+      log('debug', 'Utilisation des données elements_data depuis la base de données');
+      return res.status(200).json(sanitizeElementsData(data));
     }
     
-    // Si ça ne marche pas, essayer avec elements.json
-    const elementsPath = path.join(DATA_DIR, 'elements.json');
+    // Si ça ne marche pas, essayer avec 'elements'
+    data = await fetchGameDataByName('elements');
     
-    if (fs.existsSync(elementsPath)) {
-      log('debug', 'Utilisation du fichier elements.json');
-      const data = readJsonFile('elements.json');
-      
-      if (data) {
-        return res.status(200).json(sanitizeElementsData(data));
-      }
+    if (data) {
+      log('debug', 'Utilisation des données elements depuis la base de données');
+      return res.status(200).json(sanitizeElementsData(data));
     }
     
-    // Si aucun fichier n'existe ou ne peut être lu, retourner la liste par défaut
-    log('info', 'Utilisation des éléments par défaut, fichiers non trouvés');
+    // Si aucune donnée n'est trouvée, retourner la liste par défaut
+    log('info', 'Utilisation des éléments par défaut, données non trouvées');
     res.status(200).json(defaultElements);
   } catch (error) {
     log('error', 'Erreur lors du chargement des éléments', error);
@@ -167,48 +182,43 @@ router.get('/elements', authMiddleware, (req, res) => {
   }
 });
 
-// Route pour charger un fichier JSON spécifique (version sécurisée)
-router.get('/:filename', authMiddleware, (req, res) => {
+// Route pour charger un fichier JSON spécifique
+router.get('/:filename', authMiddleware, async (req, res) => {
   try {
-    const { filename } = req.params;
+    let { filename } = req.params;
+    
+    // Décoder le nom de fichier pour gérer les caractères spéciaux
+    filename = decodeURIComponent(filename);
     
     // Vérifier que le nom de fichier est sécurisé
-    if (!filename.match(/^[a-zA-Z0-9_-]+$/)) {
+    if (!filename.match(/^[a-zA-ZÀ-ÿ0-9_-]+$/)) {
       log('warn', 'Tentative d\'accès avec un nom de fichier invalide', { filename });
       return res.status(400).json({ message: 'Nom de fichier invalide' });
     }
     
-    // Chemin complet avec extension
-    const jsonFilename = `${filename}.json`;
-    const filePath = path.join(DATA_DIR, jsonFilename);
+    log('debug', 'Chargement de données spécifiques', { filename });
     
-    // Vérifier que le fichier existe
-    if (!fs.existsSync(filePath)) {
-      log('warn', 'Fichier demandé non trouvé', { filename });
-      return res.status(404).json({ message: 'Fichier non trouvé' });
+    // Récupérer les données depuis la base de données
+    const data = await fetchGameDataByName(filename);
+    
+    if (data) {
+      // Nettoyer les données sensibles si nécessaire
+      if (filename.includes('elements') || filename.includes('formations') || 
+          filename.includes('animaux') || filename.includes('phenomenes')) {
+        return res.status(200).json(sanitizeElementsData(data));
+      }
+      
+      // Envoyer les données
+      return res.status(200).json(data);
     }
     
-    log('debug', 'Chargement de fichier spécifique', { filename });
-    
-    // Lire le fichier
-    const data = readJsonFile(jsonFilename);
-    
-    if (!data) {
-      return res.status(500).json({ message: 'Erreur lors de la lecture du fichier' });
-    }
-    
-    // Nettoyer les données sensibles si nécessaire
-    if (filename.includes('elements') || filename.includes('formations') || 
-        filename.includes('animaux') || filename.includes('phenomenes')) {
-      return res.status(200).json(sanitizeElementsData(data));
-    }
-    
-    // Envoyer les données
-    res.status(200).json(data);
+    // Si les données ne sont pas trouvées
+    log('warn', 'Données demandées non trouvées', { filename });
+    return res.status(404).json({ message: 'Données non trouvées' });
   } catch (error) {
-    log('error', `Erreur lors du chargement du fichier ${req.params.filename}`, error);
+    log('error', `Erreur lors du chargement des données ${req.params.filename}`, error);
     res.status(500).json({
-      message: 'Erreur lors du chargement du fichier',
+      message: 'Erreur lors du chargement des données',
       errorDetails: process.env.NODE_ENV === 'development' ? error.message : null
     });
   }
@@ -216,36 +226,33 @@ router.get('/:filename', authMiddleware, (req, res) => {
 
 // Route pour vérifier les combinaisons d'éléments
 router.post('/combine', authMiddleware, async (req, res) => {
-    try {
-      const { elements } = req.body;
-      
-      if (!elements || !Array.isArray(elements) || elements.length < 2) {
-        return res.status(400).json({ 
-          message: 'Au moins deux éléments sont nécessaires pour une combinaison'
-        });
-      }
-      
-      log('info', 'Tentative de combinaison', { elements: elements.join(' + ') });
-      
-      // Charger les formules de combinaison (formules cachées côté serveur)
-      const formulasPath = path.join(DATA_DIR, 'formulas.json');
-      let formulas = {};
-      
-      try {
-        const formulasContent = fs.readFileSync(formulasPath, 'utf8');
-        formulas = JSON.parse(formulasContent);
-      } catch (error) {
-        log('error', 'Erreur lors du chargement des formules', error);
-        return res.status(500).json({ message: 'Erreur lors du chargement des formules' });
-      }
-      
-      // Trier les éléments pour correspondre aux formules (ordre alphabétique)
-      const sortedElements = [...elements].sort();
-      
-      // Chercher une formule correspondante
-      let result = null;
-      
-      // Vérifier les combinaisons spécifiques
+  try {
+    const { elements } = req.body;
+    
+    if (!elements || !Array.isArray(elements) || elements.length < 2) {
+      return res.status(400).json({ 
+        message: 'Au moins deux éléments sont nécessaires pour une combinaison'
+      });
+    }
+    
+    log('info', 'Tentative de combinaison', { elements: elements.join(' + ') });
+    
+    // Charger les formules de combinaison depuis la base de données
+    let formulas = await fetchGameDataByName('formulas');
+    
+    if (!formulas) {
+      log('error', 'Erreur lors du chargement des formules');
+      return res.status(500).json({ message: 'Erreur lors du chargement des formules' });
+    }
+    
+    // Trier les éléments pour correspondre aux formules (ordre alphabétique)
+    const sortedElements = [...elements].sort();
+    
+    // Chercher une formule correspondante
+    let result = null;
+    
+    // Vérifier les combinaisons spécifiques
+    if (formulas.specific) {
       for (const formula of formulas.specific) {
         // Convertir les ingrédients requis en ensemble pour vérification facile
         const requiredIngredients = new Set(formula.ingredients);
@@ -262,67 +269,115 @@ router.post('/combine', authMiddleware, async (req, res) => {
           break;
         }
       }
-      
-      // Si aucune combinaison spécifique n'est trouvée, vérifier les règles génériques
-      if (!result && formulas.generic) {
-        for (const rule of formulas.generic) {
-          // Vérifier si la règle s'applique à ces éléments
-          const matches = checkGenericRule(rule, elements);
-          if (matches) {
-            result = {
-              success: true,
-              resultElement: matches.result,
-              newElement: matches.isNew,
-              message: matches.message
-            };
-            break;
-          }
+    }
+    
+    // Si aucune combinaison spécifique n'est trouvée, vérifier les règles génériques
+    if (!result && formulas.generic) {
+      for (const rule of formulas.generic) {
+        // Vérifier si la règle s'applique à ces éléments
+        const matches = await checkGenericRule(rule, elements);
+        if (matches) {
+          result = {
+            success: true,
+            resultElement: matches.result,
+            newElement: matches.isNew,
+            message: matches.message
+          };
+          break;
         }
       }
-      
-      // Si aucun résultat trouvé
-      if (!result) {
-        log('debug', 'Combinaison échouée', { elements: elements.join(' + ') });
-        return res.status(200).json({
-          success: false,
-          message: 'Ces éléments ne se combinent pas...'
-        });
+    }
+    
+    // Si aucun résultat trouvé, vérifier les règles de craft dans les données geologie, etc.
+    if (!result) {
+      const craftResult = await checkCraftRules(elements);
+      if (craftResult) {
+        result = {
+          success: true,
+          resultElement: craftResult,
+          newElement: true,
+          message: `Vous avez créé ${craftResult} !`
+        };
       }
-      
-      log('info', 'Combinaison réussie', { 
-        elements: elements.join(' + '), 
-        result: result.resultElement,
-        isNew: result.newElement
-      });
-      
-      // Charger les détails de l'élément résultant
-      const elementsData = readJsonFile('elements_data.json');
-      if (elementsData && elementsData.elements) {
-        const resultElementDetails = elementsData.elements.find(e => e.name === result.resultElement);
-        if (resultElementDetails) {
-          // Ajouter les détails mais sans les formules
-          result.elementDetails = sanitizeElementsData(resultElementDetails);
-        }
-      }
-      
-      res.status(200).json(result);
-    } catch (error) {
-      log('error', 'Erreur lors de la vérification de la combinaison', error);
-      res.status(500).json({
-        message: 'Erreur lors de la vérification de la combinaison',
-        errorDetails: process.env.NODE_ENV === 'development' ? error.message : null
+    }
+    
+    // Si toujours aucun résultat
+    if (!result) {
+      log('debug', 'Combinaison échouée', { elements: elements.join(' + ') });
+      return res.status(200).json({
+        success: false,
+        message: 'Ces éléments ne se combinent pas...'
       });
     }
+    
+    log('info', 'Combinaison réussie', { 
+      elements: elements.join(' + '), 
+      result: result.resultElement,
+      isNew: result.newElement
+    });
+    
+    // Charger les détails de l'élément résultant
+    const elementsData = await fetchGameDataByName('elements_data');
+    if (elementsData && elementsData.elements) {
+      const resultElementDetails = elementsData.elements.find(e => e.name === result.resultElement);
+      if (resultElementDetails) {
+        // Ajouter les détails mais sans les formules
+        result.elementDetails = sanitizeElementsData(resultElementDetails);
+      }
+    }
+    
+    res.status(200).json(result);
+  } catch (error) {
+    log('error', 'Erreur lors de la vérification de la combinaison', error);
+    res.status(500).json({
+      message: 'Erreur lors de la vérification de la combinaison',
+      errorDetails: process.env.NODE_ENV === 'development' ? error.message : null
+    });
+  }
 });
+
+// Fonction pour vérifier les règles de craft dans les données DB
+async function checkCraftRules(elements) {
+  // Liste des catégories qui peuvent contenir des règles de craft
+  const craftCategories = [
+    'geologie',
+    'biologie',
+    'materiaux_elementaires',
+    'formations_naturelles',
+    'phenomenes_naturels'
+  ];
   
+  const originalKey = elements.join('+');
+  const sortedElements = [...elements].sort();
+  const sortedKey = sortedElements.join('+');
+  
+  for (const category of craftCategories) {
+    // Chercher depuis la base de données
+    const data = await fetchGameDataByName(category);
+    
+    if (data && data.rules) {
+      // Vérifier les règles, d'abord avec la clé originale
+      if (data.rules[originalKey]) {
+        return data.rules[originalKey];
+      }
+      
+      // Puis avec la clé triée
+      if (data.rules[sortedKey]) {
+        return data.rules[sortedKey];
+      }
+    }
+  }
+  
+  return null;
+}
+
 // Fonction pour vérifier si une règle générique s'applique
-function checkGenericRule(rule, elements) {
+async function checkGenericRule(rule, elements) {
   // Exemple de règle générique :
   // { type: "category", category1: "Feu", category2: "Eau", result: "Vapeur" }
   
-  // Charger les catégories des éléments
-  const categoriesData = {};
-  const elementsData = readJsonFile('elements_data.json');
+  // Charger les catégories des éléments depuis la base de données
+  const elementsData = await fetchGameDataByName('elements_data');
   
   if (!elementsData || !elementsData.elements) {
     return null;
@@ -369,8 +424,6 @@ function checkGenericRule(rule, elements) {
       }
       break;
     }
-    
-    // Ajoutez d'autres types de règles au besoin
   }
   
   return null;
