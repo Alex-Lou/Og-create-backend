@@ -1,3 +1,5 @@
+// routes/progress.js avec les modifications pour la synchronisation des achievements
+
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
@@ -15,6 +17,63 @@ const progressRateLimiter = rateLimit({
 });
 
 const saveQueue = {};
+
+// Fonction pour récupérer les achievements depuis la base de données
+async function fetchAchievementsFromDB() {
+  try {
+    log('debug', 'Récupération des achievements depuis la base de données pour progress');
+    
+    const result = await db.query(
+      'SELECT id, name, description, unlocked, condition, image FROM achievements_list ORDER BY id'
+    );
+    
+    if (result.rows.length === 0) {
+      log('warn', 'Aucun achievement trouvé dans la base de données');
+      return [];
+    }
+    
+    return result.rows;
+  } catch (error) {
+    log('error', 'Erreur lors de la récupération des achievements depuis la base de données', error);
+    return [];
+  }
+}
+
+// Fonction pour fusionner les achievements de la BD avec ceux enregistrés pour l'utilisateur
+async function mergeAchievementsWithUserProgress(userAchievements) {
+  try {
+    // Récupérer tous les achievements depuis la BD
+    const allAchievements = await fetchAchievementsFromDB();
+    
+    // Convertir les achievements de l'utilisateur en format attendu par le frontend
+    const formattedAchievements = {};
+    
+    // Pour chaque achievement de la BD, vérifier s'il est débloqué dans les données de l'utilisateur
+    for (const achievement of allAchievements) {
+      const achievementKey = achievement.name;
+      const userAchievement = userAchievements[achievementKey];
+      
+      // Si l'utilisateur a débloqué cet achievement, utiliser ses données
+      if (userAchievement && userAchievement.unlocked) {
+        formattedAchievements[achievementKey] = {
+          unlocked: true,
+          unlockedAt: userAchievement.unlockedAt || new Date().toISOString()
+        };
+      } else {
+        // Sinon, utiliser les données par défaut
+        formattedAchievements[achievementKey] = {
+          unlocked: false,
+          unlockedAt: null
+        };
+      }
+    }
+    
+    return formattedAchievements;
+  } catch (error) {
+    log('error', 'Erreur lors de la fusion des achievements', error);
+    return userAchievements || {};
+  }
+}
 
 const processSaveQueue = async (userId) => {
   if (saveQueue[userId] && saveQueue[userId].length > 0) {
@@ -174,6 +233,17 @@ router.get('/load', authMiddleware, progressRateLimiter, async (req, res) => {
     if (result.rows.length === 0) {
       log('info', 'Aucune progression trouvée, création d\'une nouvelle entrée avec les valeurs par défaut', { userId });
       const defaultCategoryProgress = { "Elements Fondamentaux": 100 };
+      
+      // Charger tous les achievements depuis la BD et les initialiser comme non débloqués
+      const allAchievements = await fetchAchievementsFromDB();
+      const defaultAchievements = {};
+      allAchievements.forEach(achievement => {
+        defaultAchievements[achievement.name] = {
+          unlocked: false,
+          unlockedAt: null
+        };
+      });
+      
       const newProgress = await db.query(
         `INSERT INTO progress (
            user_id,
@@ -192,7 +262,7 @@ router.get('/load', authMiddleware, progressRateLimiter, async (req, res) => {
           userId,
           JSON.stringify(fundamentalElements),
           [fundamentalCategory],
-          JSON.stringify({}),
+          JSON.stringify(defaultAchievements),
           JSON.stringify(defaultCategoryProgress),
           0,
           JSON.stringify({ completedQuestions: {}, unlockedCategories: {}, bestScores: { Facile: 0, Moyen: 0, Difficile: 0 } }),
@@ -204,7 +274,7 @@ router.get('/load', authMiddleware, progressRateLimiter, async (req, res) => {
       return res.status(200).json({
         discoveredElements: fundamentalElements, // Modification importante
         discoveredCategories: [fundamentalCategory],
-        achievements: {},
+        achievements: defaultAchievements,
         categoryProgress: defaultCategoryProgress,
         coins: 0,
         timerProgress: { completedQuestions: {}, unlockedCategories: {}, bestScores: { Facile: 0, Moyen: 0, Difficile: 0 } },
@@ -243,14 +313,20 @@ router.get('/load', authMiddleware, progressRateLimiter, async (req, res) => {
       inventoryLength: inventory.length
     });
 
+    // Récupérer les achievements de l'utilisateur
+    let userAchievements = progress.achievements ? (
+      typeof progress.achievements === 'string' 
+        ? JSON.parse(progress.achievements) 
+        : progress.achievements
+    ) : {};
+    
+    // Fusionner avec les achievements de la BD
+    const mergedAchievements = await mergeAchievementsWithUserProgress(userAchievements);
+
     let parsedProgress = {
       discoveredElements: inventory, // Changement clé
       discoveredCategories: progress.discovered_categories || [fundamentalCategory],
-      achievements: progress.achievements ? (
-        typeof progress.achievements === 'string' 
-          ? JSON.parse(progress.achievements) 
-          : progress.achievements
-      ) : {},
+      achievements: mergedAchievements,
       categoryProgress: progress.category_progress ? (
         typeof progress.category_progress === 'string' 
           ? JSON.parse(progress.category_progress) 
@@ -451,4 +527,5 @@ router.post('/update-discovered-elements', authMiddleware, progressRateLimiter, 
     });
   }
 });
+
 module.exports = router;
