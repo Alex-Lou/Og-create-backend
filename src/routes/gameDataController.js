@@ -44,6 +44,98 @@ async function fetchGameDataByName(name) {
   }
 }
 
+// Fonction pour récupérer les achievements depuis la base de données
+async function fetchAchievementsFromDB() {
+  try {
+    log('debug', 'Récupération des achievements depuis la base de données pour progress');
+    
+    const result = await db.query(
+      'SELECT id, name, description, unlocked, condition, image FROM achievements_list ORDER BY id'
+    );
+    
+    if (result.rows.length === 0) {
+      log('warn', 'Aucun achievement trouvé dans la base de données');
+      return [];
+    }
+    
+    return result.rows;
+  } catch (error) {
+    log('error', 'Erreur lors de la récupération des achievements depuis la base de données', error);
+    return [];
+  }
+}
+
+// Fonction pour récupérer et formater les questions du timer depuis la base de données
+async function fetchTimerQuestionsFromDB() {
+  try {
+    log('debug', 'Récupération des questions du timer depuis la base de données');
+    
+    const result = await db.query(
+      'SELECT id, level, timer, category, question_text, valid_answers, points, initial_elements FROM timer_questions ORDER BY id'
+    );
+    
+    if (result.rows.length === 0) {
+      log('warn', 'Aucune question de timer trouvée dans la base de données');
+      return { levels: {} };
+    }
+    
+    // Organiser les questions par niveau et catégorie
+    const organized = {
+      levels: {}
+    };
+    
+    // Traiter chaque question
+    for (const row of result.rows) {
+      const level = row.level;
+      const category = row.category;
+      
+      // Initialiser le niveau s'il n'existe pas
+      if (!organized.levels[level]) {
+        organized.levels[level] = {
+          timer: level === "Facile" ? 300 : (level === "Moyen" ? 240 : 180),
+          categories: {}
+        };
+      }
+      
+      // Initialiser la catégorie si elle n'existe pas
+      if (!organized.levels[level].categories[category]) {
+        organized.levels[level].categories[category] = {
+          questions: []
+        };
+      }
+      
+      // Formatter la question
+      let initialElements = row.initial_elements;
+      if (typeof initialElements === 'string') {
+        try {
+          initialElements = JSON.parse(initialElements);
+        } catch (e) {
+          initialElements = {};
+        }
+      }
+      
+      // Créer l'objet question
+      const question = {
+        id: row.id,
+        level: row.level,
+        category: row.category,
+        text: row.question_text,
+        validAnswers: row.valid_answers,
+        points: row.points,
+        initialElements: initialElements
+      };
+      
+      // Ajouter la question à la catégorie
+      organized.levels[level].categories[category].questions.push(question);
+    }
+    
+    return organized;
+  } catch (error) {
+    log('error', 'Erreur lors de la récupération des questions du timer', error);
+    return { levels: {} };
+  }
+}
+
 // Purger les données sensibles des éléments
 function sanitizeElementsData(data) {
   function sanitizeObject(obj) {
@@ -119,6 +211,12 @@ router.get('/load', authMiddleware, async (req, res) => {
       }
     }
     
+    // Récupérer les achievements et les ajouter aux données
+    const achievements = await fetchAchievementsFromDB();
+    if (achievements.length > 0) {
+      allData['achievements'] = achievements;
+    }
+    
     // Mettre à jour le cache
     dataCache.data = allData;
     dataCache.timestamp = now;
@@ -182,6 +280,31 @@ router.get('/elements', authMiddleware, async (req, res) => {
   }
 });
 
+// Route pour charger les achievements depuis la base de données
+router.get('/achievements', authMiddleware, async (req, res) => {
+  try {
+    log('debug', 'Demande de chargement des achievements');
+    
+    const achievements = await fetchAchievementsFromDB();
+    
+    if (achievements.length === 0) {
+      log('warn', 'Aucun achievement trouvé dans la base de données');
+      return res.status(404).json({
+        message: 'Aucun achievement trouvé'
+      });
+    }
+    
+    // Envoyer les achievements
+    res.status(200).json(achievements);
+  } catch (error) {
+    log('error', 'Erreur lors du chargement des achievements', error);
+    res.status(500).json({
+      message: 'Erreur lors du chargement des achievements',
+      errorDetails: process.env.NODE_ENV === 'development' ? error.message : null
+    });
+  }
+});
+
 // Route pour charger un fichier JSON spécifique
 router.get('/:filename', authMiddleware, async (req, res) => {
   try {
@@ -197,6 +320,18 @@ router.get('/:filename', authMiddleware, async (req, res) => {
     }
     
     log('debug', 'Chargement de données spécifiques', { filename });
+    
+    // Cas spécial pour timer-questions - charger depuis la BD
+    if (filename === 'timer-questions') {
+      const timerQuestionsData = await fetchTimerQuestionsFromDB();
+      return res.status(200).json(timerQuestionsData);
+    }
+    
+    // Cas spécial pour les achievements
+    if (filename === 'achievements') {
+      const achievements = await fetchAchievementsFromDB();
+      return res.status(200).json(achievements);
+    }
     
     // Récupérer les données depuis la base de données
     const data = await fetchGameDataByName(filename);
