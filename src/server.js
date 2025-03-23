@@ -38,35 +38,47 @@ app.use(helmet({
 
 const corsOptions = {
     origin: process.env.CORS_ORIGIN || '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
     optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));
 
-const globalLimiter = rateLimit({
-    windowMs: process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000,
-    max: process.env.RATE_LIMIT_MAX_REQUESTS || 1000,
-    message: 'Trop de requêtes, veuillez réessayer plus tard',
-    standardHeaders: true,
-    legacyHeaders: false,
-    skip: (req) => req.method === 'OPTIONS'
-});
+const createRateLimiter = (windowMinutes, maxRequests, message) => {
+    return rateLimit({
+        windowMs: windowMinutes * 60 * 1000,
+        max: maxRequests,
+        message: message,
+        standardHeaders: true,
+        legacyHeaders: false,
+        skipFailedRequests: true,
+        handler: (req, res) => {
+            res.status(429).json({
+                error: 'Trop de requêtes',
+                retryAfter: Math.ceil(req.rateLimit.resetTime / 1000 / 60)
+            });
+        }
+    });
+};
 
-const gameLimiter = rateLimit({
-    windowMs: 1 * 60 * 1000,
-    max: 200,
-    message: 'Trop de requêtes de jeu, veuillez réessayer plus tard',
-    standardHeaders: true,
-    legacyHeaders: false,
-    skip: (req) => req.method === 'OPTIONS'
-});
+const globalLimiter = createRateLimiter(
+    process.env.RATE_LIMIT_WINDOW_MINUTES || 15, 
+    process.env.RATE_LIMIT_MAX_REQUESTS || 1000, 
+    'Trop de requêtes, veuillez réessayer plus tard'
+);
+
+const gameLimiter = createRateLimiter(
+    1, 
+    process.env.GAME_RATE_LIMIT_MAX_REQUESTS || 200, 
+    'Trop de requêtes de jeu, veuillez réessayer plus tard'
+);
 
 app.use(globalLimiter);
 
 app.use(express.json({ 
-    limit: process.env.REQUEST_BODY_SIZE_LIMIT || '10kb' 
+    limit: process.env.REQUEST_BODY_SIZE_LIMIT || '10kb',
+    strict: true
 }));
 app.use(express.urlencoded({ 
     extended: true,
@@ -77,61 +89,50 @@ const authRoutes = require('./routes/auth');
 const progressRoutes = require('./routes/progress');
 const achievementsRouter = require('./routes/progressAchievements');
 const coinsRouter = require('./routes/progressCoins');
-const elementsRouter = require('./routes/progressElements');
 const contactRoutes = require('./routes/contactRoutes');
 const customizationRoutes = require('./routes/customization');
 const explorerRoutes = require('./routes/explorer');
 const gameDataController = require('./routes/gameDataController');
-const timerService = require('./routes/timerService');
+const timerService = require('./routes/timerServiceBack');
+
+const KNOWN_MISSING_FILES = {
+    animaux: { elements: {}, rules: {} },
+    biologie: { elements: {}, rules: {} },
+    'créations_humaines': { elements: {}, rules: {} },
+    elements_data: { 
+        elements: {},
+        categories: {},
+        rules: {} 
+    },
+    elements: { 
+        elements: {},
+        categories: {},
+        rules: {} 
+    },
+    geologie: { elements: {}, rules: {} },
+    magie: { elements: {}, rules: {} },
+    achievements: []
+};
+
+const generateMissingFileResponse = (filename) => {
+    return (req, res, next) => {
+        if (KNOWN_MISSING_FILES.hasOwnProperty(filename)) {
+            return res.status(200).json(KNOWN_MISSING_FILES[filename]);
+        }
+        next();
+    };
+};
 
 app.use('/api/auth', authRoutes);
 app.use('/api/progress', gameLimiter, progressRoutes);
 app.use('/api/progress/achievements', gameLimiter, achievementsRouter);
 app.use('/api/progress/coins', gameLimiter, coinsRouter);
-app.use('/api/progress/elements', gameLimiter, elementsRouter);
 app.use('/api/contact', contactRoutes);
 app.use('/api/customization', customizationRoutes);
 app.use('/api/explorer', gameLimiter, explorerRoutes);
 
-// Middleware pour gérer les fichiers manquants connus sans générer de 404
-app.use('/api/game-data/:filename', (req, res, next) => {
-  // Liste des fichiers qu'on sait ne pas exister dans la BD
-  const knownMissing = [
-    'animaux', 
-    'biologie', 
-    'créations_humaines',
-    'elements_data', 
-    'geologie', 
-    'magie', 
-    'timer-questions'
-    // 'achievements' retiré car il existe et doit être chargé normalement
-  ];
-  
-  // Si c'est un fichier connu comme manquant, retourner une réponse vide mais valide
-  // avec un statut 200 plutôt qu'un 404
-  if (knownMissing.includes(req.params.filename)) {
-    // Structure de retour spécifique selon le fichier demandé
-    if (req.params.filename === 'achievements') {
-      // Pour les achievements, on retourne un tableau vide car la fonction map() est utilisée
-      return res.status(200).json([]);
-    } else if (req.params.filename === 'elements_data' || req.params.filename === 'elements') {
-      // Pour les éléments, structure appropriée
-      return res.status(200).json({
-        elements: {},
-        categories: {},
-        rules: {}
-      });
-    } else {
-      // Pour les autres fichiers, structure par défaut
-      return res.status(200).json({
-        elements: {},
-        rules: {}
-      });
-    }
-  }
-  
-  // Sinon, passer au prochain middleware
-  next();
+Object.keys(KNOWN_MISSING_FILES).forEach(filename => {
+    app.use(`/api/game-data/${filename}`, generateMissingFileResponse(filename));
 });
 
 app.use('/api/game-data', gameLimiter, gameDataController);
