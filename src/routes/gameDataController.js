@@ -747,7 +747,7 @@
     // ----------------------------------------
 
     // Route pour charger toutes les données du jeu
-    router.get('/load', authMiddleware, getAllGameDataController);
+    router.get('/load-game-data', authMiddleware, getAllGameDataController);
 
     // Route pour les éléments
     router.get('/elements', authMiddleware, getElementsController);

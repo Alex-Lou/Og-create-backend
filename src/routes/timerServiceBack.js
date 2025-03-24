@@ -1,4 +1,3 @@
-// Fichier: routes/timerService.js
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
@@ -34,7 +33,6 @@ const FUNDAMENTAL_EMOJIS = {
 // ----------------------------------------
 
 const timerProgressService = {
-  // Récupère la progression timer d'un utilisateur
   async getUserTimerProgress(userId) {
     try {
       const result = await db.query(
@@ -68,18 +66,14 @@ const timerProgressService = {
     }
   },
   
-  // Met à jour la progression timer d'un utilisateur
   async updateUserTimerProgress(userId, newTimerProgress) {
     try {
-      // Vérifier que les données sont valides
       if (!newTimerProgress || typeof newTimerProgress !== 'object') {
         throw new Error('Les données de progression sont invalides');
       }
       
-      // Récupérer les données existantes de la progression
       const existingProgress = await this.getUserTimerProgress(userId);
       
-      // Fusionner les données existantes avec les nouvelles données
       const mergedProgress = {
         completedQuestions: {
           ...existingProgress.completedQuestions || {},
@@ -106,7 +100,6 @@ const timerProgressService = {
         }
       };
       
-      // Enregistrer dans la base de données
       const result = await db.query(
         `UPDATE progress 
          SET 
@@ -126,7 +119,6 @@ const timerProgressService = {
 };
 
 const timerElementsService = {
-  // Récupère les éléments du timer pour un utilisateur
   async getUserTimerElements(userId) {
     try {
       const result = await db.query(
@@ -134,17 +126,14 @@ const timerElementsService = {
         [userId]
       );
       
-      // Éléments fondamentaux toujours disponibles
       let timerElements = [...FUNDAMENTAL_ELEMENTS];
       
-      // Ajouter les éléments sauvegardés de l'utilisateur
       if (result.rows.length > 0) {
         try {
           const savedElements = typeof result.rows[0].timer_elements === 'string'
             ? JSON.parse(result.rows[0].timer_elements)
             : result.rows[0].timer_elements || [];
           
-          // Fusionner sans dupliquer
           savedElements.forEach(element => {
             if (!timerElements.includes(element)) {
               timerElements.push(element);
@@ -162,25 +151,19 @@ const timerElementsService = {
     }
   },
   
-  // Sauvegarde les éléments du timer pour un utilisateur
   async saveUserTimerElements(userId, newElements) {
     try {
-      // Valider les éléments reçus
       const elementsToAdd = Array.isArray(newElements) ? [...newElements] : [];
       
-      // Récupérer les éléments existants
       const existingElements = await this.getUserTimerElements(userId);
       
-      // Fusionner sans dupliquer
       const mergedElements = [...new Set([...existingElements, ...elementsToAdd])];
       
-      // Vérifier si l'utilisateur a déjà une entrée dans la table progress
       const existingProgress = await db.query(
         'SELECT timer_elements FROM progress WHERE user_id = $1',
         [userId]
       );
       
-      // Enregistrer dans la base de données
       if (existingProgress.rows.length === 0) {
         await db.query(
           `INSERT INTO progress (
@@ -210,18 +193,14 @@ const timerElementsService = {
     }
   },
   
-  // Récupère les emojis pour tous les éléments
   async getAllElementEmojis() {
     try {
-      // Commencer avec les emojis fondamentaux
       const elementEmojis = {...FUNDAMENTAL_EMOJIS};
       
-      // Récupérer tous les emojis des questions
       const result = await db.query(
         'SELECT elements_emojis FROM timer_questions WHERE elements_emojis IS NOT NULL'
       );
       
-      // Parcourir tous les enregistrements
       result.rows.forEach(row => {
         try {
           if (!row.elements_emojis) return;
@@ -245,7 +224,6 @@ const timerElementsService = {
     }
   },
   
-  // Récupère les éléments spécifiques à une question
   async getQuestionElements(questionId) {
     try {
       const result = await db.query(
@@ -265,13 +243,11 @@ const timerElementsService = {
       const questionElements = [...FUNDAMENTAL_ELEMENTS];
       const questionEmojis = {...FUNDAMENTAL_EMOJIS};
       
-      // Récupérer les éléments spécifiques à cette question
       try {
         const initialElements = typeof row.initial_elements === 'string'
           ? JSON.parse(row.initial_elements)
           : row.initial_elements;
           
-        // Extraire les éléments requis et additionnels
         if (initialElements.required) {
           initialElements.required.forEach(element => {
             if (!questionElements.includes(element)) {
@@ -288,7 +264,6 @@ const timerElementsService = {
           });
         }
         
-        // Si nous avons des recettes, inclure les résultats possibles
         if (initialElements.recipes) {
           Object.keys(initialElements.recipes).forEach(result => {
             if (!questionElements.includes(result)) {
@@ -300,13 +275,11 @@ const timerElementsService = {
         log('error', `Erreur de parsing initial_elements pour question ${questionId}:`, e);
       }
       
-      // Récupérer les emojis spécifiques à cette question
       try {
         const emojisData = typeof row.elements_emojis === 'string'
           ? JSON.parse(row.elements_emojis)
           : row.elements_emojis || {};
           
-        // Ajouter ces emojis au mapping
         Object.assign(questionEmojis, emojisData);
       } catch (e) {
         log('error', `Erreur de parsing elements_emojis pour question ${questionId}:`, e);
@@ -322,26 +295,81 @@ const timerElementsService = {
     }
   },
   
-  // Génère la liste enrichie des éléments (avec emojis)
+  async getElementsByLevelAndCategory(level, category) {
+    try {
+      const result = await db.query(
+        `SELECT initial_elements, elements_emojis 
+         FROM timer_questions 
+         WHERE level = $1 AND category = $2`,
+        [level, category]
+      );
+      
+      const questionElements = [...FUNDAMENTAL_ELEMENTS];
+      const questionEmojis = {...FUNDAMENTAL_EMOJIS};
+      
+      result.rows.forEach(row => {
+        try {
+          const initialElements = typeof row.initial_elements === 'string'
+            ? JSON.parse(row.initial_elements)
+            : row.initial_elements;
+          
+          if (initialElements.required) {
+            initialElements.required.forEach(element => {
+              if (!questionElements.includes(element)) {
+                questionElements.push(element);
+              }
+            });
+          }
+          
+          if (initialElements.additional) {
+            initialElements.additional.forEach(element => {
+              if (!questionElements.includes(element)) {
+                questionElements.push(element);
+              }
+            });
+          }
+          
+          if (initialElements.recipes) {
+            Object.keys(initialElements.recipes).forEach(result => {
+              if (!questionElements.includes(result)) {
+                questionElements.push(result);
+              }
+            });
+          }
+          
+          const emojisData = typeof row.elements_emojis === 'string'
+            ? JSON.parse(row.elements_emojis)
+            : row.elements_emojis || {};
+          
+          Object.assign(questionEmojis, emojisData);
+        } catch (e) {
+          log('error', `Erreur de parsing pour une question de ${level}/${category}`, e);
+        }
+      });
+      
+      return {
+        elements: questionElements,
+        emojis: questionEmojis
+      };
+    } catch (error) {
+      log('error', `Erreur lors de la récupération des éléments pour ${level}/${category}`, error);
+      throw error;
+    }
+  },
+  
   enrichElements(elements, emojis) {
     return elements.map(element => ({
       name: element,
-      emoji: emojis[element] || '❓' // Emoji par défaut si non trouvé
+      emoji: emojis[element] || '❓'
     }));
   }
 };
 
-// ----------------------------------------
-// GESTIONNAIRE DE RÉPONSES STANDARDISÉ
-// ----------------------------------------
-
 const responseHandler = {
-  // Envoyer une réponse standard
   send(res, data, status = 200) {
     return res.status(status).json(data);
   },
   
-  // Gérer les erreurs de manière cohérente
   error(res, error, message = 'Une erreur est survenue') {
     const status = error.status || 500;
     const errorDetails = process.env.NODE_ENV === 'development' ? error.message : null;
@@ -356,11 +384,6 @@ const responseHandler = {
   }
 };
 
-// ----------------------------------------
-// CONTRÔLEURS
-// ----------------------------------------
-
-// Contrôleur pour sauvegarder les éléments découverts par l'utilisateur
 async function saveElementsController(req, res) {
   try {
     const userId = req.user.id;
@@ -383,7 +406,6 @@ async function saveElementsController(req, res) {
   }
 }
 
-// Contrôleur pour mettre à jour la progression du timer
 async function updateTimerProgressController(req, res) {
   try {
     const userId = req.user.id;
@@ -406,7 +428,6 @@ async function updateTimerProgressController(req, res) {
   }
 }
 
-// Contrôleur pour charger la progression du timer
 async function loadProgressController(req, res) {
   try {
     const userId = req.user.id;
@@ -418,25 +439,38 @@ async function loadProgressController(req, res) {
   }
 }
 
-// Contrôleur pour charger les éléments disponibles
 async function loadElementsController(req, res) {
   try {
     const userId = req.user.id;
-    // Récupérer l'ID de la question actuelle (envoyé en query parameter)
-    const questionId = req.query.questionId;
     
-    log('debug', 'Chargement des éléments du mode Timer', { userId, questionId });
+    const questionId = req.query.questionId;
+    const level = req.query.level;
+    const category = req.query.category;
+    
+    log('debug', 'Chargement des éléments du mode Timer', { 
+      userId, 
+      questionId, 
+      level, 
+      category 
+    });
     
     let timerElements;
     let elementEmojis;
     
-    // Si un ID de question est fourni, ne récupérer que les éléments de cette question
+    // Si un ID de question est fourni, charger ses éléments spécifiques
     if (questionId) {
       const questionData = await timerElementsService.getQuestionElements(questionId);
       timerElements = questionData.elements;
       elementEmojis = questionData.emojis;
-    } else {
-      // Sinon, récupérer tous les éléments de l'utilisateur
+    } 
+    // Sinon, filtrer les questions selon le niveau et la catégorie
+    else if (level && category) {
+      const filteredQuestionData = await timerElementsService.getElementsByLevelAndCategory(level, category);
+      timerElements = filteredQuestionData.elements;
+      elementEmojis = filteredQuestionData.emojis;
+    } 
+    // Si aucun filtre, charger tous les éléments
+    else {
       timerElements = await timerElementsService.getUserTimerElements(userId);
       elementEmojis = await timerElementsService.getAllElementEmojis();
     }
