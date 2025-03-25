@@ -248,24 +248,27 @@ const timerElementsService = {
           ? JSON.parse(row.initial_elements)
           : row.initial_elements;
           
-        if (initialElements.required) {
-          initialElements.required.forEach(element => {
+        // Vérifier la structure imbriquée
+        const elementsData = initialElements.initialElements ? initialElements.initialElements : initialElements;
+        
+        if (elementsData.required) {
+          elementsData.required.forEach(element => {
             if (!questionElements.includes(element)) {
               questionElements.push(element);
             }
           });
         }
         
-        if (initialElements.additional) {
-          initialElements.additional.forEach(element => {
+        if (elementsData.additional) {
+          elementsData.additional.forEach(element => {
             if (!questionElements.includes(element)) {
               questionElements.push(element);
             }
           });
         }
         
-        if (initialElements.recipes) {
-          Object.keys(initialElements.recipes).forEach(result => {
+        if (elementsData.recipes) {
+          Object.keys(elementsData.recipes).forEach(result => {
             if (!questionElements.includes(result)) {
               questionElements.push(result);
             }
@@ -281,6 +284,9 @@ const timerElementsService = {
           : row.elements_emojis || {};
           
         Object.assign(questionEmojis, emojisData);
+        
+        // Log pour le débogage
+        log('debug', `Emojis pour la question ${questionId}:`, questionEmojis);
       } catch (e) {
         log('error', `Erreur de parsing elements_emojis pour question ${questionId}:`, e);
       }
@@ -313,24 +319,27 @@ const timerElementsService = {
             ? JSON.parse(row.initial_elements)
             : row.initial_elements;
           
-          if (initialElements.required) {
-            initialElements.required.forEach(element => {
+          // Vérifier la structure imbriquée
+          const elementsData = initialElements.initialElements ? initialElements.initialElements : initialElements;
+          
+          if (elementsData.required) {
+            elementsData.required.forEach(element => {
               if (!questionElements.includes(element)) {
                 questionElements.push(element);
               }
             });
           }
           
-          if (initialElements.additional) {
-            initialElements.additional.forEach(element => {
+          if (elementsData.additional) {
+            elementsData.additional.forEach(element => {
               if (!questionElements.includes(element)) {
                 questionElements.push(element);
               }
             });
           }
           
-          if (initialElements.recipes) {
-            Object.keys(initialElements.recipes).forEach(result => {
+          if (elementsData.recipes) {
+            Object.keys(elementsData.recipes).forEach(result => {
               if (!questionElements.includes(result)) {
                 questionElements.push(result);
               }
@@ -384,6 +393,7 @@ const responseHandler = {
   }
 };
 
+// Dans routes/timer.js, corriger la fonction saveElementsController:
 async function saveElementsController(req, res) {
   try {
     const userId = req.user.id;
@@ -395,6 +405,9 @@ async function saveElementsController(req, res) {
     });
     
     const savedElements = await timerElementsService.saveUserTimerElements(userId, elements);
+    
+    // Supprimer ou corriger ces lignes qui utilisent des variables non définies
+    // console.log("DATA SENT TO FRONTEND:", JSON.stringify({...}));
     
     return responseHandler.send(res, {
       message: 'Éléments du mode Timer sauvegardés avec succès',
