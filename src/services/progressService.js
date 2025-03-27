@@ -1,6 +1,7 @@
 // services/progressService.js
 const db = require('../config/db');
 const { log } = require('../utils/logger');
+const achievementService = require('./achievementService');
 
 // Constants
 const FUNDAMENTAL_ELEMENTS = ["Eau", "Feu", "Terre", "Air"];
@@ -81,16 +82,8 @@ class ProgressService {
         ])
       ];
       
-      // Mise en cache des achievements pour éviter des requêtes répétées
-      const userAchievements = this.parseJsonValue(progress.achievements, {});
-      const cachedAchievements = await this.getCachedAchievements();
-      
-      const mergedAchievements = Object.fromEntries(
-        cachedAchievements.map(achievement => [
-          achievement.name, 
-          userAchievements[achievement.name] || { unlocked: false, unlockedAt: null }
-        ])
-      );
+      // Utiliser le service achievements pour récupérer les achievements
+      const mergedAchievements = await achievementService.getUserAchievements(userId);
       
       return {
         discoveredElements: elements,
@@ -111,15 +104,6 @@ class ProgressService {
     }
   }
   
-  // Mise en cache persistant des achievements
-  static cachedAchievements = null;
-  static async getCachedAchievements() {
-    if (!this.cachedAchievements) {
-      this.cachedAchievements = await this.fetchAchievementsFromDB();
-    }
-    return this.cachedAchievements;
-  }
-  
   /**
    * Crée une progression par défaut pour un nouvel utilisateur
    * @param {number} userId - ID de l'utilisateur
@@ -130,8 +114,8 @@ class ProgressService {
       // Initialiser les valeurs par défaut
       const defaultCategoryProgress = { [FUNDAMENTAL_CATEGORY]: 100 };
       
-      // Charger les achievements et les initialiser comme non débloqués
-      const allAchievements = await this.fetchAchievementsFromDB();
+      // Récupérer les achievements depuis le service centralisé
+      const allAchievements = await achievementService.getAllAchievements();
       const defaultAchievements = {};
       
       allAchievements.forEach(achievement => {
@@ -296,6 +280,9 @@ class ProgressService {
           ]
         );
       }
+
+      // Après avoir mis à jour les éléments, vérifier les achievements
+      await achievementService.checkAndUpdateAchievements(userId, mergedElements);
       
       return {
         message: 'Éléments mis à jour avec succès',
@@ -409,36 +396,114 @@ class ProgressService {
    */
   static async saveProgress(userId, progressData) {
     try {
-      const {
-        gameMode = 'infinite',
-        elements = FUNDAMENTAL_ELEMENTS,
-        discoveredCategories = [FUNDAMENTAL_CATEGORY],
-        achievements = {},
-        categoryProgress = { [FUNDAMENTAL_CATEGORY]: 100 },
-        coins = 0,
-        timerProgress = DEFAULT_TIMER_PROGRESS
-      } = progressData;
+      console.log('Données reçues dans saveProgress:', JSON.stringify(progressData, null, 2));
+      
+      // Vérifier et formater les données pour éviter les erreurs
+      let discoveredElements = Array.isArray(progressData.discoveredElements) 
+        ? progressData.discoveredElements 
+        : (Array.isArray(progressData.elements) ? progressData.elements : FUNDAMENTAL_ELEMENTS);
+      
+      let categories = Array.isArray(progressData.discoveredCategories) 
+        ? progressData.discoveredCategories 
+        : [FUNDAMENTAL_CATEGORY];
+      
+      // S'assurer que la catégorie fondamentale est toujours incluse
+      if (!categories.includes(FUNDAMENTAL_CATEGORY)) {
+        categories.push(FUNDAMENTAL_CATEGORY);
+      }
+      
+      // Vérifier et formater categoryProgress
+      let catProgress = progressData.categoryProgress;
+      if (typeof catProgress !== 'object' || catProgress === null) {
+        catProgress = { [FUNDAMENTAL_CATEGORY]: 100 };
+      } else if (typeof catProgress === 'string') {
+        try {
+          catProgress = JSON.parse(catProgress);
+        } catch (e) {
+          catProgress = { [FUNDAMENTAL_CATEGORY]: 100 };
+        }
+      }
+      // S'assurer que la catégorie fondamentale a toujours une progression de 100%
+      catProgress[FUNDAMENTAL_CATEGORY] = 100;
+      
+      // Vérifier et formater coins
+      let userCoins = progressData.coins;
+      if (typeof userCoins !== 'number' || isNaN(userCoins)) {
+        if (typeof userCoins === 'string') {
+          userCoins = parseInt(userCoins);
+          if (isNaN(userCoins)) userCoins = 0;
+        } else {
+          userCoins = 0;
+        }
+      }
+      
+      // Vérifier et formater timerProgress
+      let timerProgressData = progressData.timerProgress;
+      if (typeof timerProgressData !== 'object' || timerProgressData === null) {
+        timerProgressData = DEFAULT_TIMER_PROGRESS;
+      } else if (typeof timerProgressData === 'string') {
+        try {
+          timerProgressData = JSON.parse(timerProgressData);
+        } catch (e) {
+          timerProgressData = DEFAULT_TIMER_PROGRESS;
+        }
+      }
+      
+      // S'assurer que timerProgress a la structure attendue
+      if (!timerProgressData.completedQuestions) timerProgressData.completedQuestions = {};
+      if (!timerProgressData.unlockedCategories) timerProgressData.unlockedCategories = {};
+      if (!timerProgressData.bestScores) {
+        timerProgressData.bestScores = {
+          Facile: 0,
+          Moyen: 0,
+          Difficile: 0
+        };
+      } else {
+        // S'assurer que tous les niveaux sont présents
+        if (typeof timerProgressData.bestScores.Facile !== 'number') timerProgressData.bestScores.Facile = 0;
+        if (typeof timerProgressData.bestScores.Moyen !== 'number') timerProgressData.bestScores.Moyen = 0;
+        if (typeof timerProgressData.bestScores.Difficile !== 'number') timerProgressData.bestScores.Difficile = 0;
+      }
+      
+      // Déterminer le mode de jeu
+      const gameMode = progressData.gameMode || 'infinite';
       
       // Déterminer le nom de colonne pour les éléments selon le mode de jeu
       const columnName = gameMode === 'timer' ? 'timer_elements' : 'infinite_elements';
       
       // Vérifier si l'utilisateur a déjà une entrée dans la table progress
       const existingProgress = await db.query(
-        `SELECT id, ${columnName}, achievements FROM progress WHERE user_id = $1`,
+        `SELECT id, ${columnName} FROM progress WHERE user_id = $1`,
         [userId]
       );
       
       // Préparer les données à sauvegarder
-      let elementsToSave = elements;
-      let achievementsToSave = achievements;
+      let elementsToSave = discoveredElements;
       
       // Si l'utilisateur existe déjà, fusionner les données
       if (existingProgress.rows.length > 0) {
-        const existingElements = this.parseJsonValue(existingProgress.rows[0][columnName], []);
-        elementsToSave = [...new Set([...existingElements, ...elements])];
+        // Récupérer les éléments existants
+        let existingElements = existingProgress.rows[0][columnName];
+        if (typeof existingElements === 'string') {
+          try {
+            existingElements = JSON.parse(existingElements);
+          } catch (e) {
+            existingElements = [];
+          }
+        }
+        if (!Array.isArray(existingElements)) existingElements = [];
         
-        const existingAchievements = this.parseJsonValue(existingProgress.rows[0].achievements, {});
-        achievementsToSave = { ...existingAchievements, ...achievements };
+        // Fusionner et dédupliquer
+        elementsToSave = [...new Set([...existingElements, ...discoveredElements])];
+      }
+      
+      // Gérer les achievements via le service dédié
+      let achievements = progressData.achievements || {};
+      try {
+        await achievementService.updateUserAchievements(userId, achievements);
+      } catch (error) {
+        console.error('Erreur lors de la mise à jour des achievements:', error);
+        // Continuer malgré l'erreur
       }
       
       // Sauvegarder la progression
@@ -448,19 +513,17 @@ class ProgressService {
            SET 
              ${columnName} = $1,
              discovered_categories = $2,
-             achievements = $3,
-             category_progress = $4,
-             coins = $5,
-             timer_progress = $6,
+             category_progress = $3,
+             coins = $4,
+             timer_progress = $5,
              last_saved = CURRENT_TIMESTAMP
-           WHERE user_id = $7`,
+           WHERE user_id = $6`,
           [
             JSON.stringify(elementsToSave),
-            discoveredCategories,
-            JSON.stringify(achievementsToSave),
-            JSON.stringify(categoryProgress),
-            coins,
-            JSON.stringify(timerProgress),
+            categories,
+            JSON.stringify(catProgress),
+            userCoins,
+            JSON.stringify(timerProgressData),
             userId
           ]
         );
@@ -477,23 +540,29 @@ class ProgressService {
              infinite_elements,
              timer_elements,
              discovered_categories,
-             achievements,
              category_progress,
              coins,
              timer_progress,
              last_saved
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)`,
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)`,
           [
             userId,
             infiniteElementsValue,
             timerElementsValue,
-            discoveredCategories,
-            JSON.stringify(achievementsToSave),
-            JSON.stringify(categoryProgress),
-            coins,
-            JSON.stringify(timerProgress)
+            categories,
+            JSON.stringify(catProgress),
+            userCoins,
+            JSON.stringify(timerProgressData)
           ]
         );
+      }
+      
+      // Vérifier si de nouveaux achievements ont été débloqués
+      try {
+        await achievementService.checkAndUpdateAchievements(userId, elementsToSave);
+      } catch (error) {
+        console.error('Erreur lors de la vérification des achievements:', error);
+        // Continuer malgré l'erreur
       }
       
       return {
@@ -501,6 +570,7 @@ class ProgressService {
         lastSaved: new Date().toISOString()
       };
     } catch (error) {
+      console.error('Erreur détaillée lors de la sauvegarde de la progression:', error);
       log('error', 'Erreur lors de la sauvegarde de la progression', error);
       throw error;
     }
@@ -561,6 +631,9 @@ class ProgressService {
         );
       }
       
+      // Vérifier si de nouveaux achievements ont été débloqués
+      await achievementService.checkAndUpdateAchievements(userId, mergedElements);
+      
       return {
         message: 'Éléments du timer sauvegardés avec succès',
         timerElements: mergedElements,
@@ -569,70 +642,6 @@ class ProgressService {
     } catch (error) {
       log('error', 'Erreur lors de la sauvegarde des éléments du timer', error);
       throw error;
-    }
-  }
-  
-  /**
-   * Récupère tous les achievements depuis la base de données
-   * @returns {Array} - Liste des achievements
-   */
-  static async fetchAchievementsFromDB() {
-    try {
-      log('debug', 'Récupération des achievements depuis la base de données');
-      
-      const result = await db.query(
-        'SELECT id, name, description, unlocked, condition, image FROM achievements_list ORDER BY id'
-      );
-      
-      if (result.rows.length === 0) {
-        log('warn', 'Aucun achievement trouvé dans la base de données');
-        return [];
-      }
-      
-      return result.rows;
-    } catch (error) {
-      log('error', 'Erreur lors de la récupération des achievements', error);
-      return [];
-    }
-  }
-  
-  /**
-   * Fusionne les achievements de l'utilisateur avec ceux de la base de données
-   * @param {Object} userAchievements - Achievements de l'utilisateur
-   * @returns {Object} - Achievements fusionnés
-   */
-  static async mergeAchievementsWithUserProgress(userAchievements) {
-    try {
-      // Récupérer tous les achievements depuis la BD
-      const allAchievements = await this.fetchAchievementsFromDB();
-      
-      // Convertir les achievements de l'utilisateur en format attendu par le frontend
-      const formattedAchievements = {};
-      
-      // Pour chaque achievement de la BD, vérifier s'il est débloqué dans les données de l'utilisateur
-      for (const achievement of allAchievements) {
-        const achievementKey = achievement.name;
-        const userAchievement = userAchievements[achievementKey];
-        
-        // Si l'utilisateur a débloqué cet achievement, utiliser ses données
-        if (userAchievement && userAchievement.unlocked) {
-          formattedAchievements[achievementKey] = {
-            unlocked: true,
-            unlockedAt: userAchievement.unlockedAt || new Date().toISOString()
-          };
-        } else {
-          // Sinon, utiliser les données par défaut
-          formattedAchievements[achievementKey] = {
-            unlocked: false,
-            unlockedAt: null
-          };
-        }
-      }
-      
-      return formattedAchievements;
-    } catch (error) {
-      log('error', 'Erreur lors de la fusion des achievements', error);
-      return userAchievements || {};
     }
   }
 }

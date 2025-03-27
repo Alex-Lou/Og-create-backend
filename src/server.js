@@ -126,6 +126,8 @@ const generateMissingFileResponse = (filename) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/progress', gameLimiter, progressRoutes);
 app.use('/api/progress/achievements', gameLimiter, achievementsRouter);
+// Ajouter une route supplémentaire pour les achievements avec un chemin plus court
+app.use('/api/achievements', gameLimiter, achievementsRouter);
 app.use('/api/progress/coins', gameLimiter, coinsRouter);
 app.use('/api/contact', contactRoutes);
 app.use('/api/customization', customizationRoutes);

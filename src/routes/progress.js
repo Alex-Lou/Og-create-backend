@@ -61,9 +61,20 @@ const processSaveQueue = async (userId) => {
     const { data, resolve, reject } = saveQueue[userId].shift();
     
     try {
+      console.log(`Traitement de la file d'attente pour l'utilisateur ${userId}`);
+      console.log('Données à traiter:', JSON.stringify(data, null, 2));
+      
+      // Vérifier que les données sont valides avant de continuer
+      if (!data || typeof data !== 'object') {
+        console.error('Données invalides dans la file d\'attente:', data);
+        reject(new Error('Données de progression invalides'));
+        return;
+      }
+      
       const result = await ProgressService.saveProgress(userId, data);
       resolve(result);
     } catch (error) {
+      console.error('Erreur détaillée lors du traitement de la queue:', error);
       log('error', 'Erreur lors du traitement de la queue', error);
       reject(error);
     } finally {
@@ -104,7 +115,8 @@ async function saveProgressController(req, res) {
   try {
     const userId = req.user.id;
     
-    log('info', 'Requête de sauvegarde reçue', { userId });
+    console.log('Requête de sauvegarde reçue', { userId });
+    console.log('Données reçues pour saveProgress:', JSON.stringify(req.body, null, 2));
     
     // Utiliser une file d'attente pour éviter les conflits
     const savePromise = new Promise((resolve, reject) => {
@@ -122,6 +134,7 @@ async function saveProgressController(req, res) {
     const result = await savePromise;
     return responseHandler.send(res, result);
   } catch (error) {
+    console.error('Erreur dans saveProgressController:', error);
     return responseHandler.error(res, error, 'Erreur lors de la sauvegarde de la progression');
   }
 }
