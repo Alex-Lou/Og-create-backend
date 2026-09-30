@@ -729,19 +729,20 @@ async function checkCombinationController(req, res) {
 
 // ----------------------------------------
 // DÉFINITION DES ROUTES
+// Lecture du contenu du jeu : publique (mode invité). Diagnostic et combine : connecté.
 // ----------------------------------------
 
 // Route pour charger toutes les données du jeu
-router.get('/load-game-data', authMiddleware, getAllGameDataController);
+router.get('/load-game-data', getAllGameDataController);
 
 // Route pour les éléments
-router.get('/elements', authMiddleware, getElementsController);
+router.get('/elements', getElementsController);
 
 // Route pour les achievements
-router.get('/achievements', authMiddleware, getAchievementsController);
+router.get('/achievements', getAchievementsController);
 
 // Route pour les questions du timer
-router.get('/timer-questions', authMiddleware, getTimerQuestionsController);
+router.get('/timer-questions', getTimerQuestionsController);
 
 // Route de diagnostic pour timer_questions
 router.get('/debug-timer-questions', authMiddleware, diagnosisTimerQuestionsController);
@@ -750,6 +751,6 @@ router.get('/debug-timer-questions', authMiddleware, diagnosisTimerQuestionsCont
 router.post('/combine', authMiddleware, checkCombinationController);
 
 // Route générique pour charger un fichier JSON spécifique
-router.get('/:filename', authMiddleware, getSpecificDataController);
+router.get('/:filename', getSpecificDataController);
 
 module.exports = router;
