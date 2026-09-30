@@ -12,6 +12,15 @@ function generateSecureJWTSecret() {
 
 // Fonction pour vérifier et mettre à jour la clé secrète JWT
 function ensureJWTSecret() {
+    // Secret fourni par l'environnement (Render, CI...) : rien à faire.
+    // 32 caractères min. : le generateValue de Render (256 bits en base64) en fait ~44.
+    if (process.env.JWT_SECRET && process.env.JWT_SECRET.length >= 32) return;
+    
+    // Sans .env (hébergeur), impossible de générer et persister un secret : échouer clairement
+    if (!fs.existsSync(envPath)) {
+        throw new Error('JWT_SECRET manquant ou trop court (32 caractères minimum)');
+    }
+    
     // Lire le contenu actuel du .env
     let envContent = fs.readFileSync(envPath, 'utf8');
     
