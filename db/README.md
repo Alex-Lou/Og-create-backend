@@ -19,7 +19,7 @@ Ajoutez `-h <hôte> -U <utilisateur>` si besoin. Au démarrage, le serveur resyn
 
 ```bash
 export DATABASE_URL="postgresql://user:motdepasse@hote/base?sslmode=require"
-npm run db:setup          # schéma + seed (psql requis), rejouable
+npm run db:setup          # schéma + seed, rejouable (Node, sans psql)
 ```
 
 ## Variables d'environnement
