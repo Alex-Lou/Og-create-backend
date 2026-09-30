@@ -10,120 +10,19 @@ FRONT_DIR = os.environ.get("FRONT_DIR", os.path.join(ROOT, "..", "og-create"))
 
 BASE = ["Eau", "Feu", "Terre", "Air"]
 
-# file(game_data.name) -> { category: {name: emoji} }
-FILES = {
-  "materiaux_elementaires": {
-    "Elements Fondamentaux": {"Eau": "💧", "Feu": "🔥", "Terre": "🌱", "Air": "💨"},
-    "Matériaux": {
-      "Boue": "🟤", "Lave": "🟠", "Vapeur": "♨️", "Poussière": "🟫", "Fumée": "🌫️",
-      "Pierre": "🪨", "Sable": "⏳", "Cendre": "⚱️", "Métal": "⚙️", "Verre": "🔍",
-      "Cristal": "💎", "Magma": "🔴",
-    },
-  },
-  "phenomenes_naturels": {
-    "Phénomènes Naturels": {
-      "Pluie": "🌧️", "Nuage": "☁️", "Énergie": "⚡", "Vent": "🌬️", "Bourrasque": "🍃",
-      "Tempête": "⛈️", "Éclair": "🌩️", "Tornade": "🌪️", "Explosion": "💥", "Incendie": "🚒",
-      "Brasier": "🪔", "Geyser": "⛲", "Vague": "🏄", "Ozone": "🔵", "Lumière": "☀️",
-      "Arc-en-ciel": "🌈", "Temps": "⌛", "Neige": "❄️", "Glace": "🧊",
-      "Blizzard": "🌨️", "Tsunami": "🌀", "Déluge": "☔",
-    },
-    "Cosmos": {
-      "Étoile": "⭐", "Aurore": "🌠", "Météore": "☄️", "Galaxie": "🌌", "Univers": "🪐",
-    },
-  },
-  "formations_naturelles": {
-    "Formations Naturelles": {
-      "Montagne": "⛰️", "Volcan": "🌋", "Lac": "🏞️", "Océan": "🌊", "Continent": "🗺️",
-      "Planète Terre": "🌍", "Île": "🏝️", "Désert": "🏜️", "Oasis": "🌴",
-      "Marais": "🪷", "Forêt": "🌲", "Jungle": "🎋", "Récif": "🪸", "Jardin": "🌻",
-    },
-    "Vie et Créatures": {
-      "Vie": "🧬", "Plante": "🌿", "Arbre": "🌳", "Lombric": "🪱", "Asticot": "🐛",
-      "Chenille": "🐛", "Papillon": "🦋", "Poisson": "🐟", "Poisson Tropical": "🐠",
-      "Poisson Polaire": "🐟", "Poisson Volant": "🐟", "Poisson Abyssal": "🐡",
-      "Méduse": "🪼", "Salamandre": "🦎", "Dragon": "🐉", "Ptérodactyle": "🦖",
-      "Luciole": "🪲", "Oiseau": "🐦", "Phénix": "🦅", "Hydre": "🐍",
-    },
-  },
-  # servi au front sous /api/game-data/creations_humaines (mapping backend)
-  "humains_craft_rules": {
-    "Magie": {
-      "Magie": "✨", "Esprit": "👻", "Mana": "💠", "Orbe": "🔮", "Baguette": "🪄",
-      "Pouvoir": "⚜️", "Anneau": "💍", "Anneau de Pouvoir": "💫", "Feu Magique": "🎇",
-      "Potion": "🧪", "Élixir": "⚗️", "Golem": "🗿", "Licorne": "🦄", "Sorcier": "🧙",
-    },
-    "Créations Humaines": {
-      "Humain": "🧑", "Héros": "🦸", "Épée": "⚔️", "Bois": "🪵", "Brique": "🧱", "Maison": "🏠",
-      "Chevalier": "🛡️", "Château": "🏰", "Ville": "🏙️", "Arche": "🚢", "Olympe": "🏛️",
-    },
-  },
-}
+sys.path.insert(0, os.path.join(HERE, "content"))
+from elements import FAMILIES, FILE_OF_FAMILY  # noqa: E402
+import check  # noqa: E402  (chargement des recettes, partagé avec le vérificateur)
 
-# (ingredients, result, file where the rule lives)
-R = [
-  # matériaux
-  ("Eau+Terre", "Boue"), ("Feu+Terre", "Lave"), ("Eau+Feu", "Vapeur"), ("Air+Terre", "Poussière"),
-  ("Air+Feu", "Fumée"), ("Eau+Lave", "Pierre"), ("Air+Pierre", "Sable"), ("Fumée+Terre", "Cendre"),
-  ("Feu+Pierre", "Métal"), ("Feu+Sable", "Verre"), ("Pierre+Vapeur", "Cristal"), ("Lave+Terre", "Magma"),
-  # phénomènes
-  ("Air+Eau", "Pluie"), ("Air+Vapeur", "Nuage"), ("Feu+Vapeur", "Énergie"), ("Air+Énergie", "Vent"),
-  ("Air+Vent", "Bourrasque"), ("Pluie+Vent", "Tempête"), ("Nuage+Énergie", "Éclair"),
-  ("Tempête+Vent", "Tornade"), ("Feu+Énergie", "Explosion"), ("Feu+Vent", "Incendie"),
-  ("Cendre+Feu", "Brasier"), ("Terre+Vapeur", "Geyser"), ("Eau+Vent", "Vague"), ("Air+Éclair", "Ozone"),
-  ("Feu+Éclair", "Lumière"), ("Lumière+Pluie", "Arc-en-ciel"), ("Sable+Verre", "Temps"),
-  ("Nuage+Vent", "Neige"), ("Eau+Neige", "Glace"),
-  # formations
-  ("Pierre+Terre", "Montagne"), ("Lave+Montagne", "Volcan"), ("Pluie+Terre", "Lac"), ("Eau+Lac", "Océan"),
-  ("Montagne+Océan", "Continent"), ("Continent+Vie", "Planète Terre"), ("Océan+Volcan", "Île"),
-  ("Sable+Vent", "Désert"), ("Désert+Eau", "Oasis"),
-  # vie & créatures
-  ("Air+Boue", "Vie"), ("Air+Eau+Feu+Terre", "Vie"),
-  ("Terre+Vie", "Plante"), ("Plante+Terre", "Arbre"), ("Boue+Vie", "Lombric"), ("Poussière+Vie", "Asticot"),
-  ("Plante+Vie", "Chenille"), ("Air+Chenille", "Papillon"), ("Eau+Vie", "Poisson"),
-  ("Lumière+Poisson", "Poisson Tropical"), ("Glace+Poisson", "Poisson Polaire"), ("Air+Poisson", "Poisson Volant"),
-  ("Océan+Poisson", "Poisson Abyssal"), ("Océan+Vie", "Méduse"), ("Feu+Vie", "Salamandre"),
-  ("Salamandre+Volcan", "Dragon"), ("Salamandre+Vent", "Ptérodactyle"),
-  # magie
-  ("Énergie+Vie", "Magie"), ("Air+Vie", "Esprit"), ("Eau+Magie", "Mana"), ("Cristal+Magie", "Orbe"),
-  ("Bois+Magie", "Baguette"), ("Énergie+Magie", "Pouvoir"), ("Feu+Métal", "Anneau"),
-  ("Anneau+Pouvoir", "Anneau de Pouvoir"), ("Feu+Magie", "Feu Magique"),
-  # créations humaines
-  ("Esprit+Vie", "Humain"), ("Métal+Pierre", "Épée"), ("Épée+Humain", "Héros"), ("Arbre+Métal", "Bois"),
-  ("Boue+Feu", "Brique"), ("Bois+Brique", "Maison"),
+# file(game_data.name) -> { famille: {nom: emoji} }
+FILES = {}
+for family, els in FAMILIES.items():
+    FILES.setdefault(FILE_OF_FAMILY[family], {})[family] = els
 
-  # ---- recettes à 3 éléments ----
-  ("Air+Eau+Lumière", "Arc-en-ciel"),            # 2e chemin
-  ("Air+Glace+Lumière", "Aurore"),
-  ("Énergie+Feu+Lumière", "Étoile"),
-  ("Énergie+Étoile+Temps", "Galaxie"),
-  ("Neige+Tempête+Vent", "Blizzard"),
-  ("Explosion+Océan+Vague", "Tsunami"),
-  ("Boue+Eau+Plante", "Marais"),
-  ("Arbre+Pluie+Terre", "Forêt"),
-  ("Forêt+Pluie+Vie", "Jungle"),
-  ("Océan+Pierre+Vie", "Récif"),
-  ("Air+Lumière+Vie", "Luciole"),
-  ("Air+Arbre+Vie", "Oiseau"),
-  ("Cendre+Feu+Vie", "Phénix"),
-  ("Eau+Magie+Plante", "Potion"),
-  ("Esprit+Magie+Pierre", "Golem"),
-  ("Arc-en-ciel+Magie+Vie", "Licorne"),
-  ("Baguette+Humain+Magie", "Sorcier"),
-  ("Humain+Métal+Épée", "Chevalier"),
-  ("Héros+Maison+Pierre", "Château"),
-  ("Brique+Humain+Maison", "Ville"),
-
-  # ---- recettes à 4 éléments ----
-  ("Air+Feu+Pierre+Énergie", "Météore"),
-  ("Galaxie+Étoile+Temps+Énergie", "Univers"),
-  ("Nuage+Océan+Pluie+Tempête", "Déluge"),
-  ("Arbre+Eau+Plante+Terre", "Jardin"),
-  ("Dragon+Eau+Magie+Poisson", "Hydre"),
-  ("Cristal+Lumière+Potion+Vie", "Élixir"),
-  ("Bois+Humain+Océan+Vie", "Arche"),
-  ("Humain+Montagne+Nuage+Pouvoir", "Olympe"),
-]
+# (ingrédients, résultat) : toutes les recettes de db/content/recipes_*.py
+import glob  # noqa: E402
+R = [(ing, res) for path in sorted(glob.glob(os.path.join(HERE, "content", "recipes_*.py")))
+     for ing, res, _ in check.load(path)]
 
 name_to_file = {}
 for f, cats in FILES.items():
@@ -136,7 +35,6 @@ for f, cats in FILES.items():
 keys = {}
 for ing, res in R:
     parts = ing.split("+")
-    assert len(set(parts)) == len(parts), ing
     for p in parts + [res]:
         assert p in name_to_file, ("unknown element", p)
     k = "+".join(sorted(parts))
@@ -290,10 +188,10 @@ w("-- humains_craft_rules (servi sous /api/game-data/creations_humaines) atteign
 w("-- réellement la BDD depuis le front : server.js intercepte animaux, biologie,")
 w("-- geologie, magie, elements, elements_data avec des réponses vides.")
 meta_desc = {
-  "materiaux_elementaires": "Éléments fondamentaux et matériaux de base",
-  "phenomenes_naturels": "Météo, énergies et phénomènes naturels",
-  "formations_naturelles": "Reliefs, étendues d'eau et êtres vivants",
-  "humains_craft_rules": "Magie et créations humaines",
+  "materiaux_elementaires": "Éléments fondamentaux, matériaux, chimie et physique",
+  "phenomenes_naturels": "Météo, phénomènes naturels et cosmos",
+  "formations_naturelles": "Reliefs, eaux, flore, biologie et êtres vivants",
+  "humains_craft_rules": "Corps et esprit, créations humaines, histoire, technologie et légendes",
 }
 rows = []
 for f, cats in FILES.items():
