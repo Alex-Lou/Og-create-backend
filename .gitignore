@@ -12,3 +12,4 @@ yarn-error.log*
 # Fichiers temporaires et de système
 .DS_Store
 Thumbs.db
+__pycache__/
