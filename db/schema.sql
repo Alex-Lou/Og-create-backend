@@ -24,19 +24,9 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- ---------------------------------------------------------------------
--- Refresh tokens (routes/auth.js, routes/contactRoutes.js)
--- Pas de UNIQUE sur token : deux JWT signés dans la même seconde avec le
--- même payload sont identiques.
+-- Ancienne table des jetons de rafraîchissement, remplacée par auth_sessions
 -- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS refresh_tokens (
-    id          SERIAL PRIMARY KEY,
-    user_id     INTEGER     NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    token       TEXT        NOT NULL,
-    expires_at  TIMESTAMPTZ NOT NULL,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token   ON refresh_tokens (token);
-CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens (user_id);
+DROP TABLE IF EXISTS refresh_tokens;
 
 -- ---------------------------------------------------------------------
 -- Sessions (services/authSession.js) : empreinte SHA-256 du jeton de
