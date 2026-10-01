@@ -160,3 +160,78 @@ test('l’Expédition mélange les éléments de la région', async () => {
   const outside = await api('POST', '/play/combine', { mode: 'explorer', ingredients: [secret, run.data.elements[0]] }, player);
   assert.equal(outside.status, 403);
 });
+
+// Une question qu'une seule fusion des éléments de départ résout, avec la recette qui la résout
+async function oneStepQuestion() {
+  const rules = await sql(`SELECT r.key, r.value FROM game_data g, jsonb_each_text(g.rules->'rules') r WHERE g.active`);
+  const questions = await sql(`SELECT id, level, category, points, valid_answers, initial_elements FROM timer_questions
+                               WHERE initial_elements->>'validationMode' = 'any' ORDER BY id`);
+  for (const q of questions) {
+    const have = new Set([...BASE, ...(q.initial_elements.required || []), ...(q.initial_elements.additional || [])]);
+    const rule = rules.find(r => q.valid_answers.includes(r.value) && r.key.split('+').every(p => have.has(p)));
+    if (rule) return { ...q, ingredients: rule.key.split('+') };
+  }
+  throw new Error('aucune question en une fusion');
+}
+
+test('les questions de l’Épreuve arrivent sans leurs réponses', async () => {
+  const { data } = await api('GET', '/game-data/timer_questions');
+  assert.equal(data.allEmojis, undefined);
+  const questions = Object.values(data.levels).flatMap(level => Object.values(level.categories).flatMap(c => c.questions));
+  assert.ok(questions.length > 0);
+  assert.ok(questions.every(q => q.validAnswers === undefined && q.initialElements && q.text));
+  // Une question à plusieurs réponses : aucune ne figure dans ce que reçoit le navigateur
+  const [multiple] = await sql(`SELECT id, valid_answers FROM timer_questions WHERE initial_elements->>'validationMode' = 'multiple' LIMIT 1`);
+  const sent = JSON.stringify(questions.find(q => q.id === multiple.id));
+  assert.ok(multiple.valid_answers.every(answer => !sent.includes(answer)), sent);
+});
+
+test('l’Épreuve : le serveur juge la réponse et paie une seule fois', async () => {
+  const q = await oneStepQuestion();
+  const player = await newPlayer();
+  await api('POST', '/play/run', { mode: 'timer', questionId: q.id, launch: true }, player);
+  const won = await api('POST', '/play/combine', { mode: 'timer', ingredients: q.ingredients }, player);
+  assert.equal(won.status, 200);
+  assert.equal(won.data.trial.solved, true);
+  assert.equal(won.data.trial.coins, q.points);
+  // Déjà résolue : rien de plus
+  const again = await api('POST', '/play/combine', { mode: 'timer', ingredients: q.ingredients }, player);
+  assert.equal(again.data.trial, null);
+  // Même question rejouée plus tard : elle compte au score, mais ses points ne sont versés qu’une fois
+  await api('POST', '/play/run', { mode: 'timer', questionId: q.id }, player);
+  const replay = await api('POST', '/play/combine', { mode: 'timer', ingredients: q.ingredients }, player);
+  assert.equal(replay.data.trial.solved, true);
+  assert.equal(replay.data.trial.credited, false);
+  assert.equal(await coinsOf(player), q.points);
+  assert.equal((await api('POST', '/coins/claim/timer-question', { questionId: q.id }, player)).status, 404);
+});
+
+test('l’Épreuve : une réponse après la fin du sablier ne compte pas', async () => {
+  const q = await oneStepQuestion();
+  const player = await newPlayer();
+  await api('POST', '/play/run', { mode: 'timer', questionId: q.id, launch: true }, player);
+  await sql(`UPDATE play_runs SET deadline = NOW() - INTERVAL '1 minute' WHERE owner = $1 AND mode = 'timer'`, [`u:${player.userId}`]);
+  const late = await api('POST', '/play/combine', { mode: 'timer', ingredients: q.ingredients }, player);
+  assert.equal(late.data.trial.late, true);
+  assert.equal(await coinsOf(player), 0);
+  // Le joker de temps rallonge aussi le sablier du serveur
+  await sql(`UPDATE play_runs SET deadline = NOW() - INTERVAL '10 seconds' WHERE owner = $1 AND mode = 'timer'`, [`u:${player.userId}`]);
+  await api('POST', '/play/joker', { kind: 'time' }, player);
+  const saved = await api('POST', '/play/combine', { mode: 'timer', ingredients: q.ingredients }, player);
+  assert.equal(saved.data.trial.solved, true);
+});
+
+test('l’Épreuve : le bonus de record vient du score compté par le serveur', async () => {
+  const q = await oneStepQuestion();
+  const player = await newPlayer();
+  await api('POST', '/play/run', { mode: 'timer', questionId: q.id, launch: true }, player);
+  await api('POST', '/play/combine', { mode: 'timer', ingredients: q.ingredients }, player);
+  const end = await api('POST', '/play/timer/finish', { score: 999 }, player);
+  assert.equal(end.data.score, 1);
+  assert.equal(end.data.coins, q.points + 5);
+  // Rejouer la fin ne paie rien : la partie est close
+  const twice = await api('POST', '/play/timer/finish', {}, player);
+  assert.equal(twice.data.score, 0);
+  assert.equal(await coinsOf(player), q.points + 5);
+  assert.equal((await api('POST', '/coins/claim/timer-record', { level: q.level, score: 9 }, player)).status, 404);
+});

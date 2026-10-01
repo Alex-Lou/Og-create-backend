@@ -8,6 +8,7 @@ const book = require('../services/recipeBook');
 const players = require('../services/players');
 const ledger = require('../services/ledger');
 const achievementService = require('../services/achievementService');
+const trial = require('../services/trial');
 const { verifyAccess, readCookie } = require('../services/authSession');
 const { log } = require('../utils/logger');
 
@@ -15,7 +16,7 @@ const router = express.Router();
 
 const MODES = ['infinite', 'timer', 'explorer'];
 const HELP_PRICE = 50; // piste de l'Infini et joker payant de l'Épreuve
-const FREE_JOKERS = 2; // offerts à chaque lancement de l'Épreuve
+const JOKER_TIME = 30; // secondes ajoutées par le joker de temps
 const MAX_ORIGINS = 3;
 const NAME = /^[^\u0000-\u001f]{1,60}$/;
 
@@ -81,31 +82,23 @@ router.get('/state', playLimiter, withPlayer(async (req, res, owner, b) => {
     });
 }));
 
-// Début d'une question de l'Épreuve ou d'une région de l'Expédition : les éléments en main
+// Début d'une question de l'Épreuve (services/trial.js) ou d'une région de l'Expédition : les éléments en main
 router.post('/run', playLimiter, withPlayer(async (req, res, owner, b) => {
     const { mode } = req.body;
-    let context;
-    let inventory;
-    let freeJokers = null;
     if (mode === 'timer') {
         const questionId = Number(req.body.questionId);
         if (!Number.isInteger(questionId) || questionId <= 0) return res.status(400).json({ message: 'Question invalide' });
-        const { rows } = await db.query('SELECT initial_elements FROM timer_questions WHERE id = $1', [questionId]);
-        if (!rows.length) return res.status(404).json({ message: 'Question inconnue' });
-        const initial = rows[0].initial_elements || {};
-        inventory = [...new Set([...book.BASE_ELEMENTS, ...(initial.required || []), ...(initial.additional || [])])];
-        context = questionId;
-        if (req.body.launch === true) freeJokers = FREE_JOKERS;
-    } else if (mode === 'explorer') {
-        const region = REGIONS.find(r => r.id === Number(req.body.regionId));
-        if (!region) return res.status(404).json({ message: 'Région inconnue' });
-        inventory = region.availableElements?.length ? [...new Set(region.availableElements)] : [...book.BASE_ELEMENTS];
-        context = region.id;
-    } else {
-        return res.status(400).json({ message: 'Mode invalide' });
+        const q = await trial.question(questionId);
+        if (!q) return res.status(404).json({ message: 'Question inconnue' });
+        const started = await trial.start(owner, q, req.body.launch === true);
+        return res.json({ elements: started.inventory, known: book.describe(b, started.inventory), freeJokers: started.freeJokers, required: started.required });
     }
-    const left = await players.startRun(owner, mode, context, inventory, freeJokers);
-    res.json({ elements: inventory, known: book.describe(b, inventory), freeJokers: left });
+    if (mode !== 'explorer') return res.status(400).json({ message: 'Mode invalide' });
+    const region = REGIONS.find(r => r.id === Number(req.body.regionId));
+    if (!region) return res.status(404).json({ message: 'Région inconnue' });
+    const inventory = region.availableElements?.length ? [...new Set(region.availableElements)] : [...book.BASE_ELEMENTS];
+    await players.startRun(owner, mode, region.id, inventory);
+    res.json({ elements: inventory, known: book.describe(b, inventory) });
 }));
 
 // Un mélange : les ingrédients doivent être en main ; seul le serveur ajoute le résultat
@@ -126,6 +119,8 @@ router.post('/combine', playLimiter, withPlayer(async (req, res, owner, b) => {
 
     const isNew = run ? await players.addToRun(owner, mode, result) : await players.addElement(owner, result);
     const reply = { result, ...book.describe(b, [result])[result], isNew };
+    // Épreuve : le serveur juge la question (réussite, points, progression « 2 / 3 »)
+    if (mode === 'timer') reply.trial = await trial.judge(owner, [...run.inventory, result]);
     if (mode === 'infinite' && isNew) {
         reply.unexplored = book.unexplored(b, [...inHand, result]);
         if (owner.kind === 'user') await achievementService.syncAchievements(owner.id);
@@ -183,9 +178,15 @@ router.post('/joker', playLimiter, withPlayer(async (req, res, owner, b) => {
     } else {
         reply.freeJokers = free;
     }
+    if (kind === 'time') await trial.addTime(owner, JOKER_TIME);
     if (kind === 'step') reply.ingredients = step.ingredients;
     if (kind === 'ingredient') reply.ingredient = step.ingredients.find(p => !book.BASE_ELEMENTS.includes(p)) || step.ingredients[0];
     res.json(reply);
+}));
+
+// Fin du sablier : score compté par le serveur, bonus de record versé s'il monte
+router.post('/timer/finish', playLimiter, withPlayer(async (req, res, owner) => {
+    res.json(await trial.finish(owner));
 }));
 
 module.exports = router;

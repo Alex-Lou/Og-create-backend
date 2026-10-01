@@ -16,25 +16,6 @@ test('le client ne peut plus écrire son solde', async () => {
   assert.equal(await coinsOf(player), 40);
 });
 
-test('une question de l’Épreuve ne paie qu’une fois, au prix de la base', async () => {
-  const player = await newPlayer();
-  const [question] = await sql('SELECT id, points FROM timer_questions ORDER BY id LIMIT 1');
-  const first = await api('POST', '/coins/claim/timer-question', { questionId: question.id }, player);
-  assert.equal(first.status, 200);
-  assert.deepEqual(first.data, { credited: true, coins: question.points });
-  const again = await api('POST', '/coins/claim/timer-question', { questionId: question.id }, player);
-  assert.deepEqual(again.data, { credited: false, coins: question.points });
-  assert.equal((await api('POST', '/coins/claim/timer-question', { questionId: 'x' }, player)).status, 400);
-
-  // Bonus de record : seulement quand il monte, et borné par le nombre de questions du niveau
-  const [{ count }] = await sql("SELECT COUNT(*)::int AS count FROM timer_questions WHERE level = 'Facile'");
-  assert.equal((await api('POST', '/coins/claim/timer-record', { level: 'Facile', score: count + 1 }, player)).status, 400);
-  const record = await api('POST', '/coins/claim/timer-record', { level: 'Facile', score: 2 }, player);
-  assert.equal(record.data.coins, question.points + 10);
-  const same = await api('POST', '/coins/claim/timer-record', { level: 'Facile', score: 2 }, player);
-  assert.equal(same.data.credited, false);
-});
-
 test('l’énergie s’achète en quantité positive, et la visite coûte le prix de la région', async () => {
   const player = await newPlayer({ coins: 200 });
   await api('GET', '/explorer/init', null, player);
