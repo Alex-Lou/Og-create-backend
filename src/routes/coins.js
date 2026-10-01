@@ -8,8 +8,6 @@ const { log } = require('../utils/logger');
 const router = express.Router();
 router.use(authMiddleware);
 
-// Prix des aides (doivent rester alignés avec le front : src/utils/hints.js)
-const PRICES = { joker: 50, piste: 50 };
 const LEVELS = ['Facile', 'Moyen', 'Difficile'];
 // Bonus de record de l'Épreuve : 5 écus par réussite, versé quand le record du niveau monte
 const RECORD_BONUS = 5;
@@ -60,18 +58,6 @@ router.post('/claim/timer-record', async (req, res) => {
   }
 });
 
-// Aide payante (joker de l'Épreuve, piste de l'Infini) : prix du serveur, débit seulement si le solde suffit
-router.post('/spend', async (req, res) => {
-  const price = PRICES[req.body.reason];
-  if (!price) return res.status(400).json({ message: 'Dépense inconnue' });
-  try {
-    const coins = await ledger.debit(req.user.id, price, req.body.reason);
-    if (coins === null) return res.status(400).json({ message: 'Pas assez d’écus', required: price });
-    res.json({ coins });
-  } catch (error) {
-    log('error', 'Dépense', { errorMessage: error.message });
-    res.status(500).json({ message: 'Dépense non enregistrée' });
-  }
-});
+// Les aides payantes (joker, piste) sont débitées par routes/play.js, qui calcule l'aide elle-même
 
 module.exports = router;

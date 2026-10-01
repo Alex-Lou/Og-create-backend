@@ -103,6 +103,7 @@ const customizationRoutes = require('./routes/customization');
 const explorerRoutes = require('./routes/explorer');
 const gameDataController = require('./routes/gameDataController');
 const timerService = require('./routes/timerServiceBack');
+const playRoutes = require('./routes/play');
 
 const KNOWN_MISSING_FILES = {
     animaux: { elements: {}, rules: {} },
@@ -142,6 +143,7 @@ app.use('/api/coins', gameLimiter, coinsRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/customization', customizationRoutes);
 app.use('/api/explorer', gameLimiter, explorerRoutes);
+app.use('/api/play', playRoutes);
 
 Object.keys(KNOWN_MISSING_FILES).forEach(filename => {
     app.use(`/api/game-data/${filename}`, generateMissingFileResponse(filename));

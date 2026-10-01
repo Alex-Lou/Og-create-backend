@@ -137,35 +137,6 @@ async function saveProgressController(req, res) {
   }
 }
 
-/**
- * Met à jour les éléments découverts par l'utilisateur
- */
-async function updateDiscoveredElementsController(req, res) {
-  try {
-    const userId = req.user.id;
-    const { discoveredElements, elements, gameMode = 'infinite' } = req.body;
-    
-    // Utiliser discoveredElements ou elements selon ce qui est fourni
-    const elementsToUpdate = discoveredElements || elements || [];
-    
-    log('debug', 'Mise à jour des éléments découverts', { 
-      userId, 
-      elementsCount: elementsToUpdate.length,
-      gameMode
-    });
-    
-    const result = await ProgressService.updateDiscoveredElements(
-        userId,
-        elementsToUpdate,
-        gameMode
-    );
-      
-    return responseHandler.send(res, result);
-  } catch (error) {
-    return responseHandler.error(res, error, 'Erreur lors de la mise à jour des éléments découverts');
-  }
-  }
-  
   /**
    * Met à jour la progression du timer d'un utilisateur
    */
@@ -220,11 +191,7 @@ async function updateDiscoveredElementsController(req, res) {
   // Route pour sauvegarder la progression complète
   router.post('/save', authMiddleware, progressRateLimiter, saveProgressController);
   
-  // Route pour mettre à jour les éléments découverts
-  router.post('/update-discovered-elements', authMiddleware, progressRateLimiter, updateDiscoveredElementsController);
-  
-  // Compatibilité avec le ancien nom (update)
-  router.post('/update', authMiddleware, progressRateLimiter, updateDiscoveredElementsController);
+  // Les éléments découverts ne s'écrivent plus d'ici : seul un mélange réussi les ajoute (routes/play.js)
   
   // Routes pour le timer
   router.post('/update-timer-progress', authMiddleware, progressRateLimiter, updateTimerProgressController);

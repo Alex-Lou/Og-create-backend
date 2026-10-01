@@ -729,28 +729,11 @@ async function checkCombinationController(req, res) {
 
 // ----------------------------------------
 // DÉFINITION DES ROUTES
-// Lecture du contenu du jeu : publique (mode invité). Diagnostic et combine : connecté.
+// Lecture publique (mode invité)
 // ----------------------------------------
 
-// Route pour charger toutes les données du jeu
-router.get('/load-game-data', getAllGameDataController);
-
-// Route pour les éléments
-router.get('/elements', getElementsController);
-
-// Route pour les achievements
-router.get('/achievements', getAchievementsController);
-
-// Route pour les questions du timer
-router.get('/timer-questions', getTimerQuestionsController);
-
-// Route de diagnostic pour timer_questions
-router.get('/debug-timer-questions', authMiddleware, diagnosisTimerQuestionsController);
-
-// Route pour vérifier les combinaisons d'éléments
-router.post('/combine', authMiddleware, checkCombinationController);
-
-// Route générique pour charger un fichier JSON spécifique
-router.get('/:filename', getSpecificDataController);
+// Seules les questions de l'Épreuve sortent d'ici : les recettes ne quittent plus le serveur (routes/play.js)
+// Le front normalise le nom en « timer_questions » : les deux écritures mènent aux questions
+router.get(['/timer-questions', '/timer_questions'], getTimerQuestionsController);
 
 module.exports = router;
