@@ -1,7 +1,6 @@
 // Mélanges et aides de tous les modes, décidés par le serveur.
 // Le navigateur n'apprend que le résultat d'un mélange qu'il peut faire, et les éléments qu'il possède.
 const express = require('express');
-const path = require('path');
 const rateLimit = require('express-rate-limit');
 const db = require('../config/db');
 const book = require('../services/recipeBook');
@@ -9,6 +8,7 @@ const players = require('../services/players');
 const ledger = require('../services/ledger');
 const achievementService = require('../services/achievementService');
 const trial = require('../services/trial');
+const expedition = require('../services/expedition');
 const { verifyAccess, readCookie } = require('../services/authSession');
 const { log } = require('../utils/logger');
 
@@ -20,7 +20,6 @@ const JOKER_TIME = 30; // secondes ajoutées par le joker de temps
 const MAX_ORIGINS = 3;
 const NAME = /^[^\u0000-\u001f]{1,60}$/;
 
-const REGIONS = require(path.join(__dirname, '../public/data/regionChallenges.json')).regions;
 
 // Limites : par joueur (compte ou cookie invité), et par adresse pour la création de carnets invités
 const limiter = (windowMs, max, keyGenerator) => rateLimit({
@@ -94,11 +93,15 @@ router.post('/run', playLimiter, withPlayer(async (req, res, owner, b) => {
         return res.json({ elements: started.inventory, known: book.describe(b, started.inventory), freeJokers: started.freeJokers, required: started.required });
     }
     if (mode !== 'explorer') return res.status(400).json({ message: 'Mode invalide' });
-    const region = REGIONS.find(r => r.id === Number(req.body.regionId));
-    if (!region) return res.status(404).json({ message: 'Région inconnue' });
-    const inventory = region.availableElements?.length ? [...new Set(region.availableElements)] : [...book.BASE_ELEMENTS];
-    await players.startRun(owner, mode, region.id, inventory);
-    res.json({ elements: inventory, known: book.describe(b, inventory) });
+    const started = await expedition.start(owner, req.body.regionId);
+    if (started.status) return res.status(started.status).json({ message: started.message });
+    res.json({
+        elements: started.inventory,
+        known: book.describe(b, started.inventory),
+        required: started.required,
+        elementsWithGifs: started.elementsWithGifs,
+        boss: started.boss
+    });
 }));
 
 // Un mélange : les ingrédients doivent être en main ; seul le serveur ajoute le résultat
@@ -111,16 +114,19 @@ router.post('/combine', playLimiter, withPlayer(async (req, res, owner, b) => {
     }
     const run = mode === 'infinite' ? null : await players.getRun(owner, mode);
     if (mode !== 'infinite' && !run) return res.status(409).json({ message: 'Aucune partie en cours', code: 'NO_RUN' });
+    if (mode === 'explorer' && await expedition.fightOver(owner)) return res.status(409).json({ message: 'Le combat est terminé.', code: 'FIGHT_OVER' });
     const inHand = new Set(run ? run.inventory : await players.elements(owner));
     if (!ingredients.every(i => inHand.has(i))) return res.status(403).json({ message: 'Ingrédient absent de ton carnet' });
 
     const result = book.combine(b, ingredients);
-    if (!result) return res.json({ result: null });
+    // Expédition : chaque mélange porte un coup au gardien, un raté coûte des points de vie
+    if (!result) return res.json({ result: null, fight: mode === 'explorer' ? await expedition.strike(owner, null) : undefined });
 
     const isNew = run ? await players.addToRun(owner, mode, result) : await players.addElement(owner, result);
     const reply = { result, ...book.describe(b, [result])[result], isNew };
     // Épreuve : le serveur juge la question (réussite, points, progression « 2 / 3 »)
     if (mode === 'timer') reply.trial = await trial.judge(owner, [...run.inventory, result]);
+    if (mode === 'explorer') reply.fight = await expedition.strike(owner, result);
     if (mode === 'infinite' && isNew) {
         reply.unexplored = book.unexplored(b, [...inHand, result]);
         if (owner.kind === 'user') await achievementService.syncAchievements(owner.id);
@@ -183,6 +189,11 @@ router.post('/joker', playLimiter, withPlayer(async (req, res, owner, b) => {
     if (kind === 'ingredient') reply.ingredient = step.ingredients.find(p => !book.BASE_ELEMENTS.includes(p)) || step.ingredients[0];
     res.json(reply);
 }));
+
+// Carte de l'Expédition : régions, dialogues et récompenses, sans les éléments ni les règles de combat
+router.get('/regions', playLimiter, (req, res) => {
+    res.json({ regions: expedition.catalogue() });
+});
 
 // Fin du sablier : score compté par le serveur, bonus de record versé s'il monte
 router.post('/timer/finish', playLimiter, withPlayer(async (req, res, owner) => {

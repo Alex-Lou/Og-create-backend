@@ -1,7 +1,7 @@
 // Tests de l'API sur une vraie base : le serveur est le seul juge des écus, des succès et de l'énergie
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { startServer, api, sql, newPlayer, coinsOf } = require('./helpers');
+const { startServer, api, sql, newPlayer, coinsOf, solveRegion } = require('./helpers');
 
 let server;
 test.before(async () => { server = await startServer(); });
@@ -30,6 +30,10 @@ test('l’énergie s’achète en quantité positive, et la visite coûte le pri
   const [region] = await sql('SELECT id, energy_cost, energy_reward, coin_reward FROM explorer_regions WHERE is_default = TRUE ORDER BY id LIMIT 1');
   const visit = await api('POST', `/explorer/visit/${region.id}`, { energyCost: -1000 }, player);
   assert.equal(visit.data.energy, 12 - region.energy_cost);
+
+  // Pas de récompense tant que le défi n'est pas relevé dans la partie suivie par le serveur
+  assert.equal((await api('POST', `/explorer/complete/${region.id}`, {}, player)).status, 403);
+  await solveRegion(player, region.id);
 
   // Récompense de la base, versée une seule fois, quoi que dise le client
   const done = await api('POST', `/explorer/complete/${region.id}`, { coins: 999999, energy: 999 }, player);

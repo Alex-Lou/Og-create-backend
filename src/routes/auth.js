@@ -88,7 +88,8 @@ const accountLimiter = rateLimit({
     keyGenerator: req => `login:${String(req.body?.email || '').trim().toLowerCase()}`,
     message: { message: 'Trop de tentatives sur ce compte, réessaie dans quelques minutes.' }
 });
-const registerLimiter = limiter(60, 10);
+// Inscriptions par adresse et par heure (relevable pour les tests automatiques, qui créent beaucoup de comptes)
+const registerLimiter = limiter(60, Number(process.env.REGISTER_RATE_LIMIT) || 10);
 const refreshLimiter = limiter(15, 60);
 
 // Route d'inscription

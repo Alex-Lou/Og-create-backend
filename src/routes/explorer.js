@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../config/db');
 const authMiddleware = require('../middleware/auth');
 const ledger = require('../services/ledger');
+const expedition = require('../services/expedition');
 
 // Fonction pour calculer l'énergie actuelle en fonction du temps écoulé
 function calculateCurrentEnergy(baseEnergy, lastUpdate, maxEnergy) {
@@ -96,7 +97,8 @@ router.get('/regions', authMiddleware, async (req, res) => {
     
     const result = await db.query(`
       SELECT 
-        r.*, 
+        r.id, r.name, r.description, r.image_path, r.is_default, r.required_level, r.parent_region_id,
+        r.position_x, r.position_y, r.is_boss, r.energy_cost, r.energy_reward, r.map_id, r.coin_reward,
         ur.visited, 
         ur.completed, 
         ur.progress, 
@@ -270,6 +272,11 @@ router.post('/complete/:regionId', authMiddleware, async (req, res) => {
     
     if (userRegionResult.rows.length === 0 || !userRegionResult.rows[0].visited) {
       return res.status(403).json({ message: "Vous devez d'abord visiter cette région" });
+    }
+
+    // Le défi doit avoir été relevé dans la partie suivie par le serveur (éléments créés, gardien vaincu)
+    if (!(await expedition.solved(userId, regionId))) {
+      return res.status(403).json({ message: "Le défi de cette région n'est pas relevé" });
     }
     
     // Vérifier si la région est déjà complétée
@@ -458,7 +465,9 @@ router.get('/regions/:regionId', authMiddleware, async (req, res) => {
   
   try {
     const result = await db.query(`
-      SELECT r.*, ur.visited, ur.completed, ur.progress, ur.required_elements, ur.boss_defeated
+      SELECT r.id, r.name, r.description, r.image_path, r.is_default, r.required_level, r.parent_region_id,
+             r.position_x, r.position_y, r.is_boss, r.energy_cost, r.energy_reward, r.map_id, r.coin_reward,
+             ur.visited, ur.completed, ur.progress, ur.required_elements, ur.boss_defeated
       FROM explorer_regions r
       LEFT JOIN user_regions ur ON r.id = ur.region_id AND ur.user_id = $1
       WHERE r.id = $2
@@ -495,6 +504,10 @@ router.post('/discover/:regionId/:elementName', authMiddleware, async (req, res)
       return res.status(403).json({ message: "Vous devez d'abord visiter cette région" });
     }
     
+    if (!(await expedition.holds(userId, regionId, elementName))) {
+      return res.status(403).json({ message: "Cet élément n'a pas été créé dans cette région" });
+    }
+
     // Récupérer les éléments déjà découverts
     let requiredElements = userRegionResult.rows[0].required_elements || [];
     
