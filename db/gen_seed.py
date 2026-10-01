@@ -261,22 +261,35 @@ for n, _, c in ACH:
 # Une illustration n'existe que pour certains succès ; les autres s'affichent avec le sceau gravé
 ACH_IMAGE = {n: (n + ".png" if succ is None or n + ".png" in succ else None) for n, _, _ in ACH}
 
+# Cabinet : cadres (anneau du sceau) et emblèmes (cœur du sceau), dessinés par le front
+# (src/utils/cabinet.js, clés = image_path). Avec un succès : ne s'achète pas, se mérite.
 ITEMS = [
-  ("Cadre basique", "frame", "basicCadre.png", 0, True, "Le cadre de départ."),
-  ("Cadre argenté", "frame", "silverFrame.png", 100, False, "Un cadre argenté élégant."),
-  ("Cadre doré", "frame", "goldFrame.png", 250, False, "Pour les alchimistes fortunés."),
-  ("Cadre mystique", "frame", "customCadre1.png", 400, False, "Un cadre orné de runes."),
-  ("Pièce", "avatar", "coin.png", 0, True, "L'avatar par défaut."),
-  ("Goutte d'eau", "avatar", "waterAvatar.png", 150, False, "Pour les amis de l'Eau."),
-  ("Flamme", "avatar", "fireAvatar.png", 150, False, "Pour les amis du Feu."),
-  ("Nuage", "avatar", "cloudy.png", 200, False, "Léger comme l'Air."),
-  ("Lune", "avatar", "moon.png", 300, False, "Un avatar nocturne."),
+  ("Cadre basique", "frame", "basicCadre.png", 0, True, "Un filet simple autour du sceau.", None),
+  ("Cadre argenté", "frame", "silverFrame.png", 100, False, "Double filet gradué, comme un cadran.", None),
+  ("Cadre doré", "frame", "goldFrame.png", 250, False, "Un filet d'or perlé, pour les alchimistes fortunés.", None),
+  ("Orbe céleste", "frame", "orbe", 350, False, "Une orbite d'étoiles et sa planète d'or.", None),
+  ("Cadre mystique", "frame", "customCadre1.png", 400, False, "Douze runes gravées entre deux filets.", None),
+  ("Couronne de ronces", "frame", "ronces", 450, False, "Une tige vivante, feuilles et épines.", None),
+  ("Rouages", "frame", "rouages", 0, False, "Une couronne dentée, boulonnée d'or.", "Ingénieur des Étoiles"),
+  ("Ouroboros", "frame", "ouroboros", 0, False, "Le serpent d'or qui se mord la queue.", "Maître des Arcanes"),
+  ("Pièce", "avatar", "coin.png", 0, True, "Le cœur d'or d'origine.", None),
+  ("Goutte d'eau", "avatar", "waterAvatar.png", 150, False, "Le triangle de l'Eau.", None),
+  ("Flamme", "avatar", "fireAvatar.png", 150, False, "Le triangle du Feu.", None),
+  ("Nuage", "avatar", "cloudy.png", 200, False, "Le triangle barré de l'Air.", None),
+  ("Lune", "avatar", "moon.png", 300, False, "Un croissant d'or.", None),
+  ("Soleil d'or", "avatar", "soleil", 400, False, "Le disque pointé et ses douze rayons.", None),
+  ("Arbre de vie", "avatar", "arbre", 500, False, "Ramure et racines dans un cercle.", None),
+  ("Œil du Sage", "avatar", "oeil", 0, False, "L'œil qui a tout vu.", "Sage parmi les Sages"),
+  ("Étoile septénaire", "avatar", "septenaire", 0, False, "L'heptagramme des sept lumières.", "Architecte des Étoiles"),
 ]
-SVGS_DIR = os.path.join(FRONT_DIR, "src", "assets", "Svgs")
-if os.path.isdir(SVGS_DIR):
-    svgs = set(os.listdir(SVGS_DIR))
+ach_names = {n for n, _, _ in ACH}
+for it in ITEMS:
+    assert it[6] is None or it[6] in ach_names, it
+CABINET_JS = os.path.join(FRONT_DIR, "src", "utils", "cabinet.js")
+if os.path.isfile(CABINET_JS):
+    drawn = set(re.findall(r"^  '?([\w.]+)'?: \[", open(CABINET_JS, encoding="utf-8").read(), re.M))
     for it in ITEMS:
-        assert it[2] in svgs, it
+        assert it[2] in drawn, ("gravure absente de cabinet.js", it[2])
 
 # --- SQL emit ---
 def q(s):
@@ -343,9 +356,9 @@ for n, d, c in ACH:
     w("ON CONFLICT (name) DO UPDATE SET description = EXCLUDED.description, condition = EXCLUDED.condition, image = EXCLUDED.image;")
 w("")
 w("-- ---------------------------------------------------------------- customization_items")
-for n, t, p, price, dflt, d in ITEMS:
-    w(f"INSERT INTO customization_items (name, type, image_path, price, is_default, description) VALUES ({q(n)}, {q(t)}, {q(p)}, {price}, {'TRUE' if dflt else 'FALSE'}, {q(d)})")
-    w("ON CONFLICT (image_path) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type, price = EXCLUDED.price, is_default = EXCLUDED.is_default, description = EXCLUDED.description;")
+for n, t, p, price, dflt, d, ach in ITEMS:
+    w(f"INSERT INTO customization_items (name, type, image_path, price, is_default, description, achievement) VALUES ({q(n)}, {q(t)}, {q(p)}, {price}, {'TRUE' if dflt else 'FALSE'}, {q(d)}, {q(ach) if ach else 'NULL'})")
+    w("ON CONFLICT (image_path) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type, price = EXCLUDED.price, is_default = EXCLUDED.is_default, description = EXCLUDED.description, achievement = EXCLUDED.achievement;")
 w("")
 w("-- ---------------------------------------------------------------- game_settings")
 for k, v, d in [("max_energy", "20", "Énergie maximale en mode Explorer"),
