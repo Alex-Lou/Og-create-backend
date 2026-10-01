@@ -113,7 +113,6 @@ RECIPES = [
   # --- Chronique
   ("Temps+Écriture", "Chronique"),
   ("Roi+Écriture", "Chronique"),
-  ("Héros+Temps", "Chronique"),
   ("Papier+Roi+Temps+Écriture", "Chronique"),
   # --- Mythologie
   ("Civilisation+Mythe", "Mythologie"),

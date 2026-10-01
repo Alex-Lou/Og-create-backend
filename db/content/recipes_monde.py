@@ -42,7 +42,7 @@ RECIPES = [
   ("Grotte+Son", "Écho"), ("Montagne+Son", "Écho"), ("Canyon+Son", "Écho"), ("Falaise+Son", "Écho"),
 
   # ===== Temps, jour, nuit, saisons =====
-  ("Soleil+Terre", "Jour"), ("Lumière+Temps", "Jour"), ("Nuit+Temps", "Jour"),
+  ("Soleil+Terre", "Jour"), ("Nuit+Temps", "Jour"),
   ("Jour+Temps", "Nuit"), ("Jour+Ombre", "Nuit"), ("Ombre+Planète Terre", "Nuit"),
   ("Jour+Nuit", "Temps"),
   ("Orbite+Planète Terre", "Saison"), ("Soleil+Temps", "Saison"), ("Chaleur+Froid+Temps", "Saison"),
@@ -99,8 +99,7 @@ RECIPES = [
   ("Glace+Montagne", "Glacier"), ("Montagne+Neige+Temps", "Glacier"),
   ("Froid+Neige+Temps+Vallée", "Glacier"),
   ("Froid+Océan", "Banquise"), ("Froid+Mer", "Banquise"), ("Glace+Océan", "Banquise"),
-  ("Glacier+Mer", "Iceberg"), ("Glacier+Océan", "Iceberg"), ("Banquise+Vague", "Iceberg"),
-  ("Froid+Glace+Mer+Montagne", "Iceberg"),
+  ("Glacier+Mer", "Iceberg"), ("Glacier+Océan", "Iceberg"),
   ("Froid+Planète Terre", "Pôle"), ("Magnétisme+Planète Terre", "Pôle"), ("Continent+Glace", "Pôle"),
   ("Froid+Glace+Neige+Planète Terre", "Pôle"),
   ("Corail+Mer", "Récif"), ("Corail+Océan", "Récif"), ("Chaleur+Corail+Lumière+Mer", "Récif"),
