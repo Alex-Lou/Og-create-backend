@@ -4,7 +4,8 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
 const rateLimit = require('express-rate-limit');
-const { generateAccessToken, generateRefreshToken, verifyRefreshToken } = require('../utils/tokenManager');
+const authSession = require('../services/authSession');
+const authMiddleware = require('../middleware/auth');
 
 // Configuration des niveaux de log
 const LOG_LEVELS = {
@@ -47,6 +48,9 @@ const validatePassword = (password) => {
     return passwordRegex.test(password);
 };
 
+// Empreinte bcrypt sans compte associé (même coût), comparée quand l'adresse est inconnue
+const DUMMY_HASH = bcrypt.hashSync(require('crypto').randomBytes(16).toString('hex'), 12);
+
 // Génération de username unique
 const generateUsername = (email) => {
     const baseUsername = email.split('@')[0];
@@ -63,6 +67,15 @@ const limiter = (windowMinutes, max) => rateLimit({
     message: { message: 'Trop de tentatives, réessaie dans quelques minutes.' }
 });
 const loginLimiter = limiter(15, 10);
+// Second verrou, par compte visé : indépendant de l'adresse IP (proxies, réseaux partagés)
+const accountLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: req => `login:${String(req.body?.email || '').trim().toLowerCase()}`,
+    message: { message: 'Trop de tentatives sur ce compte, réessaie dans quelques minutes.' }
+});
 const registerLimiter = limiter(60, 10);
 const refreshLimiter = limiter(15, 60);
 
@@ -118,32 +131,10 @@ router.post('/register', registerLimiter, async (req, res) => {
             [email, hashedPassword, username]
         );
 
-        // Génération des tokens
-        log('debug', 'Génération des tokens');
-        const userData = { 
-            userId: result.rows[0].id, 
-            email: result.rows[0].email,
-            username: result.rows[0].username
-        };
-        
-        const accessToken = generateAccessToken(userData);
-        const refreshToken = generateRefreshToken(userData);
-        
-        // Stocker le refreshToken dans la base de données
-        await db.query(
-            'INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, NOW() + INTERVAL \'7 days\')',
-            [result.rows[0].id, refreshToken]
-        );
-
-        log('info', 'Inscription réussie', { userId: result.rows[0].id, username });
-        res.status(201).json({
-            message: 'Utilisateur créé avec succès',
-            token: accessToken,
-            refreshToken,
-            userId: result.rows[0].id,
-            username: result.rows[0].username,
-            expiresIn: 3600 // 1 heure en secondes
-        });
+        // Session en cookies httpOnly : aucun jeton dans la réponse
+        const session = await authSession.issue(res, { id: result.rows[0].id, username: result.rows[0].username });
+        log('info', 'Inscription réussie', { userId: session.userId });
+        res.status(201).json({ message: 'Utilisateur créé avec succès', ...session });
     } catch (error) {
         log('error', 'Erreur lors de l\'inscription', { 
             errorType: error.name,
@@ -159,7 +150,7 @@ router.post('/register', registerLimiter, async (req, res) => {
 });
 
 // Route de connexion
-router.post('/login', loginLimiter, async (req, res) => {
+router.post('/login', loginLimiter, accountLimiter, async (req, res) => {
     log('info', 'Tentative de connexion');
 
     try {
@@ -177,53 +168,18 @@ router.post('/login', loginLimiter, async (req, res) => {
             [email]
         );
 
-        if (result.rows.length === 0) {
-            log('warn', 'Utilisateur non trouvé');
-            return res.status(401).json({ message: 'Authentification échouée' });
-        }
-
+        // Même travail (bcrypt) que l'adresse existe ou non : la durée ne trahit pas les comptes
         const user = result.rows[0];
-        log('debug', 'Utilisateur trouvé', { userId: user.id, username: user.username });
+        const validPassword = await bcrypt.compare(String(password), user ? user.password_hash : DUMMY_HASH);
 
-        // Vérification du mot de passe
-        const validPassword = await bcrypt.compare(password, user.password_hash);
-
-        if (!validPassword) {
-            log('warn', 'Mot de passe incorrect', { userId: user.id });
+        if (!user || !validPassword) {
+            log('warn', 'Connexion refusée');
             return res.status(401).json({ message: 'Authentification échouée' });
         }
 
-        // Génération des tokens
-        log('debug', 'Génération des tokens');
-        const userData = { 
-            userId: user.id, 
-            email: user.email,
-            username: user.username
-        };
-        
-        const accessToken = generateAccessToken(userData);
-        const refreshToken = generateRefreshToken(userData);
-        
-        // Supprimer les anciens refresh tokens de cet utilisateur (optionnel)
-        await db.query(
-            'DELETE FROM refresh_tokens WHERE user_id = $1',
-            [user.id]
-        );
-        
-        // Stocker le nouveau refresh token
-        await db.query(
-            'INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, NOW() + INTERVAL \'7 days\')',
-            [user.id, refreshToken]
-        );
-
+        const session = await authSession.issue(res, user);
         log('info', 'Connexion réussie', { userId: user.id });
-        res.status(200).json({
-            token: accessToken,
-            refreshToken,
-            userId: user.id,
-            username: user.username,
-            expiresIn: 3600 // 1 heure en secondes
-        });
+        res.status(200).json(session);
     } catch (error) {
         log('error', 'Erreur lors de la connexion', { 
             errorType: error.name,
@@ -237,104 +193,31 @@ router.post('/login', loginLimiter, async (req, res) => {
     }
 });
 
-// Route pour rafraîchir le token
-router.post('/refresh-token', refreshLimiter, async (req, res) => {
-    log('debug', 'Demande de rafraîchissement de token');
-
+// Renouvellement de session : le jeton de rafraîchissement (cookie) est changé à chaque usage
+router.post('/refresh', refreshLimiter, async (req, res) => {
     try {
-        const { refreshToken } = req.body;
-
-        if (!refreshToken) {
-            log('warn', 'Refresh token manquant');
-            return res.status(400).json({ message: 'Refresh token requis' });
-        }
-
-        // Vérifier le refresh token
-        const decoded = verifyRefreshToken(refreshToken);
-        
-        if (!decoded) {
-            log('warn', 'Refresh token invalide');
-            return res.status(401).json({ message: 'Refresh token invalide ou expiré' });
-        }
-        
-        log('debug', 'Refresh token décodé', { userId: decoded.userId });
-        
-        // Vérifier si le refresh token existe dans la base de données
-        const tokenResult = await db.query(
-            'SELECT * FROM refresh_tokens WHERE token = $1 AND user_id = $2 AND expires_at > NOW()',
-            [refreshToken, decoded.userId]
-        );
-        
-        if (tokenResult.rows.length === 0) {
-            log('warn', 'Refresh token non trouvé ou expiré en BDD', { userId: decoded.userId });
-            return res.status(401).json({ message: 'Session expirée, veuillez vous reconnecter' });
-        }
-
-        // Récupérer les données complètes de l'utilisateur
-        const userResult = await db.query(
-            'SELECT id, email, username FROM users WHERE id = $1',
-            [decoded.userId]
-        );
-
-        if (userResult.rows.length === 0) {
-            log('warn', 'Utilisateur non trouvé lors du rafraîchissement', { userId: decoded.userId });
-            return res.status(401).json({ message: 'Utilisateur non trouvé, veuillez vous reconnecter' });
-        }
-        
-        const user = userResult.rows[0];
-
-        // Générer un nouveau token d'accès
-        const userData = {
-            userId: user.id,
-            email: user.email,
-            username: user.username
-        };
-        
-        log('debug', 'Génération d\'un nouveau token d\'accès');
-        const newAccessToken = generateAccessToken(userData);
-
-        log('info', 'Rafraîchissement de token réussi', { userId: user.id });
-        res.status(200).json({
-            token: newAccessToken,
-            userId: user.id,
-            username: user.username,
-            expiresIn: 3600 // 1 heure en secondes
-        });
+        const result = await authSession.rotate(req, res);
+        if (result.error) return res.status(result.status).json({ message: result.error, code: result.code });
+        res.status(200).json(result.user);
     } catch (error) {
-        log('error', 'Erreur lors du rafraîchissement du token', { 
-            errorType: error.name,
-            errorMessage: error.message
-        });
-
-        res.status(401).json({ 
-            message: 'Erreur lors du rafraîchissement du token',
-            errorDetails: process.env.NODE_ENV === 'development' ? error.message : null
-        });
+        log('error', 'Erreur lors du renouvellement de session', { errorMessage: error.message });
+        res.status(500).json({ message: 'Erreur lors du renouvellement de session' });
     }
 });
 
-// Route de déconnexion
+// Qui suis-je : l'interface vérifie ainsi qu'une session est valable
+router.get('/me', authMiddleware, (req, res) => {
+    res.status(200).json({ userId: req.user.id, username: req.user.username });
+});
+
+// Déconnexion : la session du cookie présenté est révoquée, les cookies effacés
 router.post('/logout', async (req, res) => {
     try {
-        // Seul le jeton présenté est révoqué : un identifiant de joueur venu du client n'est jamais utilisé
-        const { refreshToken } = req.body;
-        log('info', 'Demande de déconnexion');
-        if (typeof refreshToken === 'string' && refreshToken) {
-            await db.query('DELETE FROM refresh_tokens WHERE token = $1', [refreshToken]);
-            log('debug', 'Refresh token supprimé');
-        }
-        
+        await authSession.revoke(req, res);
         res.status(200).json({ message: 'Déconnexion réussie' });
     } catch (error) {
-        log('error', 'Erreur lors de la déconnexion', { 
-            errorType: error.name,
-            errorMessage: error.message
-        });
-        
-        res.status(500).json({
-            message: 'Erreur lors de la déconnexion',
-            errorDetails: process.env.NODE_ENV === 'development' ? error.message : null
-        });
+        log('error', 'Erreur lors de la déconnexion', { errorMessage: error.message });
+        res.status(500).json({ message: 'Erreur lors de la déconnexion' });
     }
 });
 

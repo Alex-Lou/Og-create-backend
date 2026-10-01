@@ -62,11 +62,10 @@ const processSaveQueue = async (userId) => {
     
     try {
       console.log(`Traitement de la file d'attente pour l'utilisateur ${userId}`);
-      console.log('Données à traiter:', JSON.stringify(data, null, 2));
       
       // Vérifier que les données sont valides avant de continuer
       if (!data || typeof data !== 'object') {
-        console.error('Données invalides dans la file d\'attente:', data);
+        console.error('Données invalides dans la file d\'attente');
         reject(new Error('Données de progression invalides'));
         return;
       }
@@ -116,7 +115,6 @@ async function saveProgressController(req, res) {
     const userId = req.user.id;
     
     console.log('Requête de sauvegarde reçue', { userId });
-    console.log('Données reçues pour saveProgress:', JSON.stringify(req.body, null, 2));
     
     // Utiliser une file d'attente pour éviter les conflits
     const savePromise = new Promise((resolve, reject) => {

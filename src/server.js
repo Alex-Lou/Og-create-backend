@@ -14,8 +14,9 @@ const { initRegions } = require('./initRegions');
 ensureJWTSecret();
 
 const app = express();
-// Render place le serveur derrière un proxy : l'adresse du joueur (limites de requêtes) vient de X-Forwarded-For
-app.set('trust proxy', 1);
+// Render place le serveur derrière un proxy (et le site relaie /api : un saut de plus) : l'adresse du joueur,
+// pour les limites de requêtes, se lit dans X-Forwarded-For en ne faisant confiance qu'à ces sauts
+app.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS) || 1);
 
 const morganFormat = process.env.NODE_ENV === 'production' 
     ? '[:date[clf]] :method :url :status :response-time ms' 
@@ -41,7 +42,7 @@ app.use(helmet({
 const corsOptions = {
     origin: process.env.CORS_ORIGIN || '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'X-Requested-With'],
     credentials: true,
     optionsSuccessStatus: 200
 };
@@ -76,6 +77,12 @@ const gameLimiter = createRateLimiter(
 );
 
 app.use(globalLimiter);
+
+// Anti-CSRF : toute requête d'écriture porte l'en-tête de l'application (en plus des cookies SameSite=Strict)
+app.use('/api', (req, res, next) => {
+    if (['GET', 'HEAD', 'OPTIONS'].includes(req.method) || req.get('X-Requested-With') === 'origins') return next();
+    res.status(403).json({ message: 'Requête refusée' });
+});
 
 app.use(express.json({ 
     limit: process.env.REQUEST_BODY_SIZE_LIMIT || '10kb',

@@ -7,6 +7,7 @@ const rateLimit = require('express-rate-limit');
 const db = require('../config/db');
 const transporter = require('../config/emailConfig');
 const { log } = require('../utils/logger');
+const authSession = require('../services/authSession');
 
 const router = express.Router();
 
@@ -85,7 +86,7 @@ router.post('/reset-password', limiter(10), async (req, res) => {
     const userId = rows[0].user_id;
     await client.query('UPDATE users SET password_hash = $1 WHERE id = $2', [await bcrypt.hash(password, 12), userId]);
     // Toutes les sessions ouvertes sont fermées
-    await client.query('DELETE FROM refresh_tokens WHERE user_id = $1', [userId]);
+    await authSession.revokeAll(userId, client);
     await client.query('COMMIT');
     log('info', 'Mot de passe réinitialisé', { userId });
     res.status(200).json({ message: 'Mot de passe changé. Tu peux te connecter.' });

@@ -396,7 +396,6 @@ class ProgressService {
    */
   static async saveProgress(userId, progressData) {
     try {
-      console.log('Données reçues dans saveProgress:', JSON.stringify(progressData, null, 2));
       
       // Vérifier et formater les données pour éviter les erreurs
       let discoveredElements = Array.isArray(progressData.discoveredElements) 
