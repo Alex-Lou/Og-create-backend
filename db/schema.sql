@@ -39,6 +39,23 @@ CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token   ON refresh_tokens (token);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens (user_id);
 
 -- ---------------------------------------------------------------------
+-- Sessions (services/authSession.js) : empreinte SHA-256 du jeton de
+-- rafraîchissement, changé à chaque usage. Une famille = une connexion ;
+-- un jeton remplacé qui revient fait révoquer toute la famille.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS auth_sessions (
+    id          BIGSERIAL    PRIMARY KEY,
+    user_id     INTEGER      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    family      UUID         NOT NULL,
+    token_hash  CHAR(64)     NOT NULL UNIQUE,
+    expires_at  TIMESTAMPTZ  NOT NULL,
+    revoked_at  TIMESTAMPTZ,
+    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_auth_sessions_family ON auth_sessions (family);
+CREATE INDEX IF NOT EXISTS idx_auth_sessions_user   ON auth_sessions (user_id);
+
+-- ---------------------------------------------------------------------
 -- Mot de passe oublié (routes/passwordReset.js) : empreinte SHA-256 du
 -- jeton envoyé par e-mail, un seul lien actif par compte, 30 minutes.
 -- ---------------------------------------------------------------------

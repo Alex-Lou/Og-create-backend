@@ -5,12 +5,6 @@ require('dotenv').config();
 // Configuration du niveau de log
 const LOG_LEVEL = process.env.DB_LOG_LEVEL || 'INFO'; // Valeurs possibles: 'ERROR', 'INFO', 'DEBUG'
 
-// Affichage des infos de connexion uniquement au démarrage
-console.log('Configuration de la base de données :');
-console.log('Utilisateur :', process.env.DB_USER);
-console.log('Hôte :', process.env.DB_HOST);
-console.log('Port :', process.env.DB_PORT);
-console.log('Base de données :', process.env.DB_NAME);
 
 // DATABASE_URL (Neon, Render...) prioritaire ; sinon variables DB_* séparées (local).
 // Le SSL est piloté par l'URL (ex. ?sslmode=require).
