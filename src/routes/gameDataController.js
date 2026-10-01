@@ -169,7 +169,7 @@ const dbService = {
       log('debug', `Nombre de questions dans la table: ${countResult.rows[0].count}`);
       
       const result = await db.query(
-        'SELECT id, level, timer, category, question_text, valid_answers, points, initial_elements, elements_emojis FROM timer_questions ORDER BY level, category'
+        'SELECT id, level, timer, category, question_text, points, initial_elements FROM timer_questions ORDER BY level, category'
       );
       
       log('debug', `Résultat de la requête: ${result.rowCount} lignes trouvées`);
@@ -183,9 +183,6 @@ const dbService = {
       const organized = {
         levels: {}
       };
-      
-      // Collecter tous les emojis
-      const allEmojis = {};
       
       // Traiter chaque question
       for (const row of result.rows) {
@@ -225,59 +222,25 @@ const dbService = {
           };
         }
         
-        // Parser elementsEmojis
-        let elementsEmojis;
-        try {
-          elementsEmojis = typeof row.elements_emojis === 'string'
-            ? JSON.parse(row.elements_emojis)
-            : row.elements_emojis || {};
-            
-          // Ajouter ces emojis à la collection globale
-          Object.assign(allEmojis, elementsEmojis);
-        } catch (e) {
-          log('error', `Erreur de parsing elements_emojis pour question ${row.id}:`, e);
-          elementsEmojis = {};
-        }
-        
-        // S'assurer que validAnswers est un tableau
-        let validAnswers;
-        if (Array.isArray(row.valid_answers)) {
-          validAnswers = row.valid_answers;
-        } else if (typeof row.valid_answers === 'string') {
-          try {
-            validAnswers = JSON.parse(row.valid_answers);
-          } catch (e) {
-            validAnswers = [row.valid_answers];
-          }
-        } else {
-          validAnswers = [];
-        }
-        
         // Créer l'objet question
         const question = {
           id: row.id,
           text: row.question_text,
-          validAnswers: validAnswers,
           points: row.points,
-          initialElements: initialElements
+          // Éléments de départ et mode de validation seulement : les réponses restent au serveur (services/trial.js)
+          initialElements: {
+            validationMode: initialElements.validationMode || 'any',
+            requiredCount: initialElements.requiredCount,
+            required: initialElements.required || [],
+            additional: initialElements.additional || []
+          }
         };
         
         // Ajouter la question à la catégorie
         organized.levels[level].categories[category].questions.push(question);
       }
       
-      // Ajouter les emojis fondamentaux
-      Object.assign(allEmojis, {
-        "Eau": "💧",
-        "Feu": "🔥",
-        "Terre": "🌎",
-        "Air": "💨"
-      });
-      
-      // Ajouter la collection d'emojis à la réponse
-      organized.allEmojis = allEmojis;
-      
-      log('info', `Questions du timer chargées: ${result.rows.length}, emojis: ${Object.keys(allEmojis).length}`);
+      log('info', `Questions du timer chargées: ${result.rows.length}`);
       
       // Mettre en cache et retourner
       return cacheService.set('timerQuestions', organized);

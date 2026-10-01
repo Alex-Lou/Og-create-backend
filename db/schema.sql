@@ -70,6 +70,13 @@ CREATE TABLE IF NOT EXISTS play_runs (
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (owner, mode)
 );
+-- Épreuve (services/trial.js) : chrono, réussites et score tenus par le serveur
+ALTER TABLE play_runs ADD COLUMN IF NOT EXISTS level      TEXT;
+ALTER TABLE play_runs ADD COLUMN IF NOT EXISTS category   TEXT;
+ALTER TABLE play_runs ADD COLUMN IF NOT EXISTS deadline   TIMESTAMPTZ;
+ALTER TABLE play_runs ADD COLUMN IF NOT EXISTS paused_at  TIMESTAMPTZ;
+ALTER TABLE play_runs ADD COLUMN IF NOT EXISTS solved     BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE play_runs ADD COLUMN IF NOT EXISTS solved_ids JSONB   NOT NULL DEFAULT '[]'::jsonb;
 
 -- ---------------------------------------------------------------------
 -- Mot de passe oublié (routes/passwordReset.js) : empreinte SHA-256 du
