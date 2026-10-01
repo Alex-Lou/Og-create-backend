@@ -191,6 +191,8 @@ CREATE TABLE IF NOT EXISTS explorer_regions (
 );
 CREATE INDEX IF NOT EXISTS idx_explorer_regions_parent ON explorer_regions (parent_region_id);
 CREATE INDEX IF NOT EXISTS idx_explorer_regions_map    ON explorer_regions (map_id);
+-- Écus versés à la première réussite de la région (ou du gardien), lus par le serveur
+ALTER TABLE explorer_regions ADD COLUMN IF NOT EXISTS coin_reward INTEGER NOT NULL DEFAULT 50;
 
 CREATE TABLE IF NOT EXISTS user_regions (
     id                 SERIAL PRIMARY KEY,
@@ -216,3 +218,27 @@ CREATE TABLE IF NOT EXISTS game_settings (
     value         TEXT         NOT NULL,
     description   TEXT
 );
+
+-- ---------------------------------------------------------------------
+-- Grand livre des écus (src/services/ledger.js) : seul le serveur fait
+-- varier progress.coins ; chaque mouvement est inscrit ici. Un gain porte
+-- une référence (question, région, record) : unique, il n'est versé qu'une fois.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS coin_ledger (
+    id          BIGSERIAL    PRIMARY KEY,
+    user_id     INTEGER      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    amount      INTEGER      NOT NULL,
+    reason      VARCHAR(40)  NOT NULL,
+    ref         VARCHAR(100),
+    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_coin_ledger_claim UNIQUE (user_id, reason, ref)
+);
+CREATE INDEX IF NOT EXISTS idx_coin_ledger_user ON coin_ledger (user_id, created_at);
+
+-- Garde-fou : ni solde ni énergie négatifs (NOT VALID : contrôle les écritures futures sans bloquer sur l'existant)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_progress_non_negative') THEN
+    ALTER TABLE progress ADD CONSTRAINT chk_progress_non_negative CHECK (coins >= 0 AND explorer_energy >= 0) NOT VALID;
+  END IF;
+END $$;

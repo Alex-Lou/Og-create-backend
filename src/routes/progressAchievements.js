@@ -21,7 +21,7 @@ router.get('/', async (req, res) => {
     log('error', 'Erreur lors de la récupération des achievements', error);
     res.status(500).json({ 
       message: 'Erreur lors de la récupération des achievements',
-      error: error.message 
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
@@ -48,7 +48,7 @@ router.post('/update', authMiddleware, async (req, res) => {
     log('error', 'Erreur lors de la mise à jour des achievements', error);
     res.status(500).json({ 
       message: 'Erreur lors de la mise à jour des achievements',
-      error: error.message 
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
@@ -79,7 +79,7 @@ router.post('/check', authMiddleware, async (req, res) => {
     log('error', 'Erreur lors de la vérification des achievements', error);
     res.status(500).json({ 
       message: 'Erreur lors de la vérification des achievements',
-      error: error.message 
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
@@ -97,7 +97,7 @@ router.get('/user', authMiddleware, async (req, res) => {
     log('error', 'Erreur lors de la récupération des achievements de l\'utilisateur', error);
     res.status(500).json({ 
       message: 'Erreur lors de la récupération des achievements',
-      error: error.message 
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });

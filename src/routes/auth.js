@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
+const rateLimit = require('express-rate-limit');
 const { generateAccessToken, generateRefreshToken, verifyRefreshToken } = require('../utils/tokenManager');
 
 // Configuration des niveaux de log
@@ -53,8 +54,20 @@ const generateUsername = (email) => {
     return `${baseUsername}_${randomSuffix}`;
 };
 
+// Limites par adresse IP : essais de connexion (échecs compris) et créations de compte
+const limiter = (windowMinutes, max) => rateLimit({
+    windowMs: windowMinutes * 60 * 1000,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: 'Trop de tentatives, réessaie dans quelques minutes.' }
+});
+const loginLimiter = limiter(15, 10);
+const registerLimiter = limiter(60, 10);
+const refreshLimiter = limiter(15, 60);
+
 // Route d'inscription
-router.post('/register', async (req, res) => {
+router.post('/register', registerLimiter, async (req, res) => {
     log('info', 'Nouvelle demande d\'inscription');
     
     try {
@@ -67,7 +80,7 @@ router.post('/register', async (req, res) => {
         }
 
         if (!validateEmail(email)) {
-            log('warn', 'Format d\'email invalide', { email });
+            log('warn', 'Format d\'email invalide');
             return res.status(400).json({ message: 'Format d\'email invalide' });
         }
 
@@ -90,7 +103,7 @@ router.post('/register', async (req, res) => {
         );
 
         if (userExists.rows.length > 0) {
-            log('warn', 'Email ou username déjà utilisé', { email });
+            log('warn', 'Email ou username déjà utilisé');
             return res.status(400).json({ message: 'Email ou username déjà utilisé' });
         }
 
@@ -146,7 +159,7 @@ router.post('/register', async (req, res) => {
 });
 
 // Route de connexion
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
     log('info', 'Tentative de connexion');
 
     try {
@@ -158,14 +171,14 @@ router.post('/login', async (req, res) => {
         }
 
         // Recherche de l'utilisateur
-        log('debug', 'Recherche de l\'utilisateur', { email });
+        log('debug', 'Recherche de l\'utilisateur');
         const result = await db.query(
             'SELECT * FROM users WHERE email = $1',
             [email]
         );
 
         if (result.rows.length === 0) {
-            log('warn', 'Utilisateur non trouvé', { email });
+            log('warn', 'Utilisateur non trouvé');
             return res.status(401).json({ message: 'Authentification échouée' });
         }
 
@@ -225,7 +238,7 @@ router.post('/login', async (req, res) => {
 });
 
 // Route pour rafraîchir le token
-router.post('/refresh-token', async (req, res) => {
+router.post('/refresh-token', refreshLimiter, async (req, res) => {
     log('debug', 'Demande de rafraîchissement de token');
 
     try {
@@ -303,24 +316,12 @@ router.post('/refresh-token', async (req, res) => {
 // Route de déconnexion
 router.post('/logout', async (req, res) => {
     try {
-        const { refreshToken, userId } = req.body;
-        
-        log('info', 'Demande de déconnexion', { userId });
-        
-        if (refreshToken) {
-            // Supprimer le refresh token spécifique
-            await db.query(
-                'DELETE FROM refresh_tokens WHERE token = $1',
-                [refreshToken]
-            );
+        // Seul le jeton présenté est révoqué : un identifiant de joueur venu du client n'est jamais utilisé
+        const { refreshToken } = req.body;
+        log('info', 'Demande de déconnexion');
+        if (typeof refreshToken === 'string' && refreshToken) {
+            await db.query('DELETE FROM refresh_tokens WHERE token = $1', [refreshToken]);
             log('debug', 'Refresh token supprimé');
-        } else if (userId) {
-            // Supprimer tous les refresh tokens de l'utilisateur
-            await db.query(
-                'DELETE FROM refresh_tokens WHERE user_id = $1',
-                [userId]
-            );
-            log('debug', 'Tous les refresh tokens de l\'utilisateur supprimés', { userId });
         }
         
         res.status(200).json({ message: 'Déconnexion réussie' });

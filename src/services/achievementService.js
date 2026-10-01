@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const { log } = require('../utils/logger');
+const { isConditionMet } = require('../utils/achievementCondition');
 
 /**
  * Service de gestion des achievements
@@ -94,267 +95,43 @@ class AchievementService {
   }
 
   /**
-   * Vérifie et met à jour les achievements débloqués par l'utilisateur
-   * @param {number} userId - ID de l'utilisateur
-   * @param {Array} discoveredElements - Éléments découverts par l'utilisateur
-   * @returns {Object} - Achievements mis à jour et liste de nouveaux achievements débloqués
+   * Recalcule les succès d'un joueur depuis ses découvertes enregistrées (mode Infini).
+   * Le client ne fait que demander une vérification : un succès n'est débloqué que si sa
+   * condition est remplie côté serveur. `claimed` sert seulement à garder la date affichée.
+   * @param {number} userId
+   * @param {Object} claimed - { "<nom>": { unlockedAt } } envoyés par le client (facultatif)
+   * @returns {{ achievements: Object, newlyUnlocked: Array }}
    */
-  static async checkAndUpdateAchievements(userId, discoveredElements) {
-    try {
-      // Vérifier les entrées
-      if (!userId) {
-        throw new Error('ID utilisateur requis');
-      }
-      
-      if (!discoveredElements || !Array.isArray(discoveredElements)) {
-        discoveredElements = [];
-      }
-      
-      // Récupérer tous les achievements
-      const allAchievements = await this.getAllAchievements();
-      
-      // Récupérer les achievements actuels de l'utilisateur
-      const currentProgress = await db.query(
-        'SELECT achievements FROM progress WHERE user_id = $1',
-        [userId]
-      );
-      
-      let currentAchievements = {};
-      if (currentProgress.rows.length > 0) {
-        currentAchievements = this.parseJsonValue(currentProgress.rows[0].achievements, {});
-      }
-      
-      // Créer un contexte d'évaluation pour les conditions
-      const evaluationContext = {
-        discoveredElements: discoveredElements || [],
-        elementsCount: discoveredElements ? discoveredElements.length : 0,
-        hasElement: (element) => Array.isArray(discoveredElements) && discoveredElements.includes(element),
-        hasAllElements: (elements) => {
-          if (!Array.isArray(elements) || !Array.isArray(discoveredElements)) return false;
-          return elements.every(element => discoveredElements.includes(element));
-        },
-        hasAnyElement: (elements) => {
-          if (!Array.isArray(elements) || !Array.isArray(discoveredElements)) return false;
-          return elements.some(element => discoveredElements.includes(element));
-        }
-      };
-      
-      const updatedAchievements = { ...currentAchievements };
-      const newlyUnlocked = [];
-      
-      // Vérifier chaque achievement
-      for (const achievement of allAchievements) {
-        const achievementName = achievement.name;
-        const currentStatus = currentAchievements[achievementName] || { unlocked: false, unlockedAt: null };
-        
-        // Si l'achievement est déjà débloqué, passer au suivant
-        if (currentStatus.unlocked) {
-          continue;
-        }
-        
-        // Vérifier que la condition est définie et non vide
-        if (!achievement.condition || typeof achievement.condition !== 'string' || achievement.condition.trim() === '') {
-          continue;
-        }
-        
-        // Évaluer la condition (méthode alternative plus sûre)
-        let isUnlocked = false;
-        
-        try {
-          // MÉTHODE ALTERNATIVE: Utiliser une évaluation manuelle plus simple
-          // Cela évite les problèmes de syntaxe dans les conditions
-          
-          // Quelques exemples de conditions simples que nous pouvons gérer
-          const condition = achievement.condition.trim().toLowerCase();
-          
-          if (condition.includes('discoveredelements.length') || condition.includes('elementcount')) {
-            // Condition basée sur le nombre d'éléments découverts
-            const requiredCount = 
-              parseInt(condition.match(/\d+/)?.[0]) || 
-              parseInt(condition.match(/\>=\s*(\d+)/)?.[1]) || 
-              parseInt(condition.match(/\>\s*(\d+)/)?.[1]) || 
-              50; // Valeur par défaut si on ne peut pas extraire un nombre
-            
-            isUnlocked = discoveredElements.length >= requiredCount;
-          }
-          else if (condition.includes('includes(')) {
-            // Condition basée sur un élément spécifique
-            // Extraire les noms entre guillemets
-            const matches = condition.match(/'([^']+)'|"([^"]+)"/g);
-            if (matches && matches.length > 0) {
-              const requiredElements = matches.map(m => 
-                m.replace(/['"]/g, '') // Supprimer les guillemets
-              );
-              
-              if (condition.includes('every') || condition.includes('all')) {
-                // Tous les éléments doivent être présents
-                isUnlocked = requiredElements.every(el => 
-                  discoveredElements.includes(el)
-                );
-              } else {
-                // Au moins un élément doit être présent
-                isUnlocked = requiredElements.some(el => 
-                  discoveredElements.includes(el)
-                );
-              }
-            }
-          }
-          else if (condition.includes('haselement(')) {
-            // Utiliser notre fonction hasElement
-            const match = condition.match(/haselement\(['"](.*?)['"]/) || 
-                          condition.match(/haselement\((.*?)\)/);
-            if (match && match[1]) {
-              isUnlocked = evaluationContext.hasElement(match[1]);
-            }
-          }
-          else {
-            // Si nous ne pouvons pas analyser la condition manuellement, 
-            // essayer l'ancienne méthode en masquant les erreurs
-            try {
-              const correctedCondition = achievement.condition
-                .replace(/\bdiscoveredElements\b/g, 'ctx.discoveredElements')
-                .replace(/\binclude\(/g, 'includes(')
-                .replace(/\bincludes\(/g, 'includes(')
-                .replace(/\belementsCount\b/g, 'ctx.elementsCount');
-              
-              // Simplifier l'évaluation
-              const fn = new Function('ctx', `
-                try {
-                  return Boolean(${correctedCondition});
-                } catch(e) {
-                  return false;
-                }
-              `);
-              
-              isUnlocked = fn(evaluationContext);
-            } catch (innerError) {
-              // Ignorer silencieusement cette erreur
-            }
-          }
-        } catch (error) {
-          // Ne pas afficher ces erreurs pour réduire le bruit dans les logs
-          continue;
-        }
-        
-        // Si la condition est remplie, débloquer l'achievement
-        if (isUnlocked) {
-          const timestamp = new Date().toISOString();
-          updatedAchievements[achievementName] = {
-            unlocked: true,
-            unlockedAt: timestamp
-          };
-          
-          newlyUnlocked.push({
-            ...achievement,
-            unlockedAt: timestamp
-          });
-        }
-      }
-      
-      // Si des achievements ont été débloqués, mettre à jour la base de données
-      if (newlyUnlocked.length > 0) {
-        // Mise à jour des achievements
-        if (currentProgress.rows.length > 0) {
-          await db.query(
-            `UPDATE progress 
-             SET achievements = $1, 
-                 last_saved = CURRENT_TIMESTAMP
-             WHERE user_id = $2`,
-            [JSON.stringify(updatedAchievements), userId]
-          );
-        } else {
-          // Créer une nouvelle entrée si l'utilisateur n'existe pas
-          await db.query(
-            `INSERT INTO progress (
-               user_id, 
-               achievements,
-               last_saved
-             ) VALUES ($1, $2, CURRENT_TIMESTAMP)`,
-            [userId, JSON.stringify(updatedAchievements)]
-          );
-        }
-      }
-      
-      return {
-        achievements: updatedAchievements,
-        newlyUnlocked
-      };
-    } catch (error) {
-      // Erreur plus générale - simplement retourner un résultat vide
-      return {
-        achievements: {},
-        newlyUnlocked: []
-      };
+  static async syncAchievements(userId, claimed = {}) {
+    if (!userId) throw new Error('ID utilisateur requis');
+    const { rows } = await db.query('SELECT achievements, infinite_elements FROM progress WHERE user_id = $1', [userId]);
+    if (!rows.length) return { achievements: {}, newlyUnlocked: [] };
+
+    const current = this.parseJsonValue(rows[0].achievements, {});
+    const discovered = this.parseJsonValue(rows[0].infinite_elements, []);
+    const updated = { ...current };
+    const newlyUnlocked = [];
+    for (const achievement of await this.getAllAchievements()) {
+      if (updated[achievement.name]?.unlocked || !isConditionMet(achievement.condition, discovered)) continue;
+      const claimedAt = Date.parse(claimed?.[achievement.name]?.unlockedAt);
+      const unlockedAt = Number.isNaN(claimedAt) || claimedAt > Date.now() ? new Date().toISOString() : new Date(claimedAt).toISOString();
+      updated[achievement.name] = { unlocked: true, unlockedAt };
+      newlyUnlocked.push({ ...achievement, unlockedAt });
     }
+    if (newlyUnlocked.length) {
+      await db.query('UPDATE progress SET achievements = $1, last_saved = CURRENT_TIMESTAMP WHERE user_id = $2', [JSON.stringify(updated), userId]);
+    }
+    return { achievements: updated, newlyUnlocked };
   }
 
-  /**
-   * Met à jour directement les achievements de l'utilisateur
-   * @param {number} userId - ID de l'utilisateur
-   * @param {Object} achievements - Achievements à mettre à jour
-   * @returns {Object} - Achievements mis à jour
-   */
+  // Compatibilité des routes existantes : les deux recalculent depuis le serveur
+  static async checkAndUpdateAchievements(userId) {
+    return this.syncAchievements(userId);
+  }
+
   static async updateUserAchievements(userId, achievements) {
-    try {
-      if (!userId) {
-        throw new Error('ID utilisateur requis');
-      }
-      
-      if (!achievements || Object.keys(achievements).length === 0) {
-        console.log('Aucun achievement à mettre à jour');
-        return {
-          message: 'Aucun achievement à mettre à jour',
-          achievements: {},
-          timestamp: new Date().toISOString()
-        };
-      }
-      
-      // Récupérer les achievements actuels
-      const currentProgress = await db.query(
-        'SELECT achievements FROM progress WHERE user_id = $1',
-        [userId]
-      );
-      
-      let currentAchievements = {};
-      if (currentProgress.rows.length > 0) {
-        currentAchievements = this.parseJsonValue(currentProgress.rows[0].achievements, {});
-      }
-      
-      // Fusionner les achievements
-      const updatedAchievements = { 
-        ...currentAchievements, 
-        ...achievements 
-      };
-      
-      // Mise à jour dans la base de données
-      if (currentProgress.rows.length > 0) {
-        await db.query(
-          `UPDATE progress 
-           SET achievements = $1, 
-               last_saved = CURRENT_TIMESTAMP
-           WHERE user_id = $2`,
-          [JSON.stringify(updatedAchievements), userId]
-        );
-      } else {
-        await db.query(
-          `INSERT INTO progress (
-             user_id, 
-             achievements,
-             last_saved
-           ) VALUES ($1, $2, CURRENT_TIMESTAMP)`,
-          [userId, JSON.stringify(updatedAchievements)]
-        );
-      }
-      
-      return {
-        message: 'Achievements mis à jour avec succès',
-        achievements: updatedAchievements,
-        timestamp: new Date().toISOString()
-      };
-    } catch (error) {
-      log('error', 'Erreur lors de la mise à jour des achievements', error);
-      throw error;
-    }
+    const result = await this.syncAchievements(userId, achievements);
+    return { message: 'Succès vérifiés', ...result, timestamp: new Date().toISOString() };
   }
 
   /**
