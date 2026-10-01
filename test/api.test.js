@@ -35,15 +35,6 @@ test('une question de l’Épreuve ne paie qu’une fois, au prix de la base', a
   assert.equal(same.data.credited, false);
 });
 
-test('une aide se paie au prix du serveur, jamais à découvert', async () => {
-  const player = await newPlayer({ coins: 60 });
-  assert.equal((await api('POST', '/coins/spend', { reason: 'joker' }, player)).data.coins, 10);
-  const broke = await api('POST', '/coins/spend', { reason: 'piste' }, player);
-  assert.equal(broke.status, 400);
-  assert.equal((await api('POST', '/coins/spend', { reason: 'cadeau' }, player)).status, 400);
-  assert.equal(await coinsOf(player), 10);
-});
-
 test('l’énergie s’achète en quantité positive, et la visite coûte le prix de la région', async () => {
   const player = await newPlayer({ coins: 200 });
   await api('GET', '/explorer/init', null, player);

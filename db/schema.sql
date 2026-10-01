@@ -46,6 +46,32 @@ CREATE INDEX IF NOT EXISTS idx_auth_sessions_family ON auth_sessions (family);
 CREATE INDEX IF NOT EXISTS idx_auth_sessions_user   ON auth_sessions (user_id);
 
 -- ---------------------------------------------------------------------
+-- Carnet d'un joueur sans compte (routes/play.js) : cookie oc_guest, dont
+-- seule l'empreinte SHA-256 est gardée. Effacé après 30 jours sans jouer.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS guest_players (
+    id          SERIAL PRIMARY KEY,
+    token_hash  CHAR(64)    NOT NULL UNIQUE,
+    elements    JSONB       NOT NULL DEFAULT '["Eau","Feu","Terre","Air"]'::jsonb,
+    last_seen   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_guest_players_last_seen ON guest_players (last_seen);
+
+-- ---------------------------------------------------------------------
+-- Partie en cours de l'Épreuve ou de l'Expédition (routes/play.js) : les
+-- éléments en main, une par joueur et par mode. owner = 'u:<id>' | 'g:<id>'.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS play_runs (
+    owner        TEXT        NOT NULL,
+    mode         TEXT        NOT NULL CHECK (mode IN ('timer', 'explorer')),
+    context      TEXT        NOT NULL,
+    inventory    JSONB       NOT NULL,
+    free_jokers  INTEGER     NOT NULL DEFAULT 0,
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (owner, mode)
+);
+
+-- ---------------------------------------------------------------------
 -- Mot de passe oublié (routes/passwordReset.js) : empreinte SHA-256 du
 -- jeton envoyé par e-mail, un seul lien actif par compte, 30 minutes.
 -- ---------------------------------------------------------------------

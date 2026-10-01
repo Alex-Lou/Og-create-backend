@@ -398,9 +398,11 @@ class ProgressService {
     try {
       
       // Vérifier et formater les données pour éviter les erreurs
-      let discoveredElements = Array.isArray(progressData.discoveredElements) 
-        ? progressData.discoveredElements 
-        : (Array.isArray(progressData.elements) ? progressData.elements : FUNDAMENTAL_ELEMENTS);
+      // Le carnet de l'Infini n'est jamais écrit depuis le client : seul un mélange réussi l'enrichit (routes/play.js)
+      const gameModeForElements = progressData.gameMode || 'infinite';
+      let discoveredElements = gameModeForElements === 'timer' && Array.isArray(progressData.discoveredElements)
+        ? progressData.discoveredElements
+        : [];
       
       let categories = Array.isArray(progressData.discoveredCategories) 
         ? progressData.discoveredCategories 
@@ -519,7 +521,7 @@ class ProgressService {
         // Créer une nouvelle entrée avec les valeurs par défaut selon le mode de jeu
         const emptyArray = JSON.stringify([]);
         const elementsJson = JSON.stringify(elementsToSave);
-        let infiniteElementsValue = gameMode === 'infinite' ? elementsJson : JSON.stringify(FUNDAMENTAL_ELEMENTS);
+        const infiniteElementsValue = JSON.stringify(FUNDAMENTAL_ELEMENTS);
         let timerElementsValue = gameMode === 'timer' ? elementsJson : emptyArray;
         
         await db.query(

@@ -6,6 +6,18 @@ const db = require('../config/db');
 const rateLimit = require('express-rate-limit');
 const authSession = require('../services/authSession');
 const authMiddleware = require('../middleware/auth');
+const players = require('../services/players');
+const achievementService = require('../services/achievementService');
+
+// Les découvertes faites en invité rejoignent le compte ; un échec n'empêche pas la connexion
+async function adoptGuest(req, res, userId) {
+    try {
+        await players.adoptGuest(req, res, userId);
+        await achievementService.syncAchievements(userId);
+    } catch (error) {
+        log('error', 'Reprise du carnet invité', { errorMessage: error.message });
+    }
+}
 
 // Configuration des niveaux de log
 const LOG_LEVELS = {
@@ -133,6 +145,7 @@ router.post('/register', registerLimiter, async (req, res) => {
 
         // Session en cookies httpOnly : aucun jeton dans la réponse
         const session = await authSession.issue(res, { id: result.rows[0].id, username: result.rows[0].username });
+        await adoptGuest(req, res, session.userId);
         log('info', 'Inscription réussie', { userId: session.userId });
         res.status(201).json({ message: 'Utilisateur créé avec succès', ...session });
     } catch (error) {
@@ -178,6 +191,7 @@ router.post('/login', loginLimiter, accountLimiter, async (req, res) => {
         }
 
         const session = await authSession.issue(res, user);
+        await adoptGuest(req, res, user.id);
         log('info', 'Connexion réussie', { userId: user.id });
         res.status(200).json(session);
     } catch (error) {
