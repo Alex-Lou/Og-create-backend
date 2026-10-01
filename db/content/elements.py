@@ -36,6 +36,8 @@ FAMILIES = {
     "Son": "🔊", "Écho": "📢", "Feu de forêt": "🔥",
     # Plateau 1
     "Pluie acide": "🥀",
+    # Paquet thématique (culture commune)
+    "Hiver": "🧣", "Printemps": "🌷", "Été": "⛱️", "Automne": "🎃", "Ciel": "🌤️", "Coucher de soleil": "🌇",
   },
 
   "Physique": {
@@ -93,6 +95,8 @@ FAMILIES = {
     "Fruit": "🍑", "Pollen": "🟡", "Feuille": "🍃", "Racine": "🫚", "Bois": "🪵",
     "Cotonnier": "🌱", "Lin": "🌾", "Thé": "🍵", "Café": "☕", "Cacao": "🍫",
     "Canne à sucre": "🎋", "Herbe médicinale": "🌿", "Lichen": "🟢", "Nénuphar": "🪷",
+    # Paquet thématique (culture commune)
+    "Tomate": "🍅", "Laitue": "🥬", "Noix de coco": "🥥", "Érable": "🍁", "Bouquet": "💐",
   },
 
   "Biologie": {
@@ -120,6 +124,9 @@ FAMILIES = {
     "Lion": "🦁", "Chameau": "🐫", "Castor": "🦫", "Moustique": "🦟", "Plume": "🪶",
     "Nid": "🪺", "Ruche": "🍯", "Toile d'araignée": "🕸️", "Fourrure": "🦊", "Écaille": "🐉",
     "Os": "🦴", "Mammouth": "🦣", "Oiseau marin": "🕊️", "Cygne": "🦢",
+    # Paquet thématique (culture commune)
+    "Chèvre": "🐐", "Cerf": "🦌", "Canard": "🦆", "Zèbre": "🦓", "Tigre": "🐅", "Phoque": "🦭",
+    "Perroquet": "🦜",
   },
 
   "Corps et Esprit": {
@@ -130,6 +137,9 @@ FAMILIES = {
     "Maladie": "🤒", "Santé": "🩺", "Remède": "💊", "Mort": "🕯️", "Tombe": "🪦",
     "Deuil": "🖤", "Langage": "🗣️", "Conscience": "🪞", "Idée": "💡", "Curiosité": "🔍",
     "Courage": "🦁", "Sagesse": "🦉", "Faim": "🍽️", "Douleur": "🤕",
+    # Paquet thématique (culture commune)
+    "Larme": "😭", "Rire": "😂", "Cauchemar": "😨", "Sueur": "😓", "Fatigue": "🥱", "Pansement": "🩹",
+    "Rhume": "🤧",
   },
 
   "Créations Humaines": {
@@ -151,6 +161,12 @@ FAMILIES = {
     "Momie": "🧟",
     # Plateau 2
     "Pop-corn": "🍿", "Caramel": "🍮", "Gâteau": "🍰", "Soupe": "🍲", "Panier": "🧺", "Cloche": "🔔", "Feu d'artifice": "🎆",
+    # Paquet thématique (culture commune)
+    "Beurre": "🧈", "Pâtes": "🍝", "Crêpe": "🥞", "Frites": "🍟", "Jus de fruit": "🧃", "Crème glacée": "🍨",
+    "Croissant": "🥐", "Sandwich": "🥪", "Lit": "🛏️", "Porte": "🚪", "Fenêtre": "🪟", "Clé": "🔑",
+    "Parapluie": "☂️", "Fermier": "🧑‍🌾", "Pot de fleurs": "🪴", "Hôpital": "🏥", "Rails": "🛤️", "Guitare": "🎸",
+    "Piano": "🎹", "Tambour": "🥁", "Danse": "💃", "Ballon": "⚽", "Ski": "🎿", "Cerf-volant": "🪁",
+    "Bonhomme de neige": "⛄",
   },
 
   "Histoire": {
@@ -174,6 +190,8 @@ FAMILIES = {
     "Réseau électrique": "🔌", "Moulin à eau": "💧", "Sauvegarde": "💾",
     # Plateau 2
     "Lunettes": "👓",
+    # Paquet thématique (culture commune)
+    "Vélo": "🚲", "Moto": "🏍️", "Parachute": "🪂", "Grue": "🏗️", "Bateau à vapeur": "🛳️", "Téléphérique": "🚡",
   },
 
   "Légendes": {
