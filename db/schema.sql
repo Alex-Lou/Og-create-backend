@@ -157,6 +157,8 @@ CREATE TABLE IF NOT EXISTS customization_items (
     description TEXT,
     created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
+-- Pièce méritée : nom du succès qui la débloque (NULL = s'achète en écus)
+ALTER TABLE customization_items ADD COLUMN IF NOT EXISTS achievement VARCHAR(150);
 
 CREATE TABLE IF NOT EXISTS user_items (
     id            SERIAL PRIMARY KEY,

@@ -1,7 +1,7 @@
 -- =====================================================================
 -- Origins Creation - données de démonstration (idempotent, rejouable)
 -- 583 éléments, 2028 recettes (1420 à 2, 414 à 3, 194 à 4 éléments), 96 questions Timer,
--- 50 succès, 9 items, 10 régions. Aucun utilisateur.
+-- 50 succès, 17 items, 10 régions. Aucun utilisateur.
 -- NE PAS MODIFIER À LA MAIN : généré par db/gen_seed.py (python3 db/gen_seed.py).
 -- Vérifié : tout élément est atteignable depuis Eau/Feu/Terre/Air.
 -- =====================================================================
@@ -324,24 +324,40 @@ INSERT INTO achievements_list (name, description, unlocked, condition, image) VA
 ON CONFLICT (name) DO UPDATE SET description = EXCLUDED.description, condition = EXCLUDED.condition, image = EXCLUDED.image;
 
 -- ---------------------------------------------------------------- customization_items
-INSERT INTO customization_items (name, type, image_path, price, is_default, description) VALUES ('Cadre basique', 'frame', 'basicCadre.png', 0, TRUE, 'Le cadre de départ.')
-ON CONFLICT (image_path) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type, price = EXCLUDED.price, is_default = EXCLUDED.is_default, description = EXCLUDED.description;
-INSERT INTO customization_items (name, type, image_path, price, is_default, description) VALUES ('Cadre argenté', 'frame', 'silverFrame.png', 100, FALSE, 'Un cadre argenté élégant.')
-ON CONFLICT (image_path) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type, price = EXCLUDED.price, is_default = EXCLUDED.is_default, description = EXCLUDED.description;
-INSERT INTO customization_items (name, type, image_path, price, is_default, description) VALUES ('Cadre doré', 'frame', 'goldFrame.png', 250, FALSE, 'Pour les alchimistes fortunés.')
-ON CONFLICT (image_path) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type, price = EXCLUDED.price, is_default = EXCLUDED.is_default, description = EXCLUDED.description;
-INSERT INTO customization_items (name, type, image_path, price, is_default, description) VALUES ('Cadre mystique', 'frame', 'customCadre1.png', 400, FALSE, 'Un cadre orné de runes.')
-ON CONFLICT (image_path) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type, price = EXCLUDED.price, is_default = EXCLUDED.is_default, description = EXCLUDED.description;
-INSERT INTO customization_items (name, type, image_path, price, is_default, description) VALUES ('Pièce', 'avatar', 'coin.png', 0, TRUE, 'L''avatar par défaut.')
-ON CONFLICT (image_path) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type, price = EXCLUDED.price, is_default = EXCLUDED.is_default, description = EXCLUDED.description;
-INSERT INTO customization_items (name, type, image_path, price, is_default, description) VALUES ('Goutte d''eau', 'avatar', 'waterAvatar.png', 150, FALSE, 'Pour les amis de l''Eau.')
-ON CONFLICT (image_path) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type, price = EXCLUDED.price, is_default = EXCLUDED.is_default, description = EXCLUDED.description;
-INSERT INTO customization_items (name, type, image_path, price, is_default, description) VALUES ('Flamme', 'avatar', 'fireAvatar.png', 150, FALSE, 'Pour les amis du Feu.')
-ON CONFLICT (image_path) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type, price = EXCLUDED.price, is_default = EXCLUDED.is_default, description = EXCLUDED.description;
-INSERT INTO customization_items (name, type, image_path, price, is_default, description) VALUES ('Nuage', 'avatar', 'cloudy.png', 200, FALSE, 'Léger comme l''Air.')
-ON CONFLICT (image_path) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type, price = EXCLUDED.price, is_default = EXCLUDED.is_default, description = EXCLUDED.description;
-INSERT INTO customization_items (name, type, image_path, price, is_default, description) VALUES ('Lune', 'avatar', 'moon.png', 300, FALSE, 'Un avatar nocturne.')
-ON CONFLICT (image_path) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type, price = EXCLUDED.price, is_default = EXCLUDED.is_default, description = EXCLUDED.description;
+INSERT INTO customization_items (name, type, image_path, price, is_default, description, achievement) VALUES ('Cadre basique', 'frame', 'basicCadre.png', 0, TRUE, 'Un filet simple autour du sceau.', NULL)
+ON CONFLICT (image_path) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type, price = EXCLUDED.price, is_default = EXCLUDED.is_default, description = EXCLUDED.description, achievement = EXCLUDED.achievement;
+INSERT INTO customization_items (name, type, image_path, price, is_default, description, achievement) VALUES ('Cadre argenté', 'frame', 'silverFrame.png', 100, FALSE, 'Double filet gradué, comme un cadran.', NULL)
+ON CONFLICT (image_path) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type, price = EXCLUDED.price, is_default = EXCLUDED.is_default, description = EXCLUDED.description, achievement = EXCLUDED.achievement;
+INSERT INTO customization_items (name, type, image_path, price, is_default, description, achievement) VALUES ('Cadre doré', 'frame', 'goldFrame.png', 250, FALSE, 'Un filet d''or perlé, pour les alchimistes fortunés.', NULL)
+ON CONFLICT (image_path) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type, price = EXCLUDED.price, is_default = EXCLUDED.is_default, description = EXCLUDED.description, achievement = EXCLUDED.achievement;
+INSERT INTO customization_items (name, type, image_path, price, is_default, description, achievement) VALUES ('Orbe céleste', 'frame', 'orbe', 350, FALSE, 'Une orbite d''étoiles et sa planète d''or.', NULL)
+ON CONFLICT (image_path) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type, price = EXCLUDED.price, is_default = EXCLUDED.is_default, description = EXCLUDED.description, achievement = EXCLUDED.achievement;
+INSERT INTO customization_items (name, type, image_path, price, is_default, description, achievement) VALUES ('Cadre mystique', 'frame', 'customCadre1.png', 400, FALSE, 'Douze runes gravées entre deux filets.', NULL)
+ON CONFLICT (image_path) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type, price = EXCLUDED.price, is_default = EXCLUDED.is_default, description = EXCLUDED.description, achievement = EXCLUDED.achievement;
+INSERT INTO customization_items (name, type, image_path, price, is_default, description, achievement) VALUES ('Couronne de ronces', 'frame', 'ronces', 450, FALSE, 'Une tige vivante, feuilles et épines.', NULL)
+ON CONFLICT (image_path) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type, price = EXCLUDED.price, is_default = EXCLUDED.is_default, description = EXCLUDED.description, achievement = EXCLUDED.achievement;
+INSERT INTO customization_items (name, type, image_path, price, is_default, description, achievement) VALUES ('Rouages', 'frame', 'rouages', 0, FALSE, 'Une couronne dentée, boulonnée d''or.', 'Ingénieur des Étoiles')
+ON CONFLICT (image_path) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type, price = EXCLUDED.price, is_default = EXCLUDED.is_default, description = EXCLUDED.description, achievement = EXCLUDED.achievement;
+INSERT INTO customization_items (name, type, image_path, price, is_default, description, achievement) VALUES ('Ouroboros', 'frame', 'ouroboros', 0, FALSE, 'Le serpent d''or qui se mord la queue.', 'Maître des Arcanes')
+ON CONFLICT (image_path) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type, price = EXCLUDED.price, is_default = EXCLUDED.is_default, description = EXCLUDED.description, achievement = EXCLUDED.achievement;
+INSERT INTO customization_items (name, type, image_path, price, is_default, description, achievement) VALUES ('Pièce', 'avatar', 'coin.png', 0, TRUE, 'Le cœur d''or d''origine.', NULL)
+ON CONFLICT (image_path) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type, price = EXCLUDED.price, is_default = EXCLUDED.is_default, description = EXCLUDED.description, achievement = EXCLUDED.achievement;
+INSERT INTO customization_items (name, type, image_path, price, is_default, description, achievement) VALUES ('Goutte d''eau', 'avatar', 'waterAvatar.png', 150, FALSE, 'Le triangle de l''Eau.', NULL)
+ON CONFLICT (image_path) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type, price = EXCLUDED.price, is_default = EXCLUDED.is_default, description = EXCLUDED.description, achievement = EXCLUDED.achievement;
+INSERT INTO customization_items (name, type, image_path, price, is_default, description, achievement) VALUES ('Flamme', 'avatar', 'fireAvatar.png', 150, FALSE, 'Le triangle du Feu.', NULL)
+ON CONFLICT (image_path) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type, price = EXCLUDED.price, is_default = EXCLUDED.is_default, description = EXCLUDED.description, achievement = EXCLUDED.achievement;
+INSERT INTO customization_items (name, type, image_path, price, is_default, description, achievement) VALUES ('Nuage', 'avatar', 'cloudy.png', 200, FALSE, 'Le triangle barré de l''Air.', NULL)
+ON CONFLICT (image_path) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type, price = EXCLUDED.price, is_default = EXCLUDED.is_default, description = EXCLUDED.description, achievement = EXCLUDED.achievement;
+INSERT INTO customization_items (name, type, image_path, price, is_default, description, achievement) VALUES ('Lune', 'avatar', 'moon.png', 300, FALSE, 'Un croissant d''or.', NULL)
+ON CONFLICT (image_path) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type, price = EXCLUDED.price, is_default = EXCLUDED.is_default, description = EXCLUDED.description, achievement = EXCLUDED.achievement;
+INSERT INTO customization_items (name, type, image_path, price, is_default, description, achievement) VALUES ('Soleil d''or', 'avatar', 'soleil', 400, FALSE, 'Le disque pointé et ses douze rayons.', NULL)
+ON CONFLICT (image_path) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type, price = EXCLUDED.price, is_default = EXCLUDED.is_default, description = EXCLUDED.description, achievement = EXCLUDED.achievement;
+INSERT INTO customization_items (name, type, image_path, price, is_default, description, achievement) VALUES ('Arbre de vie', 'avatar', 'arbre', 500, FALSE, 'Ramure et racines dans un cercle.', NULL)
+ON CONFLICT (image_path) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type, price = EXCLUDED.price, is_default = EXCLUDED.is_default, description = EXCLUDED.description, achievement = EXCLUDED.achievement;
+INSERT INTO customization_items (name, type, image_path, price, is_default, description, achievement) VALUES ('Œil du Sage', 'avatar', 'oeil', 0, FALSE, 'L''œil qui a tout vu.', 'Sage parmi les Sages')
+ON CONFLICT (image_path) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type, price = EXCLUDED.price, is_default = EXCLUDED.is_default, description = EXCLUDED.description, achievement = EXCLUDED.achievement;
+INSERT INTO customization_items (name, type, image_path, price, is_default, description, achievement) VALUES ('Étoile septénaire', 'avatar', 'septenaire', 0, FALSE, 'L''heptagramme des sept lumières.', 'Architecte des Étoiles')
+ON CONFLICT (image_path) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type, price = EXCLUDED.price, is_default = EXCLUDED.is_default, description = EXCLUDED.description, achievement = EXCLUDED.achievement;
 
 -- ---------------------------------------------------------------- game_settings
 INSERT INTO game_settings (setting_name, value, description) VALUES ('max_energy', '20', 'Énergie maximale en mode Explorer')

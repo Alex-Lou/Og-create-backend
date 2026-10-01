@@ -6,6 +6,16 @@ const authMiddleware = require('../middleware/auth');
 // Middleware d'authentification pour toutes les routes
 router.use(authMiddleware);
 
+// Objets possédés : par défaut, achetés, ou mérités par un succès débloqué
+const OWNED_ITEMS_SQL = `
+    SELECT ci.*
+    FROM customization_items ci
+    LEFT JOIN user_items ui ON ci.id = ui.item_id AND ui.user_id = $1
+    LEFT JOIN progress p ON p.user_id = $1
+    WHERE ci.is_default = true
+       OR ui.user_id IS NOT NULL
+       OR (ci.achievement IS NOT NULL AND (p.achievements -> ci.achievement ->> 'unlocked') = 'true')`;
+
 // Récupérer tous les items disponibles
 router.get('/items', async (req, res) => {
     try {
@@ -28,14 +38,7 @@ router.get('/unlocked', async (req, res) => {
     try {
         const userId = req.user.id;
         
-        // Récupérer les items déverrouillés + les items par défaut
-        const result = await db.query(
-            `SELECT ci.* 
-             FROM customization_items ci
-             LEFT JOIN user_items ui ON ci.id = ui.item_id AND ui.user_id = $1
-             WHERE ui.user_id IS NOT NULL OR ci.is_default = true`,
-            [userId]
-        );
+        const result = await db.query(OWNED_ITEMS_SQL, [userId]);
         
         res.status(200).json(result.rows);
     } catch (error) {
@@ -86,13 +89,7 @@ router.post('/selections', async (req, res) => {
         }
         
         // Vérifier que les items sélectionnés sont déverrouillés pour l'utilisateur
-        const unlockedItems = await db.query(
-            `SELECT ci.image_path 
-             FROM customization_items ci
-             LEFT JOIN user_items ui ON ci.id = ui.item_id AND ui.user_id = $1
-             WHERE (ui.user_id IS NOT NULL OR ci.is_default = true)`,
-            [userId]
-        );
+        const unlockedItems = await db.query(OWNED_ITEMS_SQL, [userId]);
         
         const unlockedPaths = unlockedItems.rows.map(item => item.image_path);
         
@@ -143,71 +140,44 @@ router.post('/purchase', async (req, res) => {
         }
         
         const item = itemResult.rows[0];
-        
-        // Vérifier si l'utilisateur a déjà déverrouillé cet item
-        const alreadyUnlocked = await db.query(
-            'SELECT * FROM user_items WHERE user_id = $1 AND item_id = $2',
-            [userId, itemId]
-        );
-        
-        if (alreadyUnlocked.rows.length > 0) {
-            return res.status(400).json({ message: 'Vous possédez déjà cet item' });
+
+        // Une pièce méritée ne s'achète pas
+        if (item.achievement) {
+            return res.status(403).json({ message: `Cette pièce se mérite : succès « ${item.achievement} »` });
         }
-        
-        // Vérifier si l'utilisateur a assez de pièces
-        const progressResult = await db.query(
-            'SELECT coins FROM progress WHERE user_id = $1',
-            [userId]
-        );
-        
-        if (progressResult.rows.length === 0) {
-            return res.status(404).json({ message: 'Progression non trouvée' });
-        }
-        
-        const userCoins = progressResult.rows[0].coins;
-        
-        if (userCoins < item.price) {
-            return res.status(400).json({ 
-                message: 'Vous n\'avez pas assez de pièces',
-                required: item.price,
-                current: userCoins
-            });
-        }
-        
-        // Débiter les pièces et déverrouiller l'item (dans une transaction)
-        await db.query('BEGIN');
-        
+
+        // Débit et déverrouillage sur une seule connexion, dans une transaction ;
+        // le débit n'a lieu que si le solde suffit (pas de solde négatif en cas de double clic)
+        const client = await db.pool.connect();
         try {
-            // Débiter les pièces
-            await db.query(
-                'UPDATE progress SET coins = coins - $1 WHERE user_id = $2',
-                [item.price, userId]
-            );
-            
-            // Déverrouiller l'item
-            await db.query(
-                'INSERT INTO user_items (user_id, item_id) VALUES ($1, $2)',
+            await client.query('BEGIN');
+            const owned = await client.query(
+                'INSERT INTO user_items (user_id, item_id) VALUES ($1, $2) ON CONFLICT (user_id, item_id) DO NOTHING RETURNING id',
                 [userId, itemId]
             );
-            
-            await db.query('COMMIT');
-            
-            // Récupérer le nouveau solde de pièces
-            const newProgressResult = await db.query(
-                'SELECT coins FROM progress WHERE user_id = $1',
-                [userId]
+            if (owned.rows.length === 0) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ message: 'Vous possédez déjà cet item' });
+            }
+            const debit = await client.query(
+                'UPDATE progress SET coins = coins - $1 WHERE user_id = $2 AND coins >= $1 RETURNING coins',
+                [item.price, userId]
             );
-            
-            const newCoins = newProgressResult.rows[0].coins;
-            
+            if (debit.rows.length === 0) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ message: 'Vous n\'avez pas assez de pièces', required: item.price });
+            }
+            await client.query('COMMIT');
             res.status(200).json({
                 message: 'Item acheté avec succès',
                 item,
-                remainingCoins: newCoins
+                remainingCoins: debit.rows[0].coins
             });
         } catch (transactionError) {
-            await db.query('ROLLBACK');
+            await client.query('ROLLBACK').catch(() => {});
             throw transactionError;
+        } finally {
+            client.release();
         }
     } catch (error) {
         console.error('Erreur lors de l\'achat de l\'item:', error);
