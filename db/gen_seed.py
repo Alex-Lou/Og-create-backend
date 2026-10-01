@@ -380,10 +380,10 @@ for r in regions:
             "TRUE" if r.get("is_default") else "FALSE", str(r.get("required_level") or r["id"]),
             str(parent) if parent else "NULL", arr(r.get("requiredElements", [])), arr(r.get("availableElements", [])),
             str(r.get("position_x") or 50), str(r.get("position_y") or 50), "TRUE" if boss else "FALSE",
-            str(cost), str(reward), str(r.get("map_id") or 1)]
-    w("INSERT INTO explorer_regions (id, name, description, image_path, is_default, required_level, parent_region_id, required_elements, unlocked_elements, position_x, position_y, is_boss, energy_cost, energy_reward, map_id)")
+            str(cost), str(reward), str(r.get("map_id") or 1), str(r.get("rewardCoins", 50))]
+    w("INSERT INTO explorer_regions (id, name, description, image_path, is_default, required_level, parent_region_id, required_elements, unlocked_elements, position_x, position_y, is_boss, energy_cost, energy_reward, map_id, coin_reward)")
     w(f"VALUES ({', '.join(vals)})")
-    w("ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description, image_path = EXCLUDED.image_path, is_default = EXCLUDED.is_default, required_level = EXCLUDED.required_level, parent_region_id = EXCLUDED.parent_region_id, required_elements = EXCLUDED.required_elements, unlocked_elements = EXCLUDED.unlocked_elements, position_x = EXCLUDED.position_x, position_y = EXCLUDED.position_y, is_boss = EXCLUDED.is_boss, energy_cost = EXCLUDED.energy_cost, energy_reward = EXCLUDED.energy_reward, map_id = EXCLUDED.map_id;")
+    w("ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description, image_path = EXCLUDED.image_path, is_default = EXCLUDED.is_default, required_level = EXCLUDED.required_level, parent_region_id = EXCLUDED.parent_region_id, required_elements = EXCLUDED.required_elements, unlocked_elements = EXCLUDED.unlocked_elements, position_x = EXCLUDED.position_x, position_y = EXCLUDED.position_y, is_boss = EXCLUDED.is_boss, energy_cost = EXCLUDED.energy_cost, energy_reward = EXCLUDED.energy_reward, map_id = EXCLUDED.map_id, coin_reward = EXCLUDED.coin_reward;")
 w("")
 w("COMMIT;")
 open(os.path.join(HERE, "seed.sql"), "w", encoding="utf-8").write("\n".join(out) + "\n")

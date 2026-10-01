@@ -426,16 +426,7 @@ class ProgressService {
       // S'assurer que la catégorie fondamentale a toujours une progression de 100%
       catProgress[FUNDAMENTAL_CATEGORY] = 100;
       
-      // Vérifier et formater coins
-      let userCoins = progressData.coins;
-      if (typeof userCoins !== 'number' || isNaN(userCoins)) {
-        if (typeof userCoins === 'string') {
-          userCoins = parseInt(userCoins);
-          if (isNaN(userCoins)) userCoins = 0;
-        } else {
-          userCoins = 0;
-        }
-      }
+      // Le solde n'est jamais écrit depuis le client : il ne bouge que par le grand livre (services/ledger.js)
       
       // Vérifier et formater timerProgress
       let timerProgressData = progressData.timerProgress;
@@ -514,15 +505,13 @@ class ProgressService {
              ${columnName} = $1,
              discovered_categories = $2,
              category_progress = $3,
-             coins = $4,
-             timer_progress = $5,
+             timer_progress = $4,
              last_saved = CURRENT_TIMESTAMP
-           WHERE user_id = $6`,
+           WHERE user_id = $5`,
           [
             JSON.stringify(elementsToSave),
             categories,
             JSON.stringify(catProgress),
-            userCoins,
             JSON.stringify(timerProgressData),
             userId
           ]
@@ -541,17 +530,15 @@ class ProgressService {
              timer_elements,
              discovered_categories,
              category_progress,
-             coins,
              timer_progress,
              last_saved
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)`,
+           ) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)`,
           [
             userId,
             infiniteElementsValue,
             timerElementsValue,
             categories,
             JSON.stringify(catProgress),
-            userCoins,
             JSON.stringify(timerProgressData)
           ]
         );

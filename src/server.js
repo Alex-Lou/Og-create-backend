@@ -14,6 +14,8 @@ const { initRegions } = require('./initRegions');
 ensureJWTSecret();
 
 const app = express();
+// Render place le serveur derrière un proxy : l'adresse du joueur (limites de requêtes) vient de X-Forwarded-For
+app.set('trust proxy', 1);
 
 const morganFormat = process.env.NODE_ENV === 'production' 
     ? '[:date[clf]] :method :url :status :response-time ms' 
@@ -52,7 +54,6 @@ const createRateLimiter = (windowMinutes, maxRequests, message) => {
         message: message,
         standardHeaders: true,
         legacyHeaders: false,
-        skipFailedRequests: true,
         handler: (req, res) => {
             res.status(429).json({
                 error: 'Trop de requêtes',
@@ -89,7 +90,7 @@ const authRoutes = require('./routes/auth');
 const passwordResetRoutes = require('./routes/passwordReset');
 const progressRoutes = require('./routes/progress');
 const achievementsRouter = require('./routes/progressAchievements');
-const coinsRouter = require('./routes/progressCoins');
+const coinsRoutes = require('./routes/coins');
 const contactRoutes = require('./routes/contactRoutes');
 const customizationRoutes = require('./routes/customization');
 const explorerRoutes = require('./routes/explorer');
@@ -130,7 +131,7 @@ app.use('/api/progress', gameLimiter, progressRoutes);
 app.use('/api/progress/achievements', gameLimiter, achievementsRouter);
 // Ajouter une route supplémentaire pour les achievements avec un chemin plus court
 app.use('/api/achievements', gameLimiter, achievementsRouter);
-app.use('/api/progress/coins', gameLimiter, coinsRouter);
+app.use('/api/coins', gameLimiter, coinsRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/customization', customizationRoutes);
 app.use('/api/explorer', gameLimiter, explorerRoutes);
