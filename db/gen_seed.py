@@ -2,7 +2,7 @@
 # chaque élément est atteignable depuis Eau/Feu/Terre/Air, aucune recette en double,
 # questions Timer et régions Explorer faisables.
 # Usage : python3 db/gen_seed.py   (FRONT_DIR=../og-create pour vérifier aussi les images)
-import json, os, sys
+import json, os, re, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -12,6 +12,7 @@ BASE = ["Eau", "Feu", "Terre", "Air"]
 
 sys.path.insert(0, os.path.join(HERE, "content"))
 from elements import FAMILIES, FILE_OF_FAMILY  # noqa: E402
+FAMILY_OF = {n: f for f, els in FAMILIES.items() for n in els}
 import check  # noqa: E402  (chargement des recettes, partagé avec le vérificateur)
 
 # file(game_data.name) -> { famille: {nom: emoji} }
@@ -102,6 +103,75 @@ TQ = [
   ("Difficile", 180, "Créatures", "Fais renaître le Phénix de ses cendres", ["Phénix"], 35,
    {"validationMode": "any", "required": ["Feu", "Terre", "Air"], "additional": ["Vie", "Cendre"]}),
 ]
+# --- épreuves générées : par famille, une cible et exactement ce qu'il faut pour l'obtenir ---
+# Facile = 1 fusion, Moyen = 2, Difficile = 3 ; deux leurres de la même famille. Déterministe.
+import hashlib  # noqa: E402
+
+recipes_of = {}
+for ing, res in R:
+    recipes_of.setdefault(res, []).append(ing.split("+"))
+
+depth = {e: 0 for e in BASE}
+changed = True
+while changed:
+    changed = False
+    for ing, res in R:
+        parts = ing.split("+")
+        if all(p in depth for p in parts):
+            d = 1 + max(depth[p] for p in parts)
+            if d < depth.get(res, 10 ** 6):
+                depth[res] = d
+                changed = True
+
+
+def stable(key):
+    return int(hashlib.sha1(key.encode("utf-8")).hexdigest(), 16)
+
+
+def simplest(recipes):
+    # la recette la plus « lisible » : peu d'ingrédients, ingrédients peu profonds
+    return min(recipes, key=lambda parts: (len(parts), max(depth[p] for p in parts), "+".join(parts)))
+
+
+def plan(target, steps, forbid=frozenset()):
+    """Ingrédients à donner pour obtenir target en `steps` fusions (ou moins), sans jamais donner `forbid`."""
+    forbid = forbid | {target}
+    usable = [parts for parts in recipes_of[target] if not forbid & set(parts)]
+    if not usable:
+        return None
+    parts = simplest(usable)
+    if steps <= 1:
+        return set(parts)
+    deeper = sorted((p for p in parts if p not in BASE and p in recipes_of), key=lambda p: (-depth[p], p))
+    if not deeper:
+        return set(parts)
+    below = plan(deeper[0], steps - 1, forbid)
+    return None if below is None else (set(parts) - {deeper[0]}) | below
+
+
+LEVELS = [("Facile", 300, 1, 10), ("Moyen", 240, 2, 20), ("Difficile", 180, 3, 30)]
+for family, els in FAMILIES.items():
+    if family == "Elements Fondamentaux":
+        continue
+    pool = sorted((e for e in els if e in recipes_of and depth.get(e, 0) >= 1), key=lambda e: (depth[e], e))
+    used = set()
+    for level, timer, steps, points in LEVELS:
+        # cibles assez profondes pour le niveau, choisies de façon stable
+        fit = [e for e in pool if depth[e] >= steps and e not in used] or [e for e in pool if e not in used]
+        fit.sort(key=lambda e: stable(f"{family}/{level}/{e}"))
+        picked = 0
+        for target in fit:
+            given = plan(target, steps)
+            if given is None or picked == 2:
+                continue
+            picked += 1
+            used.add(target)
+            given -= set(BASE)
+            decoys = sorted((e for e in els if e != target and e not in given and depth.get(e, 99) <= depth[target]),
+                            key=lambda e: stable(f"leurre/{target}/{e}"))[:2]
+            TQ.append((level, timer, family, f"Fais naître « {target} »", [target], points,
+                       {"validationMode": "any", "required": sorted(given), "additional": decoys}))
+
 emoji = {}
 for cats in FILES.values():
     for els in cats.values():
@@ -138,13 +208,58 @@ ACH = [
   ("Maître Créateur", "Découvre 50 éléments.", "this.discoveredElements.length >= 50"),
   ("Dieu Omniscient", "Découvre tous les éléments du monde.", f"this.discoveredElements.length >= {len(name_to_file)}"),
 ]
+# Succès de famille : un repère (une découverte clé) et une maîtrise (plusieurs découvertes savantes)
+def has(*names):
+    return " && ".join(f"this.discoveredElements.includes('{n}')" for n in names)
+
+
+FAMILY_ACH = [
+  ("Matériaux", ("Main de Potier", "Façonne la Céramique.", ["Céramique"]),
+   ("Maître des Alliages", "Forge l'Acier, le Bronze et le Béton.", ["Acier", "Bronze", "Béton"])),
+  ("Chimie", ("Premier Flacon", "Isole l'Oxygène.", ["Oxygène"]),
+   ("Grand Chimiste", "Maîtrise la Réaction chimique, le Catalyseur et le Polymère.", ["Réaction chimique", "Catalyseur", "Polymère"])),
+  ("Physique", ("Pomme de Newton", "Découvre la Gravité.", ["Gravité"]),
+   ("Esprit Quantique", "Comprends la Relativité, la Physique quantique et l'Antimatière.", ["Relativité", "Physique quantique", "Antimatière"])),
+  ("Phénomènes Naturels", ("Faiseur de Pluie", "Déclenche un Orage.", ["Orage"]),
+   ("Seigneur des Cieux", "Déchaîne Ouragan, Séisme et Avalanche.", ["Ouragan", "Séisme", "Avalanche"])),
+  ("Cosmos", ("Premier Regard", "Contemple la Lune.", ["Lune"]),
+   ("Architecte des Étoiles", "Fais naître Supernova, Trou noir et Big Bang.", ["Supernova", "Trou noir", "Big Bang"])),
+  ("Formations Naturelles", ("Source Claire", "Fais jaillir une Source.", ["Source"]),
+   ("Arpenteur du Monde", "Dessine Canyon, Glacier et Delta.", ["Canyon", "Glacier", "Delta"])),
+  ("Flore", ("Main Verte", "Fais éclore une Fleur.", ["Fleur"]),
+   ("Botaniste Royal", "Cultive Vigne, Cacao et Herbe médicinale.", ["Vigne", "Cacao", "Herbe médicinale"])),
+  ("Biologie", ("Première Cellule", "Fais naître la Cellule.", ["Cellule"]),
+   ("Gardien du Vivant", "Comprends ADN, Évolution et Écosystème.", ["ADN", "Évolution", "Écosystème"])),
+  ("Vie et Créatures", ("Ami des Bêtes", "Apprivoise le Chien.", ["Chien"]),
+   ("Arche Vivante", "Fais naître Baleine, Éléphant et Aigle.", ["Baleine", "Éléphant", "Aigle"])),
+  ("Corps et Esprit", ("Premier Rêve", "Fais naître le Rêve.", ["Rêve"]),
+   ("Sage parmi les Sages", "Atteins Conscience, Sagesse et Mémoire.", ["Conscience", "Sagesse", "Mémoire"])),
+  ("Créations Humaines", ("Premier Outil", "Façonne un Outil.", ["Outil"]),
+   ("Bâtisseur de Cités", "Élève Pyramide, Temple et Pont.", ["Pyramide", "Temple", "Pont"])),
+  ("Histoire", ("Mémoire des Âges", "Ouvre la Préhistoire.", ["Préhistoire"]),
+   ("Chroniqueur du Temps", "Traverse Antiquité, Renaissance et Révolution industrielle.", ["Antiquité", "Renaissance", "Révolution industrielle"])),
+  ("Technologie", ("Étincelle", "Allume l'Ampoule.", ["Ampoule"]),
+   ("Ingénieur des Étoiles", "Construis Ordinateur, Fusée et Intelligence artificielle.", ["Ordinateur", "Fusée", "Intelligence artificielle"])),
+  ("Légendes", ("Conteur", "Fais naître le Mythe.", ["Mythe"]),
+   ("Maître des Arcanes", "Crée Pierre philosophale, Kraken et Centaure.", ["Pierre philosophale", "Kraken", "Centaure"])),
+]
+for family, *pairs in FAMILY_ACH:
+    for name, desc, needed in pairs:
+        for el in needed:
+            assert FAMILY_OF.get(el) == family, (name, el, FAMILY_OF.get(el))
+        ACH.append((name, desc, has(*needed)))
+for count, name in [(100, "Archiviste"), (200, "Gardien du Registre"), (300, "Grand Encyclopédiste"),
+                    (400, "Mémoire du Monde"), (500, "Presque Tout")]:
+    ACH.append((name, f"Consigne {count} éléments au registre.", f"this.discoveredElements.length >= {count}"))
+
 SUCCESS_DIR = os.path.join(FRONT_DIR, "src", "assets", "success")
 succ = set(os.listdir(SUCCESS_DIR)) if os.path.isdir(SUCCESS_DIR) else None
+assert len({n for n, _, _ in ACH}) == len(ACH), "succès en double"
 for n, _, c in ACH:
-    assert succ is None or n + ".png" in succ, n
-    if "includes" in c:
-        el = c.split("'")[1]
-        assert el in name_to_file, el
+    for el in re.findall(r"includes\('([^']+)'\)", c):
+        assert el in name_to_file, (n, el)
+# Une illustration n'existe que pour certains succès ; les autres s'affichent avec le sceau gravé
+ACH_IMAGE = {n: (n + ".png" if succ is None or n + ".png" in succ else None) for n, _, _ in ACH}
 
 ITEMS = [
   ("Cadre basique", "frame", "basicCadre.png", 0, True, "Le cadre de départ."),
@@ -224,7 +339,7 @@ w("-- ---------------------------------------------------------------- achieveme
 w("-- Formats de condition compris par le front (utils/achievementChecker.js) :")
 w("--   this.discoveredElements.includes('X')  |  this.discoveredElements.length >= N")
 for n, d, c in ACH:
-    w(f"INSERT INTO achievements_list (name, description, unlocked, condition, image) VALUES ({q(n)}, {q(d)}, FALSE, {q(c)}, {q(n + '.png')})")
+    w(f"INSERT INTO achievements_list (name, description, unlocked, condition, image) VALUES ({q(n)}, {q(d)}, FALSE, {q(c)}, {q(ACH_IMAGE[n]) if ACH_IMAGE[n] else 'NULL'})")
     w("ON CONFLICT (name) DO UPDATE SET description = EXCLUDED.description, condition = EXCLUDED.condition, image = EXCLUDED.image;")
 w("")
 w("-- ---------------------------------------------------------------- customization_items")
