@@ -66,7 +66,7 @@ RECIPES = [
   ("Montagne+Pluie+Temps", "Érosion"),
 
   # ===== Formations : eaux =====
-  ("Eau+Eau", "Mer"), ("Eau+Eau salée", "Mer"), ("Lac+Sel", "Mer"),
+  ("Eau+Eau salée", "Mer"), ("Lac+Sel", "Mer"),
   ("Mer+Mer", "Océan"),
   ("Eau+Vallée", "Lac"), ("Castor+Rivière", "Lac"), ("Barrage+Rivière", "Lac"), ("Cratère+Eau", "Lac"),
   ("Eau+Montagne", "Rivière"), ("Montagne+Pluie", "Rivière"), ("Chaleur+Glacier", "Rivière"),

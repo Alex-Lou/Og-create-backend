@@ -102,7 +102,7 @@ RECIPES = [
   ("Maison+Roue+Vent", "Moulin"),
   ("Eau+Farine+Feu", "Pain"), ("Farine+Four", "Pain"), ("Farine+Levure", "Pain"),
   ("Eau+Farine+Four", "Pain"), ("Eau+Farine+Feu+Sel", "Pain"), ("Eau+Farine+Feu+Levure", "Pain"),
-  ("Brique+Feu", "Four"), ("Feu+Maison", "Four"), ("Brasier+Brique", "Four"),
+  ("Brique+Feu", "Four"), ("Brasier+Brique", "Four"),
   ("Argile+Feu+Pierre", "Four"),
   ("Argile+Humain", "Poterie"), ("Argile+Four", "Poterie"), ("Boue+Humain", "Poterie"),
   ("Boue+Four", "Brique"), ("Argile+Eau+Humain", "Poterie"),
