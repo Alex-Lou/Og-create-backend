@@ -51,7 +51,6 @@ RECIPES = [
   ("Fleur+Pollinisation", "Fruit"),
   ("Arbre+Fruit", "Pomme"),
   ("Fruit+Gravité", "Pomme"),
-  ("Arbre+Fruit+Pierre", "Olive"),
   ("Fruit+Huile", "Olive"),
   ("Arbre+Fruit+Soleil", "Olive"),
   # Racine / Légume / Pomme de terre
@@ -84,7 +83,6 @@ RECIPES = [
   # Champignon
   ("Bois+Pluie", "Champignon"),
   ("Décomposition+Forêt", "Champignon"),
-  ("Ombre+Pluie+Terre", "Champignon"),
   # Algue / Nénuphar
   ("Eau+Plante", "Algue"),
   ("Océan+Plante", "Algue"),
@@ -101,7 +99,6 @@ RECIPES = [
   ("Chlorophylle+Plante", "Feuille"),
   # Plantes cultivées
   ("Coton+Plante", "Cotonnier"),
-  ("Graine+Nuage", "Cotonnier"),
   ("Champ+Nuage+Plante", "Cotonnier"),
   ("Fleur+Herbe+Humain", "Lin"),
   ("Plante+Tissu", "Lin"),
@@ -132,7 +129,6 @@ RECIPES = [
   ("Cellule+Vie", "Organisme"),
   ("Cellule+Cellule+Cellule", "Organisme"),
   # ADN / Gène / Protéine / Enzyme
-  ("Cellule+Cristal", "ADN"),
   ("Cellule+Molécule", "ADN"),
   ("Azote+Phosphore+Sucre", "ADN"),
   ("ADN+Reproduction", "Gène"),
@@ -143,7 +139,6 @@ RECIPES = [
   ("Catalyseur+Protéine", "Enzyme"),
   ("Levure+Protéine", "Enzyme"),
   # Microbes
-  ("Cellule+Poussière", "Microbe"),
   ("Bactérie+Microscope", "Microbe"),
   ("Eau+Microscope", "Microbe"),
   ("Boue+Cellule", "Bactérie"),
@@ -276,7 +271,6 @@ RECIPES = [
   ("Pierre+Salamandre", "Lézard"),
   ("Salamandre+Écaille", "Lézard"),
   ("Salamandre+Soleil", "Lézard"),
-  ("Évolution+Grenouille", "Lézard"),
   ("Cristal+Poisson", "Écaille"),
   ("Outil+Poisson", "Écaille"),
   ("Écaille+Lombric", "Serpent"),
@@ -287,7 +281,6 @@ RECIPES = [
   ("Lézard+Marais", "Crocodile"),
   ("Lézard+Rivière", "Crocodile"),
   ("Dinosaure+Marais", "Crocodile"),
-  ("Lézard+Ptérodactyle", "Dinosaure"),
   ("Lézard+Préhistoire", "Dinosaure"),
   ("Fossile+Os", "Dinosaure"),
   # Oiseaux
@@ -443,7 +436,6 @@ RECIPES = [
   ("Dinosaure+Feu+Météore+Poussière", "Extinction"),
   ("Glace+Océan+Oiseau+Poisson", "Pingouin"),
   ("Mammifère+Océan+Temps+Évolution", "Baleine"),
-  ("Air+Lézard+Plume+Temps", "Oiseau"),
   ("Humain+Loup+Maison+Os", "Chien"),
   ("Humain+Lion+Maison+Souris", "Chat"),
   ("Ferme+Herbe+Lait+Mammifère", "Vache"),

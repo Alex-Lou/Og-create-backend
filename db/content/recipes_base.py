@@ -9,8 +9,8 @@ RECIPES = [
   ("Air+Vent", "Bourrasque"), ("Pluie+Vent", "Tempête"), ("Nuage+Énergie", "Éclair"),
   ("Tempête+Vent", "Tornade"), ("Feu+Énergie", "Explosion"), ("Feu+Vent", "Incendie"),
   ("Terre+Vapeur", "Geyser"), ("Eau+Vent", "Vague"), ("Air+Éclair", "Ozone"),
-  ("Feu+Éclair", "Lumière"), ("Lumière+Pluie", "Arc-en-ciel"), ("Sable+Verre", "Temps"),
-  ("Nuage+Vent", "Neige"), ("Eau+Neige", "Glace"),
+  ("Feu+Éclair", "Lumière"), ("Lumière+Pluie", "Arc-en-ciel"),
+  ("Eau+Neige", "Glace"),
   # formations
   ("Pierre+Terre", "Montagne"), ("Lave+Montagne", "Volcan"), ("Pluie+Terre", "Lac"), ("Eau+Lac", "Océan"),
   ("Montagne+Océan", "Continent"), ("Continent+Vie", "Planète Terre"), ("Océan+Volcan", "Île"),
@@ -21,10 +21,10 @@ RECIPES = [
   ("Plante+Vie", "Chenille"), ("Air+Chenille", "Papillon"), ("Eau+Vie", "Poisson"),
   ("Lumière+Poisson", "Poisson Tropical"), ("Glace+Poisson", "Poisson Polaire"), ("Air+Poisson", "Poisson Volant"),
   ("Océan+Poisson", "Poisson Abyssal"), ("Océan+Vie", "Méduse"),
-  ("Salamandre+Volcan", "Dragon"), ("Salamandre+Vent", "Ptérodactyle"),
+  ("Salamandre+Volcan", "Dragon"),
   # magie
   ("Énergie+Vie", "Magie"), ("Air+Vie", "Esprit"), ("Eau+Magie", "Mana"), ("Cristal+Magie", "Orbe"),
-  ("Bois+Magie", "Baguette"), ("Énergie+Magie", "Pouvoir"), ("Feu+Métal", "Anneau"),
+  ("Bois+Magie", "Baguette"), ("Énergie+Magie", "Pouvoir"),
   ("Anneau+Pouvoir", "Anneau de Pouvoir"), ("Feu+Magie", "Feu Magique"),
   # créations humaines
   ("Esprit+Vie", "Humain"), ("Métal+Pierre", "Épée"), ("Épée+Humain", "Héros"), ("Arbre+Métal", "Bois"),
@@ -32,9 +32,7 @@ RECIPES = [
 
   # ---- recettes à 3 éléments ----
   ("Air+Eau+Lumière", "Arc-en-ciel"),            # 2e chemin
-  ("Air+Glace+Lumière", "Aurore"),
   ("Énergie+Feu+Lumière", "Étoile"),
-  ("Énergie+Étoile+Temps", "Galaxie"),
   ("Neige+Tempête+Vent", "Blizzard"),
   ("Explosion+Océan+Vague", "Tsunami"),
   ("Boue+Eau+Plante", "Marais"),
@@ -49,16 +47,11 @@ RECIPES = [
   ("Arc-en-ciel+Magie+Vie", "Licorne"),
   ("Baguette+Humain+Magie", "Sorcier"),
   ("Humain+Métal+Épée", "Chevalier"),
-  ("Héros+Maison+Pierre", "Château"),
-  ("Brique+Humain+Maison", "Ville"),
 
   # ---- recettes à 4 éléments ----
   ("Air+Feu+Pierre+Énergie", "Météore"),
   ("Galaxie+Étoile+Temps+Énergie", "Univers"),
   ("Nuage+Océan+Pluie+Tempête", "Déluge"),
-  ("Arbre+Eau+Plante+Terre", "Jardin"),
-  ("Dragon+Eau+Magie+Poisson", "Hydre"),
   ("Cristal+Lumière+Potion+Vie", "Élixir"),
   ("Bois+Humain+Océan+Vie", "Arche"),
-  ("Humain+Montagne+Nuage+Pouvoir", "Olympe"),
 ]

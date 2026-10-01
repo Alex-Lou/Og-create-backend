@@ -19,6 +19,8 @@ FAMILIES = {
     "Coton": "☁️", "Tissu": "🧵", "Cuir": "👞", "Corde": "🪢", "Rouille": "🟫",
     # Plateau 1
     "Pierre ponce": "🧽", "Compost": "♻️", "Sédiment": "🫙", "Suie": "🧹",
+    # Plateau 2
+    "Résine": "🟨", "Ambre": "🔶",
   },
 
   "Phénomènes Naturels": {
@@ -147,6 +149,8 @@ FAMILIES = {
     "Tisserand": "🧵", "Forgeron": "⚒️", "Philosophie": "📜", "Mathématiques": "➗",
     "Carte": "🗺️", "Boussole": "🧭", "Calendrier": "📅", "Horloge": "🕰️", "Bougie": "🕯️",
     "Momie": "🧟",
+    # Plateau 2
+    "Pop-corn": "🍿", "Caramel": "🍮", "Gâteau": "🍰", "Soupe": "🍲", "Panier": "🧺", "Cloche": "🔔", "Feu d'artifice": "🎆",
   },
 
   "Histoire": {
@@ -168,6 +172,8 @@ FAMILIES = {
     "Cinéma": "🎬", "Vaccin": "💉", "Antibiotique": "💊", "Laser": "🔴", "Électroaimant": "🧲",
     "Station spatiale": "🛰️", "Sous-marin": "🌊", "Bombe atomique": "💣", "Puce électronique": "🔲",
     "Réseau électrique": "🔌", "Moulin à eau": "💧", "Sauvegarde": "💾",
+    # Plateau 2
+    "Lunettes": "👓",
   },
 
   "Légendes": {

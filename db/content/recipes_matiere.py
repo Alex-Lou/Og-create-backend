@@ -4,27 +4,27 @@ RECIPES = [
   # Argile
   ("Eau+Poussière", "Argile"), ("Boue+Pierre+Temps", "Argile"),
   # Charbon
-  ("Bois+Feu", "Charbon"), ("Bois+Pression+Temps", "Charbon"), ("Fossile+Pression", "Charbon"),
+  ("Bois+Feu", "Charbon"), ("Bois+Pression+Temps", "Charbon"),
   ("Pression+Tourbe", "Charbon"), ("Forêt+Pression+Temps+Terre", "Charbon"),
   # Sel
   ("Feu+Océan", "Sel"), ("Eau salée+Feu", "Sel"), ("Chlore+Sodium", "Sel"), ("Acide+Base chimique", "Sel"),
   # Fer
   ("Métal+Terre", "Fer"), ("Charbon+Feu+Pierre", "Fer"), ("Métal+Météore", "Fer"), ("Aimant+Métal", "Fer"),
   # Cuivre
-  ("Électricité+Métal", "Cuivre"), ("Feu+Métal+Pierre", "Cuivre"),
+  ("Feu+Métal+Pierre", "Cuivre"),
   # Or
-  ("Lumière+Métal", "Or"), ("Métal+Soleil", "Or"), ("Pierre philosophale+Plomb", "Or"),
+  ("Pierre philosophale+Plomb", "Or"),
   ("Métal+Rivière+Sable", "Or"),
   # Argent
-  ("Lune+Métal", "Argent"), ("Air+Feu+Plomb", "Argent"),
+  ("Air+Feu+Plomb", "Argent"),
   # Étain
-  ("Métal+Sable", "Étain"), ("Charbon+Feu+Sable", "Étain"),
+  ("Métal+Sable", "Étain"),
   # Bronze
   ("Cuivre+Étain", "Bronze"), ("Cuivre+Feu+Étain", "Bronze"),
   # Acier
   ("Charbon+Fer", "Acier"), ("Carbone+Fer", "Acier"), ("Fer+Forge", "Acier"), ("Carbone+Chaleur+Fer", "Acier"),
   # Plomb
-  ("Masse+Métal", "Plomb"), ("Métal+Soufre", "Plomb"), ("Métal+Radioactivité", "Plomb"),
+  ("Métal+Soufre", "Plomb"), ("Métal+Radioactivité", "Plomb"),
   # Calcaire
   ("Pierre+Récif", "Calcaire"), ("Calcium+Pierre", "Calcaire"), ("Calcium+Dioxyde de carbone", "Calcaire"),
   ("Océan+Pierre+Temps", "Calcaire"),
@@ -36,7 +36,6 @@ RECIPES = [
   ("Magma+Montagne", "Granite"),
   # Obsidienne
   ("Glace+Lave", "Obsidienne"), ("Froid+Lave", "Obsidienne"), ("Lave+Verre", "Obsidienne"),
-  ("Eau+Lave+Volcan", "Obsidienne"),
   # Quartz
   ("Cristal+Sable", "Quartz"), ("Oxygène+Silicium", "Quartz"),
   ("Pression+Sable+Temps", "Quartz"),
@@ -58,7 +57,7 @@ RECIPES = [
   ("Ciment+Eau+Sable", "Béton"), ("Ciment+Sable", "Béton"), ("Ciment+Eau+Pierre+Sable", "Béton"),
   ("Acier+Ciment", "Béton"),
   # Plâtre
-  ("Calcium+Soufre", "Plâtre"), ("Calcaire+Eau+Poussière", "Plâtre"), ("Calcium+Eau+Soufre", "Plâtre"),
+  ("Calcium+Soufre", "Plâtre"), ("Calcium+Eau+Soufre", "Plâtre"),
   # Céramique
   ("Argile+Feu", "Céramique"), ("Argile+Chaleur", "Céramique"),
   ("Argile+Brasier", "Céramique"),
@@ -69,7 +68,7 @@ RECIPES = [
   ("Bois+Machine", "Papier"), ("Plante+Pression", "Papier"), ("Bois+Eau+Pression", "Papier"),
   ("Coton+Eau+Pression", "Papier"),
   # Encre
-  ("Charbon+Eau", "Encre"), ("Carbone+Liquide", "Encre"), ("Eau+Pieuvre", "Encre"), ("Cendre+Eau+Huile", "Encre"),
+  ("Charbon+Eau", "Encre"), ("Carbone+Liquide", "Encre"), ("Eau+Pieuvre", "Encre"),
   # Cire
   ("Feu+Ruche", "Cire"), ("Distillation+Pétrole", "Cire"), ("Chaleur+Miel+Ruche", "Cire"),
   # Caoutchouc
@@ -99,7 +98,7 @@ RECIPES = [
   ("Pierre+Érosion", "Sable"), ("Quartz+Érosion", "Sable"), ("Molécule+Solide+Temps", "Cristal"),
   # ===================== PHYSIQUE =====================
   # Atome
-  ("Lentille+Poussière", "Atome"), ("Philosophie+Poussière", "Atome"), ("Électron+Noyau atomique", "Atome"),
+  ("Philosophie+Poussière", "Atome"), ("Électron+Noyau atomique", "Atome"),
   ("Électron+Neutron+Proton", "Atome"),
   # Particule
   ("Microscope+Poussière", "Particule"), ("Atome+Atome+Vitesse", "Particule"),
@@ -137,7 +136,6 @@ RECIPES = [
   ("Pierre+Solide", "Masse"), ("Gravité+Inertie", "Masse"), ("Énergie+Relativité", "Masse"),
   # Force
   ("Masse+Mouvement", "Force"), ("Énergie+Muscle", "Force"), ("Masse+Vitesse+Temps", "Force"),
-  ("Bourrasque+Pierre", "Force"),
   # Mouvement
   ("Énergie+Pierre", "Mouvement"), ("Force+Masse", "Mouvement"), ("Énergie+Roue", "Mouvement"),
   # Vitesse
@@ -236,7 +234,7 @@ RECIPES = [
   ("Atome+Atome+Force", "Molécule"),
   # Réaction chimique
   ("Molécule+Molécule", "Réaction chimique"), ("Énergie+Molécule+Molécule", "Réaction chimique"),
-  ("Catalyseur+Molécule", "Réaction chimique"), ("Acide+Métal+Eau", "Réaction chimique"),
+  ("Catalyseur+Molécule", "Réaction chimique"),
   # Combustion
   ("Feu+Oxygène", "Combustion"), ("Oxygène+Réaction chimique", "Combustion"),
   ("Bois+Feu+Oxygène", "Combustion"), ("Chaleur+Oxygène+Charbon", "Combustion"),
@@ -244,7 +242,7 @@ RECIPES = [
   ("Métal+Oxygène", "Oxydation"), ("Oxygène+Temps", "Oxydation"), ("Air+Eau+Métal", "Oxydation"),
   ("Oxygène+Pomme", "Oxydation"),
   # Acide
-  ("Chlore+Hydrogène", "Acide"), ("Dioxyde de carbone+Eau", "Acide"), ("Eau+Soufre", "Acide"),
+  ("Chlore+Hydrogène", "Acide"), ("Dioxyde de carbone+Eau", "Acide"),
   ("Eau+Oxygène+Soufre", "Acide"),
   # Base chimique
   ("Cendre+Eau", "Base chimique"), ("Calcaire+Feu", "Base chimique"), ("Ammoniac+Eau", "Base chimique"),
@@ -274,7 +272,7 @@ RECIPES = [
   ("Enzyme+Réaction chimique", "Catalyseur"),
   # Alcool
   ("Levure+Sucre", "Alcool"), ("Distillation+Vin", "Alcool"), ("Fermentation+Sucre", "Alcool"),
-  ("Eau+Sucre+Temps", "Alcool"), ("Fruit+Levure+Temps", "Alcool"),
+  ("Fruit+Levure+Temps", "Alcool"),
   # Sucre
   ("Canne à sucre+Feu", "Sucre"), ("Carbone+Hydrogène+Oxygène", "Sucre"), ("Air+Eau+Lumière+Plante", "Sucre"),
   ("Canne à sucre+Cristallisation", "Sucre"),
@@ -291,11 +289,11 @@ RECIPES = [
   ("Ammoniac+Terre", "Engrais"), ("Azote+Phosphore", "Engrais"), ("Azote+Terre", "Engrais"),
   ("Azote+Calcium+Phosphore", "Engrais"),
   # Poudre à canon
-  ("Charbon+Soufre", "Poudre à canon"), ("Charbon+Sel+Soufre", "Poudre à canon"),
-  ("Explosion+Poussière", "Poudre à canon"), ("Azote+Charbon+Soufre", "Poudre à canon"),
+  ("Charbon+Sel+Soufre", "Poudre à canon"),
+  ("Azote+Charbon+Soufre", "Poudre à canon"),
   ("Azote+Charbon+Oxygène+Soufre", "Poudre à canon"),
   # Polymère
-  ("Molécule+Molécule+Molécule", "Polymère"), ("Corde+Molécule", "Polymère"),
+  ("Molécule+Molécule+Molécule", "Polymère"),
   ("Carbone+Molécule+Réaction chimique", "Polymère"), ("Molécule+Molécule+Molécule+Molécule", "Polymère"),
   # Tableau périodique
   ("Atome+Science", "Tableau périodique"), ("Atome+Papier", "Tableau périodique"), ("Atome+Livre", "Tableau périodique"),
