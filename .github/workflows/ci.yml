@@ -24,8 +24,8 @@ jobs:
     env:
       DATABASE_URL: postgres://origins:origins@localhost:5432/origins_test
       # Secrets de test uniquement (aucun lien avec la production)
-      JWT_SECRET: ci-only-access-secret
-      JWT_REFRESH_SECRET: ci-only-refresh-secret
+      JWT_SECRET: ci-only-access-secret-not-used-in-production-0001
+      JWT_REFRESH_SECRET: ci-only-refresh-secret-not-used-in-production-01
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

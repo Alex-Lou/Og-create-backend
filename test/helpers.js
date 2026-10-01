@@ -13,14 +13,16 @@ function startServer() {
       env: { ...process.env, PORT: String(PORT), NODE_ENV: 'test', LOG_LEVEL: 'error' },
       stdio: ['ignore', 'pipe', 'pipe']
     });
-    const timer = setTimeout(() => reject(new Error('Le serveur ne démarre pas')), 20000);
+    let output = '';
+    const timer = setTimeout(() => reject(new Error(`Le serveur ne démarre pas\n${output}`)), 20000);
+    child.stderr.on('data', chunk => (output += chunk));
     child.stdout.on('data', chunk => {
       if (String(chunk).includes('Tout roule')) {
         clearTimeout(timer);
         resolve(child);
       }
     });
-    child.on('exit', code => reject(new Error(`Serveur arrêté (code ${code})`)));
+    child.on('exit', code => reject(new Error(`Serveur arrêté (code ${code})\n${output.slice(-2000)}`)));
   });
 }
 
