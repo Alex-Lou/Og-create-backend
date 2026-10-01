@@ -127,6 +127,9 @@ FAMILIES = {
     # Paquet thématique (culture commune)
     "Chèvre": "🐐", "Cerf": "🦌", "Canard": "🦆", "Zèbre": "🦓", "Tigre": "🐅", "Phoque": "🦭",
     "Perroquet": "🦜",
+    # Palier 2 (culture commune)
+    "Coquillage": "🐚", "Hérisson": "🦔", "Écureuil": "🐿️", "Scorpion": "🦂", "Corbeau": "🐦‍⬛", "Grillon": "🦗",
+    "Cafard": "🪳", "Dodo": "🦤", "Poussin": "🐣",
   },
 
   "Corps et Esprit": {
@@ -167,6 +170,13 @@ FAMILIES = {
     "Parapluie": "☂️", "Fermier": "🧑‍🌾", "Pot de fleurs": "🪴", "Hôpital": "🏥", "Rails": "🛤️", "Guitare": "🎸",
     "Piano": "🎹", "Tambour": "🥁", "Danse": "💃", "Ballon": "⚽", "Ski": "🎿", "Cerf-volant": "🪁",
     "Bonhomme de neige": "⛄",
+    # Palier 2 (culture commune)
+    "Sushi": "🍣", "Hameçon": "🪝", "Bouée": "🛟", "Chaussure": "👟", "Botte": "👢", "Chaussette": "🧦",
+    "Manteau": "🧥", "Maillot de bain": "🩱", "Blouse blanche": "🥼", "Porte-monnaie": "👛", "Boulanger": "🥖", "Cuisinier": "🧑‍🍳",
+    "Pompier": "🧑‍🚒", "Médecin": "🧑‍⚕️", "Maçon": "👷", "Pilote": "🧑‍✈️", "Gratte-ciel": "🏢", "Gare": "🚉",
+    "Église": "⛪", "Ruine": "🏚️", "Restaurant": "🍴", "Hôtel": "🏨", "Stylo": "🖊️", "Cartable": "🎒",
+    "Journal": "📰", "Alphabet": "🔤", "Dictionnaire": "📘", "Astronaute": "🧑‍🚀", "Tarte": "🥧", "Biscuit": "🍪",
+    "Beignet": "🍩", "Sorbet": "🍧", "Limonade": "🥤", "Cocktail": "🍹", "Rhum": "🥃",
   },
 
   "Histoire": {
@@ -176,6 +186,8 @@ FAMILIES = {
     "Explorateur": "🧗", "Révolution": "✊", "Démocratie": "🗳️", "Révolution industrielle": "🏭",
     "Ère atomique": "☢️", "Conquête spatiale": "🚀", "Ère numérique": "💻", "Civilisation": "🏛️",
     "Empire": "👑", "Archéologie": "🏺", "Musée": "🏛️", "Chronique": "📜", "Mythologie": "📚",
+    # Palier 2 (culture commune)
+    "Pirate": "🏴‍☠️",
   },
 
   "Technologie": {
@@ -192,6 +204,8 @@ FAMILIES = {
     "Lunettes": "👓",
     # Paquet thématique (culture commune)
     "Vélo": "🚲", "Moto": "🏍️", "Parachute": "🪂", "Grue": "🏗️", "Bateau à vapeur": "🛳️", "Téléphérique": "🚡",
+    # Palier 2 (culture commune)
+    "Smartphone": "📱", "Radiotélescope": "📡", "GPS": "📍",
   },
 
   "Légendes": {
