@@ -16,7 +16,7 @@ function startServer() {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [path.join(__dirname, '..', 'src', 'server.js')], {
       // Fenêtre de tolérance des rafraîchissements concurrents à 0 : la réutilisation d'un jeton se teste sans attendre
-      env: { ...process.env, PORT: String(PORT), NODE_ENV: 'test', LOG_LEVEL: 'error', AUTH_RACE_SECONDS: '0' },
+      env: { ...process.env, PORT: String(PORT), NODE_ENV: 'test', LOG_LEVEL: 'error', AUTH_RACE_SECONDS: '0', REGISTER_RATE_LIMIT: '200' },
       stdio: ['ignore', 'pipe', 'pipe']
     });
     let output = '';
@@ -91,4 +91,29 @@ async function coinsOf(player) {
   return (await api('GET', '/coins/balance', null, player)).data.coins;
 }
 
-module.exports = { startServer, api, sql, newPlayer, coinsOf, randomPassword };
+// Livre des recettes lu en base, pour chercher un chemin comme le ferait un joueur
+async function recipeBook() {
+  const { keyOf } = require('../src/services/recipeBook');
+  const rules = await sql(`SELECT r.key, r.value FROM game_data g, jsonb_each_text(g.rules->'rules') r WHERE g.active`);
+  const recipes = new Map(rules.map(r => [keyOf(r.key.split('+')), r.value]));
+  return { recipes, entries: [...recipes].map(([key, result]) => [key.split('+'), result]) };
+}
+
+// Entre dans une région déjà visitée et y crée ses éléments demandés, par de vrais mélanges
+async function solveRegion(player, regionId) {
+  const { nextStep } = require('../src/services/recipeBook');
+  const book = await recipeBook();
+  const run = await api('POST', '/play/run', { mode: 'explorer', regionId }, player);
+  const inventory = [...run.data.elements];
+  for (let i = 0; i < 40; i++) {
+    const missing = run.data.required.filter(name => !inventory.includes(name));
+    if (!missing.length) return run.data;
+    const step = nextStep(book, inventory, missing);
+    if (!step) throw new Error(`région ${regionId} : aucun chemin vers ${missing.join(', ')}`);
+    const reply = await api('POST', '/play/combine', { mode: 'explorer', ingredients: step.ingredients }, player);
+    inventory.push(reply.data.result);
+  }
+  throw new Error(`région ${regionId} : défi trop long`);
+}
+
+module.exports = { startServer, api, sql, newPlayer, coinsOf, randomPassword, recipeBook, solveRegion };

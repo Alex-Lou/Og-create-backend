@@ -77,6 +77,9 @@ ALTER TABLE play_runs ADD COLUMN IF NOT EXISTS deadline   TIMESTAMPTZ;
 ALTER TABLE play_runs ADD COLUMN IF NOT EXISTS paused_at  TIMESTAMPTZ;
 ALTER TABLE play_runs ADD COLUMN IF NOT EXISTS solved     BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE play_runs ADD COLUMN IF NOT EXISTS solved_ids JSONB   NOT NULL DEFAULT '[]'::jsonb;
+-- Expédition (services/expedition.js) : combat d'un gardien tenu par le serveur
+ALTER TABLE play_runs ADD COLUMN IF NOT EXISTS boss_hp    INTEGER;
+ALTER TABLE play_runs ADD COLUMN IF NOT EXISTS player_hp  INTEGER;
 
 -- ---------------------------------------------------------------------
 -- Mot de passe oublié (routes/passwordReset.js) : empreinte SHA-256 du
