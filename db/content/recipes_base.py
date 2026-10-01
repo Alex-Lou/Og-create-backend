@@ -2,13 +2,13 @@
 RECIPES = [
   # matériaux
   ("Eau+Terre", "Boue"), ("Feu+Terre", "Lave"), ("Eau+Feu", "Vapeur"), ("Air+Terre", "Poussière"),
-  ("Air+Feu", "Fumée"), ("Eau+Lave", "Pierre"), ("Air+Pierre", "Sable"), ("Fumée+Terre", "Cendre"),
+  ("Air+Feu", "Fumée"), ("Eau+Lave", "Pierre"), ("Air+Pierre", "Sable"),
   ("Feu+Pierre", "Métal"), ("Feu+Sable", "Verre"), ("Pierre+Vapeur", "Cristal"), ("Lave+Terre", "Magma"),
   # phénomènes
   ("Air+Eau", "Pluie"), ("Air+Vapeur", "Nuage"), ("Feu+Vapeur", "Énergie"), ("Air+Énergie", "Vent"),
   ("Air+Vent", "Bourrasque"), ("Pluie+Vent", "Tempête"), ("Nuage+Énergie", "Éclair"),
   ("Tempête+Vent", "Tornade"), ("Feu+Énergie", "Explosion"), ("Feu+Vent", "Incendie"),
-  ("Cendre+Feu", "Brasier"), ("Terre+Vapeur", "Geyser"), ("Eau+Vent", "Vague"), ("Air+Éclair", "Ozone"),
+  ("Terre+Vapeur", "Geyser"), ("Eau+Vent", "Vague"), ("Air+Éclair", "Ozone"),
   ("Feu+Éclair", "Lumière"), ("Lumière+Pluie", "Arc-en-ciel"), ("Sable+Verre", "Temps"),
   ("Nuage+Vent", "Neige"), ("Eau+Neige", "Glace"),
   # formations
@@ -16,11 +16,11 @@ RECIPES = [
   ("Montagne+Océan", "Continent"), ("Continent+Vie", "Planète Terre"), ("Océan+Volcan", "Île"),
   ("Sable+Vent", "Désert"), ("Désert+Eau", "Oasis"),
   # vie & créatures
-  ("Air+Boue", "Vie"), ("Air+Eau+Feu+Terre", "Vie"),
-  ("Terre+Vie", "Plante"), ("Plante+Terre", "Arbre"), ("Boue+Vie", "Lombric"), ("Poussière+Vie", "Asticot"),
+  ("Air+Eau+Feu+Terre", "Vie"),
+  ("Terre+Vie", "Plante"), ("Plante+Terre", "Arbre"), ("Boue+Vie", "Lombric"),
   ("Plante+Vie", "Chenille"), ("Air+Chenille", "Papillon"), ("Eau+Vie", "Poisson"),
   ("Lumière+Poisson", "Poisson Tropical"), ("Glace+Poisson", "Poisson Polaire"), ("Air+Poisson", "Poisson Volant"),
-  ("Océan+Poisson", "Poisson Abyssal"), ("Océan+Vie", "Méduse"), ("Feu+Vie", "Salamandre"),
+  ("Océan+Poisson", "Poisson Abyssal"), ("Océan+Vie", "Méduse"),
   ("Salamandre+Volcan", "Dragon"), ("Salamandre+Vent", "Ptérodactyle"),
   # magie
   ("Énergie+Vie", "Magie"), ("Air+Vie", "Esprit"), ("Eau+Magie", "Mana"), ("Cristal+Magie", "Orbe"),

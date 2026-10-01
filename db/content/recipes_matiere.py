@@ -2,7 +2,7 @@
 RECIPES = [
   # ===================== MATÉRIAUX =====================
   # Argile
-  ("Boue+Sable", "Argile"), ("Eau+Poussière", "Argile"), ("Boue+Pierre+Temps", "Argile"),
+  ("Eau+Poussière", "Argile"), ("Boue+Pierre+Temps", "Argile"),
   # Charbon
   ("Bois+Feu", "Charbon"), ("Bois+Pression+Temps", "Charbon"), ("Fossile+Pression", "Charbon"),
   ("Pression+Tourbe", "Charbon"), ("Forêt+Pression+Temps+Terre", "Charbon"),
@@ -32,7 +32,7 @@ RECIPES = [
   ("Calcaire+Pression", "Marbre"), ("Calcaire+Chaleur", "Marbre"),
   ("Calcaire+Pression+Temps", "Marbre"),
   # Granite
-  ("Magma+Temps", "Granite"), ("Magma+Quartz", "Granite"), ("Froid+Magma", "Granite"),
+  ("Magma+Temps", "Granite"), ("Magma+Quartz", "Granite"),
   ("Magma+Montagne", "Granite"),
   # Obsidienne
   ("Glace+Lave", "Obsidienne"), ("Froid+Lave", "Obsidienne"), ("Lave+Verre", "Obsidienne"),
@@ -94,8 +94,8 @@ RECIPES = [
   ("Fer+Oxygène", "Rouille"), ("Eau+Fer", "Rouille"), ("Fer+Oxydation", "Rouille"),
   ("Air+Eau+Fer", "Rouille"),
   # chemins savants vers des matériaux de base
-  ("Gaz+Liquide", "Vapeur"), ("Chaleur+Eau", "Vapeur"), ("Chaleur+Pierre", "Magma"),
-  ("Carbone+Oxygène+Chaleur", "Fumée"), ("Quartz+Feu", "Verre"), ("Silicium+Oxygène+Chaleur", "Verre"),
+  ("Chaleur+Eau", "Vapeur"), ("Chaleur+Pierre", "Magma"),
+  ("Quartz+Feu", "Verre"), ("Silicium+Oxygène+Chaleur", "Verre"),
   ("Pierre+Érosion", "Sable"), ("Quartz+Érosion", "Sable"), ("Molécule+Solide+Temps", "Cristal"),
   # ===================== PHYSIQUE =====================
   # Atome
@@ -260,8 +260,7 @@ RECIPES = [
   ("Azote+Hydrogène", "Ammoniac"), ("Azote+Catalyseur+Hydrogène+Pression", "Ammoniac"),
   ("Azote+Hydrogène+Hydrogène+Hydrogène", "Ammoniac"), ("Azote+Décomposition", "Ammoniac"),
   # Eau salée
-  ("Eau+Sel", "Eau salée"), ("Océan+Verre", "Eau salée"), ("Liquide+Sel", "Eau salée"),
-  ("Mer+Verre", "Eau salée"),
+  ("Eau+Sel", "Eau salée"), ("Liquide+Sel", "Eau salée"),
   # Solution
   ("Eau+Sucre", "Solution"), ("Liquide+Molécule", "Solution"), ("Liquide+Solide+Eau", "Solution"),
   # Distillation

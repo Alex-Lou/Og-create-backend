@@ -248,7 +248,6 @@ RECIPES = [
   ("Oiseau+Poisson", "Poisson Volant"),
   ("Pression+Poisson", "Poisson Abyssal"),
   ("Nuit+Océan+Poisson", "Poisson Abyssal"),
-  ("Grenouille+Feu", "Salamandre"),
   # Insectes et petites bêtes
   ("Air+Asticot", "Insecte"),
   ("Asticot+Métamorphose", "Insecte"),

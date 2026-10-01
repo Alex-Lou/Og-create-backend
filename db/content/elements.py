@@ -17,6 +17,8 @@ FAMILIES = {
     "Ciment": "🪣", "Plâtre": "🤍", "Céramique": "🍶", "Porcelaine": "🫖", "Papier": "📄",
     "Encre": "🖋️", "Cire": "🕯️", "Caoutchouc": "🎈", "Plastique": "🧴", "Laine": "🧶",
     "Coton": "☁️", "Tissu": "🧵", "Cuir": "👞", "Corde": "🪢", "Rouille": "🟫",
+    # Plateau 1
+    "Pierre ponce": "🧽", "Compost": "♻️", "Sédiment": "🫙", "Suie": "🧹",
   },
 
   "Phénomènes Naturels": {
@@ -30,6 +32,8 @@ FAMILIES = {
     "Froid": "❄️", "Sécheresse": "🥵", "Inondation": "🌊", "Avalanche": "🏔️",
     "Glissement de terrain": "⛰️", "Saison": "🍂", "Jour": "🌞", "Nuit": "🌙", "Ombre": "👤",
     "Son": "🔊", "Écho": "📢", "Feu de forêt": "🔥",
+    # Plateau 1
+    "Pluie acide": "🥀",
   },
 
   "Physique": {
@@ -64,6 +68,8 @@ FAMILIES = {
     "Banquise": "🐧", "Delta": "🔺", "Plaine": "🌾", "Prairie": "🌼", "Savane": "🦒",
     "Toundra": "🌨️", "Mer": "🌊", "Source": "⛲", "Atoll": "🏝️", "Stalactite": "🔻",
     "Sol fertile": "🟫", "Tourbe": "🟤", "Fossile": "🦴", "Pôle": "🧭",
+    # Plateau 1
+    "Source hydrothermale": "♨️", "Volcan de boue": "🫕", "Désert de sel": "◻️",
   },
 
   "Cosmos": {

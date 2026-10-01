@@ -229,7 +229,6 @@ RECIPES = [
   ("Rivière+Roue", "Moulin à eau"),
   # --- Barrage
   ("Mur+Rivière", "Barrage"),
-  ("Brique+Lac", "Barrage"),
   ("Béton+Rivière", "Barrage"),
   ("Béton+Mur+Rivière+Électricité", "Barrage"),
   # --- Centrale nucléaire
