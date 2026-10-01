@@ -69,7 +69,7 @@ FAMILIES = {
     "Toundra": "🌨️", "Mer": "🌊", "Source": "⛲", "Atoll": "🏝️", "Stalactite": "🔻",
     "Sol fertile": "🟫", "Tourbe": "🟤", "Fossile": "🦴", "Pôle": "🧭",
     # Plateau 1
-    "Source hydrothermale": "♨️", "Volcan de boue": "🫕", "Désert de sel": "◻️",
+    "Source hydrothermale": "♨️", "Volcan de boue": "🫕", "Désert de sel": "◻️", "Archipel": "🗾",
   },
 
   "Cosmos": {
