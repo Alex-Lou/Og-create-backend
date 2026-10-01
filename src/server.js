@@ -86,6 +86,7 @@ app.use(express.urlencoded({
 }));
 
 const authRoutes = require('./routes/auth');
+const passwordResetRoutes = require('./routes/passwordReset');
 const progressRoutes = require('./routes/progress');
 const achievementsRouter = require('./routes/progressAchievements');
 const coinsRouter = require('./routes/progressCoins');
@@ -124,6 +125,7 @@ const generateMissingFileResponse = (filename) => {
 };
 
 app.use('/api/auth', authRoutes);
+app.use('/api/auth', passwordResetRoutes);
 app.use('/api/progress', gameLimiter, progressRoutes);
 app.use('/api/progress/achievements', gameLimiter, achievementsRouter);
 // Ajouter une route supplémentaire pour les achievements avec un chemin plus court

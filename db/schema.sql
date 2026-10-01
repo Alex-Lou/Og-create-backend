@@ -39,6 +39,19 @@ CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token   ON refresh_tokens (token);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens (user_id);
 
 -- ---------------------------------------------------------------------
+-- Mot de passe oublié (routes/passwordReset.js) : empreinte SHA-256 du
+-- jeton envoyé par e-mail, un seul lien actif par compte, 30 minutes.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS password_resets (
+    id          SERIAL PRIMARY KEY,
+    user_id     INTEGER     NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash  CHAR(64)    NOT NULL UNIQUE,
+    expires_at  TIMESTAMPTZ NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_password_resets_user_id ON password_resets (user_id);
+
+-- ---------------------------------------------------------------------
 -- Progression (services/progressService.js, services/achievementService.js,
 -- routes/progressCoins.js, routes/timerServiceBack.js, routes/explorer.js,
 -- routes/customization.js)
