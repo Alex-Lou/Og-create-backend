@@ -32,4 +32,33 @@ RECIPES = [
   ("Boue+Poisson", "Salamandre"),             # du poisson à l'amphibien
   ("Décomposition+Vie", "Asticot"),           # l'asticot naît sur la matière qui se décompose (expérience de Redi)
   ("Herbe+Vie", "Insecte"),                   # la petite vie qui grouille dans l'herbe
+
+  # ===================== DENSITÉ DU DÉBUT : mélanges évidents entre les premiers éléments =====================
+  # Eau et terre
+  ("Océan+Terre", "Île"),                     # une terre entourée d'eau
+  ("Île+Île", "Archipel"),                    # un groupe d'îles
+  ("Eau+Énergie", "Vague"),                   # une vague, c'est de l'énergie qui traverse l'eau
+  ("Source+Source", "Rivière"),               # des sources qui se rejoignent
+  ("Argile+Eau", "Boue"),                     # l'argile mouillée
+  ("Sédiment+Sédiment", "Pierre"),            # les couches se tassent en roche sédimentaire
+  ("Pierre+Pierre", "Mur"),                   # le mur en pierres sèches
+  ("Océan+Sédiment", "Plage"),                # le sable déposé par la mer
+  ("Magma+Terre", "Volcan"),                  # le magma qui perce la croûte
+  ("Gaz+Magma", "Volcan"),                    # les gaz du magma déclenchent l'éruption
+  ("Pierre+Pluie acide", "Érosion"),          # la pluie acide ronge la roche
+  ("Brasier+Brasier", "Incendie"),            # l'escalade du feu, comme Feu+Feu → Brasier
+  # Vivant
+  ("Pierre+Vie", "Lichen"),                   # le premier vivant à coloniser la roche nue
+  ("Air+Plante", "Oxygène"),                  # la photosynthèse
+  ("Plante+Reproduction", "Fleur"),           # la fleur est l'organe reproducteur des plantes
+  ("Marais+Plante", "Tourbe"),                # les plantes du marais qui s'accumulent
+  ("Marais+Vie", "Grenouille"),               # l'animal du marais
+  ("Geyser+Vie", "Bactérie"),                 # les bactéries des sources chaudes (Yellowstone)
+  ("Île+Plante", "Palmier"),                  # l'arbre des îles
+  ("Montagne+Plante", "Sapin"),               # l'arbre des montagnes
+  ("Lombric+Poisson", "Pêche"),               # le ver au bout de l'hameçon
+  ("Lac+Plante+Poisson", "Écosystème"),       # la mare, l'exemple de l'école
+  ("Chaleur+Océan+Poisson", "Poisson Tropical"),  # le poisson des mers chaudes
+  # Légendes
+  ("Esprit+Énergie", "Mana"),                 # la force des esprits, comme Énergie+Vie → Magie
 ]
