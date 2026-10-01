@@ -21,6 +21,7 @@ FAMILIES = {
     "Pierre ponce": "🧽", "Compost": "♻️", "Sédiment": "🫙", "Suie": "🧹",
     # Plateau 2
     "Résine": "🟨", "Ambre": "🔶",
+    "Soie": "svg:soie",
   },
 
   "Phénomènes Naturels": {
@@ -38,6 +39,7 @@ FAMILIES = {
     "Pluie acide": "🥀",
     # Paquet thématique (culture commune)
     "Hiver": "🧣", "Printemps": "🌷", "Été": "⛱️", "Automne": "🎃", "Ciel": "🌤️", "Coucher de soleil": "🌇",
+    "Verglas": "svg:verglas", "Mirage": "svg:mirage", "Tonnerre": "svg:tonnerre",
   },
 
   "Physique": {
@@ -69,11 +71,12 @@ FAMILIES = {
     "Marais": "🪷", "Forêt": "🌲", "Jungle": "🎋", "Récif": "🪸", "Jardin": "🌻",
     "Rivière": "🏞️", "Cascade": "💧", "Plage": "🏖️", "Falaise": "🧗", "Grotte": "🕳️",
     "Canyon": "🏜️", "Vallée": "🏞️", "Colline": "⛰️", "Glacier": "🏔️", "Iceberg": "🧊",
-    "Banquise": "🐧", "Delta": "🔺", "Plaine": "🌾", "Prairie": "🌼", "Savane": "🦒",
+    "Banquise": "🐧", "Delta": "🔺", "Plaine": "🌾", "Prairie": "🌼", "Savane": "🦏",
     "Toundra": "🌨️", "Mer": "🌊", "Source": "⛲", "Atoll": "🏝️", "Stalactite": "🔻",
     "Sol fertile": "🟫", "Tourbe": "🟤", "Fossile": "🦴", "Pôle": "🧭",
     # Plateau 1
     "Source hydrothermale": "♨️", "Volcan de boue": "🫕", "Désert de sel": "◻️", "Archipel": "🗾",
+    "Fjord": "svg:fjord", "Taïga": "svg:taiga", "Dune": "svg:dune",
   },
 
   "Cosmos": {
@@ -93,7 +96,7 @@ FAMILIES = {
     "Tournesol": "🌻", "Chêne": "🌳", "Sapin": "🌲", "Palmier": "🌴", "Lierre": "🍃",
     "Mousse": "🟩", "Fougère": "🌿", "Champignon": "🍄", "Algue": "🌿", "Graine": "🌰",
     "Fruit": "🍑", "Pollen": "🟡", "Feuille": "🍃", "Racine": "🫚", "Bois": "🪵",
-    "Cotonnier": "🌱", "Lin": "🌾", "Thé": "🍵", "Café": "☕", "Cacao": "🍫",
+    "Cotonnier": "🌱", "Lin": "🌾", "Thé": "🍵", "Café": "☕", "Cacao": "🫘",
     "Canne à sucre": "🎋", "Herbe médicinale": "🌿", "Lichen": "🟢", "Nénuphar": "🪷",
     # Paquet thématique (culture commune)
     "Tomate": "🍅", "Laitue": "🥬", "Noix de coco": "🥥", "Érable": "🍁", "Bouquet": "💐",
@@ -122,7 +125,7 @@ FAMILIES = {
     "Ours polaire": "🐻‍❄️", "Baleine": "🐋", "Dauphin": "🐬", "Requin": "🦈", "Pieuvre": "🐙",
     "Crabe": "🦀", "Corail": "🪸", "Chauve-souris": "🦇", "Singe": "🐒", "Éléphant": "🐘",
     "Lion": "🦁", "Chameau": "🐫", "Castor": "🦫", "Moustique": "🦟", "Plume": "🪶",
-    "Nid": "🪺", "Ruche": "🍯", "Toile d'araignée": "🕸️", "Fourrure": "🦊", "Écaille": "🐉",
+    "Nid": "🪺", "Ruche": "🍯", "Toile d'araignée": "🕸️", "Fourrure": "svg:fourrure", "Écaille": "🐉",
     "Os": "🦴", "Mammouth": "🦣", "Oiseau marin": "🕊️", "Cygne": "🦢",
     # Paquet thématique (culture commune)
     "Chèvre": "🐐", "Cerf": "🦌", "Canard": "🦆", "Zèbre": "🦓", "Tigre": "🐅", "Phoque": "🦭",
@@ -130,6 +133,7 @@ FAMILIES = {
     # Palier 2 (culture commune)
     "Coquillage": "🐚", "Hérisson": "🦔", "Écureuil": "🐿️", "Scorpion": "🦂", "Corbeau": "🐦‍⬛", "Grillon": "🦗",
     "Cafard": "🪳", "Dodo": "🦤", "Poussin": "🐣",
+    "Girafe": "🦒", "Étoile de mer": "svg:etoile-de-mer", "Renard": "🦊",
   },
 
   "Corps et Esprit": {
@@ -149,7 +153,7 @@ FAMILIES = {
     "Humain": "🧑", "Héros": "🦸", "Épée": "⚔️", "Brique": "🧱", "Maison": "🏠",
     "Chevalier": "🛡️", "Château": "🏰", "Ville": "🏙️", "Arche": "🚢",
     "Outil": "🛠️", "Hache": "🪓", "Marteau": "🔨", "Lance": "🔱", "Arc": "🏹", "Roue": "🛞",
-    "Charrette": "🛒", "Bateau": "⛵", "Voile": "⛵", "Agriculture": "🚜", "Champ": "🌾",
+    "Charrette": "🛒", "Bateau": "⛵", "Voile": "⛵", "Agriculture": "🐂", "Champ": "🌾",
     "Ferme": "🏡", "Farine": "🌾", "Pain": "🍞", "Four": "🔥", "Poterie": "🏺",
     "Feu de camp": "🏕️", "Cuisine": "🍳", "Viande": "🍖", "Lait": "🥛", "Fromage": "🧀",
     "Vin": "🍷", "Bière": "🍺", "Miel": "🍯", "Huile": "🫒", "Vêtement": "👕", "Écriture": "✍️",
@@ -177,6 +181,7 @@ FAMILIES = {
     "Église": "⛪", "Ruine": "🏚️", "Restaurant": "🍴", "Hôtel": "🏨", "Stylo": "🖊️", "Cartable": "🎒",
     "Journal": "📰", "Alphabet": "🔤", "Dictionnaire": "📘", "Astronaute": "🧑‍🚀", "Tarte": "🥧", "Biscuit": "🍪",
     "Beignet": "🍩", "Sorbet": "🍧", "Limonade": "🥤", "Cocktail": "🍹", "Rhum": "🥃",
+    "Bibliothèque": "📚", "Miroir": "🪞", "Lampe à huile": "🪔", "Couteau": "🔪", "Ciseaux": "✂️", "Ours en peluche": "🧸", "Cahier": "📔", "Pelle": "svg:pelle", "Chocolat": "🍫", "Cidre": "svg:cidre", "Parc": "svg:parc", "Chocolat chaud": "svg:chocolat-chaud", "Confiture": "svg:confiture", "Mayonnaise": "svg:mayonnaise", "Fontaine": "svg:fontaine", "Cimetière": "svg:cimetiere", "Crayon": "svg:crayon", "Potier": "svg:potier", "Bûcheron": "svg:bucheron", "Berger": "svg:berger", "Pêcheur": "svg:pecheur", "Gomme": "svg:gomme", "Phare": "svg:phare",
   },
 
   "Histoire": {
@@ -206,6 +211,7 @@ FAMILIES = {
     "Vélo": "🚲", "Moto": "🏍️", "Parachute": "🪂", "Grue": "🏗️", "Bateau à vapeur": "🛳️", "Téléphérique": "🚡",
     # Palier 2 (culture commune)
     "Smartphone": "📱", "Radiotélescope": "📡", "GPS": "📍",
+    "Feu tricolore": "🚦", "Tracteur": "🚜", "Lampadaire": "svg:lampadaire", "Montgolfière": "svg:montgolfiere",
   },
 
   "Légendes": {

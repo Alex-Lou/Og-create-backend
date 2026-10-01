@@ -62,6 +62,15 @@ by_arity = {n: sum(1 for ing, _ in R if len(ing.split("+")) == n) for n in (2, 3
 assert all(2 <= len(ing.split("+")) <= 4 for ing, _ in R), "le front accepte 2 à 4 éléments"
 print("elements:", len(name_to_file), "recipes:", len(R), by_arity, file=sys.stderr)
 
+# Un élément sans emoji convenable porte « svg:nom » : le front doit avoir public/icons/elements/nom.svg
+ICONS_DIR = os.path.join(FRONT_DIR, "public", "icons", "elements")
+icons = set(os.listdir(ICONS_DIR)) if os.path.isdir(ICONS_DIR) else None
+for fam, els in FAMILIES.items():
+    for n, e in els.items():
+        if e.startswith("svg:"):
+            assert re.fullmatch(r"svg:[a-z0-9-]{1,40}", e), ("nom de dessin invalide", n, e)
+            assert icons is None or e[4:] + ".svg" in icons, ("dessin manquant dans le front", n, e)
+
 # rules go in the file of the result element
 rules_by_file = {f: {} for f in FILES}
 for ing, res in R:
