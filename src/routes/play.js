@@ -77,7 +77,9 @@ router.get('/state', playLimiter, withPlayer(async (req, res, owner, b) => {
         elements,
         known: book.describe(b, elements),
         families: familiesOf(b),
-        unexplored: book.unexplored(b, elements)
+        unexplored: book.unexplored(b, elements),
+        // Nombre d'éléments inconnus créables tout de suite (le nombre seul, jamais les noms)
+        reachable: book.nearby(b, elements).length
     });
 }));
 
@@ -129,6 +131,7 @@ router.post('/combine', playLimiter, withPlayer(async (req, res, owner, b) => {
     if (mode === 'explorer') reply.fight = await expedition.strike(owner, result);
     if (mode === 'infinite' && isNew) {
         reply.unexplored = book.unexplored(b, [...inHand, result]);
+        reply.reachable = book.nearby(b, [...inHand, result]).length;
         if (owner.kind === 'user') await achievementService.syncAchievements(owner.id);
     }
     res.json(reply);

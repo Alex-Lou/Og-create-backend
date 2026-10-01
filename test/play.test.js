@@ -64,6 +64,7 @@ test('un mélange n’accepte que des ingrédients du carnet, et seul le serveur
   assert.equal(first.data.isNew, true);
   assert.ok(first.data.emoji && first.data.family);
   assert.ok(first.data.unexplored);
+  assert.equal(typeof first.data.reachable, 'number');
   const again = await api('POST', '/play/combine', { mode: 'infinite', ingredients: [...recipe.ingredients].reverse() }, player);
   assert.equal(again.data.isNew, false);
 
@@ -74,6 +75,7 @@ test('un mélange n’accepte que des ingrédients du carnet, et seul le serveur
   const state = await api('GET', '/play/state', null, player);
   assert.ok(state.data.elements.includes(recipe.result));
   assert.equal(state.data.known[recipe.result].emoji, first.data.emoji);
+  assert.equal(state.data.reachable, first.data.reachable);
 });
 
 test('un compte ne peut plus écrire son carnet par la sauvegarde', async () => {
