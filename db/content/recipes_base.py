@@ -27,7 +27,7 @@ RECIPES = [
   ("Bois+Magie", "Baguette"), ("Énergie+Magie", "Pouvoir"),
   ("Anneau+Pouvoir", "Anneau de Pouvoir"), ("Feu+Magie", "Feu Magique"),
   # créations humaines
-  ("Esprit+Vie", "Humain"), ("Métal+Pierre", "Épée"), ("Épée+Humain", "Héros"), ("Arbre+Métal", "Bois"),
+  ("Esprit+Vie", "Humain"), ("Métal+Pierre", "Épée"), ("Arbre+Métal", "Bois"),
   ("Boue+Feu", "Brique"), ("Bois+Brique", "Maison"),
 
   # ---- recettes à 3 éléments ----

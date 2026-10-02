@@ -22,7 +22,6 @@ RECIPES = [
   # --- Âge du fer
   ("Civilisation+Fer", "Âge du fer"),
   ("Fer+Âge du bronze", "Âge du fer"),
-  ("Feu+Métal+Âge du bronze", "Âge du fer"),
   ("Civilisation+Fer+Feu+Forge", "Âge du fer"),
   # --- Antiquité
   ("Civilisation+Temps", "Antiquité"),
@@ -59,7 +58,6 @@ RECIPES = [
   # --- Renaissance
   ("Art+Imprimerie", "Renaissance"),
   ("Art+Moyen Âge", "Renaissance"),
-  ("Moyen Âge+Temps", "Renaissance"),
   ("Art+Imprimerie+Moyen Âge+Science", "Renaissance"),
   # --- Grandes découvertes
   ("Boussole+Renaissance", "Grandes découvertes"),
@@ -70,11 +68,10 @@ RECIPES = [
   ("Carte+Humain", "Explorateur"),
   ("Boussole+Humain", "Explorateur"),
   ("Curiosité+Humain", "Explorateur"),
-  ("Grandes découvertes+Humain", "Explorateur"),
   ("Bateau+Humain+Océan", "Explorateur"),
   # --- Révolution
   ("Colère+Roi", "Révolution"),
-  ("Empire+Explosion", "Révolution"),
+  ("Faim+Roi", "Révolution"),
   ("Colère+Humain+Ville", "Révolution"),
   ("Colère+Humain+Roi+Ville", "Révolution"),
   # --- Démocratie
@@ -91,7 +88,6 @@ RECIPES = [
   ("Atome+Civilisation", "Ère atomique"),
   ("Bombe atomique+Civilisation", "Ère atomique"),
   ("Centrale nucléaire+Civilisation", "Ère atomique"),
-  ("Explosion+Révolution industrielle+Énergie", "Ère atomique"),
   # --- Conquête spatiale
   ("Fusée+Humain", "Conquête spatiale"),
   ("Fusée+Lune", "Conquête spatiale"),
@@ -103,7 +99,7 @@ RECIPES = [
   ("Civilisation+Internet+Ordinateur+Téléphone", "Ère numérique"),
   # --- Archéologie
   ("Antiquité+Science", "Archéologie"),
-  ("Fossile+Science", "Archéologie"),
+  ("Pelle+Ruine", "Archéologie"),
   ("Antiquité+Humain+Terre", "Archéologie"),
   ("Antiquité+Outil+Science+Terre", "Archéologie"),
   # --- Musée
@@ -138,10 +134,8 @@ RECIPES = [
   # --- Locomotive
   ("Charrette+Machine à vapeur", "Locomotive"),
   ("Machine à vapeur+Roue", "Locomotive"),
-  ("Machine à vapeur+Métal+Route", "Locomotive"),
   # --- Train
   ("Charrette+Locomotive", "Train"),
-  ("Locomotive+Ville", "Train"),
   # --- Voiture
   ("Charrette+Moteur", "Voiture"),
   ("Moteur+Roue", "Voiture"),
@@ -153,7 +147,6 @@ RECIPES = [
   # --- Fusée
   ("Espace+Moteur", "Fusée"),
   ("Avion+Espace", "Fusée"),
-  ("Avion+Étoile", "Fusée"),
   ("Espace+Explosion+Moteur+Métal", "Fusée"),
   # --- Satellite
   ("Fusée+Orbite", "Satellite"),
@@ -203,7 +196,6 @@ RECIPES = [
   ("Cerveau+Machine+Électricité", "Ordinateur"),
   ("Machine+Mathématiques+Puce électronique+Électricité", "Ordinateur"),
   # --- Internet
-  ("Ordinateur+Réseau électrique", "Internet"),
   ("Ordinateur+Téléphone", "Internet"),
   ("Ordinateur+Planète Terre", "Internet"),
   # --- Robot
@@ -250,7 +242,6 @@ RECIPES = [
   # --- Imprimerie
   ("Livre+Machine", "Imprimerie"),
   ("Machine+Écriture", "Imprimerie"),
-  ("Machine+Renaissance", "Imprimerie"),
   ("Encre+Machine+Papier", "Imprimerie"),
   # --- Vaccin
   ("Médecine+Virus", "Vaccin"),
@@ -269,7 +260,6 @@ RECIPES = [
   # --- Sous-marin
   ("Machine+Poisson Abyssal", "Sous-marin"),
   ("Bateau+Moteur+Océan", "Sous-marin"),
-  ("Bateau+Métal+Moteur+Océan", "Sous-marin"),
   # --- Sauvegarde
   ("Mémoire+Ordinateur", "Sauvegarde"),
   ("Mémoire+Puce électronique", "Sauvegarde"),
@@ -303,7 +293,6 @@ RECIPES = [
   ("Chauve-souris+Humain", "Vampire"),
   ("Humain+Mythe+Sang", "Vampire"),
   ("Humain+Mort+Sang", "Vampire"),
-  ("Humain+Mythe+Nuit", "Vampire"),
   ("Chauve-souris+Humain+Nuit+Sang", "Vampire"),
   # --- Loup-garou
   ("Humain+Loup+Lune", "Loup-garou"),
