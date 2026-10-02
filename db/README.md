@@ -3,7 +3,7 @@
 Le schéma et le contenu n'étaient versionnés nulle part : `schema.sql` a été reconstruit à partir des requêtes SQL de `src/`, et `seed.sql` contient des données de démo.
 
 - `schema.sql` : les tables (users, auth_sessions, progress, game_data, timer_questions, achievements_list, customization_items, user_items, explorer_regions, user_regions, game_settings). Vous pouvez le rejouer sans risque, il utilise `IF NOT EXISTS`.
-- `seed.sql` : généré, ne pas modifier à la main. 811 éléments répartis en 15 familles et 2 531 recettes (de 2 à 4 ingrédients), tous atteignables depuis Eau, Feu, Terre et Air. Il contient aussi les questions Timer, les succès, les items de personnalisation, les régions Explorer et `max_energy`. Aucun utilisateur n'est créé. Vous pouvez le rejouer : il fait des upserts.
+- `seed.sql` : généré, ne pas modifier à la main. 812 éléments répartis en 15 familles et 2 616 recettes (de 2 à 4 ingrédients), tous atteignables depuis Eau, Feu, Terre et Air. Il contient aussi les questions Timer, les succès, les items de personnalisation, les régions Explorer et `max_energy`. Aucun utilisateur n'est créé. Vous pouvez le rejouer : il fait des upserts.
 - `content/` : la source du contenu.
   - `elements.py` : les éléments par famille. Ne jamais renommer un élément existant : les sauvegardes, le Timer, l'Explorer et les succès s'appuient sur les noms.
   - `recipes_*.py` : les recettes, un fichier par domaine.
