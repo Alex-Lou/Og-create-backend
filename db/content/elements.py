@@ -42,6 +42,7 @@ FAMILIES = {
     "Hiver": "🧣", "Printemps": "🌷", "Été": "⛱️", "Automne": "🎃", "Ciel": "🌤️", "Coucher de soleil": "🌇",
     "Verglas": "svg:verglas", "Mirage": "svg:mirage", "Tonnerre": "svg:tonnerre",
     "Buée": "svg:buee",
+    "Feu follet": "svg:feu-follet",
   },
 
   "Physique": {
