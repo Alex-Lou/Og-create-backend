@@ -40,15 +40,14 @@ RECIPES = [
   ("Cristal+Sable", "Quartz"), ("Oxygène+Silicium", "Quartz"),
   ("Pression+Sable+Temps", "Quartz"),
   # Diamant
-  ("Charbon+Pression", "Diamant"), ("Carbone+Pression", "Diamant"), ("Graphite+Pression", "Diamant"),
-  ("Charbon+Magma+Pression", "Diamant"),
+  ("Carbone+Pression", "Diamant"), ("Graphite+Pression", "Diamant"),
   # Graphite
   ("Carbone+Solide", "Graphite"), ("Chaleur+Charbon", "Graphite"), ("Carbone+Carbone", "Graphite"),
   # Pétrole
-  ("Fossile+Pression+Temps", "Pétrole"), ("Plancton+Pression+Temps", "Pétrole"),
-  ("Océan+Pression+Temps+Vie", "Pétrole"), ("Fossile+Liquide", "Pétrole"), ("Méduse+Pression+Temps", "Pétrole"),
+  ("Plancton+Pression+Temps", "Pétrole"),
+  ("Algue+Pression+Sédiment", "Pétrole"),
   # Goudron
-  ("Feu+Pétrole", "Goudron"), ("Charbon+Distillation", "Goudron"), ("Bois+Distillation", "Goudron"),
+  ("Charbon+Distillation", "Goudron"), ("Bois+Distillation", "Goudron"),
   ("Pétrole+Sable", "Goudron"),
   # Ciment
   ("Argile+Calcaire", "Ciment"), ("Argile+Calcaire+Feu", "Ciment"), ("Calcium+Chaleur+Silicium", "Ciment"),
@@ -70,25 +69,23 @@ RECIPES = [
   # Encre
   ("Charbon+Eau", "Encre"), ("Carbone+Liquide", "Encre"), ("Eau+Pieuvre", "Encre"),
   # Cire
-  ("Feu+Ruche", "Cire"), ("Distillation+Pétrole", "Cire"), ("Chaleur+Miel+Ruche", "Cire"),
+  ("Feu+Ruche", "Cire"), ("Distillation+Pétrole", "Cire"),
   # Caoutchouc
   ("Arbre+Liquide", "Caoutchouc"), ("Arbre+Feu+Soufre", "Caoutchouc"), ("Pétrole+Polymère+Soufre", "Caoutchouc"),
   # Plastique
   ("Pétrole+Polymère", "Plastique"), ("Pétrole+Réaction chimique", "Plastique"),
-  ("Laboratoire+Pétrole", "Plastique"),
   # Laine
-  ("Mouton+Outil", "Laine"), ("Fourrure+Outil", "Laine"), ("Mouton+Épée", "Laine"),
+  ("Mouton+Outil", "Laine"), ("Fourrure+Outil", "Laine"),
   # Coton
   ("Nuage+Plante", "Coton"), ("Cotonnier+Humain", "Coton"), ("Cotonnier+Outil", "Coton"),
   # Tissu
   ("Coton+Outil", "Tissu"), ("Corde+Corde", "Tissu"), ("Coton+Tisserand", "Tissu"), ("Laine+Tisserand", "Tissu"),
   ("Lin+Outil", "Tissu"), ("Coton+Machine", "Tissu"),
   # Cuir
-  ("Fourrure+Sel", "Cuir"), ("Arbre+Eau+Fourrure", "Cuir"), ("Outil+Vache", "Cuir"),
+  ("Arbre+Eau+Fourrure", "Cuir"),
   ("Chêne+Eau+Fourrure", "Cuir"),
   # Corde
   ("Coton+Coton", "Corde"), ("Lin+Lin", "Corde"),
-  ("Force+Plante+Humain", "Corde"),
   # Rouille
   ("Fer+Oxygène", "Rouille"), ("Eau+Fer", "Rouille"), ("Fer+Oxydation", "Rouille"),
   ("Air+Eau+Fer", "Rouille"),
@@ -101,7 +98,7 @@ RECIPES = [
   ("Philosophie+Poussière", "Atome"), ("Électron+Noyau atomique", "Atome"),
   ("Électron+Neutron+Proton", "Atome"),
   # Particule
-  ("Microscope+Poussière", "Particule"), ("Atome+Atome+Vitesse", "Particule"),
+  ("Atome+Atome+Vitesse", "Particule"),
   ("Atome+Énergie", "Particule"),
   # Électron
   ("Électricité+Particule", "Électron"), ("Atome+Lumière", "Électron"), ("Éclair+Particule", "Électron"),
@@ -110,10 +107,8 @@ RECIPES = [
   ("Énergie+Hydrogène", "Proton"), ("Neutron+Radioactivité", "Proton"), ("Électricité+Hydrogène", "Proton"),
   # Neutron
   ("Électron+Pression+Proton", "Neutron"), ("Fission nucléaire+Noyau atomique", "Neutron"),
-  ("Noyau atomique+Particule+Radioactivité", "Neutron"),
   # Noyau atomique
-  ("Neutron+Proton", "Noyau atomique"), ("Atome+Radiation", "Noyau atomique"), ("Atome+Masse", "Noyau atomique"),
-  ("Atome+Microscope", "Noyau atomique"),
+  ("Neutron+Proton", "Noyau atomique"), ("Atome+Radiation", "Noyau atomique"),
   # Onde
   ("Énergie+Vague", "Onde"), ("Air+Son", "Onde"), ("Lumière+Vague", "Onde"),
   ("Écho+Air", "Onde"),
@@ -133,13 +128,13 @@ RECIPES = [
   ("Masse+Masse", "Gravité"), ("Masse+Planète Terre", "Gravité"), ("Pomme+Planète Terre", "Gravité"),
   ("Lune+Planète Terre+Masse", "Gravité"),
   # Masse
-  ("Pierre+Solide", "Masse"), ("Gravité+Inertie", "Masse"), ("Énergie+Relativité", "Masse"),
+  ("Gravité+Inertie", "Masse"), ("Énergie+Relativité", "Masse"),
   # Force
   ("Masse+Mouvement", "Force"), ("Énergie+Muscle", "Force"), ("Masse+Vitesse+Temps", "Force"),
   # Mouvement
   ("Énergie+Pierre", "Mouvement"), ("Force+Masse", "Mouvement"), ("Énergie+Roue", "Mouvement"),
   # Vitesse
-  ("Mouvement+Temps", "Vitesse"), ("Mouvement+Vent", "Vitesse"), ("Éclair+Mouvement", "Vitesse"),
+  ("Mouvement+Temps", "Vitesse"), ("Mouvement+Vent", "Vitesse"),
   ("Force+Mouvement+Temps", "Vitesse"),
   # Friction
   ("Mouvement+Solide", "Friction"), ("Mouvement+Sable", "Friction"),
@@ -152,14 +147,13 @@ RECIPES = [
   ("Énergie+Lumière+Onde", "Radiation"),
   # Radioactivité
   ("Noyau atomique+Temps", "Radioactivité"), ("Noyau atomique+Radiation", "Radioactivité"),
-  ("Pierre+Radiation", "Radioactivité"), ("Noyau atomique+Neutron+Neutron", "Radioactivité"),
+  ("Pierre+Radiation", "Radioactivité"),
   # Fusion nucléaire
   ("Chaleur+Hydrogène+Hydrogène+Pression", "Fusion nucléaire"),
   ("Noyau atomique+Noyau atomique", "Fusion nucléaire"), ("Hydrogène+Plasma+Pression", "Fusion nucléaire"),
   ("Hydrogène+Étoile", "Fusion nucléaire"), ("Hydrogène+Hydrogène+Plasma+Pression", "Fusion nucléaire"),
   # Fission nucléaire
   ("Neutron+Noyau atomique", "Fission nucléaire"), ("Neutron+Radioactivité+Noyau atomique", "Fission nucléaire"),
-  ("Explosion+Noyau atomique", "Fission nucléaire"), ("Atome+Force+Neutron", "Fission nucléaire"),
   # Lentille
   ("Lumière+Verre", "Lentille"), ("Verre+Œil", "Lentille"), ("Glace+Lumière", "Lentille"),
   ("Eau+Lumière+Verre", "Lentille"),
@@ -174,12 +168,11 @@ RECIPES = [
   ("Chaleur+Onde", "Infrarouge"),
   # Ultraviolet
   ("Lumière+Ozone", "Ultraviolet"), ("Énergie+Spectre lumineux", "Ultraviolet"), ("Soleil+Spectre lumineux", "Ultraviolet"),
-  ("Lumière+Onde+Énergie+Ozone", "Ultraviolet"),
   # Rayons X
-  ("Énergie+Ultraviolet", "Rayons X"), ("Électron+Énergie+Métal", "Rayons X"), ("Os+Radiation", "Rayons X"),
+  ("Énergie+Ultraviolet", "Rayons X"), ("Électron+Énergie+Métal", "Rayons X"),
   ("Électron+Métal+Vitesse", "Rayons X"),
   # Vide
-  ("Air+Espace", "Vide"), ("Air+Univers", "Vide"), ("Air+Pression+Verre", "Vide"),
+  ("Air+Espace", "Vide"), ("Air+Pression+Verre", "Vide"),
   # Gaz
   ("Feu+Liquide", "Gaz"), ("Fumée+Vapeur", "Gaz"), ("Chaleur+Liquide", "Gaz"), ("Air+Molécule", "Gaz"),
   # Liquide
@@ -190,7 +183,7 @@ RECIPES = [
   ("Chaleur+Froid", "Température"), ("Mouvement+Particule", "Température"),
   ("Molécule+Vitesse", "Température"),
   # Inertie
-  ("Masse+Vitesse", "Inertie"), ("Mouvement+Vide", "Inertie"), ("Masse+Mouvement+Temps", "Inertie"),
+  ("Masse+Vitesse", "Inertie"), ("Mouvement+Vide", "Inertie"),
   # Relativité
   ("Temps+Vitesse", "Relativité"), ("Gravité+Lumière", "Relativité"), ("Énergie+Lumière+Masse", "Relativité"),
   ("Lumière+Temps+Vitesse", "Relativité"),
@@ -209,7 +202,6 @@ RECIPES = [
   ("Eau+Électricité+Air", "Oxygène"),
   # Carbone
   ("Atome+Charbon", "Carbone"), ("Atome+Graphite", "Carbone"), ("Atome+Diamant", "Carbone"),
-  ("Atome+Vie", "Carbone"),
   # Azote
   ("Air+Distillation", "Azote"), ("Ammoniac+Oxygène", "Azote"),
   # Hélium
@@ -223,12 +215,12 @@ RECIPES = [
   ("Calcaire+Électricité", "Calcium"), ("Atome+Os", "Calcium"), ("Atome+Calcaire", "Calcium"),
   ("Lait+Os", "Calcium"),
   # Silicium
-  ("Atome+Sable", "Silicium"), ("Carbone+Feu+Quartz", "Silicium"), ("Atome+Quartz", "Silicium"),
+  ("Atome+Sable", "Silicium"), ("Carbone+Feu+Quartz", "Silicium"),
   ("Charbon+Feu+Quartz", "Silicium"),
   # Soufre
   ("Fumée+Volcan", "Soufre"), ("Cristal+Volcan", "Soufre"), ("Geyser+Pierre", "Soufre"),
   # Phosphore
-  ("Feu+Os", "Phosphore"), ("Atome+Luciole", "Phosphore"), ("Distillation+Os", "Phosphore"),
+  ("Feu+Os", "Phosphore"), ("Distillation+Os", "Phosphore"),
   # Molécule
   ("Atome+Atome", "Molécule"), ("Hydrogène+Hydrogène", "Molécule"), ("Oxygène+Oxygène", "Molécule"),
   ("Atome+Atome+Force", "Molécule"),
@@ -278,7 +270,7 @@ RECIPES = [
   ("Canne à sucre+Cristallisation", "Sucre"),
   # Amidon
   ("Sucre+Sucre", "Amidon"), ("Polymère+Sucre", "Amidon"),
-  ("Blé+Eau+Pression", "Amidon"), ("Sucre+Sucre+Sucre", "Amidon"),
+  ("Sucre+Sucre+Sucre", "Amidon"),
   # Savon
   ("Base chimique+Huile", "Savon"), ("Cendre+Huile", "Savon"),
   ("Base chimique+Cire", "Savon"), ("Cendre+Eau+Huile+Feu", "Savon"),
@@ -296,8 +288,7 @@ RECIPES = [
   ("Molécule+Molécule+Molécule", "Polymère"),
   ("Carbone+Molécule+Réaction chimique", "Polymère"), ("Molécule+Molécule+Molécule+Molécule", "Polymère"),
   # Tableau périodique
-  ("Atome+Science", "Tableau périodique"), ("Atome+Papier", "Tableau périodique"), ("Atome+Livre", "Tableau périodique"),
-  ("Carbone+Hydrogène+Hélium+Oxygène", "Tableau périodique"),
+  ("Atome+Science", "Tableau périodique"), ("Atome+Papier", "Tableau périodique"),
   # Laboratoire
   ("Maison+Réaction chimique", "Laboratoire"), ("Maison+Science", "Laboratoire"), ("Distillation+Maison", "Laboratoire"),
   ("Maison+Solution+Verre", "Laboratoire"),
