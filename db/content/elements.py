@@ -138,6 +138,7 @@ FAMILIES = {
     "Coquillage": "🐚", "Hérisson": "🦔", "Écureuil": "🐿️", "Scorpion": "🦂", "Corbeau": "🐦‍⬛", "Grillon": "🦗",
     "Cafard": "🪳", "Dodo": "🦤", "Poussin": "🐣",
     "Girafe": "🦒", "Étoile de mer": "svg:etoile-de-mer", "Renard": "🦊",
+    "Cigale": "svg:cigale",
   },
 
   "Corps et Esprit": {
@@ -187,6 +188,7 @@ FAMILIES = {
     "Beignet": "🍩", "Sorbet": "🍧", "Limonade": "🥤", "Cocktail": "🍹", "Rhum": "🥃",
     "Bibliothèque": "📚", "Miroir": "🪞", "Lampe à huile": "🪔", "Couteau": "🔪", "Ciseaux": "✂️", "Ours en peluche": "🧸", "Cahier": "📔", "Pelle": "svg:pelle", "Chocolat": "🍫", "Cidre": "svg:cidre", "Parc": "svg:parc", "Chocolat chaud": "svg:chocolat-chaud", "Confiture": "svg:confiture", "Mayonnaise": "svg:mayonnaise", "Fontaine": "svg:fontaine", "Cimetière": "svg:cimetiere", "Crayon": "svg:crayon", "Potier": "svg:potier", "Bûcheron": "svg:bucheron", "Berger": "svg:berger", "Pêcheur": "svg:pecheur", "Gomme": "svg:gomme", "Phare": "svg:phare",
     "Armure": "svg:armure", "Douves": "svg:douves", "Pont-levis": "svg:pont-levis", "Blason": "svg:blason", "Catapulte": "svg:catapulte", "Fer à cheval": "svg:fer-a-cheval", "Vitrail": "svg:vitrail", "Troubadour": "svg:troubadour", "Carrosse": "svg:carrosse", "Pantoufle de verre": "svg:pantoufle-de-verre", "Bottes de sept lieues": "svg:bottes-sept-lieues", "Maison en pain d'épices": "svg:maison-pain-epices", "Clou": "svg:clou", "Poulie": "svg:poulie", "Cabane": "🛖", "Menuisier": "svg:menuisier", "Papier peint": "svg:papier-peint", "Mécanicien": "🧑‍🔧", "Gâteau d'anniversaire": "🎂", "Cadeau": "🎁", "Sapin de Noël": "🎄", "Traîneau": "🛷", "Mariage": "💒", "Ballon de baudruche": "svg:ballon-baudruche", "Jeu": "🎲", "Sport": "🤸", "Jeux olympiques": "svg:anneaux-olympiques", "Médaille": "🏅", "Natation": "🏊", "Patin à glace": "⛸️", "Football": "🥅", "Échecs": "♟️", "Grange": "svg:grange", "Épouvantail": "svg:epouvantail", "Potager": "svg:potager", "Arrosoir": "svg:arrosoir", "Moisson": "svg:moisson", "Silex taillé": "svg:silex-taille", "Chasseur-cueilleur": "svg:chasseur-cueilleur", "Menhir": "svg:menhir", "Dolmen": "svg:dolmen",
+    "Épave": "svg:epave", "Trésor": "svg:coffre-tresor",
   },
 
   "Histoire": {
@@ -230,6 +232,7 @@ FAMILIES = {
     "Fée": "🧚", "Mythe": "📜", "Dieu": "🌟", "Démon": "😈", "Ange": "😇", "Alchimie": "⚗️",
     "Pierre philosophale": "🔴", "Zombie": "🧟", "Kraken": "🦑", "Centaure": "🐎", "Grimoire": "📕",
     "Génie": "🧞", "Ogre": "👹", "Chat botté": "svg:chat-botte", "Père Noël": "🎅",
+    "Monstre de Frankenstein": "svg:monstre-frankenstein", "Robin des Bois": "svg:robin-des-bois", "Ailes d'Icare": "svg:ailes-icare", "Cheval de Troie": "svg:cheval-de-troie", "Boîte de Pandore": "svg:boite-de-pandore",
   },
 }
 
