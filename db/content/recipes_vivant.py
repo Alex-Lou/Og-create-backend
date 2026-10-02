@@ -203,7 +203,6 @@ RECIPES = [
   ("Pollen+Vent", "Pollinisation"),
   ("Insecte+Pollen", "Pollinisation"),
   ("Chauve-souris+Fleur", "Pollinisation"),
-  ("Lombric+Sang", "Parasite"),
   ("Organisme+Sang+Insecte", "Parasite"),
   # Instinct
   ("Araignée+Toile d'araignée", "Instinct"),
@@ -248,10 +247,10 @@ RECIPES = [
   ("Insecte+Miel", "Abeille"),
   ("Insecte+Terre", "Fourmi"),
   ("Force+Insecte", "Fourmi"),
-  ("Insecte+Maison", "Araignée"),
+  ("Soie+Chasse", "Araignée"),  # la chasseresse qui tisse sa soie (l'araignée n'est pas un insecte : huit pattes, c'est un arachnide)
   ("Araignée+Insecte", "Toile d'araignée"),
   ("Araignée+Tissu", "Toile d'araignée"),
-  ("Lombric+Maison", "Escargot"),
+  ("Jardin+Pluie", "Escargot"),  # il sort au jardin après la pluie (l'escargot n'est pas un ver : c'est un mollusque)
   ("Insecte+Marais", "Moustique"),
   ("Insecte+Sang", "Moustique"),
   ("Insecte+Maladie", "Moustique"),
@@ -263,17 +262,14 @@ RECIPES = [
   ("Évolution+Poisson", "Grenouille"),
   ("Eau+Métamorphose", "Grenouille"),
   ("Eau+Poisson+Temps+Terre", "Grenouille"),
-  ("Pierre+Salamandre", "Lézard"),
   ("Salamandre+Écaille", "Lézard"),
   ("Salamandre+Soleil", "Lézard"),
   ("Cristal+Poisson", "Écaille"),
   ("Outil+Poisson", "Écaille"),
   ("Herbe+Lézard", "Serpent"),
-  ("Lézard+Maison", "Tortue"),
-  ("Escargot+Lézard", "Tortue"),
-  ("Lézard+Marais", "Crocodile"),
-  ("Lézard+Rivière", "Crocodile"),
-  ("Dinosaure+Marais", "Crocodile"),
+  ("Plage+Œuf", "Tortue"),  # la tortue marine éclot dans le sable de la plage (la tortue n'est pas un lézard)
+  ("Armure+Écaille", "Tortue"),  # le reptile en armure : sa carapace est couverte d'écailles
+  ("Marais+Écaille", "Crocodile"),  # une bête à écailles des marais (le crocodile n'est pas un lézard, il est cousin des oiseaux et des dinosaures)
   ("Lézard+Préhistoire", "Dinosaure"),
   ("Fossile+Os", "Dinosaure"),
   # Oiseaux
@@ -304,14 +300,12 @@ RECIPES = [
   ("Froid+Mammifère", "Fourrure"),
   ("Blé+Mammifère", "Souris"),
   ("Fromage+Mammifère", "Souris"),
-  ("Lion+Maison", "Chat"),
   ("Mammifère+Souris", "Chat"),
   ("Maison+Souris+Mammifère", "Chat"),
   ("Loup+Os", "Chien"),
   ("Loup+Maison", "Chien"),
   ("Humain+Loup+Os", "Chien"),
   ("Forêt+Mammifère", "Loup"),
-  ("Lune+Mammifère", "Loup"),
   ("Chevalier+Mammifère", "Cheval"),
   ("Mammifère+Prairie", "Cheval"),
   ("Mammifère+Plaine", "Cheval"),
@@ -335,7 +329,7 @@ RECIPES = [
   ("Poisson+Sang", "Requin"),
   ("Escargot+Méduse", "Pieuvre"),
   ("Encre+Méduse", "Pieuvre"),
-  ("Araignée+Océan", "Crabe"),
+  ("Araignée+Océan", "Crabe"),  # l'« araignée de mer » est un crabe
   ("Plage+Vie", "Crabe"),
   ("Méduse+Récif", "Corail"),
   ("Méduse+Pierre", "Corail"),
@@ -349,6 +343,7 @@ RECIPES = [
   ("Glace+Éléphant", "Mammouth"),
   ("Fourrure+Glace+Mammifère", "Mammouth"),
   ("Mammifère+Mémoire", "Éléphant"),
+  ("Géant+Mammifère+Savane", "Éléphant"),  # le géant de la savane : le plus grand animal terrestre
   ("Mammifère+Savane", "Lion"),
   ("Mammifère+Roi", "Lion"),
   ("Désert+Mammifère", "Chameau"),
@@ -383,8 +378,8 @@ RECIPES = [
   ("Chasse+Espèce+Humain", "Extinction"),
   ("Fleur+Insecte+Miel", "Abeille"),
   ("Feuille+Insecte+Terre", "Fourmi"),
-  ("Insecte+Maison+Ombre", "Araignée"),
-  ("Lombric+Maison+Pluie", "Escargot"),
+  ("Insecte+Soie+Chasse", "Araignée"),  # elle chasse les insectes avec sa soie
+  ("Jardin+Pluie+Vie", "Escargot"),
   ("Insecte+Marais+Sang", "Moustique"),
   ("Montagne+Oiseau+Vent", "Aigle"),
   ("Nuit+Oiseau+Souris", "Hibou"),

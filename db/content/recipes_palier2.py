@@ -17,7 +17,7 @@ RECIPES = [
   ("Escargot+Mammifère+Nuit", "Hérisson"),         # il chasse la nuit
   ("Chêne+Mammifère", "Écureuil"),                 # le mangeur de glands
   ("Arbre+Graine+Hiver+Mammifère", "Écureuil"),    # il cache ses graines pour l'hiver
-  ("Araignée+Désert", "Scorpion"),                 # l'arachnide du désert
+  ("Araignée+Crabe+Désert", "Scorpion"),           # un arachnide à pinces, au désert
   ("Arbre+Fromage+Oiseau", "Corbeau"),             # « Maître Corbeau, sur un arbre perché, tenait en son bec un fromage »
   ("Insecte+Musique+Nuit", "Grillon"),             # le chant du soir
   ("Cuisine+Insecte+Nuit", "Cafard"),              # l'insecte qui sort la nuit dans les cuisines

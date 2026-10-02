@@ -173,7 +173,7 @@ RECIPES = [
   ("Galaxie+Système solaire", "Voie lactée"), ("Galaxie+Planète Terre", "Voie lactée"),
   ("Étoile+Galaxie+Nuit+Planète Terre", "Voie lactée"),
   ("Galaxie+Gravité", "Matière noire"),
-  ("Espace+Explosion+Temps", "Big Bang"), ("Explosion+Vide", "Big Bang"),
+  ("Espace+Explosion+Temps", "Big Bang"),
   ("Chaleur+Énergie+Espace+Temps", "Big Bang"),
   ("Big Bang+Temps", "Univers"), ("Galaxie+Galaxie", "Univers"), ("Espace+Galaxie", "Univers"),
   ("Espace+Galaxie+Matière noire+Temps", "Univers"),
