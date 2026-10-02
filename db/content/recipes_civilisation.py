@@ -259,7 +259,7 @@ RECIPES = [
   ("Magnétisme+Électricité", "Électroaimant"),
   # --- Sous-marin
   ("Machine+Poisson Abyssal", "Sous-marin"),
-  ("Bateau+Moteur+Océan", "Sous-marin"),
+  ("Bateau+Poisson Abyssal", "Sous-marin"),  # le bateau qui plonge jusqu'aux abysses
   # --- Sauvegarde
   ("Mémoire+Ordinateur", "Sauvegarde"),
   ("Mémoire+Puce électronique", "Sauvegarde"),

@@ -167,12 +167,12 @@ RECIPES = [
   ("Chaleur+Lumière", "Infrarouge"), ("Feu+Onde", "Infrarouge"), ("Feu+Spectre lumineux", "Infrarouge"),
   ("Chaleur+Onde", "Infrarouge"),
   # Ultraviolet
-  ("Lumière+Ozone", "Ultraviolet"), ("Énergie+Spectre lumineux", "Ultraviolet"), ("Soleil+Spectre lumineux", "Ultraviolet"),
+  ("Énergie+Spectre lumineux", "Ultraviolet"), ("Soleil+Spectre lumineux", "Ultraviolet"),
   # Rayons X
   ("Énergie+Ultraviolet", "Rayons X"), ("Électron+Énergie+Métal", "Rayons X"),
   ("Électron+Métal+Vitesse", "Rayons X"),
   # Vide
-  ("Air+Espace", "Vide"), ("Air+Pression+Verre", "Vide"),
+  ("Air+Pression+Verre", "Vide"),
   # Gaz
   ("Feu+Liquide", "Gaz"), ("Fumée+Vapeur", "Gaz"), ("Chaleur+Liquide", "Gaz"), ("Air+Molécule", "Gaz"),
   # Liquide

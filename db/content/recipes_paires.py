@@ -42,7 +42,6 @@ RECIPES = [
   ("Lave+Lave", "Volcan"),                            # coulée sur coulée, la lave empilée bâtit un volcan (volcans boucliers : Mauna Loa, Piton de la Fournaise)
   ("Marais+Vapeur", "Brouillard"),                    # la vapeur qui monte du marais : la brume des marais
   ("Montagne+Source", "Rivière"),                     # la source dans la montagne descend la pente et devient rivière
-  ("Montagne+Reproduction", "Souris"),                # clin d'œil : La Fontaine, « La Montagne qui accouche » : la montagne accouche d'une souris
   ("Vapeur+Vapeur", "Nuage"),                         # beaucoup de vapeur rassemblée : un nuage
   ("Océan+Pierre", "Sable"),                          # les vagues usent les rochers en sable, même procédé que Mer+Pierre → Sable
   ("Océan+Poussière", "Sédiment"),                    # la poussière (ex. du Sahara) retombe sur l'océan et se dépose au fond, comme Lac+Poussière → Sédiment
