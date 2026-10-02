@@ -125,7 +125,7 @@ RECIPES = [
   ("Éclair+Fer+Pierre", "Aimant"),
   # Électricité
   ("Énergie+Métal", "Électricité"), ("Aimant+Mouvement", "Électricité"),
-  ("Friction+Laine", "Électricité"), ("Électron+Mouvement", "Électricité"),
+  ("Friction+Laine", "Électricité statique"), ("Électron+Mouvement", "Électricité"),
   # Pression
   ("Air+Force", "Pression"), ("Air+Gravité", "Pression"), ("Force+Gaz", "Pression"),
   ("Eau+Gravité+Océan", "Pression"),
