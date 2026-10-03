@@ -271,6 +271,60 @@ test('l’Encre du Livre se paie au serveur, demande un compte, et ne vise qu’
   assert.equal(await coinsOf(player), 70);
 });
 
+test('le Livre : un mélange visé dit combien d’ingrédients sont justes, puis l’encre devient offerte', async () => {
+  const { pageId } = require('../src/services/bookPages');
+  const rules = await sql(`SELECT r.key, r.value FROM game_data g, jsonb_each_text(g.rules->'rules') r WHERE g.active`);
+  const makes = new Set(rules.filter(r => r.value === recipe.result).map(r => r.key.split('+').map(p => p.trim()).sort().join('+')));
+  const pairs = [];
+  BASE.forEach((a, i) => BASE.slice(i).forEach(b => pairs.push([a, b])));
+  const wrong = pairs.filter(pair => !makes.has([...pair].sort().join('+')));
+  const page = pageId(recipe.result);
+
+  const player = await newPlayer();
+  const before = (await api('GET', '/play/book', null, player)).data;
+  const target = before.chapters.flatMap(c => c.pages).find(p => p.id === page);
+  assert.equal(target.status, 'reach');
+  assert.equal(target.first, [...recipe.result][0]);
+  assert.equal(target.groups.length, target.clue.length);
+  assert.equal(target.misses, 0);
+  assert.equal(before.freeInkAfter, 3);
+
+  const aimAt = (who, ingredients) => api('POST', '/play/combine', { mode: 'infinite', ingredients, page }, who);
+  const first = await aimAt(player, wrong[0]);
+  assert.equal(first.status, 200);
+  assert.equal(first.data.aim.of, recipe.ingredients.length === 2 ? 2 : first.data.aim.of);
+  assert.ok(first.data.aim.right < first.data.aim.of);
+  assert.equal(first.data.aim.misses, 1);
+  // Le même mélange ne compte qu'une fois
+  assert.equal((await aimAt(player, wrong[0])).data.aim.misses, 1);
+  await aimAt(player, wrong[1]);
+  const third = await aimAt(player, wrong[2]);
+  assert.equal(third.data.aim.misses, 3);
+  assert.equal(third.data.aim.freeInk, true);
+  const misses = (await api('GET', '/play/book', null, player)).data.chapters.flatMap(c => c.pages).find(p => p.id === page).misses;
+  assert.equal(misses, 3);
+
+  // Encre offerte : sans écus, sans débit
+  const ink = await api('POST', '/play/ink', { page }, player);
+  assert.equal(ink.status, 200);
+  assert.equal(ink.data.free, true);
+  assert.equal(await coinsOf(player), 0);
+
+  // La bonne recette inscrit la page : pas de verdict, et les essais s'effacent
+  const found = await aimAt(player, recipe.ingredients);
+  assert.equal(found.data.result, recipe.result);
+  assert.equal(found.data.aim, undefined);
+  assert.equal((await sql('SELECT COUNT(*)::int AS n FROM book_tries WHERE user_id = $1', [player.userId]))[0].n, 0);
+
+  // Un invité a le verdict, sans compteur ; une page hors de portée n'en donne aucun
+  const visitor = await guest();
+  const seen = await aimAt(visitor, wrong[0]);
+  assert.equal(seen.data.aim.misses, null);
+  assert.equal(seen.data.aim.freeInk, false);
+  const elsewhere = await api('POST', '/play/combine', { mode: 'infinite', ingredients: wrong[0], page: 'nimporte-quoi' }, visitor);
+  assert.equal(elsewhere.data.aim, undefined);
+});
+
 test('le Monde : compte requis, pose d’éléments possédés, déplacement et retrait', async () => {
   const visitor = await guest();
   assert.equal((await api('GET', '/play/world', null, visitor)).status, 402);

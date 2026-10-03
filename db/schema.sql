@@ -294,6 +294,15 @@ CREATE TABLE IF NOT EXISTS world_tiles (
 );
 ALTER TABLE progress ADD COLUMN IF NOT EXISTS world_collected_at TIMESTAMPTZ;
 
+-- Le Livre : mélanges ratés sur une page à portée (l'encre de la page devient offerte après quelques essais différents)
+CREATE TABLE IF NOT EXISTS book_tries (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    page_id VARCHAR(32) NOT NULL,
+    combo VARCHAR(255) NOT NULL,
+    tried_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, page_id, combo)
+);
+
 -- Garde-fou : ni solde ni énergie négatifs (NOT VALID : contrôle les écritures futures sans bloquer sur l'existant)
 DO $$
 BEGIN

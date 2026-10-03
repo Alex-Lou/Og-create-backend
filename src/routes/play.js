@@ -10,6 +10,7 @@ const achievementService = require('../services/achievementService');
 const trial = require('../services/trial');
 const bookPages = require('../services/bookPages');
 const world = require('../services/world');
+const bookTries = require('../services/bookTries');
 const { verifyAccess, readCookie } = require('../services/authSession');
 const { log } = require('../utils/logger');
 
@@ -20,6 +21,7 @@ const HELP_PRICE = 50; // piste de l'Infini, encre du Livre et joker payant de l
 const JOKER_TIME = 30; // secondes ajoutées par le joker de temps
 const MAX_ORIGINS = 3;
 const NAME = /^[^\u0000-\u001f]{1,60}$/;
+const PAGE = /^[A-Za-z0-9_-]{1,32}$/;
 
 
 // Limites : par joueur (compte ou cookie invité), et par adresse pour la création de carnets invités
@@ -86,7 +88,8 @@ router.get('/state', playLimiter, withPlayer(async (req, res, owner, b) => {
 
 // Le Livre : chapitres et pages ; une page à portée ne révèle jamais le nom de l'élément inconnu
 router.get('/book', playLimiter, withPlayer(async (req, res, owner, b) => {
-    res.json(bookPages.view(b, await players.elements(owner)));
+    const misses = owner.kind === 'user' ? await bookTries.missesByPage(owner.id) : {};
+    res.json({ ...bookPages.view(b, await players.elements(owner), misses), freeInkAfter: bookTries.FREE_INK_AFTER });
 }));
 
 // Le Monde : l'île du joueur (compte requis : ses écus sont gardés par le serveur)
@@ -145,10 +148,23 @@ router.post('/combine', playLimiter, withPlayer(async (req, res, owner, b) => {
     if (!ingredients.every(i => inHand.has(i))) return res.status(403).json({ message: 'Ingrédient absent de ton carnet' });
 
     const result = book.combine(b, ingredients);
-    if (!result) return res.json({ result: null });
+    // Livre : mélange visé sur une page à portée ; si ce n'est pas elle, combien d'ingrédients sont justes
+    let aim = null;
+    const page = req.body.page;
+    if (mode === 'infinite' && typeof page === 'string' && PAGE.test(page)) {
+        const aimed = bookPages.aim(b, [...inHand], page, ingredients);
+        if (aimed && aimed.name !== result) {
+            const misses = owner.kind === 'user' ? await bookTries.record(owner.id, page, book.keyOf(ingredients)) : null;
+            aim = { page, right: aimed.right, of: aimed.of, misses, need: bookTries.FREE_INK_AFTER, freeInk: misses !== null && misses >= bookTries.FREE_INK_AFTER };
+        }
+    }
+    if (!result) return res.json(aim ? { result: null, aim } : { result: null });
 
     const isNew = run ? await players.addToRun(owner, mode, result) : await players.addElement(owner, result);
     const reply = { result, ...book.describe(b, [result])[result], isNew };
+    if (aim) reply.aim = aim;
+    // Page trouvée : ses essais ratés n'ont plus d'usage
+    if (mode === 'infinite' && isNew && owner.kind === 'user') await bookTries.clear(owner.id, bookPages.pageId(result));
     // Épreuve : le serveur juge la question (réussite, points, progression « 2 / 3 »)
     if (mode === 'timer') reply.trial = await trial.judge(owner, [...run.inventory, result]);
     if (mode === 'infinite' && isNew) {
@@ -185,16 +201,18 @@ router.post('/hint', playLimiter, withPlayer(async (req, res, owner, b) => {
     res.json({ name: near[Math.floor(Math.random() * near.length)], coins: paid.coins });
 }));
 
-// Encre du Livre : révèle un ingrédient (déjà possédé) d'une page à portée
+// Encre du Livre : révèle un ingrédient (déjà possédé) d'une page à portée ;
+// offerte après FREE_INK_AFTER mélanges ratés différents sur cette page
 router.post('/ink', playLimiter, withPlayer(async (req, res, owner, b) => {
     const id = String(req.body.page || '');
-    if (!/^[A-Za-z0-9_-]{1,32}$/.test(id)) return res.status(400).json({ message: 'Page invalide' });
+    if (!PAGE.test(id)) return res.status(400).json({ message: 'Page invalide' });
     const target = bookPages.reachableById(b, await players.elements(owner), id);
     if (!target) return res.status(404).json({ message: 'Cette page n’est pas à portée.' });
-    const paid = await pay(owner, 'encre');
+    const free = owner.kind === 'user' && await bookTries.misses(owner.id, id) >= bookTries.FREE_INK_AFTER;
+    const paid = free ? { coins: await ledger.balance(owner.id) } : await pay(owner, 'encre');
     if (paid.status) return res.status(paid.status).json({ message: paid.message });
     const ingredient = target.parts.find(p => !book.BASE_ELEMENTS.includes(p)) || target.parts[0];
-    res.json({ page: id, ingredient, coins: paid.coins });
+    res.json({ page: id, ingredient, coins: paid.coins, free });
 }));
 
 // Joker de l'Épreuve : une étape, un ingrédient, ou du temps ; offert s'il en reste, sinon payé
