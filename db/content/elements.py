@@ -125,7 +125,7 @@ FAMILIES = {
     "Luciole": "🪲", "Oiseau": "🐦",
     "Insecte": "🐞", "Abeille": "🐝", "Fourmi": "🐜", "Araignée": "🕷️", "Escargot": "🐌",
     "Grenouille": "🐸", "Serpent": "🐍", "Lézard": "🦎", "Tortue": "🐢", "Crocodile": "🐊",
-    "Dinosaure": "🦕", "Aigle": "🦅", "Hibou": "🦉", "Pingouin": "🐧", "Poule": "🐔",
+    "Dinosaure": "🦕", "Aigle": "🦅", "Hibou": "🦉", "Pingouin": "svg:pingouin", "Manchot": "🐧", "Poule": "🐔",
     "Mammifère": "🐾", "Souris": "🐭", "Chat": "🐈", "Chien": "🐕", "Loup": "🐺",
     "Cheval": "🐎", "Vache": "🐄", "Mouton": "🐑", "Cochon": "🐖", "Ours": "🐻",
     "Ours polaire": "🐻‍❄️", "Baleine": "🐋", "Dauphin": "🐬", "Requin": "🦈", "Pieuvre": "🐙",
