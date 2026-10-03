@@ -1,7 +1,7 @@
-// Tests de l'API sur une vraie base : le serveur est le seul juge des écus, des succès et de l'énergie
+// Tests de l'API sur une vraie base : le serveur est le seul juge des écus et des succès
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { startServer, api, sql, newPlayer, coinsOf, solveRegion } = require('./helpers');
+const { startServer, api, sql, newPlayer, coinsOf } = require('./helpers');
 
 let server;
 test.before(async () => { server = await startServer(); });
@@ -14,44 +14,6 @@ test('le client ne peut plus écrire son solde', async () => {
   const old = await api('POST', '/progress/coins/update', { coins: 999999 }, player);
   assert.equal(old.status, 404);
   assert.equal(await coinsOf(player), 40);
-});
-
-test('l’énergie s’achète en quantité positive, et la visite coûte le prix de la région', async () => {
-  const player = await newPlayer({ coins: 200 });
-  await api('GET', '/explorer/init', null, player);
-  await sql('UPDATE progress SET explorer_energy = 10 WHERE user_id = $1', [player.userId]);
-  const negative = await api('POST', '/explorer/buy-energy', { amount: -1000 }, player);
-  assert.equal(negative.status, 400);
-  assert.equal(await coinsOf(player), 200);
-  const bought = await api('POST', '/explorer/buy-energy', { amount: 2 }, player);
-  assert.equal(bought.data.coins_remaining, 180);
-  assert.equal(bought.data.energy, 12);
-
-  const [region] = await sql('SELECT id, energy_cost, energy_reward, coin_reward FROM explorer_regions WHERE is_default = TRUE ORDER BY id LIMIT 1');
-  const visit = await api('POST', `/explorer/visit/${region.id}`, { energyCost: -1000 }, player);
-  assert.equal(visit.data.energy, 12 - region.energy_cost);
-
-  // Pas de récompense tant que le défi n'est pas relevé dans la partie suivie par le serveur
-  assert.equal((await api('POST', `/explorer/complete/${region.id}`, {}, player)).status, 403);
-  await solveRegion(player, region.id);
-
-  // Récompense de la base, versée une seule fois, quoi que dise le client
-  const done = await api('POST', `/explorer/complete/${region.id}`, { coins: 999999, energy: 999 }, player);
-  assert.equal(done.status, 200);
-  assert.equal(await coinsOf(player), 180 + region.coin_reward);
-  await api('POST', `/explorer/complete/${region.id}`, { coins: 999999 }, player);
-  assert.equal(await coinsOf(player), 180 + region.coin_reward);
-
-  // Un gardien ne se déclare vaincu que sur sa propre région
-  const fake = await api('POST', `/explorer/complete/${region.id}`, { isBossVictory: true, bossRegionId: 5 }, player);
-  assert.equal(fake.status, 400);
-});
-
-test('une région verrouillée (gardien compris) ne se visite pas', async () => {
-  const player = await newPlayer();
-  await api('GET', '/explorer/init', null, player);
-  const [boss] = await sql('SELECT id FROM explorer_regions WHERE is_boss = TRUE ORDER BY id LIMIT 1');
-  assert.equal((await api('POST', `/explorer/visit/${boss.id}`, {}, player)).status, 403);
 });
 
 test('un succès se mérite côté serveur, pas en le déclarant', async () => {

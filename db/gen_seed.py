@@ -1,6 +1,6 @@
 # db/gen_seed.py — génère db/seed.sql (contenu du jeu) et vérifie sa cohérence :
 # chaque élément est atteignable depuis Eau/Feu/Terre/Air, aucune recette en double,
-# questions Timer et régions Explorer faisables.
+# questions Timer faisables.
 # Usage : python3 db/gen_seed.py   (FRONT_DIR=../og-create pour vérifier aussi les images)
 import json, os, re, sys
 
@@ -75,13 +75,6 @@ for fam, els in FAMILIES.items():
 rules_by_file = {f: {} for f in FILES}
 for ing, res in R:
     rules_by_file[name_to_file[res]][ing] = res
-
-# --- regions ---
-regions = json.load(open(os.path.join(ROOT, "src", "public", "data", "regionChallenges.json"), encoding="utf-8"))["regions"]
-for r in regions:
-    have = closure(r.get("availableElements", []))
-    for e in r.get("requiredElements", []):
-        assert e in have, ("region", r["id"], e)
 
 # --- timer questions ---
 TQ = [
@@ -305,15 +298,12 @@ def q(s):
     return "'" + str(s).replace("'", "''") + "'"
 def j(o):
     return q(json.dumps(o, ensure_ascii=False)) + "::jsonb"
-def arr(lst):
-    return "ARRAY[" + ",".join(q(x) for x in lst) + "]::TEXT[]" if lst else "'{}'::TEXT[]"
-
 out = []
 w = out.append
 w("-- =====================================================================")
 w("-- Origins Creation - données de démonstration (idempotent, rejouable)")
 w(f"-- {len(name_to_file)} éléments, {len(R)} recettes ({by_arity[2]} à 2, {by_arity[3]} à 3, {by_arity[4]} à 4 éléments), {len(tq_rows)} questions Timer,")
-w(f"-- {len(ACH)} succès, {len(ITEMS)} items, {len(regions)} régions. Aucun utilisateur.")
+w(f"-- {len(ACH)} succès, {len(ITEMS)} items. Aucun utilisateur.")
 w("-- NE PAS MODIFIER À LA MAIN : généré par db/gen_seed.py (python3 db/gen_seed.py).")
 w("-- Vérifié : tout élément est atteignable depuis Eau/Feu/Terre/Air.")
 w("-- =====================================================================")
@@ -368,31 +358,6 @@ w("-- ---------------------------------------------------------------- customiza
 for n, t, p, price, dflt, d, ach in ITEMS:
     w(f"INSERT INTO customization_items (name, type, image_path, price, is_default, description, achievement) VALUES ({q(n)}, {q(t)}, {q(p)}, {price}, {'TRUE' if dflt else 'FALSE'}, {q(d)}, {q(ach) if ach else 'NULL'})")
     w("ON CONFLICT (image_path) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type, price = EXCLUDED.price, is_default = EXCLUDED.is_default, description = EXCLUDED.description, achievement = EXCLUDED.achievement;")
-w("")
-w("-- ---------------------------------------------------------------- game_settings")
-for k, v, d in [("max_energy", "20", "Énergie maximale en mode Explorer"),
-                ("default_energy", "10", "Énergie initiale en mode Explorer (informatif, la route utilise 10 en dur)"),
-                ("energy_regen_minutes", "30", "Minutes par point d'énergie régénéré (informatif, 30 en dur)")]:
-    w(f"INSERT INTO game_settings (setting_name, value, description) VALUES ({q(k)}, {q(v)}, {q(d)})")
-    w("ON CONFLICT (setting_name) DO UPDATE SET value = EXCLUDED.value, description = EXCLUDED.description;")
-w("")
-w("-- ---------------------------------------------------------------- explorer_regions")
-w("-- Miroir de src/public/data/regionChallenges.json (initRegions.js les ré-upserte")
-w("-- de toute façon au démarrage du serveur, avec les mêmes règles de mapping).")
-for r in regions:
-    boss = r.get("is_boss", False)
-    img = r.get("bossImage") if boss else r.get("background")
-    cost = 0 if boss else r.get("energyCost", 2)
-    reward = r.get("energyReward", 10 if boss else 5)
-    parent = r.get("parent_region_id")
-    vals = [str(r["id"]), q(r["name"]), q(r.get("description", "")), q(img) if img else "NULL",
-            "TRUE" if r.get("is_default") else "FALSE", str(r.get("required_level") or r["id"]),
-            str(parent) if parent else "NULL", arr(r.get("requiredElements", [])), arr(r.get("availableElements", [])),
-            str(r.get("position_x") or 50), str(r.get("position_y") or 50), "TRUE" if boss else "FALSE",
-            str(cost), str(reward), str(r.get("map_id") or 1), str(r.get("rewardCoins", 50))]
-    w("INSERT INTO explorer_regions (id, name, description, image_path, is_default, required_level, parent_region_id, required_elements, unlocked_elements, position_x, position_y, is_boss, energy_cost, energy_reward, map_id, coin_reward)")
-    w(f"VALUES ({', '.join(vals)})")
-    w("ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description, image_path = EXCLUDED.image_path, is_default = EXCLUDED.is_default, required_level = EXCLUDED.required_level, parent_region_id = EXCLUDED.parent_region_id, required_elements = EXCLUDED.required_elements, unlocked_elements = EXCLUDED.unlocked_elements, position_x = EXCLUDED.position_x, position_y = EXCLUDED.position_y, is_boss = EXCLUDED.is_boss, energy_cost = EXCLUDED.energy_cost, energy_reward = EXCLUDED.energy_reward, map_id = EXCLUDED.map_id, coin_reward = EXCLUDED.coin_reward;")
 w("")
 w("COMMIT;")
 open(os.path.join(HERE, "seed.sql"), "w", encoding="utf-8").write("\n".join(out) + "\n")

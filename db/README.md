@@ -2,13 +2,13 @@
 
 Le schéma et le contenu n'étaient versionnés nulle part : `schema.sql` a été reconstruit à partir des requêtes SQL de `src/`, et `seed.sql` contient des données de démo.
 
-- `schema.sql` : les tables (users, auth_sessions, progress, game_data, timer_questions, achievements_list, customization_items, user_items, explorer_regions, user_regions, game_settings). Vous pouvez le rejouer sans risque, il utilise `IF NOT EXISTS`.
-- `seed.sql` : généré, ne pas modifier à la main. 827 éléments répartis en 15 familles et 2 766 recettes (de 2 à 4 ingrédients), tous atteignables depuis Eau, Feu, Terre et Air. Il contient aussi les questions Timer, les succès, les items de personnalisation, les régions Explorer et `max_energy`. Aucun utilisateur n'est créé. Vous pouvez le rejouer : il fait des upserts.
+- `schema.sql` : les tables (users, auth_sessions, progress, game_data, timer_questions, achievements_list, customization_items, user_items, explorer_regions, user_regions, game_settings). Les tables et colonnes de l'ancienne Expédition (`explorer_regions`, `user_regions`, `game_settings`, énergie de `progress`) n'ont plus d'usage et seront retirées par une migration. Vous pouvez le rejouer sans risque, il utilise `IF NOT EXISTS`.
+- `seed.sql` : généré, ne pas modifier à la main. 827 éléments répartis en 15 familles et 2 766 recettes (de 2 à 4 ingrédients), tous atteignables depuis Eau, Feu, Terre et Air. Il contient aussi les questions Timer, les succès, et les items de personnalisation. Aucun utilisateur n'est créé. Vous pouvez le rejouer : il fait des upserts.
 - `content/` : la source du contenu.
-  - `elements.py` : les éléments par famille. Ne jamais renommer un élément existant : les sauvegardes, le Timer, l'Explorer et les succès s'appuient sur les noms.
+  - `elements.py` : les éléments par famille. Ne jamais renommer un élément existant : les sauvegardes, le Timer et les succès s'appuient sur les noms.
   - `recipes_*.py` : les recettes, un fichier par domaine.
   - `check.py` : le vérificateur (`python3 db/content/check.py`).
-- `gen_seed.py` : régénère `seed.sql` depuis `content/` (`python3 db/gen_seed.py`). Il refuse de produire le seed si un élément devient inatteignable, si une recette est en double, ou si une question Timer ou une région Explorer n'est plus faisable.
+- `gen_seed.py` : régénère `seed.sql` depuis `content/` (`python3 db/gen_seed.py`). Il refuse de produire le seed si un élément devient inatteignable, si une recette est en double, ou si une question Timer n'est plus faisable.
 
 ## Installation
 
@@ -18,7 +18,7 @@ psql -d og_create -f db/schema.sql
 psql -d og_create -f db/seed.sql
 ```
 
-Ajoutez `-h <hôte> -U <utilisateur>` si besoin. Au démarrage, le serveur resynchronise aussi `explorer_regions` depuis `src/public/data/regionChallenges.json` (voir `initRegions.js`).
+Ajoutez `-h <hôte> -U <utilisateur>` si besoin.
 
 ## Base hébergée (Neon, Supabase…)
 

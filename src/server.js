@@ -9,7 +9,6 @@ require('dotenv').config({ path: path.resolve(process.cwd(), '.env') });
 process.env.LOG_LEVEL = process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'warn' : 'info');
 
 const { ensureJWTSecret } = require('./utils/jwt');
-const { initRegions } = require('./initRegions');
 
 ensureJWTSecret();
 
@@ -100,7 +99,6 @@ const achievementsRouter = require('./routes/progressAchievements');
 const coinsRoutes = require('./routes/coins');
 const contactRoutes = require('./routes/contactRoutes');
 const customizationRoutes = require('./routes/customization');
-const explorerRoutes = require('./routes/explorer');
 const gameDataController = require('./routes/gameDataController');
 const timerService = require('./routes/timerServiceBack');
 const playRoutes = require('./routes/play');
@@ -142,7 +140,6 @@ app.use('/api/achievements', gameLimiter, achievementsRouter);
 app.use('/api/coins', gameLimiter, coinsRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/customization', customizationRoutes);
-app.use('/api/explorer', gameLimiter, explorerRoutes);
 app.use('/api/play', playRoutes);
 
 Object.keys(KNOWN_MISSING_FILES).forEach(filename => {
@@ -198,7 +195,7 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3000;
-const server = app.listen(PORT, async () => {
+const server = app.listen(PORT, () => {
     console.log(`
     🚀 Serveur démarré
     • Port: ${PORT}
@@ -206,18 +203,7 @@ const server = app.listen(PORT, async () => {
     • Niveau de log: ${process.env.LOG_LEVEL}
     • Heure: ${new Date().toLocaleString()}
     `);
-    
-    try {
-        const result = await initRegions();
-        if (result.success) {
-            console.log('✅ Régions initialisées avec succès');
-        } else {
-            console.warn('⚠️ Erreur lors de l\'initialisation des régions, le serveur continue de fonctionner');
-        }
-    } catch (error) {
-        console.error('❌ Erreur critique lors de l\'initialisation des régions:', error.message);
-    }
-    
+
     console.log('Tout roule! :)');
 });
 
