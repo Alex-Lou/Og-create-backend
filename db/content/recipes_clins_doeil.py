@@ -3,7 +3,6 @@
 RECIPES = [
   # ===================== EXPRESSIONS, FABLES ET CULTURE POPULAIRE =====================
   ("Corde+Pluie", "Déluge"),                          # clin d'œil : « il pleut des cordes » (XVIIe s.) : pluie si drue que les filets d'eau ressemblent à des cordes
-  ("Canard+Froid", "Hiver"),                          # clin d'œil : « un froid de canard » (XIXe s.) : le grand froid de la chasse aux canards, d'automne en hiver
   ("Chat+Langage", "Rhume"),                          # clin d'œil : « avoir un chat dans la gorge » : voix enrouée ; vient de « maton » (grumeau) confondu avec « matou »
   ("Cœur+Éclair", "Amour"),                           # clin d'œil : « le coup de foudre » : amour soudain, au premier regard (sens amoureux depuis la fin du XVIIIe s.)
   ("Pluie+Poule", "Peur"),                            # clin d'œil : « être une poule mouillée » (Richelet, 1680) : la poule trempée par la pluie a l'air misérable et craintive
@@ -28,9 +27,8 @@ RECIPES = [
   ("Chat+Physique quantique", "Zombie"),              # clin d'œil : le chat de Schrödinger, « à la fois mort et vivant » — fait : c'est une expérience de pensée de 1935, jamais réalisée sur un vrai chat ; le zombie est la blague du « mort-vivant »
   ("Armée+Pomme de terre", "Potager"),                # clin d'œil : Parmentier fait garder ses champs de pommes de terre par des soldats le jour seulement, pour que les Parisiens viennent en voler la nuit et les plantent chez eux (légende, apparue après sa mort en 1814) ; fait : il a bien promu la pomme de terre et cultivé la plaine des Sablons en 1786
   ("Cire+Plume", "Ailes d'Icare"),                    # clin d'œil : Icare — mythe : Dédale fabrique des ailes de plumes tenues par du lin et de la cire pour s'évader avec son fils (Ovide, Métamorphoses VIII) (légende)
-  ("Ailes d'Icare+Soleil", "Mer"),                    # clin d'œil : Icare vole trop près du Soleil, la cire fond et il tombe dans la mer qui porte son nom, la mer Icarienne (légende) ; fait : cette mer existe bien, près de l'île d'Icarie
+  ("Ailes d'Icare+Soleil", "Mort"),                    # clin d'œil : Icare vole trop près du Soleil, la cire fond et il tombe dans la mer qui porte son nom, la mer Icarienne (légende) ; fait : cette mer existe bien, près de l'île d'Icarie
   ("Cheval de Troie+Ville", "Ruine"),                 # clin d'œil : le cheval de Troie — mythe : les Grecs cachés dans le cheval ouvrent les portes et Troie est détruite (Virgile, Énéide II) (légende)
-  ("Feu+Hydre", "Héros"),                             # clin d'œil : Hercule et l'Hydre de Lerne — mythe : chaque tête coupée repousse, alors Iolaos brûle les cous avec une torche (Apollodore) (légende)
   ("Arbre+Humain+Pomme", "Gravité"),                  # clin d'œil : la pomme de Newton — fait : Newton a raconté à Stukeley (1726) que la chute d'une pomme, vue alors qu'il songeait, lui a inspiré la gravitation ; la pomme tombée sur sa tête est une légende ajoutée plus tard (légende)
   ("Eau+Masse+Pensée", "Idée"),                       # clin d'œil : « Eurêka ! » d'Archimède dans son bain (légende) — récit de Vitruve, 200 ans après : l'eau qui déborde lui donne l'idée de mesurer le volume de la couronne du roi ; fait : le principe d'Archimède sur les corps plongés dans l'eau est bien de lui
   ("Cerf-volant+Clé+Orage", "Électricité statique"),  # clin d'œil : Franklin, 1752 (légende en partie) — récit de Franklin et Priestley (1767), sans témoin, certains historiens doutent qu'elle ait eu lieu ; si elle a eu lieu, la foudre n'a pas frappé le cerf-volant : les charges du nuage descendent le fil mouillé jusqu'à la clé, d'où jaillissent des étincelles

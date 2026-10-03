@@ -8,11 +8,11 @@ RECIPES = [
   ("Cellule+Eau", "Microbe"),                 # la vie microscopique des eaux
   ("Charbon+Grotte", "Peinture"),             # le noir de charbon des grottes préhistoriques
   ("Humain+Mur+Suie", "Peinture"),            # le noir de fumée, pigment des premières peintures
-  ("Feu+Or", "Anneau"),                       # un anneau d'or forgé au feu
+  ("Or+Mariage", "Anneau"),                       # un anneau d'or forgé au feu
   ("Jour+Jour", "Temps"),                     # les jours qui passent (remplace le sablier, Sable+Verre)
 
   # ===================== MATIÈRE ET MONDE =====================
-  ("Sapin+Hache", "Résine"),                  # le résineux entaillé laisse couler sa résine
+  ("Couteau+Sapin", "Résine"),                  # le résineux entaillé laisse couler sa résine
   ("Résine+Sédiment+Temps", "Ambre"),         # la résine enfouie durcit en ambre au fil des millénaires
   ("Ambre+Insecte", "Fossile"),               # l'insecte piégé dans l'ambre
   ("Éclair+Sable", "Verre"),                  # la foudre fond le sable : la fulgurite

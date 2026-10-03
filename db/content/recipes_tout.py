@@ -10,7 +10,6 @@ RECIPES = [
   ("Ballon de baudruche+Eau+Enfant", "Jeu"),  # remplir des ballons d'eau : la bataille de bombes à eau  # lot 1
   ("Berger+Lait", "Fromage"),  # les bergers font le fromage de brebis (roquefort, ossau-iraty)  # lot 1
   ("Biscuit+Chocolat+Lait", "Gâteau"),  # gâteau de biscuits trempés dans le lait, en couches avec du chocolat (classique sans four)  # lot 1
-  ("Bottes de sept lieues+Chat", "Chat botté"),  # clin d'œil : deux contes de Perrault (Le Petit Poucet, Le Maître chat), des bottes pour un chat  # lot 1
   ("Boulanger+Huile", "Beignet"),  # pâte frite dans l'huile chez le boulanger : le beignet  # lot 1
   ("Boulanger+Fruit", "Tarte"),  # la tarte aux fruits de la boulangerie  # lot 1
   ("Bûcheron+Bois", "Cabane"),  # cabane en rondins bâtie par le bûcheron  # lot 1
@@ -39,7 +38,6 @@ RECIPES = [
   ("Hameçon+Lombric+Rivière", "Poisson"),  # un ver sur l'hameçon dans la rivière : on attrape un poisson  # lot 2
   ("Jeux olympiques+Neige", "Ski"),  # le ski est aux Jeux d'hiver depuis Chamonix 1924 (ski de fond, saut)  # lot 2
   ("Glace+Jeux olympiques", "Patin à glace"),  # le patinage artistique est olympique depuis Londres 1908  # lot 2
-  ("Journal+Usine", "Papier"),  # les vieux journaux sont recyclés en usine en papier (pâte désencrée)  # lot 2
   ("Limonade+Rhum", "Cocktail"),  # rhum + eau gazeuse sucrée citronnée : la base du mojito  # lot 2
   ("Maison+Mariage", "Famille"),  # les mariés s'installent sous le même toit : une famille (comme Amour+Maison → Famille)  # lot 2
   ("Brique+Maçon", "Mur"),  # le maçon monte un mur de briques  # lot 2
@@ -61,12 +59,10 @@ RECIPES = [
   ("Griffon+Chevalier", "Blason"),  # le griffon est une figure classique des armoiries médiévales  # lot 3
   ("Crabe+Panier+Mer", "Pêche"),  # le casier à crabes, traditionnellement un panier d'osier immergé (Bretagne)  # lot 3
   ("Crocodile+Zèbre", "Chaîne alimentaire"),  # les crocodiles du Nil attaquent zèbres et gnous à la traversée de la rivière Mara  # lot 3
-  ("Dodo+Musée", "Squelette"),  # disparu vers 1680, le dodo n'est plus connu que par les squelettes exposés dans les musées (Oxford, Port-Louis)  # lot 3
   ("Hibou+Souris", "Os"),  # la pelote de réjection : le hibou recrache poils et os de souris (dissection classique à l'école)  # lot 3
   ("Oiseau marin+Falaise", "Nid"),  # fous, guillemots et mouettes nichent en colonies sur les falaises  # lot 3
   ("Phoque+Ours polaire+Poisson Polaire", "Chaîne alimentaire"),  # la chaîne arctique : morue polaire → phoque annelé → ours polaire  # lot 3
   ("Perroquet+Bateau", "Pirate"),  # clin d'œil : le perroquet de Long John Silver dans « L'Île au trésor » (Stevenson, 1883)  # lot 3
-  ("Pingouin+Pierre", "Amour"),  # les manchots Adélie et papous offrent un galet à la femelle pour la parade nuptiale (en.wikipedia.org/wiki/Pebbling)  # lot 3
   ("Pingouin+Pingouin+Pingouin", "Chaleur"),  # serrés en « tortue », les manchots empereurs montent jusqu'à 37 °C au cœur du groupe (Gilbert et al. 2006)  # lot 3
   ("Ptérodactyle+Calcaire", "Fossile"),  # le premier ptérodactyle fossile a été trouvé dans le calcaire de Solnhofen (Bavière), décrit en 1784  # lot 3
   ("Scorpion+Humain", "Douleur"),  # la piqûre de scorpion est très douloureuse  # lot 3
@@ -125,7 +121,6 @@ RECIPES = [
   ("Fleur+Alcool", "Parfum"),  # un parfum = des essences de fleurs dissoutes dans l'alcool (eau de Cologne, 1709)  # lot 6
   ("Poulie+Montagne+Moteur", "Téléphérique"),  # le câble d'un téléphérique tourne sur de grandes poulies entraînées par un moteur  # lot 6
   ("Puits+Son", "Écho"),  # crier dans un puits : la voix revient du fond  # lot 6
-  ("Pâtes+Corde", "Cadeau"),  # clin d'œil : le collier de nouilles fabriqué à l'école pour la fête des mères  # lot 6
   ("Restaurant+Lit", "Hôtel"),  # le gîte (lit) et le couvert (restaurant) : c'est l'hôtel, l'auberge  # lot 6
   ("Rhum+Bateau", "Pirate"),  # clin d'œil : « Yo-ho-ho, et une bouteille de rhum ! », la chanson des pirates de L'Île au trésor (Stevenson, 1883)  # lot 6
   ("Noix de coco+Rhum", "Cocktail"),  # rhum + lait de coco : la piña colada, le punch coco des Antilles  # lot 6
@@ -134,7 +129,6 @@ RECIPES = [
   ("Sapin de Noël+Cadeau+Enfant", "Joie"),  # le matin de Noël : l'enfant découvre ses cadeaux au pied du sapin  # lot 6
   ("Silex taillé+Bois", "Lance"),  # une pointe de silex fixée au bout d'un bâton : la sagaie préhistorique  # lot 6
   ("Stylo+Guerre", "Paix"),  # on met fin à une guerre en signant un traité, un armistice  # lot 6
-  ("Tarte+Humain", "Rire"),  # clin d'œil : la tarte à la crème en pleine figure, gag des clowns et du burlesque  # lot 6
   ("Trésor+Archéologie", "Musée"),  # les trésors mis au jour par les archéologues finissent au musée (Toutânkhamon au Caire)  # lot 6
   ("Voile+Boussole+Océan", "Grandes découvertes"),  # la caravelle à voiles et la boussole permettent de traverser les océans au XVe s.  # lot 6
   ("Échecs+Riz", "Mathématiques"),  # clin d'œil : la légende de Sissa, un grain sur la 1re case puis on double à chaque case — 2^64−1 grains (légende) — fr.wikipedia.org/wiki/Problème_de_l'échiquier_de_Sissa  # lot 6

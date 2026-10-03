@@ -13,7 +13,6 @@ RECIPES = [
   ("Insecte+Résine", "Ambre"),  # un insecte piégé dans la résine durcie, c'est le célèbre morceau d'ambre
   ("Chien+Neige", "Traîneau"),  # des chiens qui tirent sur la neige : le traîneau à chiens
   ("Or+Roi", "Couronne"),  # l'or posé sur la tête du roi : une couronne
-  ("Sapin de Noël+Père Noël", "Cadeau"),  # le Père Noël dépose les cadeaux au pied du sapin
   ("Dinosaure+Évolution", "Oiseau"),  # les oiseaux descendent des petits dinosaures à plumes (source : fr.wikipedia.org/wiki/Histoire_évolutive_des_oiseaux)
   ("Singe+Évolution", "Humain"),  # l'humain et les grands singes ont un ancêtre commun : c'est l'évolution qui a donné l'humain
   ("Foin+Vêtement", "Épouvantail"),  # des vieux vêtements bourrés de paille, c'est un épouvantail

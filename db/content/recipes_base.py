@@ -21,13 +21,12 @@ RECIPES = [
   ("Plante+Vie", "Chenille"), ("Air+Chenille", "Papillon"), ("Eau+Vie", "Poisson"),
   ("Lumière+Poisson", "Poisson Tropical"), ("Glace+Poisson", "Poisson Polaire"), ("Air+Poisson", "Poisson Volant"),
   ("Océan+Poisson", "Poisson Abyssal"), ("Océan+Vie", "Méduse"),
-  ("Salamandre+Volcan", "Dragon"),
   # magie
   ("Énergie+Vie", "Magie"), ("Air+Vie", "Esprit"), ("Eau+Magie", "Mana"), ("Cristal+Magie", "Orbe"),
   ("Bois+Magie", "Baguette"), ("Énergie+Magie", "Pouvoir"),
   ("Anneau+Pouvoir", "Anneau de Pouvoir"), ("Feu+Magie", "Feu Magique"),
   # créations humaines
-  ("Esprit+Vie", "Humain"), ("Métal+Pierre", "Épée"), ("Arbre+Métal", "Bois"),
+  ("Esprit+Vie", "Humain"), ("Arbre+Métal", "Bois"),
   ("Boue+Feu", "Brique"), ("Bois+Brique", "Maison"),
 
   # ---- recettes à 3 éléments ----
