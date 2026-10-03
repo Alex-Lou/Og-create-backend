@@ -235,3 +235,38 @@ test('l’Expédition a disparu : ni mode de jeu, ni carte, ni routes', async ()
   assert.equal((await api('GET', '/play/regions')).status, 404);
   assert.equal((await api('GET', '/explorer/init', null, player)).status, 404);
 });
+
+test('le Livre ne livre aucun nom d’élément inconnu', async () => {
+  const player = await newPlayer();
+  const { status, data } = await api('GET', '/play/book', null, player);
+  assert.equal(status, 200);
+  assert.equal(data.chapters.length, 7);
+  const pages = data.chapters.flatMap(c => c.pages);
+  assert.ok(pages.some(p => p.status === 'reach'));
+  for (const page of pages.filter(p => p.status === 'reach')) {
+    assert.equal(page.name, undefined);
+    assert.equal(page.emoji, undefined);
+    assert.equal(page.recipe, undefined);
+  }
+  const owned = pages.filter(p => p.status === 'found').map(p => p.name).sort();
+  assert.deepEqual(owned, [...BASE].sort());
+});
+
+test('l’Encre du Livre se paie au serveur, demande un compte, et ne vise qu’une page à portée', async () => {
+  const visitor = await guest();
+  const pageOf = async who => (await api('GET', '/play/book', null, who)).data.chapters.flatMap(c => c.pages).find(p => p.status === 'reach');
+  const free = await api('POST', '/play/ink', { page: (await pageOf(visitor)).id }, visitor);
+  assert.equal(free.status, 402);
+
+  const poor = await newPlayer({ coins: 10 });
+  assert.equal((await api('POST', '/play/ink', { page: (await pageOf(poor)).id }, poor)).status, 400);
+
+  const player = await newPlayer({ coins: 120 });
+  assert.equal((await api('POST', '/play/ink', { page: 'nimporte-quoi' }, player)).status, 404);
+  const page = await pageOf(player);
+  const ink = await api('POST', '/play/ink', { page: page.id }, player);
+  assert.equal(ink.status, 200);
+  assert.ok(BASE.includes(ink.data.ingredient));
+  assert.equal(ink.data.coins, 70);
+  assert.equal(await coinsOf(player), 70);
+});

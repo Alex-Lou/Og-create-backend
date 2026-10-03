@@ -8,13 +8,14 @@ const players = require('../services/players');
 const ledger = require('../services/ledger');
 const achievementService = require('../services/achievementService');
 const trial = require('../services/trial');
+const bookPages = require('../services/bookPages');
 const { verifyAccess, readCookie } = require('../services/authSession');
 const { log } = require('../utils/logger');
 
 const router = express.Router();
 
 const MODES = ['infinite', 'timer'];
-const HELP_PRICE = 50; // piste de l'Infini et joker payant de l'Épreuve
+const HELP_PRICE = 50; // piste de l'Infini, encre du Livre et joker payant de l'Épreuve
 const JOKER_TIME = 30; // secondes ajoutées par le joker de temps
 const MAX_ORIGINS = 3;
 const NAME = /^[^\u0000-\u001f]{1,60}$/;
@@ -82,6 +83,11 @@ router.get('/state', playLimiter, withPlayer(async (req, res, owner, b) => {
     });
 }));
 
+// Le Livre : chapitres et pages ; une page à portée ne révèle jamais le nom de l'élément inconnu
+router.get('/book', playLimiter, withPlayer(async (req, res, owner, b) => {
+    res.json(bookPages.view(b, await players.elements(owner)));
+}));
+
 // Début d'une question de l'Épreuve (services/trial.js) : les éléments en main
 router.post('/run', playLimiter, withPlayer(async (req, res, owner, b) => {
     if (req.body.mode !== 'timer') return res.status(400).json({ message: 'Mode invalide' });
@@ -145,6 +151,18 @@ router.post('/hint', playLimiter, withPlayer(async (req, res, owner, b) => {
     const paid = await pay(owner, 'piste');
     if (paid.status) return res.status(paid.status).json({ message: paid.message });
     res.json({ name: near[Math.floor(Math.random() * near.length)], coins: paid.coins });
+}));
+
+// Encre du Livre : révèle un ingrédient (déjà possédé) d'une page à portée
+router.post('/ink', playLimiter, withPlayer(async (req, res, owner, b) => {
+    const id = String(req.body.page || '');
+    if (!/^[A-Za-z0-9_-]{1,32}$/.test(id)) return res.status(400).json({ message: 'Page invalide' });
+    const target = bookPages.reachableById(b, await players.elements(owner), id);
+    if (!target) return res.status(404).json({ message: 'Cette page n’est pas à portée.' });
+    const paid = await pay(owner, 'encre');
+    if (paid.status) return res.status(paid.status).json({ message: paid.message });
+    const ingredient = target.parts.find(p => !book.BASE_ELEMENTS.includes(p)) || target.parts[0];
+    res.json({ page: id, ingredient, coins: paid.coins });
 }));
 
 // Joker de l'Épreuve : une étape, un ingrédient, ou du temps ; offert s'il en reste, sinon payé
