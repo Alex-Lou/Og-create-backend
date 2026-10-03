@@ -270,9 +270,11 @@ RECIPES = [
   ("Oiseau+Souris", "Hibou"),
   ("Nuit+Oiseau", "Hibou"),
   ("Oiseau+Sagesse", "Hibou"),
-  ("Glace+Oiseau", "Pingouin"),
-  ("Banquise+Oiseau", "Pingouin"),
-  ("Glace+Océan+Oiseau", "Pingouin"),
+  ("Glace+Oiseau", "Manchot"),  # les manchots vivent dans l'hémisphère sud, sur les glaces antarctiques
+  ("Banquise+Oiseau", "Manchot"),  # le manchot empereur se reproduit sur la banquise
+  ("Iceberg+Oiseau", "Manchot"),  # l'image des manchots Adélie posés sur un iceberg
+  ("Glace+Océan+Oiseau", "Manchot"),
+  ("Froid+Oiseau marin", "Pingouin"),  # le pingouin torda, oiseau marin des mers froides de l'Atlantique nord
   ("Graine+Oiseau", "Poule"),
   ("Oiseau+Élevage", "Poule"),
   ("Oiseau+Océan", "Oiseau marin"),
@@ -395,7 +397,7 @@ RECIPES = [
   ("Air+Chenille+Feuille+Temps", "Papillon"),
   ("Espèce+Temps+Écosystème+Évolution", "Biodiversité"),
   ("Dinosaure+Feu+Météore+Poussière", "Extinction"),
-  ("Glace+Océan+Oiseau+Poisson", "Pingouin"),
+  ("Glace+Océan+Oiseau+Poisson", "Manchot"),
   ("Mammifère+Océan+Temps+Évolution", "Baleine"),
   ("Humain+Loup+Maison+Os", "Chien"),
   ("Ferme+Herbe+Lait+Mammifère", "Vache"),

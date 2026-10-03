@@ -63,7 +63,7 @@ RECIPES = [
   ("Oiseau marin+Falaise", "Nid"),  # fous, guillemots et mouettes nichent en colonies sur les falaises  # lot 3
   ("Phoque+Ours polaire+Poisson Polaire", "Chaîne alimentaire"),  # la chaîne arctique : morue polaire → phoque annelé → ours polaire  # lot 3
   ("Perroquet+Bateau", "Pirate"),  # clin d'œil : le perroquet de Long John Silver dans « L'Île au trésor » (Stevenson, 1883)  # lot 3
-  ("Pingouin+Pingouin+Pingouin", "Chaleur"),  # serrés en « tortue », les manchots empereurs montent jusqu'à 37 °C au cœur du groupe (Gilbert et al. 2006)  # lot 3
+  ("Manchot+Manchot+Manchot", "Chaleur"),  # serrés en « tortue », les manchots empereurs font monter l'air du groupe jusqu'à 37,5 °C (Gilbert et al. 2006)  # lot 3
   ("Ptérodactyle+Calcaire", "Fossile"),  # le premier ptérodactyle fossile a été trouvé dans le calcaire de Solnhofen (Bavière), décrit en 1784  # lot 3
   ("Scorpion+Humain", "Douleur"),  # la piqûre de scorpion est très douloureuse  # lot 3
   ("Singe+Fusée", "Astronaute"),  # Albert II (1949) puis le chimpanzé Ham (1961) ont volé dans l'espace avant les humains  # lot 3
