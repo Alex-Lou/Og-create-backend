@@ -89,7 +89,7 @@ router.get('/state', playLimiter, withPlayer(async (req, res, owner, b) => {
 // Le Livre : chapitres et pages ; une page à portée ne révèle jamais le nom de l'élément inconnu
 router.get('/book', playLimiter, withPlayer(async (req, res, owner, b) => {
     const misses = owner.kind === 'user' ? await bookTries.missesByPage(owner.id) : {};
-    res.json({ ...bookPages.view(b, await players.elements(owner), misses), freeInkAfter: bookTries.FREE_INK_AFTER });
+    res.json(bookPages.view(b, await players.elements(owner), misses));
 }));
 
 // Le Monde : l'île du joueur (compte requis : ses écus sont gardés par le serveur)
@@ -155,7 +155,10 @@ router.post('/combine', playLimiter, withPlayer(async (req, res, owner, b) => {
         const aimed = bookPages.aim(b, [...inHand], page, ingredients);
         if (aimed && aimed.name !== result) {
             const misses = owner.kind === 'user' ? await bookTries.record(owner.id, page, book.keyOf(ingredients)) : null;
-            aim = { page, right: aimed.right, of: aimed.of, misses, need: bookTries.FREE_INK_AFTER, freeInk: misses !== null && misses >= bookTries.FREE_INK_AFTER };
+            // Premiers chapitres : l'ingrédient est déjà offert, l'encre n'entre pas en jeu
+            const rules = bookPages.difficultyOf(b.meta.get(aimed.name)?.family);
+            const need = rules.given ? null : rules.freeInkAfter;
+            aim = { page, right: aimed.right, of: aimed.of, misses, need, freeInk: need !== null && misses !== null && misses >= need };
         }
     }
     if (!result) return res.json(aim ? { result: null, aim } : { result: null });
@@ -202,17 +205,18 @@ router.post('/hint', playLimiter, withPlayer(async (req, res, owner, b) => {
 }));
 
 // Encre du Livre : révèle un ingrédient (déjà possédé) d'une page à portée ;
-// offerte après FREE_INK_AFTER mélanges ratés différents sur cette page
+// offerte d'emblée dans les premiers chapitres (l'ingrédient y est déjà donné),
+// ailleurs après quelques mélanges ratés différents sur cette page (barème du chapitre)
 router.post('/ink', playLimiter, withPlayer(async (req, res, owner, b) => {
     const id = String(req.body.page || '');
     if (!PAGE.test(id)) return res.status(400).json({ message: 'Page invalide' });
     const target = bookPages.reachableById(b, await players.elements(owner), id);
     if (!target) return res.status(404).json({ message: 'Cette page n’est pas à portée.' });
-    const free = owner.kind === 'user' && await bookTries.misses(owner.id, id) >= bookTries.FREE_INK_AFTER;
+    const rules = bookPages.difficultyOf(b.meta.get(target.name)?.family);
+    const free = owner.kind === 'user' && (rules.given || await bookTries.misses(owner.id, id) >= rules.freeInkAfter);
     const paid = free ? { coins: await ledger.balance(owner.id) } : await pay(owner, 'encre');
     if (paid.status) return res.status(paid.status).json({ message: paid.message });
-    const ingredient = target.parts.find(p => !book.BASE_ELEMENTS.includes(p)) || target.parts[0];
-    res.json({ page: id, ingredient, coins: paid.coins, free });
+    res.json({ page: id, ingredient: bookPages.telling(target.parts), coins: paid.coins, free });
 }));
 
 // Joker de l'Épreuve : une étape, un ingrédient, ou du temps ; offert s'il en reste, sinon payé
