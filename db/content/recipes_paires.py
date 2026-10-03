@@ -20,7 +20,6 @@ RECIPES = [
   ("Colline+Terre", "Montagne"),                      # encore plus de terre entassée sur la colline : une montagne
   ("Déluge+Déluge", "Inondation"),                    # pluies diluviennes à répétition : tout est inondé
   ("Déluge+Lac", "Inondation"),                       # le lac gonflé par les pluies déborde
-  ("Déluge+Reproduction", "Arche"),                   # clin d'œil : l'arche de Noé (Genèse 6-7) : un couple de chaque espèce pour repeupler la terre après le Déluge (récit biblique)
   ("Eau+Magma", "Geyser"),                            # l'eau souterraine chauffée par le magma jaillit en geyser
   ("Eau+Sédiment", "Boue"),                           # dépôt de terre fine mêlé d'eau : de la boue
   ("Esprit+Fumée", "Génie"),                          # clin d'œil : Les Mille et Une Nuits, « Histoire du pêcheur » : une épaisse fumée sort du vase et devient un génie
@@ -30,8 +29,8 @@ RECIPES = [
   ("Feu+Montagne", "Volcan"),                         # une montagne qui crache du feu
   ("Feu+Marais", "Feu follet"),                       # les feux follets des marais : petites flammes pâles, sans doute des gaz de décomposition (méthane, peut-être phosphine) qui s'enflamment ; l'explication exacte reste une hypothèse
   ("Feu+Pluie", "Vapeur"),                            # la pluie tombe sur le feu : pschitt, l'eau part en vapeur
-  ("Feu+Vie", "Salamandre"),                          # clin d'œil : la salamandre qui vit dans le feu sans brûler, emblème de François Ier à Chambord (légende, déjà chez Pline l'Ancien ; la vraie salamandre aime l'humidité)
-  ("Feu+Reproduction", "Phénix"),                     # clin d'œil : le phénix renaît de ses cendres (légende antique)
+  ("Feu+Vie", "Phénix"),                          # clin d'œil : la salamandre qui vit dans le feu sans brûler, emblème de François Ier à Chambord (légende, déjà chez Pline l'Ancien ; la vraie salamandre aime l'humidité)
+  ("Feu+Naissance", "Phénix"),                     # clin d'œil : le phénix renaît de ses cendres (légende antique)
   ("Geyser+Océan", "Source hydrothermale"),           # un geyser au fond de l'océan : les sources hydrothermales (fumeurs noirs) crachent une eau très chaude chauffée par le magma
   ("Glissement de terrain+Lac", "Vague"),             # un pan de montagne qui tombe dans un lac soulève une vague géante (Vajont, 1963)
   ("Incendie+Pluie", "Fumée"),                        # la pluie éteint l'incendie : le feu noyé se met à fumer
@@ -47,13 +46,10 @@ RECIPES = [
   ("Océan+Poussière", "Sédiment"),                    # la poussière (ex. du Sahara) retombe sur l'océan et se dépose au fond, comme Lac+Poussière → Sédiment
   ("Terre+Île", "Continent"),                         # une île qu'on agrandit de terre devient un continent (suite de Océan+Terre → Île)
   ("Plante+Poussière", "Pollen"),                     # le pollen est la fine poussière jaune des plantes (graminées, conifères…)
-  ("Pluie+Énergie", "Orage"),                         # une pluie chargée d'énergie : l'orage (cf. Éclair+Pluie → Orage)
   ("Reproduction+Vie", "Naissance"),                  # la reproduction d'un être vivant aboutit à une naissance
   ("Sel+Sel", "Cristal"),                             # les grains de sel sont de petits cristaux cubiques (halite)
   ("Sel+Terre", "Désert de sel"),                     # une terre couverte de sel, où rien ne pousse : le désert de sel
   ("Sédiment+Terre", "Sol fertile"),                  # les alluvions déposées sur les terres les rendent fertiles (le limon du Nil)
-  ("Méduse+Pluie", "Parapluie"),                      # clin d'œil : le corps de la méduse s'appelle vraiment l'« ombrelle » ; sous la pluie, elle devient parapluie
-  ("Pierre+Île", "Sculpture"),                        # clin d'œil : les moaï de l'île de Pâques, géants taillés dans la pierre volcanique
   ("Source+Vie", "Élixir"),                           # clin d'œil : la fontaine de Jouvence et son eau qui rend la jeunesse (légende), comme Fontaine+Magie → Élixir
   # ===================== RECETTES À 3 ET 4 INGRÉDIENTS =====================
   ("Humain+Neige", "Bonhomme de neige"),              # on roule des boules de neige et on les empile

@@ -88,13 +88,11 @@ RECIPES = [
   ("Éolienne+Ville", "Réseau électrique"),            # les éoliennes alimentent le réseau de la ville
   ("Antibiotique+Bactérie+Reproduction+Temps", "Évolution"),  # seules les bactéries résistantes survivent et se multiplient : la sélection naturelle en direct
   # ===================== LÉGENDES, HISTOIRE ET COSMOS =====================
-  ("Anneau de Pouvoir+Roi", "Empire"),                # « un anneau pour les gouverner tous » (Tolkien)
   ("Centaure+Enfant", "Héros"),                       # le centaure Chiron élève Achille, Jason, Actéon et en fait des héros (mythe grec)
   ("Chat botté+Ogre", "Château"),                     # Perrault (1697), le chat ruse l'ogre (changé en souris, mangé) et prend son château pour son maître
   ("Démon+Sommeil", "Cauchemar"),                     # « cauche-mare », le démon nocturne (mare) qui foule le dormeur ; c'est l'étymologie du mot
   ("Feu Magique+Oiseau", "Phénix"),                   # l'oiseau qui s'embrase et renaît de son bûcher (Hérodote, Ovide)
   ("Grotte ornée+Archéologie", "Préhistoire"),        # l'étude de Lascaux (1940) ou Chauvet (1994) révèle la vie des humains de la préhistoire
-  ("Génie+Maison", "Château"),                        # Aladin (Mille et Une Nuits, trad. Galland) : le génie de la lampe bâtit en une nuit un palais pour Aladin
   ("Kraken+Bateau", "Épave"),                         # légende scandinave (Pontoppidan, 1752) : le kraken entraîne les navires par le fond
   ("Mana+Cristal", "Orbe"),                           # dans les jeux et contes de fantasy, la réserve d'énergie magique (mana) enfermée dans un cristal en fait un orbe magique
   ("Marée lunaire+Moulin", "Moulin à eau"),           # moulin à marée (Bretagne, dès le Moyen Âge) : le bassin rempli à marée montante fait tourner la roue en se vidant

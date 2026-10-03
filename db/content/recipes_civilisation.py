@@ -77,7 +77,6 @@ RECIPES = [
   # --- Démocratie
   ("Loi+Révolution", "Démocratie"),
   ("Grèce antique+Loi", "Démocratie"),
-  ("Civilisation+Révolution", "Démocratie"),
   ("Civilisation+Loi+Paix+Révolution", "Démocratie"),
   # --- Révolution industrielle
   ("Machine à vapeur+Usine", "Révolution industrielle"),
@@ -173,7 +172,6 @@ RECIPES = [
   ("Langage+Électricité", "Téléphone"),
   # --- Radio
   ("Onde+Son", "Radio"),
-  ("Onde+Téléphone", "Radio"),
   ("Musique+Onde+Électricité", "Radio"),
   # --- Appareil photo
   ("Lentille+Machine", "Appareil photo"),
@@ -233,7 +231,7 @@ RECIPES = [
   ("Explosion+Ère atomique", "Bombe atomique"),
   ("Atome+Explosion", "Bombe atomique"),
   # --- Microscope
-  ("Lentille+Science", "Microscope"),
+  ("Lentille+Laboratoire", "Microscope"),
   ("Lentille+Microbe", "Microscope"),
   # --- Télescope
   ("Lentille+Étoile", "Télescope"),
@@ -267,7 +265,6 @@ RECIPES = [
   # ======================= LÉGENDES =======================
   # --- Mythe (les récits nés de la peur et de l'imaginaire)
   ("Humain+Peur", "Mythe"),
-  ("Humain+Rêve", "Mythe"),
   ("Dragon+Humain", "Mythe"),
   ("Humain+Nuit+Peur", "Mythe"),
   ("Feu de camp+Humain+Nuit+Peur", "Mythe"),
@@ -306,7 +303,6 @@ RECIPES = [
   # --- Géant
   ("Humain+Montagne+Mythe", "Géant"),
   ("Force+Humain+Mythe", "Géant"),
-  ("Golem+Humain", "Géant"),
   # --- Fée
   ("Magie+Papillon", "Fée"),
   ("Fleur+Magie", "Fée"),
@@ -332,7 +328,7 @@ RECIPES = [
   ("Mythe+Océan+Poisson Abyssal", "Kraken"),
   ("Mythe+Océan+Pieuvre+Tempête", "Kraken"),
   # --- Centaure
-  ("Cheval+Mythe", "Centaure"),
+  ("Cheval+Humain", "Centaure"),
   ("Cheval+Humain+Mythe", "Centaure"),
   ("Arc+Cheval+Humain+Mythe", "Centaure"),
   # --- Grimoire

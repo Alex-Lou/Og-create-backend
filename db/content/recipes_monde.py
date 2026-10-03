@@ -1,10 +1,10 @@
 # Recettes : Phénomènes Naturels, Cosmos, Formations Naturelles
 RECIPES = [
   # ===== Météo : chaud, froid, eau dans l'air =====
-  ("Air+Glace", "Froid"), ("Air+Neige", "Froid"), ("Glace+Température", "Froid"), 
-  ("Air+Lave", "Chaleur"), ("Air+Brasier", "Chaleur"), ("Feu+Température", "Chaleur"), ("Air+Infrarouge", "Chaleur"),
+  ("Air+Glace", "Froid"), ("Air+Neige", "Froid"), 
+  ("Air+Lave", "Pierre"), ("Air+Brasier", "Chaleur"), ("Feu+Température", "Chaleur"), ("Air+Infrarouge", "Chaleur"),
   ("Eau+Froid", "Glace"), ("Froid+Lac", "Glace"),
-  ("Froid+Pluie", "Neige"), ("Froid+Nuage", "Neige"), ("Air+Eau+Froid", "Neige"),
+  ("Froid+Pluie", "Verglas"), ("Froid+Nuage", "Neige"), ("Air+Eau+Froid", "Neige"),
   ("Eau+Nuage", "Pluie"), ("Nuage+Nuage", "Pluie"), ("Eau+Gravité+Nuage", "Pluie"),
   ("Vapeur+Vent", "Nuage"), ("Air+Brouillard", "Nuage"), ("Air+Chaleur+Eau", "Nuage"),
   ("Nuage+Terre", "Brouillard"), ("Froid+Vapeur", "Brouillard"), ("Froid+Nuage+Vallée", "Brouillard"),
@@ -36,7 +36,7 @@ RECIPES = [
   ("Chaleur+Forêt+Sécheresse", "Feu de forêt"),
   ("Feu+Poudre à canon", "Explosion"), ("Pression+Vapeur", "Explosion"),
   ("Lumière+Soleil", "Énergie"),
-  ("Ampoule+Électricité", "Lumière"), ("Air+Soleil", "Lumière"),
+  ("Ampoule+Électricité", "Lumière"),
   ("Arbre+Lumière", "Ombre"), ("Lumière+Pierre", "Ombre"), ("Lumière+Montagne", "Ombre"),
   ("Air+Onde", "Son"), ("Air+Explosion", "Son"),
   ("Grotte+Son", "Écho"), ("Montagne+Son", "Écho"), ("Canyon+Son", "Écho"), ("Falaise+Son", "Écho"),
@@ -68,7 +68,7 @@ RECIPES = [
   # ===== Formations : eaux =====
   ("Eau+Eau salée", "Mer"), ("Lac+Sel", "Mer"),
   ("Mer+Mer", "Océan"),
-  ("Eau+Vallée", "Lac"), ("Castor+Rivière", "Lac"), ("Barrage+Rivière", "Lac"), ("Cratère+Eau", "Lac"),
+  ("Eau+Vallée", "Lac"), ("Castor+Rivière", "Barrage"), ("Barrage+Rivière", "Lac"), ("Cratère+Eau", "Lac"),
   ("Eau+Montagne", "Rivière"), ("Montagne+Pluie", "Rivière"), ("Chaleur+Glacier", "Rivière"),
   
   ("Eau+Colline", "Source"), ("Grotte+Rivière", "Source"),
@@ -90,7 +90,7 @@ RECIPES = [
   ("Calcaire+Eau+Montagne+Temps", "Grotte"),
   ("Eau+Grotte", "Stalactite"), ("Calcaire+Grotte", "Stalactite"), 
   ("Calcaire+Eau+Grotte+Temps", "Stalactite"),
-  ("Érosion+Colline", "Plaine"), ("Rivière+Terre", "Plaine"), ("Inondation+Rivière+Terre", "Plaine"),
+  ("Érosion+Colline", "Plaine"), ("Inondation+Rivière+Terre", "Plaine"),
   ("Mer+Montagne+Plaine", "Continent"),
   ("Mer+Volcan", "Île"), ("Lave+Océan+Temps", "Île"),
 
@@ -136,7 +136,7 @@ RECIPES = [
   ("Météore+Lune", "Cratère"),
   ("Espace+Glace", "Comète"), ("Astéroïde+Glace", "Comète"), ("Astéroïde+Espace+Glace+Poussière", "Comète"),
   ("Planète+Soleil", "Orbite"), ("Gravité+Mouvement", "Orbite"), 
-  ("Orbite+Planète", "Lune"), ("Astéroïde+Orbite", "Lune"), ("Orbite+Planète Terre+Pierre", "Lune"),
+  ("Orbite+Planète", "Lune"), ("Orbite+Planète Terre+Pierre", "Lune"),
   ("Explosion+Orbite+Planète+Planète Terre", "Lune"),
   ("Lune+Soleil", "Éclipse"), ("Ombre+Soleil", "Éclipse"), ("Lune+Ombre+Planète Terre", "Éclipse"),
   ("Lune+Ombre+Planète Terre+Soleil", "Éclipse"),

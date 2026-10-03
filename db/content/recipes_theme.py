@@ -30,7 +30,7 @@ RECIPES = [
   ("Forêt+Herbe+Mammifère", "Cerf"),               # l'herbivore des forêts
   ("Eau+Oiseau", "Canard"),                        # l'oiseau qui nage
   ("Cheval+Savane", "Zèbre"),                      # le cousin rayé du cheval, dans la savane
-  ("Jungle+Lion", "Tigre"),                        # le grand félin des jungles d'Asie
+  ("Chat+Jungle", "Tigre"),                        # le grand félin des jungles d'Asie
   ("Banquise+Mammifère", "Phoque"),                # le mammifère de la banquise
   ("Jungle+Oiseau", "Perroquet"),                  # l'oiseau des forêts tropicales
   ("Langage+Oiseau", "Perroquet"),                 # l'oiseau qui parle
