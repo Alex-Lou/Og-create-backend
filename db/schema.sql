@@ -294,6 +294,34 @@ CREATE TABLE IF NOT EXISTS world_tiles (
 );
 ALTER TABLE progress ADD COLUMN IF NOT EXISTS world_collected_at TIMESTAMPTZ;
 
+-- Le Monde v2 : stock de ressources et parties de Récolte, chantiers construits, parties jouées
+CREATE TABLE IF NOT EXISTS world_stock (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    stone INTEGER NOT NULL DEFAULT 0 CHECK (stone >= 0),
+    wood INTEGER NOT NULL DEFAULT 0 CHECK (wood >= 0),
+    water INTEGER NOT NULL DEFAULT 0 CHECK (water >= 0),
+    food INTEGER NOT NULL DEFAULT 0 CHECK (food >= 0),
+    charges SMALLINT NOT NULL DEFAULT 3 CHECK (charges >= 0),
+    charges_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    collected_at TIMESTAMPTZ
+);
+CREATE TABLE IF NOT EXISTS world_buildings (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    site VARCHAR(20) NOT NULL,
+    level SMALLINT NOT NULL CHECK (level > 0),
+    built_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, site)
+);
+CREATE TABLE IF NOT EXISTS world_runs (
+    id BIGSERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    seed INTEGER NOT NULL,
+    config JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    finished_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_world_runs_user ON world_runs (user_id, created_at);
+
 -- Le Livre : mélanges ratés sur une page à portée (l'encre de la page devient offerte après quelques essais différents)
 CREATE TABLE IF NOT EXISTS book_tries (
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
