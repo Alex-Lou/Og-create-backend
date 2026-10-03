@@ -29,7 +29,8 @@ function recipesWithin(b, have) {
     return out;
 }
 
-function view(b, owned) {
+// misses : essais ratés par page (compte seulement), pour l'encre offerte
+function view(b, owned, misses = {}) {
     const have = new Set(owned);
     const within = recipesWithin(b, have);
     const stars = owned.filter(name => !BASE_ELEMENTS.includes(name) && b.meta.has(name)).length;
@@ -51,8 +52,12 @@ function view(b, owned) {
                 found++;
                 pages.push({ id: pageId(name), status: 'found', name, emoji: info.emoji, family: info.family, recipe: BASE_ELEMENTS.includes(name) ? null : within.get(name) || null });
             } else if (within.has(name)) {
-                const clue = within.get(name).map(part => b.meta.get(part)?.family).filter(Boolean);
-                pages.push({ id: pageId(name), status: 'reach', family: info.family, letters: [...name].length, clue });
+                const parts = within.get(name);
+                const id = pageId(name);
+                const clue = parts.map(part => b.meta.get(part)?.family).filter(Boolean);
+                // groups : même numéro = même ingrédient (Eau + Eau → [0, 0]), sans dire lequel
+                const groups = parts.map(part => [...new Set(parts)].indexOf(part));
+                pages.push({ id, status: 'reach', family: info.family, letters: [...name].length, first: [...name][0], clue, groups, misses: misses[id] || 0 });
             } else {
                 far++;
             }
@@ -71,4 +76,32 @@ function reachableById(b, owned, id) {
     return null;
 }
 
-module.exports = { CHAPTERS, view, reachableById, pageId };
+// Ingrédients communs à deux mélanges (Eau + Eau contre Eau + Air : 1)
+function overlap(tried, parts) {
+    const left = [...parts];
+    let count = 0;
+    for (const part of tried) {
+        const at = left.indexOf(part);
+        if (at >= 0) {
+            left.splice(at, 1);
+            count++;
+        }
+    }
+    return count;
+}
+
+// Essai visé sur une page à portée : ingrédients justes, comparés à la recette possédée la plus proche
+// (même nombre d'ingrédients d'abord). Le nom ne sort pas d'ici sauf pour savoir si la page est trouvée.
+function aim(b, owned, id, tried) {
+    const have = new Set(owned);
+    let best = null;
+    for (const [parts, result] of b.entries) {
+        if (have.has(result) || !parts.every(p => have.has(p)) || pageId(result) !== id) continue;
+        const candidate = { name: result, right: overlap(tried, parts), of: parts.length };
+        const fits = c => (c.of === tried.length ? 1 : 0);
+        if (!best || fits(candidate) > fits(best) || (fits(candidate) === fits(best) && candidate.right > best.right)) best = candidate;
+    }
+    return best;
+}
+
+module.exports = { CHAPTERS, view, reachableById, pageId, aim };
