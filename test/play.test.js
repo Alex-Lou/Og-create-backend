@@ -1,10 +1,7 @@
 // Serveur de jeu : les recettes ne sortent jamais, seul un mélange réussi enrichit un carnet
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { startServer, api, sql, newPlayer, coinsOf, randomPassword, recipeBook } = require('./helpers');
-const { combine } = require('../src/services/recipeBook');
-const path = require('node:path');
-const REGIONS = require(path.join(__dirname, '../src/public/data/regionChallenges.json')).regions;
+const { startServer, api, sql, newPlayer, coinsOf, randomPassword } = require('./helpers');
 
 const BASE = ['Eau', 'Feu', 'Terre', 'Air'];
 
@@ -156,20 +153,6 @@ test('un joker d’étape montre une fusion faisable avec les éléments en main
   assert.equal(step.reply.freeJokers, 1);
 });
 
-test('l’Expédition : compte requis, région visitée, éléments de la région seulement', async () => {
-  assert.equal((await api('POST', '/play/run', { mode: 'explorer', regionId: 1 }, await guest())).status, 401);
-  const player = await newPlayer();
-  await api('GET', '/explorer/init', null, player);
-  assert.equal((await api('POST', '/play/run', { mode: 'explorer', regionId: 1 }, player)).status, 403);
-  await api('POST', '/explorer/visit/1', {}, player);
-  const run = await api('POST', '/play/run', { mode: 'explorer', regionId: 1 }, player);
-  assert.equal(run.status, 200);
-  assert.ok(run.data.elements.length >= 2 && run.data.required.length >= 1);
-  assert.equal((await api('POST', '/play/run', { mode: 'explorer', regionId: 999 }, player)).status, 404);
-  const outside = await api('POST', '/play/combine', { mode: 'explorer', ingredients: [secret, run.data.elements[0]] }, player);
-  assert.equal(outside.status, 403);
-});
-
 // Une question qu'une seule fusion des éléments de départ résout, avec la recette qui la résout
 async function oneStepQuestion() {
   const rules = await sql(`SELECT r.key, r.value FROM game_data g, jsonb_each_text(g.rules->'rules') r WHERE g.active`);
@@ -245,64 +228,10 @@ test('l’Épreuve : le bonus de record vient du score compté par le serveur', 
   assert.equal((await api('POST', '/coins/claim/timer-record', { level: q.level, score: 9 }, player)).status, 404);
 });
 
-test('la carte de l’Expédition ne livre ni les éléments ni les règles de combat', async () => {
-  const { data } = await api('GET', '/play/regions');
-  assert.equal(data.regions.length, REGIONS.length);
-  for (const region of data.regions) {
-    for (const key of ['requiredElements', 'availableElements', 'damagePerElement', 'bossCombatRules', 'elementsWithGifs']) {
-      assert.equal(region[key], undefined, `${region.id} ${key}`);
-    }
-  }
+test('l’Expédition a disparu : ni mode de jeu, ni carte, ni routes', async () => {
   const player = await newPlayer();
-  const listed = (await api('GET', '/explorer/regions', null, player)).data;
-  assert.ok(listed.length > 0 && listed.every(r => r.unlocked_elements === undefined));
-});
-
-test('l’Expédition : le gardien se bat sur le serveur, sa victoire se mérite', async () => {
-  const boss = REGIONS.find(r => r.is_boss && r.maxHealth);
-  const player = await newPlayer();
-  await api('GET', '/explorer/init', null, player);
-  await sql(`INSERT INTO user_regions (user_id, region_id, visited) VALUES ($1, $2, TRUE)
-             ON CONFLICT (user_id, region_id) DO UPDATE SET visited = TRUE`, [player.userId, boss.id]);
-  const run = await api('POST', '/play/run', { mode: 'explorer', regionId: boss.id }, player);
-  assert.deepEqual(run.data.boss, { bossHp: boss.maxHealth, playerHp: boss.maxHealth, maxHealth: boss.maxHealth });
-
-  // Victoire déclarée sans combat : refusée, rien n'est versé
-  assert.equal((await api('POST', `/explorer/complete/${boss.id}`, { isBossVictory: true }, player)).status, 403);
-  assert.equal((await api('POST', `/explorer/complete/${boss.id}`, {}, player)).status, 403);
-  assert.equal(await coinsOf(player), 0);
-
-  // Un mélange raté coûte des points de vie
-  const book = await recipeBook();
-  const pairs = run.data.elements.flatMap(x => run.data.elements.map(y => [x, y]));
-  const miss = pairs.find(p => !combine(book, p));
-  const hit = pairs.find(p => combine(book, p));
-  const missed = await api('POST', '/play/combine', { mode: 'explorer', ingredients: miss }, player);
-  assert.equal(missed.data.fight.playerHp, boss.maxHealth - 10);
-
-  // Le gardien tombe sous les coups (préparé presque vaincu), la victoire est payée une fois
-  await sql(`UPDATE play_runs SET boss_hp = 1 WHERE owner = $1 AND mode = 'explorer'`, [`u:${player.userId}`]);
-  const blow = await api('POST', '/play/combine', { mode: 'explorer', ingredients: hit }, player);
-  assert.equal(blow.data.fight.defeated, true);
-  assert.equal((await api('POST', '/play/combine', { mode: 'explorer', ingredients: hit }, player)).status, 409);
-  const won = await api('POST', `/explorer/complete/${boss.id}`, { isBossVictory: true }, player);
-  assert.equal(won.status, 200);
-  const [{ coin_reward: reward }] = await sql('SELECT coin_reward FROM explorer_regions WHERE id = $1', [boss.id]);
-  assert.equal(await coinsOf(player), reward);
-});
-
-test('l’Expédition : un joueur vaincu ne peut plus frapper ni réclamer', async () => {
-  const boss = REGIONS.find(r => r.is_boss && r.maxHealth);
-  const player = await newPlayer();
-  await api('GET', '/explorer/init', null, player);
-  await sql(`INSERT INTO user_regions (user_id, region_id, visited) VALUES ($1, $2, TRUE)
-             ON CONFLICT (user_id, region_id) DO UPDATE SET visited = TRUE`, [player.userId, boss.id]);
-  const run = await api('POST', '/play/run', { mode: 'explorer', regionId: boss.id }, player);
-  const book = await recipeBook();
-  const miss = run.data.elements.flatMap(x => run.data.elements.map(y => [x, y])).find(p => !combine(book, p));
-  await sql(`UPDATE play_runs SET player_hp = 5 WHERE owner = $1 AND mode = 'explorer'`, [`u:${player.userId}`]);
-  const lost = await api('POST', '/play/combine', { mode: 'explorer', ingredients: miss }, player);
-  assert.equal(lost.data.fight.lost, true);
-  assert.equal((await api('POST', '/play/combine', { mode: 'explorer', ingredients: miss }, player)).status, 409);
-  assert.equal((await api('POST', `/explorer/complete/${boss.id}`, { isBossVictory: true }, player)).status, 403);
+  assert.equal((await api('POST', '/play/run', { mode: 'explorer', regionId: 1 }, player)).status, 400);
+  assert.equal((await api('POST', '/play/combine', { mode: 'explorer', ingredients: ['Eau', 'Feu'] }, player)).status, 400);
+  assert.equal((await api('GET', '/play/regions')).status, 404);
+  assert.equal((await api('GET', '/explorer/init', null, player)).status, 404);
 });
