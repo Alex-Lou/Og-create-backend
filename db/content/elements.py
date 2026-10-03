@@ -8,7 +8,7 @@ FAMILIES = {
 
   "Matériaux": {
     "Boue": "🟤", "Lave": "svg:lave", "Vapeur": "svg:vapeur", "Poussière": "svg:poussiere", "Fumée": "🌫️",
-    "Pierre": "🪨", "Sable": "⏳", "Cendre": "⚱️", "Métal": "svg:metal", "Verre": "svg:verre",
+    "Pierre": "🪨", "Sable": "svg:sable", "Cendre": "⚱️", "Métal": "svg:metal", "Verre": "svg:verre",
     "Cristal": "💎", "Magma": "svg:magma",
     "Argile": "svg:argile", "Charbon": "svg:charbon", "Sel": "🧂", "Fer": "🔩", "Cuivre": "🟧", "Or": "🥇",
     "Argent": "🥈", "Étain": "svg:etain", "Bronze": "🥉", "Acier": "🗡️", "Plomb": "🔘",
@@ -26,6 +26,7 @@ FAMILIES = {
   },
 
   "Phénomènes Naturels": {
+    "Pollution": "svg:pollution",
     "Pluie": "🌧️", "Nuage": "☁️", "Énergie": "⚡", "Vent": "🌬️", "Bourrasque": "svg:bourrasque",
     "Tempête": "svg:tempete", "Éclair": "🌩️", "Tornade": "🌪️", "Explosion": "💥", "Incendie": "🚒",
     "Brasier": "svg:brasier", "Geyser": "svg:geyser", "Vague": "🏄", "Ozone": "🔵", "Lumière": "☀️",
@@ -156,6 +157,8 @@ FAMILIES = {
   },
 
   "Créations Humaines": {
+    "Aquarium": "svg:aquarium", "Couronne": "svg:couronne", "Igloo": "svg:igloo", "Sablier": "svg:sablier", "Serre": "svg:serre",
+    "Tirelire": "svg:tirelire", "Parasol": "svg:parasol", "Zoo": "svg:zoo", "Allumette": "svg:allumette",
     "Humain": "🧑", "Héros": "🦸", "Épée": "⚔️", "Brique": "🧱", "Maison": "🏠",
     "Chevalier": "🛡️", "Château": "🏰", "Ville": "🏙️", "Arche": "🚢",
     "Outil": "🛠️", "Hache": "🪓", "Marteau": "🔨", "Lance": "🔱", "Arc": "🏹", "Roue": "🛞",
@@ -227,6 +230,7 @@ FAMILIES = {
   },
 
   "Légendes": {
+    "Sphinx": "svg:sphinx",
     "Magie": "✨", "Esprit": "svg:esprit", "Mana": "svg:mana", "Orbe": "🔮", "Baguette": "🪄",
     "Pouvoir": "⚜️", "Anneau": "💍", "Anneau de Pouvoir": "svg:anneau-de-pouvoir", "Feu Magique": "🎇",
     "Potion": "svg:potion", "Élixir": "svg:elixir", "Golem": "svg:golem", "Licorne": "🦄", "Sorcier": "🧙",
