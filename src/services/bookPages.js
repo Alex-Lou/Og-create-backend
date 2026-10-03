@@ -57,7 +57,7 @@ function view(b, owned) {
                 far++;
             }
         }
-        return { id: chapter.id, name: chapter.name, need: chapter.need, open, total: names.length, found, far, pages: open ? pages : [] };
+        return { id: chapter.id, name: chapter.name, families: chapter.families, need: chapter.need, open, total: names.length, found, far, pages: open ? pages : [] };
     });
     return { stars, chapters };
 }
