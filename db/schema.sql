@@ -278,6 +278,22 @@ CREATE TABLE IF NOT EXISTS coin_ledger (
 );
 CREATE INDEX IF NOT EXISTS idx_coin_ledger_user ON coin_ledger (user_id, created_at);
 
+-- ---------------------------------------------------------------------
+-- Le Monde (services/world.js) : objets posés sur l'île du joueur.
+-- Un élément n'est posé qu'une fois ; une case ne porte qu'un objet.
+-- world_collected_at : dernière récolte des écus produits par l'île.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS world_tiles (
+    user_id    INTEGER      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    x          SMALLINT     NOT NULL CHECK (x >= 0),
+    y          SMALLINT     NOT NULL CHECK (y >= 0),
+    element    VARCHAR(100) NOT NULL,
+    placed_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, x, y),
+    CONSTRAINT uq_world_tiles_element UNIQUE (user_id, element)
+);
+ALTER TABLE progress ADD COLUMN IF NOT EXISTS world_collected_at TIMESTAMPTZ;
+
 -- Garde-fou : ni solde ni énergie négatifs (NOT VALID : contrôle les écritures futures sans bloquer sur l'existant)
 DO $$
 BEGIN

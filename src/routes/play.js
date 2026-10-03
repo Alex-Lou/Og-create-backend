@@ -9,6 +9,7 @@ const ledger = require('../services/ledger');
 const achievementService = require('../services/achievementService');
 const trial = require('../services/trial');
 const bookPages = require('../services/bookPages');
+const world = require('../services/world');
 const { verifyAccess, readCookie } = require('../services/authSession');
 const { log } = require('../utils/logger');
 
@@ -86,6 +87,37 @@ router.get('/state', playLimiter, withPlayer(async (req, res, owner, b) => {
 // Le Livre : chapitres et pages ; une page à portée ne révèle jamais le nom de l'élément inconnu
 router.get('/book', playLimiter, withPlayer(async (req, res, owner, b) => {
     res.json(bookPages.view(b, await players.elements(owner)));
+}));
+
+// Le Monde : l'île du joueur (compte requis : ses écus sont gardés par le serveur)
+const ACCOUNT_ONLY = { message: 'Ton île t’attend : crée un compte pour la bâtir.', code: 'ACCOUNT' };
+async function worldView(owner, b) {
+    const owned = await players.elements(owner);
+    return world.view(owner.id, owned.length - book.BASE_ELEMENTS.length, names => book.describe(b, names));
+}
+router.get('/world', playLimiter, withPlayer(async (req, res, owner, b) => {
+    if (owner.kind !== 'user') return res.status(402).json(ACCOUNT_ONLY);
+    res.json(await worldView(owner, b));
+}));
+router.post('/world/place', playLimiter, withPlayer(async (req, res, owner, b) => {
+    if (owner.kind !== 'user') return res.status(402).json(ACCOUNT_ONLY);
+    const { element } = req.body;
+    if (typeof element !== 'string' || !NAME.test(element)) return res.status(400).json({ message: 'Élément invalide' });
+    const placed = await world.place(owner.id, await players.elements(owner), element, Number(req.body.x), Number(req.body.y));
+    if (placed.status) return res.status(placed.status).json({ message: placed.message });
+    res.json(await worldView(owner, b));
+}));
+router.post('/world/remove', playLimiter, withPlayer(async (req, res, owner, b) => {
+    if (owner.kind !== 'user') return res.status(402).json(ACCOUNT_ONLY);
+    const x = Number(req.body.x), y = Number(req.body.y);
+    if (![x, y].every(v => Number.isInteger(v) && v >= 0 && v < 32)) return res.status(400).json({ message: 'Case invalide' });
+    await world.remove(owner.id, x, y);
+    res.json(await worldView(owner, b));
+}));
+router.post('/world/collect', playLimiter, withPlayer(async (req, res, owner, b) => {
+    if (owner.kind !== 'user') return res.status(402).json(ACCOUNT_ONLY);
+    const { gained, coins } = await world.collect(owner.id);
+    res.json({ gained, coins, world: await worldView(owner, b) });
 }));
 
 // Début d'une question de l'Épreuve (services/trial.js) : les éléments en main
