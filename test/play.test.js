@@ -374,11 +374,13 @@ test('le Monde : compte requis, pose d’éléments possédés, déplacement et 
   const player = await newPlayer();
   const start = await api('GET', '/play/world', null, player);
   assert.equal(start.status, 200);
-  assert.equal(start.data.size, 6);
+  assert.equal(start.data.size, 14);
   assert.deepEqual(start.data.tiles, []);
 
   assert.equal((await api('POST', '/play/world/place', { element: 'Dragon', x: 0, y: 0 }, player)).status, 403);
-  assert.equal((await api('POST', '/play/world/place', { element: 'Eau', x: 6, y: 0 }, player)).status, 400);
+  assert.equal((await api('POST', '/play/world/place', { element: 'Eau', x: 14, y: 0 }, player)).status, 400);
+  // La place d'un chantier (le Foyer au centre) ne prend pas de décoration
+  assert.equal((await api('POST', '/play/world/place', { element: 'Eau', x: 6, y: 6 }, player)).status, 400);
   const placed = await api('POST', '/play/world/place', { element: 'Eau', x: 1, y: 2 }, player);
   assert.equal(placed.status, 200);
   assert.deepEqual(placed.data.tiles.map(t => [t.element, t.x, t.y]), [['Eau', 1, 2]]);
@@ -406,4 +408,122 @@ test('le Monde : la récolte paie les écus produits, une seule fois', async () 
   assert.equal(first.data.gained + second.data.gained, 6);
   assert.equal(await coinsOf(player), 6);
   assert.equal((await api('GET', '/play/world', null, player)).data.pending, 0);
+});
+
+// Première chaîne jouable d'un plateau (recherche en profondeur), pour jouer comme un joueur
+function firstChain(board) {
+  for (let y = 0; y < 6; y++) {
+    for (let x = 0; x < 6; x++) {
+      const path = [[x, y]];
+      const seen = new Set([y * 6 + x]);
+      const extend = () => {
+        if (path.length >= 3) return true;
+        const [cx, cy] = path[path.length - 1];
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const nx = cx + dx, ny = cy + dy;
+            if (nx < 0 || ny < 0 || nx > 5 || ny > 5 || seen.has(ny * 6 + nx) || board[ny][nx] !== board[y][x]) continue;
+            seen.add(ny * 6 + nx);
+            path.push([nx, ny]);
+            if (extend()) return true;
+            path.pop();
+            seen.delete(ny * 6 + nx);
+          }
+        }
+        return false;
+      };
+      if (extend()) return path;
+    }
+  }
+  return null;
+}
+function playRun(run, count) {
+  const h = require('../src/services/harvest');
+  const game = h.create(run.seed, run.kinds);
+  const moves = [];
+  for (let i = 0; i < count; i++) {
+    const path = firstChain(game.board);
+    moves.push(path);
+    h.play(game, path);
+  }
+  return { moves, expected: h.replay(run.seed, run.kinds, moves, run.maxMoves, run.boosts).gains };
+}
+
+test('le Monde : la Récolte se joue contre une partie de la réserve, rejouée et payée une seule fois', async () => {
+  const visitor = await guest();
+  assert.equal((await api('POST', '/play/world/harvest/start', {}, visitor)).status, 402);
+
+  const player = await newPlayer();
+  const view = (await api('GET', '/play/world', null, player)).data;
+  assert.deepEqual(view.stock, { stone: 0, wood: 0, water: 0, food: 0 });
+  assert.equal(view.charges.count, 3);
+  assert.equal(view.harvest.maxMoves, 15);
+
+  const runs = [];
+  for (let i = 0; i < 3; i++) runs.push((await api('POST', '/play/world/harvest/start', {}, player)).data);
+  assert.equal((await api('POST', '/play/world/harvest/start', {}, player)).status, 409);
+  assert.ok(Number.isInteger(runs[0].seed) && runs[0].kinds.length === 4);
+
+  // Partie jouée : le gain est celui que le serveur recalcule ; la rendre deux fois ne paie qu'une fois
+  const { moves, expected } = playRun(runs[0], 6);
+  const [a, b] = await Promise.all([
+    api('POST', '/play/world/harvest/finish', { run: runs[0].id, moves }, player),
+    api('POST', '/play/world/harvest/finish', { run: runs[0].id, moves }, player)
+  ]);
+  assert.deepEqual([a.status, b.status].sort(), [200, 404]);
+  const paid = a.status === 200 ? a : b;
+  assert.deepEqual(paid.data.gains, expected);
+  assert.deepEqual(paid.data.world.stock, expected);
+
+  // Coups truqués : partie refusée et perdue
+  const cheat = await api('POST', '/play/world/harvest/finish', { run: runs[1].id, moves: [[[0, 0], [0, 1]]] }, player);
+  assert.equal(cheat.status, 400);
+  assert.equal((await api('POST', '/play/world/harvest/finish', { run: runs[1].id, moves: [] }, player)).status, 404);
+  // La partie d'un autre joueur ne se rend pas
+  const other = await newPlayer();
+  assert.equal((await api('POST', '/play/world/harvest/finish', { run: runs[2].id, moves: [] }, other)).status, 404);
+
+  // Réserve : une partie revient toutes les 30 minutes
+  await sql(`UPDATE world_stock SET charges = 0, charges_at = NOW() - INTERVAL '65 minutes' WHERE user_id = $1`, [player.userId]);
+  assert.equal((await api('GET', '/play/world', null, player)).data.charges.count, 2);
+});
+
+test('le Monde : un chantier demande son plan du Livre et ses ressources, puis change l’île', async () => {
+  const player = await newPlayer();
+  const siteOf = (world, id) => world.sites.find(s => s.id === id);
+  const start = (await api('GET', '/play/world', null, player)).data;
+  assert.equal(siteOf(start, 'foyer').level, 1);
+  const carriere = siteOf(start, 'carriere');
+  assert.equal(carriere.level, 0);
+  assert.equal(carriere.next.plan, 'Pierre');
+  assert.equal(carriere.next.planOwned, false);
+  assert.deepEqual(carriere.next.cost, { wood: 5 });
+
+  assert.equal((await api('POST', '/play/world/build', { site: 'carriere' }, player)).status, 403);
+  await sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Pierre", "Four"]'::jsonb WHERE user_id = $1`, [player.userId]);
+  assert.equal((await api('POST', '/play/world/build', { site: 'carriere' }, player)).status, 400);
+  assert.equal((await api('POST', '/play/world/build', { site: 'nimporte' }, player)).status, 404);
+
+  await sql('UPDATE world_stock SET wood = 7 WHERE user_id = $1', [player.userId]);
+  const built = await api('POST', '/play/world/build', { site: 'carriere' }, player);
+  assert.equal(built.status, 200);
+  assert.equal(built.data.built, 'Carrière');
+  assert.equal(built.data.world.stock.wood, 2);
+  assert.equal(siteOf(built.data.world, 'carriere').level, 1);
+  assert.deepEqual(built.data.world.harvest.boosts, { stone: 2 });
+  assert.equal((await api('POST', '/play/world/build', { site: 'carriere' }, player)).status, 409);
+
+  // L'Atelier ajoute 3 coups ; deux constructions simultanées ne paient pas deux fois
+  await sql('UPDATE world_stock SET stone = 15, wood = 10 WHERE user_id = $1', [player.userId]);
+  const both = await Promise.all([
+    api('POST', '/play/world/build', { site: 'atelier' }, player),
+    api('POST', '/play/world/build', { site: 'atelier' }, player)
+  ]);
+  assert.deepEqual(both.map(r => r.status).sort(), [200, 409]);
+  const after = (await api('GET', '/play/world', null, player)).data;
+  assert.equal(after.harvest.maxMoves, 18);
+  assert.deepEqual(after.stock, { stone: 0, wood: 0, water: 0, food: 0 });
+  // La Cabane demande son plan
+  await sql('UPDATE world_stock SET stone = 10, wood = 20 WHERE user_id = $1', [player.userId]);
+  assert.equal((await api('POST', '/play/world/build', { site: 'foyer' }, player)).status, 403);
 });

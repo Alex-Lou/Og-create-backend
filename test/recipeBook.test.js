@@ -110,16 +110,33 @@ test('le Livre : difficulté par chapitre (pages ouvertes, profondeur, plateau, 
   assert.ok(outil.tray.includes('Matière0') && outil.tray.includes('Terre'));
 });
 
-test('le Monde : taille de l’île et écus en attente plafonnés', () => {
-  const { sizeFor, pendingOf, CAP_HOURS } = require('../src/services/world');
-  assert.equal(sizeFor(0), 6);
-  assert.equal(sizeFor(40), 7);
-  assert.equal(sizeFor(1000), 10);
+test('le Monde : écus en attente plafonnés, parties qui reviennent, effets des bâtiments', () => {
+  const { pendingOf, chargesAt, effectsOf, isFree, CAP_HOURS, REGEN_MS } = require('../src/services/world');
   const now = Date.parse('2026-10-03T12:00:00Z');
   const hoursAgo = h => new Date(now - h * 3600000).toISOString();
   const tiles = [{ placed_at: hoursAgo(3) }, { placed_at: hoursAgo(20) }];
   // 3 h + réservoir plein (8 h) pour le second
   assert.equal(pendingOf(tiles, null, now), 3 + CAP_HOURS);
-  // Après une récolte il y a 1 h, chacun repart de là
+  // Après une récolte il y a 1 h, chacun repart de là ; le Foyer (Cabane) produit 2 écus par heure
   assert.equal(pendingOf(tiles, hoursAgo(1), now), 2);
+  assert.equal(pendingOf([...tiles, { placed_at: hoursAgo(2), rate: 2 }], hoursAgo(1), now), 4);
+
+  // Parties : une toutes les 30 min, plafonnées ; la progression partielle est gardée
+  const stock = { charges: 0, charges_at: new Date(now - REGEN_MS * 1.5).toISOString() };
+  assert.deepEqual(chargesAt(stock, 3, now), { count: 1, since: now - REGEN_MS * 0.5 });
+  assert.equal(chargesAt({ charges: 2, charges_at: hoursAgo(5) }, 3, now).count, 3);
+
+  // Effets : Foyer seul, puis Maison, Atelier, Ponton, Carrière
+  assert.deepEqual(effectsOf({ foyer: 1 }), { maxCharges: 3, maxMoves: 15, kinds: ['stone', 'wood', 'water', 'food'], boosts: {}, foyerRate: 0 });
+  const grown = effectsOf({ foyer: 3, atelier: 1, ponton: 1, carriere: 1 });
+  assert.equal(grown.maxCharges, 5);
+  assert.equal(grown.maxMoves, 18);
+  assert.ok(grown.kinds.includes('fish'));
+  assert.deepEqual(grown.boosts, { stone: 2 });
+  assert.equal(grown.foyerRate, 4);
+
+  // Les places de chantier ne prennent pas de décoration
+  assert.equal(isFree(6, 6), false);
+  assert.equal(isFree(0, 0), true);
+  assert.equal(isFree(14, 0), false);
 });
