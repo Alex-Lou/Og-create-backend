@@ -59,3 +59,17 @@ test('le Livre : pages trouvées, pages à portée sans nom, chapitres scellés'
   assert.deepEqual(vapeur.recipe, ['Eau', 'Feu']);
   assert.equal(after.stars, 1);
 });
+
+test('le Monde : taille de l’île et écus en attente plafonnés', () => {
+  const { sizeFor, pendingOf, CAP_HOURS } = require('../src/services/world');
+  assert.equal(sizeFor(0), 6);
+  assert.equal(sizeFor(40), 7);
+  assert.equal(sizeFor(1000), 10);
+  const now = Date.parse('2026-10-03T12:00:00Z');
+  const hoursAgo = h => new Date(now - h * 3600000).toISOString();
+  const tiles = [{ placed_at: hoursAgo(3) }, { placed_at: hoursAgo(20) }];
+  // 3 h + réservoir plein (8 h) pour le second
+  assert.equal(pendingOf(tiles, null, now), 3 + CAP_HOURS);
+  // Après une récolte il y a 1 h, chacun repart de là
+  assert.equal(pendingOf(tiles, hoursAgo(1), now), 2);
+});

@@ -270,3 +270,44 @@ test('l’Encre du Livre se paie au serveur, demande un compte, et ne vise qu’
   assert.equal(ink.data.coins, 70);
   assert.equal(await coinsOf(player), 70);
 });
+
+test('le Monde : compte requis, pose d’éléments possédés, déplacement et retrait', async () => {
+  const visitor = await guest();
+  assert.equal((await api('GET', '/play/world', null, visitor)).status, 402);
+
+  const player = await newPlayer();
+  const start = await api('GET', '/play/world', null, player);
+  assert.equal(start.status, 200);
+  assert.equal(start.data.size, 6);
+  assert.deepEqual(start.data.tiles, []);
+
+  assert.equal((await api('POST', '/play/world/place', { element: 'Dragon', x: 0, y: 0 }, player)).status, 403);
+  assert.equal((await api('POST', '/play/world/place', { element: 'Eau', x: 6, y: 0 }, player)).status, 400);
+  const placed = await api('POST', '/play/world/place', { element: 'Eau', x: 1, y: 2 }, player);
+  assert.equal(placed.status, 200);
+  assert.deepEqual(placed.data.tiles.map(t => [t.element, t.x, t.y]), [['Eau', 1, 2]]);
+  assert.ok(placed.data.tiles[0].emoji);
+  // Case occupée par un autre élément : refusé ; même élément ailleurs : déplacé
+  assert.equal((await api('POST', '/play/world/place', { element: 'Feu', x: 1, y: 2 }, player)).status, 409);
+  const moved = await api('POST', '/play/world/place', { element: 'Eau', x: 4, y: 4 }, player);
+  assert.deepEqual(moved.data.tiles.map(t => [t.element, t.x, t.y]), [['Eau', 4, 4]]);
+  const removed = await api('POST', '/play/world/remove', { x: 4, y: 4 }, player);
+  assert.deepEqual(removed.data.tiles, []);
+});
+
+test('le Monde : la récolte paie les écus produits, une seule fois', async () => {
+  const player = await newPlayer({ coins: 0 });
+  await api('POST', '/play/world/place', { element: 'Eau', x: 0, y: 0 }, player);
+  await api('POST', '/play/world/place', { element: 'Feu', x: 1, y: 0 }, player);
+  // Posés il y a 3 h (simulé) : 2 objets × 3 h × 1 écu
+  await sql(`UPDATE world_tiles SET placed_at = NOW() - INTERVAL '3 hours' WHERE user_id = $1`, [player.userId]);
+  const view = await api('GET', '/play/world', null, player);
+  assert.equal(view.data.pending, 6);
+  const [first, second] = await Promise.all([
+    api('POST', '/play/world/collect', null, player),
+    api('POST', '/play/world/collect', null, player)
+  ]);
+  assert.equal(first.data.gained + second.data.gained, 6);
+  assert.equal(await coinsOf(player), 6);
+  assert.equal((await api('GET', '/play/world', null, player)).data.pending, 0);
+});
