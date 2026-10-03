@@ -1,8 +1,6 @@
 // Le Livre : mélanges ratés sur une page à portée, comptés une fois chacun (compte seulement).
-// Après FREE_INK_AFTER essais différents, l'encre de cette page est offerte ; la trace s'efface quand la page est trouvée.
+// Après quelques essais différents (barème du chapitre), l'encre de cette page est offerte ; la trace s'efface quand la page est trouvée.
 const db = require('../config/db');
-
-const FREE_INK_AFTER = 3;
 
 // Note l'essai (un même mélange ne compte qu'une fois) ; renvoie le nombre d'essais ratés sur la page
 async function record(userId, page, combo) {
@@ -27,4 +25,4 @@ async function clear(userId, page) {
     await db.query('DELETE FROM book_tries WHERE user_id = $1 AND page_id = $2', [userId, page]);
 }
 
-module.exports = { FREE_INK_AFTER, record, misses, missesByPage, clear };
+module.exports = { record, misses, missesByPage, clear };
