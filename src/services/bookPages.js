@@ -1,18 +1,19 @@
 // Le Livre : chapitres et pages du joueur, calculés par le serveur.
 // Une page trouvée montre son élément et une recette ; une page à portée ne montre jamais le nom
-// de l'élément inconnu : seulement un identifiant opaque, sa famille, sa longueur et un indice de familles.
+// de l'élément inconnu : seulement un identifiant opaque, sa famille, sa longueur, son énigme et un indice de familles.
 const crypto = require('crypto');
 const { BASE_ELEMENTS } = require('./recipeBook');
 
-// Les 15 familles regroupées en 7 chapitres ; « need » = découvertes requises (hors 4 éléments de base)
+// Les 15 familles regroupées en 7 chapitres ; « need » = découvertes requises (hors 4 éléments de base),
+// « verse » = la phrase de la page de garde du chapitre
 const CHAPTERS = [
-    { id: 'I', name: 'Les Premiers Souffles', families: ['Elements Fondamentaux', 'Phénomènes Naturels'], need: 0 },
-    { id: 'II', name: 'La Matière', families: ['Matériaux', 'Chimie', 'Physique'], need: 0 },
-    { id: 'III', name: 'Ciel et Terre', families: ['Cosmos', 'Formations Naturelles'], need: 5 },
-    { id: 'IV', name: 'Le Vivant', families: ['Flore', 'Biologie', 'Vie et Créatures'], need: 12 },
-    { id: 'V', name: 'Le Foyer', families: ['Corps et Esprit', 'Créations Humaines'], need: 25 },
-    { id: 'VI', name: 'Les Âges', families: ['Histoire', 'Technologie'], need: 45 },
-    { id: 'VII', name: 'Les Légendes', families: ['Légendes'], need: 70 }
+    { id: 'I', name: 'Les Premiers Souffles', families: ['Elements Fondamentaux', 'Phénomènes Naturels'], need: 0, verse: 'Au commencement, quatre souffles et une étincelle de curiosité.' },
+    { id: 'II', name: 'La Matière', families: ['Matériaux', 'Chimie', 'Physique'], need: 0, verse: 'Ce qui se pétrit, se fond, se forge : le monde a des mains.' },
+    { id: 'III', name: 'Ciel et Terre', families: ['Cosmos', 'Formations Naturelles'], need: 5, verse: 'Lève les yeux vers les astres, puis baisse-les vers les montagnes.' },
+    { id: 'IV', name: 'Le Vivant', families: ['Flore', 'Biologie', 'Vie et Créatures'], need: 12, verse: 'Une graine, un souffle, un battement : tout ce qui pousse et respire.' },
+    { id: 'V', name: 'Le Foyer', families: ['Corps et Esprit', 'Créations Humaines'], need: 25, verse: 'Autour du feu, l’humain invente, rêve et bâtit sa maison.' },
+    { id: 'VI', name: 'Les Âges', families: ['Histoire', 'Technologie'], need: 45, verse: 'Des silex aux étoiles : les siècles tournent leurs pages.' },
+    { id: 'VII', name: 'Les Légendes', families: ['Légendes'], need: 70, verse: 'Ici s’écrit ce que nul n’a vu, et que tout le monde connaît.' }
 ];
 
 // Difficulté de chaque chapitre : leurres du plateau, pages ouvertes à la fois, première lettre,
@@ -139,6 +140,7 @@ function view(b, owned, misses = {}) {
                 const groups = parts.map(part => [...new Set(parts)].indexOf(part));
                 pages.push({
                     id, status: 'reach', family: info.family, letters: [...name].length, clue, groups,
+                    ...(info.riddle ? { riddle: info.riddle } : {}),
                     ...(rules.letter ? { first: [...name][0] } : {}),
                     tray: trayOf(b, owned, id, parts, rules.decoys),
                     misses: misses[id] || 0,
@@ -149,7 +151,7 @@ function view(b, owned, misses = {}) {
             }
         }
         const sealed = reachable.length - opened.size;
-        return { id: chapter.id, name: chapter.name, families: chapter.families, need: chapter.need, open, total: names.length, found, far, sealed, pages: open ? pages : [] };
+        return { id: chapter.id, name: chapter.name, verse: chapter.verse, families: chapter.families, need: chapter.need, open, total: names.length, found, far, sealed, pages: open ? pages : [] };
     });
     return { stars, chapters };
 }

@@ -12,6 +12,7 @@ BASE = ["Eau", "Feu", "Terre", "Air"]
 
 sys.path.insert(0, os.path.join(HERE, "content"))
 from elements import FAMILIES, FILE_OF_FAMILY  # noqa: E402
+from riddles import RIDDLES  # noqa: E402
 FAMILY_OF = {n: f for f, els in FAMILIES.items() for n in els}
 import check  # noqa: E402  (chargement des recettes, partagé avec le vérificateur)
 
@@ -41,6 +42,8 @@ for ing, res in R:
     k = "+".join(sorted(parts))
     assert k not in keys, ("dup recipe", ing, keys.get(k), res)
     keys[k] = res
+riddle_errors = check.riddle_problems(RIDDLES, [(ing, res, "") for ing, res in R])
+assert not riddle_errors, riddle_errors
 
 def closure(start, rules=R):
     have = set(start)
@@ -338,6 +341,8 @@ rows.append(("elements_data", {"elements": el_list}, {"rules": {}},
 specific = [{"ingredients": ing.split("+"), "result": res, "known": False}
             for ing, res in rules_by_file["humains_craft_rules"].items()]
 rows.append(("formulas", {}, {}, {"specific": specific, "generic": []}))
+# Énigmes des pages du Livre (db/content/riddles.py), lues par le serveur seulement
+rows.append(("riddles", {}, {}, {"riddles": RIDDLES}))
 for name, el, ru, me in rows:
     w(f"INSERT INTO game_data (name, elements, rules, metadata, active) VALUES ({q(name)}, {j(el)}, {j(ru)}, {j(me)}, TRUE)")
     w("ON CONFLICT (name) DO UPDATE SET elements = EXCLUDED.elements, rules = EXCLUDED.rules, metadata = EXCLUDED.metadata, active = TRUE, updated_at = NOW();")

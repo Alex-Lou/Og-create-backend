@@ -40,7 +40,7 @@ test('le Livre : pages trouvées, pages à portée sans nom, chapitres scellés'
   const meta = new Map([
     ['Eau', { emoji: '💧', family: 'Elements Fondamentaux' }], ['Feu', { emoji: '🔥', family: 'Elements Fondamentaux' }],
     ['Terre', { emoji: '🌱', family: 'Elements Fondamentaux' }], ['Air', { emoji: '💨', family: 'Elements Fondamentaux' }],
-    ['Vapeur', { emoji: '♨️', family: 'Matériaux' }], ['Nuage', { emoji: '☁️', family: 'Phénomènes Naturels' }],
+    ['Vapeur', { emoji: '♨️', family: 'Matériaux', riddle: 'Je m’élève en soupirant.' }], ['Nuage', { emoji: '☁️', family: 'Phénomènes Naturels' }],
     ['Pluie', { emoji: '🌧️', family: 'Phénomènes Naturels' }], ['Lave', { emoji: '🌋', family: 'Matériaux' }]
   ]);
   const b = { ...BOOK, meta };
@@ -57,6 +57,10 @@ test('le Livre : pages trouvées, pages à portée sans nom, chapitres scellés'
     assert.equal(page.emoji, undefined);
     assert.deepEqual(page.clue, ['Elements Fondamentaux', 'Elements Fondamentaux']);
   }
+  // L'énigme de l'élément accompagne sa page ; un élément sans énigme n'en porte pas
+  assert.equal(reach.find(p => p.id === pageId('Vapeur')).riddle, 'Je m’élève en soupirant.');
+  assert.equal(reach.find(p => p.id === pageId('Lave')).riddle, undefined);
+  assert.ok(two.verse);
   assert.equal(three.open, false);
   assert.deepEqual(three.pages, []);
   // L'identifiant d'une page à portée retrouve son élément côté serveur seulement

@@ -320,6 +320,8 @@ test('le Livre : pages ouvertes bornées, plateau d’éléments possédés, aid
       assert.ok(page.tray.length > 0 && page.tray.every(name => owned.includes(name)), chapter.id);
       assert.equal(page.given, undefined);
       assert.equal(page.freeInkAfter, DIFFICULTY[chapter.id].freeInkAfter);
+      // Chapitres I et II : chaque page a son énigme (db/content/riddles.py)
+      if (['I', 'II'].includes(chapter.id)) assert.ok(page.riddle && page.riddle.length <= 80, chapter.id);
       assert.equal(Boolean(page.first), DIFFICULTY[chapter.id].letter);
     }
   }
