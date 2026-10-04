@@ -374,7 +374,7 @@ async function openedOf(userId, now, conn = db) {
 const streakOf = (opened, day) => (opened.get(`jour:${loot.dayBefore(day)}`)?.streak || 0) + 1;
 
 // Ce que la vue montre des coffres : ceux qui attendent (chapitres ouverts, quêtes réclamées), le coffre du jour (série,
-// semaine en cours) et la bouteille de la tranche
+// rareté du jour et du lendemain s'il est ouvert, semaine en cours) et la bouteille de la tranche
 function chestsView({ day, slot, opened }, openChapters, claimed) {
     const today = opened.get(`jour:${day}`);
     const streak = today ? today.streak : streakOf(opened, day);
@@ -386,7 +386,10 @@ function chestsView({ day, slot, opened }, openChapters, claimed) {
             ...QUEST_CHESTS.filter(q => claimed.has(q.id) && !opened.has(`quete:${q.id}`))
                 .map(q => ({ source: `quete:${q.id}`, rarity: q.chest, label: `Quête : ${q.label}` }))
         ],
-        daily: { available: !today, streak, rarity: loot.dailyRarity(streak), week: Array.from({ length: 7 }, (_, i) => loot.dailyRarity(first + i)) },
+        daily: {
+            available: !today, streak, rarity: loot.dailyRarity(streak), tomorrow: loot.dailyRarity(streak + 1),
+            week: Array.from({ length: 7 }, (_, i) => loot.dailyRarity(first + i))
+        },
         bottle: { key: `${day}-${slot}`, available: !opened.has(`bouteille:${day}-${slot}`) }
     };
 }

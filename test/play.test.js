@@ -878,7 +878,7 @@ test('butins : le coffre du jour s’ouvre une fois par jour, sa série monte et
   const player = await newPlayer();
   const open = source => api('POST', '/play/world/chest', { source }, player);
   const start = (await api('GET', '/play/world', null, player)).data.chests.daily;
-  assert.deepEqual(start, { available: true, streak: 1, rarity: 'commun', week: ['commun', 'commun', 'rare', 'rare', 'rare', 'rare', 'epique'] });
+  assert.deepEqual(start, { available: true, streak: 1, rarity: 'commun', tomorrow: 'commun', week: ['commun', 'commun', 'rare', 'rare', 'rare', 'rare', 'epique'] });
   // Deux ouvertures simultanées : un seul coffre
   const [a, b] = await Promise.all([1, 2].map(() => open('jour')));
   assert.deepEqual([a.status, b.status].sort(), [200, 409]);
@@ -900,6 +900,7 @@ test('butins : le coffre du jour s’ouvre une fois par jour, sa série monte et
   const seventh = (await api('GET', '/play/world', null, other)).data.chests.daily;
   assert.equal(seventh.streak, 7);
   assert.equal(seventh.rarity, 'epique');
+  assert.equal(seventh.tomorrow, 'commun');
   const epic = await api('POST', '/play/world/chest', { source: 'jour' }, other);
   assert.equal(epic.data.chest.rarity, 'epique');
   await sql(`INSERT INTO world_chests (user_id, source, rarity, prize, streak) VALUES ($1, $2, 'rare', '{"kind":"coins","amount":50}', 6)`, [player.userId, `jour:${loot.dayBefore(loot.dayBefore(day))}`]);
