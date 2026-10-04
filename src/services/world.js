@@ -8,6 +8,7 @@ const db = require('../config/db');
 const ledger = require('./ledger');
 const harvest = require('./harvest');
 const map = require('./worldMap');
+const shop = require('./worldShop');
 
 const SIZE = map.SIZE;
 const CAP_HOURS = 8;
@@ -94,38 +95,57 @@ function pendingOf(sources, collectedAt, now = Date.now()) {
 }
 
 // Parties disponibles à l'instant : réserve + parties revenues depuis charges_at, plafonnées
-function chargesAt(stock, max, now = Date.now()) {
+function chargesAt(stock, max, now = Date.now(), regen = REGEN_MS) {
     const since = new Date(stock.charges_at).getTime();
-    const ticks = Math.max(0, Math.floor((now - since) / REGEN_MS));
+    const ticks = Math.max(0, Math.floor((now - since) / regen));
     if (stock.charges + ticks >= max) return { count: max, since: now };
-    return { count: stock.charges + ticks, since: since + ticks * REGEN_MS };
+    return { count: stock.charges + ticks, since: since + ticks * regen };
 }
 
 // Effets des bâtiments construits : réserve, coups, tuiles, multiplicateurs (×2 au niveau 1, ×3 au niveau 2)
-function effectsOf(levels) {
+const NO_BONUS = shop.bonusesOf([]);
+function effectsOf(levels, bonuses = NO_BONUS) {
     const boosts = {};
     for (const [site, resource] of Object.entries(BOOSTED)) if (levels[site]) boosts[resource] = 1 + levels[site];
     const foyer = levels.foyer || 1;
     const atelier = levels.atelier || 0;
     const ponton = levels.ponton || 0;
     return {
-        maxCharges: 2 + foyer,
-        maxMoves: MOVES + (atelier >= 2 ? 5 : atelier ? 3 : 0) + (ponton >= 2 ? 2 : 0),
+        maxCharges: 2 + foyer + bonuses.charges,
+        maxMoves: MOVES + (atelier >= 2 ? 5 : atelier ? 3 : 0) + (ponton >= 2 ? 2 : 0) + bonuses.moves,
         kinds: [...harvest.BASE_KINDS, ...(ponton ? ['fish'] : [])],
-        boosts
+        boosts,
+        regenMs: bonuses.regenMs || REGEN_MS
     };
 }
 
 // Production d'un bâtiment depuis sa construction ou la dernière récolte (plafonnée à CAP_HOURS) : { coins, amount }
-function productionOf(siteId, level, builtAt, collectedAt, now = Date.now()) {
+// bonus = { prod: part en plus, coins: écus par heure en plus } (boutique de l'atelier)
+function productionOf(siteId, level, builtAt, collectedAt, now = Date.now(), bonus = { prod: 0, coins: 0 }) {
     const site = SITES[siteId];
     if (!site.produce || !level) return null;
     const since = Math.max(collectedAt ? new Date(collectedAt).getTime() : 0, new Date(builtAt).getTime());
     const hours = Math.min(CAP_HOURS, Math.max(0, (now - since) / 3600000));
-    return { resource: site.produce, amount: Math.floor(hours * PRODUCE_PER_LEVEL * level), coins: Math.floor(hours * COINS_PER_LEVEL * level) };
+    const boost = 1 + (bonus.prod || 0);
+    return {
+        resource: site.produce,
+        amount: Math.floor(hours * PRODUCE_PER_LEVEL * level * boost + 1e-9),
+        coins: Math.floor(hours * (COINS_PER_LEVEL * level * boost + (bonus.coins || 0)) + 1e-9)
+    };
 }
-function productionAll(levels, builtAt, collectedAt, now = Date.now()) {
-    return Object.keys(SITES).map(id => ({ site: id, ...productionOf(id, levels[id] || 0, builtAt[id], collectedAt, now) })).filter(p => p.resource);
+function productionAll(levels, builtAt, collectedAt, now = Date.now(), bonuses = NO_BONUS) {
+    return Object.keys(SITES)
+        .map(id => ({ site: id, ...productionOf(id, levels[id] || 0, builtAt[id], collectedAt, now, { prod: bonuses.prod[id] || 0, coins: bonuses.coins[id] || 0 }) }))
+        .filter(p => p.resource);
+}
+
+async function itemsOf(userId, conn = db) {
+    const { rows } = await conn.query('SELECT item FROM world_items WHERE user_id = $1', [userId]);
+    return new Set(rows.map(r => r.item));
+}
+async function skinsOf(userId, conn = db) {
+    const { rows } = await conn.query('SELECT site, skin FROM world_skins WHERE user_id = $1', [userId]);
+    return Object.fromEntries(rows.map(r => [r.site, r.skin]));
 }
 
 async function levelsOf(userId, conn = db) {
@@ -212,15 +232,18 @@ async function settle(userId, tiles, zones) {
 async function view(userId, owned, book) {
     await migrate(userId);
     const { levels, builtAt } = await levelsOf(userId);
-    const effects = effectsOf(levels);
+    const items = await itemsOf(userId);
+    const skins = await skinsOf(userId);
+    const bonuses = shop.bonusesOf(items);
+    const effects = effectsOf(levels, bonuses);
     const stock = await stockOf(userId);
-    const charges = chargesAt(stock, effects.maxCharges);
+    const charges = chargesAt(stock, effects.maxCharges, Date.now(), effects.regenMs);
     const zones = await zonesOf(userId);
     const tiles = await settle(userId, await tilesOf(userId), zones);
     const have = new Set(owned);
     const plans = Object.values(SITES).flatMap(s => s.levels.map(l => l.plan)).filter(Boolean);
     const known = book.describe([...tiles.map(t => t.element), ...plans]);
-    const production = productionAll(levels, builtAt, stock.collected_at);
+    const production = productionAll(levels, builtAt, stock.collected_at, Date.now(), bonuses);
     const sites = Object.entries(SITES).map(([id, site]) => {
         const level = levels[id] || 0;
         const next = site.levels[level];
@@ -233,6 +256,13 @@ async function view(userId, owned, book) {
             effect: level ? site.levels[level - 1].effect : null,
             emoji: level && site.levels[level - 1].plan ? known[site.levels[level - 1].plan]?.emoji || null : null,
             produce: site.produce || null,
+            // Boutique de l'atelier : articles (possédés ou non), skin porté, bonus de production
+            shop: shop.ITEMS.filter(item => item.site === id).map(item => ({
+                id: item.id, kind: item.kind, name: item.name, price: item.price, minLevel: item.minLevel,
+                effect: shop.effectText(item), owned: items.has(item.id)
+            })),
+            skin: skins[id] || null,
+            bonus: Math.round((bonuses.prod[id] || 0) * 100),
             // Tous les paliers, pour la fiche du bâtiment (atteints, suivant, à venir)
             levels: site.levels.map(l => ({ name: l.name, plan: l.plan, planOwned: !l.plan || have.has(l.plan), planEmoji: l.plan ? known[l.plan]?.emoji || null : null, cost: l.cost, effect: l.effect })),
             pending: made ? { coins: made.coins, [made.resource]: made.amount } : null,
@@ -251,7 +281,7 @@ async function view(userId, owned, book) {
         },
         sites,
         stock: Object.fromEntries(RESOURCES.map(r => [r, stock[r]])),
-        charges: { count: charges.count, max: effects.maxCharges, nextIn: charges.count < effects.maxCharges ? Math.max(0, charges.since + REGEN_MS - Date.now()) : null },
+        charges: { count: charges.count, max: effects.maxCharges, nextIn: charges.count < effects.maxCharges ? Math.max(0, charges.since + effects.regenMs - Date.now()) : null },
         harvest: { maxMoves: effects.maxMoves, kinds: effects.kinds, boosts: effects.boosts, coinEvery: HARVEST_COIN_EVERY },
         rates: { produce: PRODUCE_PER_LEVEL, coins: COINS_PER_LEVEL },
         capHours: CAP_HOURS,
@@ -308,8 +338,8 @@ function startRun(userId) {
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
         const { levels } = await levelsOf(userId, conn);
-        const effects = effectsOf(levels);
-        const charges = chargesAt(stock, effects.maxCharges);
+        const effects = effectsOf(levels, shop.bonusesOf(await itemsOf(userId, conn)));
+        const charges = chargesAt(stock, effects.maxCharges, Date.now(), effects.regenMs);
         if (charges.count < 1) return db.rollback({ status: 409, message: 'Plus de partie en réserve : la prochaine revient bientôt.' });
         await conn.query('UPDATE world_stock SET charges = $2, charges_at = $3 WHERE user_id = $1', [userId, charges.count - 1, new Date(charges.since)]);
         const seed = crypto.randomInt(1, 2147483647);
@@ -372,11 +402,51 @@ async function remove(userId, x, y) {
     await db.query('DELETE FROM world_tiles WHERE user_id = $1 AND x = $2 AND y = $3', [userId, x, y]);
 }
 
+// Achat d'un article de la boutique d'un atelier : bâtiment construit (au niveau demandé) dans un quartier possédé,
+// écus débités une seule fois. La production en cours est encaissée d'abord (le bonus ne vaut que pour la suite).
+async function buyItem(userId, itemId) {
+    const item = shop.ITEM_BY_ID[itemId];
+    if (!item) return { status: 404, message: 'Article inconnu.' };
+    await migrate(userId);
+    return db.transaction(async conn => {
+        const stock = await stockOf(userId, conn, true);
+        const { levels } = await levelsOf(userId, conn);
+        if (!(await zonesOf(userId, conn)).has(map.siteZone(item.site)) || !(levels[item.site] || 0)) return db.rollback({ status: 403, message: 'Bâtis d’abord ce bâtiment.' });
+        if (levels[item.site] < item.minLevel) return db.rollback({ status: 403, message: `Il faut le niveau ${item.minLevel} de ce bâtiment.` });
+        const added = await conn.query('INSERT INTO world_items (user_id, item) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING item', [userId, item.id]);
+        if (!added.rows.length) return db.rollback({ status: 409, message: 'Tu l’as déjà.' });
+        await gather(userId, conn, stock);
+        const coins = await ledger.debit(userId, item.price, `boutique:${item.id}`, conn);
+        if (coins === null) return db.rollback({ status: 400, message: `Il te faut ${item.price} écus.` });
+        // Un skin acheté est porté tout de suite
+        if (item.kind === 'skin') {
+            await conn.query(`INSERT INTO world_skins (user_id, site, skin) VALUES ($1, $2, $3)
+                ON CONFLICT (user_id, site) DO UPDATE SET skin = EXCLUDED.skin`, [userId, item.site, item.id]);
+        }
+        return { bought: item.name, coins };
+    });
+}
+
+// Skin porté par un bâtiment : un skin possédé de ce bâtiment, ou aucun (apparence d'origine)
+async function chooseSkin(userId, siteId, skinId) {
+    if (!SITES[siteId]) return { status: 404, message: 'Bâtiment inconnu.' };
+    if (!skinId) {
+        await db.query('DELETE FROM world_skins WHERE user_id = $1 AND site = $2', [userId, siteId]);
+        return {};
+    }
+    const item = shop.ITEM_BY_ID[skinId];
+    if (!item || item.kind !== 'skin' || item.site !== siteId) return { status: 400, message: 'Ce skin ne va pas sur ce bâtiment.' };
+    if (!(await itemsOf(userId)).has(skinId)) return { status: 403, message: 'Achète d’abord ce skin.' };
+    await db.query(`INSERT INTO world_skins (user_id, site, skin) VALUES ($1, $2, $3)
+        ON CONFLICT (user_id, site) DO UPDATE SET skin = EXCLUDED.skin`, [userId, siteId, skinId]);
+    return {};
+}
+
 // Encaisse la production des bâtiments (écus au grand livre, ressources au stock) dans la transaction de l'appelant
 async function gather(userId, conn, stock) {
     const { levels, builtAt } = await levelsOf(userId, conn);
     const now = new Date();
-    const made = productionAll(levels, builtAt, stock.collected_at, now.getTime());
+    const made = productionAll(levels, builtAt, stock.collected_at, now.getTime(), shop.bonusesOf(await itemsOf(userId, conn)));
     const coins = made.reduce((sum, p) => sum + p.coins, 0);
     const got = Object.fromEntries(RESOURCES.map(r => [r, made.filter(p => p.resource === r).reduce((sum, p) => sum + p.amount, 0)]));
     if (!coins && RESOURCES.every(r => !got[r])) return { gained: 0, stock: got, balance: null };
@@ -397,4 +467,4 @@ async function collect(userId) {
     });
 }
 
-module.exports = { CAP_HOURS, REGEN_MS, DECO_PRICES, isFree, pendingOf, chargesAt, effectsOf, productionOf, view, build, buyZone, startRun, finishRun, place, remove, collect, migrate };
+module.exports = { CAP_HOURS, REGEN_MS, DECO_PRICES, isFree, pendingOf, chargesAt, effectsOf, productionOf, view, build, buyZone, buyItem, chooseSkin, startRun, finishRun, place, remove, collect, migrate };

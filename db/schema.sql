@@ -269,6 +269,19 @@ CREATE TABLE IF NOT EXISTS world_zones (
     bought_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (user_id, zone)
 );
+-- Boutique des ateliers (services/worldShop.js) : articles achetés, skin porté par chaque bâtiment
+CREATE TABLE IF NOT EXISTS world_items (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    item VARCHAR(30) NOT NULL,
+    bought_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, item)
+);
+CREATE TABLE IF NOT EXISTS world_skins (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    site VARCHAR(20) NOT NULL,
+    skin VARCHAR(30) NOT NULL,
+    PRIMARY KEY (user_id, site)
+);
 CREATE TABLE IF NOT EXISTS world_runs (
     id BIGSERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
