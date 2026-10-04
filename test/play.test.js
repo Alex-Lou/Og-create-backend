@@ -613,7 +613,9 @@ test('le Monde : un chantier demande son quartier, son plan du Livre et ses ress
   assert.equal(carriere.level, 0);
   assert.equal(carriere.locked, true);
   assert.equal(carriere.next.plan, 'Pierre');
-  assert.deepEqual(carriere.levels.map(l => l.name), ['Carrière', 'Mine']);
+  assert.deepEqual(carriere.levels.map(l => l.name), ['Carrière', 'Mine', 'Galerie', 'Puits de mine', 'Mine de cristal', 'Mine à vapeur', 'Mine des Géants']);
+  assert.deepEqual(carriere.levels.map(l => l.chapter), ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII']);
+  assert.deepEqual([carriere.w, carriere.h], [2, 2]);
   assert.equal(carriere.next.planOwned, false);
   assert.deepEqual(carriere.next.cost, { wood: 5 });
 
@@ -639,7 +641,11 @@ test('le Monde : un chantier demande son quartier, son plan du Livre et ses ress
   assert.equal(mine.status, 200);
   assert.equal(mine.data.built, 'Mine');
   assert.deepEqual(mine.data.world.harvest.boosts, { stone: 3 });
-  assert.equal((await api('POST', '/play/world/build', { site: 'carriere' }, player)).status, 409);
+  // Palier III : le chapitre III du Livre doit être ouvert (5 découvertes)
+  const galerie = await api('POST', '/play/world/build', { site: 'carriere' }, player);
+  assert.equal(galerie.status, 403);
+  assert.match(galerie.data.message, /chapitre III/);
+  assert.equal(siteOf(mine.data.world, 'carriere').next.chapterOpen, false);
 
   // L'Atelier ajoute 3 coups ; deux constructions simultanées ne paient pas deux fois
   // (la seconde vise alors la Forge, dont le plan manque)
@@ -655,6 +661,57 @@ test('le Monde : un chantier demande son quartier, son plan du Livre et ses ress
   // La Cabane demande son plan
   await sql('UPDATE world_stock SET stone = 10, wood = 20 WHERE user_id = $1', [player.userId]);
   assert.equal((await api('POST', '/play/world/build', { site: 'foyer' }, player)).status, 403);
+});
+
+test('le Monde : les paliers III à VII demandent chapitre et écus, le palier IV agrandit l’emprise et déplace les décorations', async () => {
+  const player = await newPlayer({ coins: 0 });
+  const siteOf = (world, id) => world.sites.find(s => s.id === id);
+  const build = () => api('POST', '/play/world/build', { site: 'carriere' }, player);
+  // Assez de découvertes pour ouvrir les chapitres III et IV (pas le V), avec les plans des paliers III et IV
+  const names = (await sql(`SELECT DISTINCT r.value AS name FROM game_data g, jsonb_each_text(g.rules->'rules') r WHERE g.active`)).map(r => r.name.trim());
+  const plans = ['Pierre', 'Marteau', 'Rails', 'Poulie', 'Bronze'];
+  const owned = [...new Set([...BASE, ...plans, ...names.filter(n => !BASE.includes(n) && !plans.includes(n)).slice(0, 15)])];
+  await sql('UPDATE progress SET infinite_elements = $1 WHERE user_id = $2', [JSON.stringify(owned), player.userId]);
+  await api('GET', '/play/world', null, player);
+  await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'colline')`, [player.userId]);
+  await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'carriere', 2)`, [player.userId]);
+  await sql('UPDATE world_stock SET stone = 500, wood = 500, water = 500, food = 500 WHERE user_id = $1', [player.userId]);
+
+  // Palier III : ressources et 150 écus ; sans écus, rien n'est pris
+  const before = (await api('GET', '/play/world', null, player)).data;
+  assert.equal(siteOf(before, 'carriere').next.coins, 150);
+  assert.equal(siteOf(before, 'carriere').next.chapterOpen, true);
+  const poor = await build();
+  assert.equal(poor.status, 400);
+  assert.match(poor.data.message, /150 écus/);
+  assert.equal((await api('GET', '/play/world', null, player)).data.stock.wood, 500);
+  await sql('UPDATE progress SET coins = 1000 WHERE user_id = $1', [player.userId]);
+  const third = await build();
+  assert.equal(third.status, 200);
+  assert.equal(third.data.built, 'Galerie');
+  assert.equal(third.data.coins, 850);
+  assert.equal(await coinsOf(player), 850);
+  assert.deepEqual(third.data.world.stock, { stone: 470, wood: 455, water: 500, food: 485 });
+  assert.deepEqual(third.data.world.harvest.boosts, { stone: 4 });
+  const galerie = siteOf(third.data.world, 'carriere');
+  assert.deepEqual([galerie.x, galerie.y, galerie.w, galerie.h], [9, 5, 2, 2]);
+
+  // Une décoration posée là où la Mine va s'étendre est déplacée quand l'emprise s'agrandit
+  const placed = await api('POST', '/play/world/place', { element: 'Bronze', x: 8, y: 4 }, player);
+  assert.equal(placed.status, 200);
+  const fourth = await build();
+  assert.equal(fourth.status, 200);
+  assert.equal(fourth.data.built, 'Puits de mine');
+  assert.equal(fourth.data.coins, 850 - 15 - 300);
+  const big = siteOf(fourth.data.world, 'carriere');
+  assert.deepEqual([big.x, big.y, big.w, big.h], [8, 4, 3, 3]);
+  const bronze = fourth.data.world.tiles.find(t => t.element === 'Bronze');
+  assert.ok(bronze && !(bronze.x >= 8 && bronze.x < 11 && bronze.y >= 4 && bronze.y < 7), 'décoration sortie de l’emprise');
+  assert.equal((await api('POST', '/play/world/place', { element: 'Bronze', x: 8, y: 5 }, player)).status, 400);
+  // Palier V : chapitre V encore fermé
+  const fifth = await build();
+  assert.equal(fifth.status, 403);
+  assert.match(fifth.data.message, /chapitre V/);
 });
 
 test('le pendu : lettre posée case par case, erreur douce, trois erreurs, rejouer contre des écus, élément inscrit', async () => {

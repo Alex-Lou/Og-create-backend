@@ -17,6 +17,31 @@ const SITE_PLACES = {
     ponton: { x: 15, y: 14 }
 };
 
+// Emprise agrandie (3 × 3 cases) à partir du palier BIG_FROM : coin haut-gauche choisi pour rester sur la terre,
+// dans le quartier du bâtiment, sans toucher l'emprise d'un autre
+const BIG_FROM = 4;
+const SITE_BIG = {
+    foyer: { x: 9, y: 9 },
+    carriere: { x: 8, y: 4 },
+    bosquet: { x: 4, y: 5 },
+    puits: { x: 9, y: 13 },
+    potager: { x: 4, y: 12 },
+    atelier: { x: 13, y: 8 },
+    ponton: { x: 14, y: 13 }
+};
+// Emprise d'un chantier à un niveau donné : { x, y, w, h }
+function footprintOf(id, level = 0) {
+    if (level >= BIG_FROM) return { ...SITE_BIG[id], w: 3, h: 3 };
+    return { ...SITE_PLACES[id], w: 2, h: 2 };
+}
+// Case couverte par un chantier, selon les niveaux du joueur ({ site: niveau })
+function inFootprint(x, y, levels = {}) {
+    return Object.keys(SITE_PLACES).some(id => {
+        const f = footprintOf(id, levels[id] || 0);
+        return x >= f.x && x < f.x + f.w && y >= f.y && y < f.y + f.h;
+    });
+}
+
 // Quartiers : prix en écus, chapitre du Livre qui doit être ouvert, secteur d'angle autour du centre (degrés)
 const ZONES = [
     { id: 'coeur', name: 'Le Cœur', price: 0, chapter: null },
@@ -86,4 +111,4 @@ const ANCHORS = Object.fromEntries(ZONES.map((zone, k) => {
     return [zone.id, n ? { x: Math.round(sx / n), y: Math.round(sy / n) } : null];
 }));
 
-module.exports = { SIZE, OFFSET, CENTER, SITE_PLACES, ZONES, ZONE_BY_ID, GRID, ANCHORS, isLand, zoneAt, siteZone, inSite };
+module.exports = { SIZE, OFFSET, CENTER, SITE_PLACES, SITE_BIG, BIG_FROM, ZONES, ZONE_BY_ID, GRID, ANCHORS, isLand, zoneAt, siteZone, inSite, footprintOf, inFootprint };

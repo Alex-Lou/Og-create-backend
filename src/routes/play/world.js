@@ -74,9 +74,10 @@ router.post('/world/zone', withAccount(async (req, res, owner, b) => {
 router.post('/world/build', withAccount(async (req, res, owner, b) => {
     const site = String(req.body.site || '');
     if (!/^[a-z]{1,20}$/.test(site)) return res.status(400).json({ message: 'Chantier invalide' });
-    const done = await world.build(owner.id, await players.elements(owner), site);
+    const owned = await players.elements(owner);
+    const done = await world.build(owner.id, owned, site, bookPages.openChapters(b, owned));
     if (done.status) return res.status(done.status).json({ message: done.message });
-    res.json({ built: done.built, world: await worldView(owner, b) });
+    res.json({ built: done.built, ...(done.coins !== undefined ? { coins: done.coins } : {}), world: await worldView(owner, b) });
 }));
 
 // Récolte : une partie de la réserve contre une graine ; les coups reviennent à la fin et le serveur les rejoue

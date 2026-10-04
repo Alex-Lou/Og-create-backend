@@ -24,64 +24,120 @@ const DECO_PRICES = { I: 10, II: 15, III: 25, IV: 40, V: 60, VI: 90, VII: 140 };
 // Récolte : 1 écu par tranche de 10 ressources gagnées
 const HARVEST_COIN_EVERY = 10;
 
-// Chantiers : place (worldMap), niveaux successifs avec leur plan (élément du Livre), leur coût et leur effet.
-// produce : ressource produite en continu par heure et par niveau, avec des écus par heure et par niveau.
+// Chantiers : 7 paliers, un par chapitre du Livre (le palier N demande le chapitre N ouvert), chacun avec son plan
+// (élément découvert), son coût en ressources et en écus (dès le palier III) ; l'emprise passe à 3 × 3 au palier IV.
+// produce : ressource produite en continu, PRODUCE_PER_LEVEL par heure et par niveau, avec COINS_PER_LEVEL écus.
+const CHAPTER_OF_LEVEL = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
+const BOOST_BY_LEVEL = [1, 2, 3, 4, 4, 5, 5, 6]; // multiplicateur de Récolte de la ressource du bâtiment (entier)
+const ATELIER_MOVES = [0, 3, 5, 6, 7, 8, 9, 10]; // coups de Récolte en plus selon le niveau de l'Atelier
+const PRODUCE_PER_LEVEL = 3; // ressources par heure et par niveau
+const COINS_PER_LEVEL = 2; // écus par heure et par niveau
+// Noms des ressources dans les textes d'effet : production, Récolte
+const WORDS = { stone: ['pierres', 'la pierre'], wood: ['bûches', 'le bois'], water: ['seaux d’eau', 'l’eau'], food: ['vivres', 'la nourriture'] };
+const tier = (name, plan, cost, coins = 0) => ({ name, plan, cost, coins });
 const SITES = {
     foyer: {
         levels: [
-            { name: 'Foyer', plan: null, cost: {}, effect: '3 parties de Récolte en réserve.' },
-            { name: 'Cabane', plan: 'Cabane', cost: { wood: 20, stone: 10 }, effect: '4 parties de Récolte en réserve.' },
-            { name: 'Maison', plan: 'Maison', cost: { stone: 40, wood: 30, water: 20 }, effect: '5 parties de Récolte en réserve.' }
+            tier('Foyer', null, {}),
+            tier('Cabane', 'Cabane', { wood: 20, stone: 10 }),
+            tier('Maison', 'Maison', { stone: 40, wood: 30, water: 20 }, 150),
+            tier('Maison à étage', 'Fenêtre', { stone: 60, wood: 50, water: 30, food: 20 }, 300),
+            tier('Manoir', 'Horloge', { stone: 100, wood: 90, water: 50, food: 40 }, 600),
+            tier('Demeure', 'Bibliothèque', { stone: 170, wood: 150, water: 90, food: 70 }, 1000),
+            tier('Château', 'Château', { stone: 300, wood: 240, water: 140, food: 120 }, 1800)
         ]
     },
     carriere: {
         produce: 'stone',
         levels: [
-            { name: 'Carrière', plan: 'Pierre', cost: { wood: 5 }, effect: 'Produit de la pierre et des écus ; la pierre rapporte double à la Récolte.' },
-            { name: 'Mine', plan: 'Marteau', cost: { stone: 30, wood: 20 }, effect: 'Produit deux fois plus ; la pierre rapporte triple à la Récolte.' }
+            tier('Carrière', 'Pierre', { wood: 5 }),
+            tier('Mine', 'Marteau', { stone: 30, wood: 20 }),
+            tier('Galerie', 'Rails', { wood: 45, stone: 30, food: 15 }, 150),
+            tier('Puits de mine', 'Poulie', { wood: 70, stone: 50, water: 20, food: 20 }, 300),
+            tier('Mine de cristal', 'Cristal', { wood: 110, stone: 90, water: 40, food: 40 }, 600),
+            tier('Mine à vapeur', 'Machine à vapeur', { wood: 180, stone: 150, water: 90, food: 60 }, 1000),
+            tier('Mine des Géants', 'Géant', { wood: 300, stone: 250, water: 130, food: 120 }, 1800)
         ]
     },
     bosquet: {
         produce: 'wood',
         levels: [
-            { name: 'Bosquet', plan: 'Arbre', cost: { stone: 5 }, effect: 'Produit du bois et des écus ; le bois rapporte double à la Récolte.' },
-            { name: 'Grand bosquet', plan: 'Forêt', cost: { wood: 25, water: 15 }, effect: 'Produit deux fois plus ; le bois rapporte triple à la Récolte.' }
+            tier('Bosquet', 'Arbre', { stone: 5 }),
+            tier('Grand bosquet', 'Forêt', { wood: 25, water: 15 }),
+            tier('Clairière du bûcheron', 'Bûcheron', { stone: 35, water: 35, food: 20 }, 150),
+            tier('Chênaie', 'Chêne', { stone: 60, water: 50, wood: 30, food: 20 }, 300),
+            tier('Scierie', 'Menuisier', { stone: 100, wood: 70, water: 70, food: 40 }, 600),
+            tier('Exploitation forestière', 'Grue', { stone: 170, wood: 120, water: 110, food: 80 }, 1000),
+            tier('Forêt enchantée', 'Fée', { stone: 280, wood: 200, water: 180, food: 140 }, 1800)
         ]
     },
     puits: {
         produce: 'water',
         levels: [
-            { name: 'Puits', plan: 'Puits', cost: { stone: 10 }, effect: 'Produit de l’eau et des écus ; l’eau rapporte double à la Récolte.' },
-            { name: 'Fontaine', plan: 'Fontaine', cost: { stone: 30, water: 15 }, effect: 'Produit deux fois plus ; l’eau rapporte triple à la Récolte.' }
+            tier('Puits', 'Puits', { stone: 10 }),
+            tier('Fontaine', 'Fontaine', { stone: 30, water: 15 }),
+            tier('Lavoir', 'Savon', { stone: 45, wood: 30, food: 15 }, 150),
+            tier('Bassin', 'Source', { stone: 70, wood: 50, water: 20, food: 20 }, 300),
+            tier('Aqueduc', 'Arche', { stone: 110, wood: 80, water: 50, food: 40 }, 600),
+            tier('Moulin à eau', 'Moulin à eau', { stone: 180, wood: 130, water: 90, food: 80 }, 1000),
+            tier('Fontaine de jouvence', 'Élixir', { stone: 300, wood: 220, water: 150, food: 130 }, 1800)
         ]
     },
     potager: {
         produce: 'food',
         levels: [
-            { name: 'Potager', plan: 'Plante', cost: { water: 8 }, effect: 'Produit des vivres et des écus ; la nourriture rapporte double à la Récolte.' },
-            { name: 'Serre', plan: 'Serre', cost: { wood: 20, water: 25, food: 10 }, effect: 'Produit deux fois plus ; la nourriture rapporte triple à la Récolte.' }
+            tier('Potager', 'Plante', { water: 8 }),
+            tier('Serre', 'Serre', { wood: 20, water: 25, food: 10 }),
+            tier('Verger', 'Pomme', { wood: 35, water: 35, stone: 20 }, 150),
+            tier('Ferme', 'Ferme', { wood: 55, water: 55, stone: 30, food: 20 }, 300),
+            tier('Moulin', 'Moulin', { wood: 95, water: 90, stone: 55, food: 40 }, 600),
+            tier('Domaine', 'Tracteur', { wood: 160, water: 150, stone: 100, food: 70 }, 1000),
+            tier('Jardin de la Licorne', 'Licorne', { wood: 270, water: 250, stone: 160, food: 120 }, 1800)
         ]
     },
     atelier: {
         levels: [
-            { name: 'Atelier', plan: 'Four', cost: { stone: 15, wood: 10 }, effect: '3 coups de plus par Récolte.' },
-            { name: 'Forge', plan: 'Forge', cost: { stone: 35, wood: 25 }, effect: '5 coups de plus par Récolte.' }
+            tier('Atelier', 'Four', { stone: 15, wood: 10 }),
+            tier('Forge', 'Forge', { stone: 35, wood: 25 }),
+            tier('Fonderie', 'Bronze', { stone: 45, wood: 35, water: 10 }, 150),
+            tier('Grande forge', 'Acier', { stone: 70, wood: 55, water: 20, food: 15 }, 300),
+            tier('Manufacture', 'Forgeron', { stone: 120, wood: 90, water: 40, food: 30 }, 600),
+            tier('Usine', 'Usine', { stone: 200, wood: 150, water: 70, food: 60 }, 1000),
+            tier('Atelier de l’Alchimiste', 'Alchimie', { stone: 330, wood: 250, water: 120, food: 100 }, 1800)
         ]
     },
     ponton: {
         produce: 'food',
         levels: [
-            { name: 'Ponton', plan: 'Bateau', cost: { wood: 25 }, effect: 'Pêche des vivres et des écus ; des poissons à la Récolte.' },
-            { name: 'Port de pêche', plan: 'Port', cost: { wood: 40, stone: 15 }, effect: 'Pêche deux fois plus ; 2 coups de plus à la Récolte.' }
+            tier('Ponton', 'Bateau', { wood: 25 }),
+            tier('Port de pêche', 'Port', { wood: 40, stone: 15 }),
+            tier('Chantier naval', 'Voile', { wood: 50, stone: 25, water: 15 }, 150),
+            tier('Grand port', 'Phare', { wood: 80, stone: 45, water: 20, food: 15 }, 300),
+            tier('Criée', 'Pêcheur', { wood: 130, stone: 80, water: 40, food: 30 }, 600),
+            tier('Port à vapeur', 'Bateau à vapeur', { wood: 220, stone: 130, water: 70, food: 60 }, 1000),
+            tier('Port du Kraken', 'Kraken', { wood: 360, stone: 220, water: 120, food: 100 }, 1800)
         ]
     }
 };
 const BOOSTED = { carriere: 'stone', bosquet: 'wood', puits: 'water', potager: 'food' };
-const PRODUCE_PER_LEVEL = 3; // ressources par heure et par niveau
-const COINS_PER_LEVEL = 2; // écus par heure et par niveau
 
-// Case où l'on peut poser une décoration : terre, hors chantier, dans un quartier possédé
-const isFree = (x, y, zones) => Number.isInteger(x) && Number.isInteger(y) && map.isLand(x, y) && !map.inSite(x, y) && zones.has(map.zoneAt(x, y));
+// Ce que fait un palier (texte de la fiche), calculé depuis les règles : jamais en désaccord avec elles
+function effectOf(siteId, n) {
+    const site = SITES[siteId];
+    const grows = n === map.BIG_FROM ? ' Le bâtiment s’agrandit (3 × 3 cases).' : '';
+    if (siteId === 'foyer') return `${2 + n} parties de Récolte en réserve.${grows}`;
+    if (siteId === 'atelier') return `${ATELIER_MOVES[n]} coups de plus par Récolte.${grows}`;
+    const [many] = WORDS[site.produce];
+    const made = `${PRODUCE_PER_LEVEL * n} ${many} et ${COINS_PER_LEVEL * n} écus par heure`;
+    if (siteId === 'ponton') return `Pêche ${made} ; des poissons à la Récolte${n >= 2 ? ', 2 coups de plus' : ''}.${grows}`;
+    return `Produit ${made} ; ${WORDS[site.produce][1]} rapporte ×${BOOST_BY_LEVEL[n]} à la Récolte.${grows}`;
+}
+for (const [id, site] of Object.entries(SITES)) {
+    site.levels.forEach((l, i) => { l.effect = effectOf(id, i + 1); l.chapter = CHAPTER_OF_LEVEL[i]; });
+}
+
+// Case où l'on peut poser une décoration : terre, hors emprise d'un chantier (selon son niveau), dans un quartier possédé
+const isFree = (x, y, zones, levels) => Number.isInteger(x) && Number.isInteger(y) && map.isLand(x, y) && !map.inFootprint(x, y, levels) && zones.has(map.zoneAt(x, y));
 
 // Écus dus selon l'ancienne règle (décorations) : chaque source compte depuis sa pose ou la dernière récolte, plafonnée
 function pendingOf(sources, collectedAt, now = Date.now()) {
@@ -102,17 +158,17 @@ function chargesAt(stock, max, now = Date.now(), regen = REGEN_MS) {
     return { count: stock.charges + ticks, since: since + ticks * regen };
 }
 
-// Effets des bâtiments construits : réserve, coups, tuiles, multiplicateurs (×2 au niveau 1, ×3 au niveau 2)
+// Effets des bâtiments construits : réserve, coups, tuiles, multiplicateurs de Récolte (BOOST_BY_LEVEL)
 const NO_BONUS = shop.bonusesOf([]);
 function effectsOf(levels, bonuses = NO_BONUS) {
     const boosts = {};
-    for (const [site, resource] of Object.entries(BOOSTED)) if (levels[site]) boosts[resource] = 1 + levels[site];
+    for (const [site, resource] of Object.entries(BOOSTED)) if (levels[site]) boosts[resource] = BOOST_BY_LEVEL[levels[site]];
     const foyer = levels.foyer || 1;
     const atelier = levels.atelier || 0;
     const ponton = levels.ponton || 0;
     return {
         maxCharges: 2 + foyer + bonuses.charges,
-        maxMoves: MOVES + (atelier >= 2 ? 5 : atelier ? 3 : 0) + (ponton >= 2 ? 2 : 0) + bonuses.moves,
+        maxMoves: MOVES + ATELIER_MOVES[atelier] + (ponton >= 2 ? 2 : 0) + bonuses.moves,
         kinds: [...harvest.BASE_KINDS, ...(ponton ? ['fish'] : [])],
         boosts,
         regenMs: bonuses.regenMs || REGEN_MS
@@ -213,15 +269,15 @@ function migrate(userId) {
     });
 }
 
-// Décorations hors d'une case libre (mer, chantier, quartier non possédé) : déplacées vers la case libre la plus proche
-async function settle(userId, tiles, zones) {
+// Décorations hors d'une case libre (mer, chantier agrandi, quartier non possédé) : déplacées vers la case libre la plus proche
+async function settle(userId, tiles, zones, levels) {
     const taken = new Set(tiles.map(t => t.y * SIZE + t.x));
     let moved = false;
-    for (const tile of tiles.filter(t => !isFree(t.x, t.y, zones))) {
+    for (const tile of tiles.filter(t => !isFree(t.x, t.y, zones, levels))) {
         let best = null;
         for (let y = 0; y < SIZE; y++) {
             for (let x = 0; x < SIZE; x++) {
-                if (!isFree(x, y, zones) || taken.has(y * SIZE + x)) continue;
+                if (!isFree(x, y, zones, levels) || taken.has(y * SIZE + x)) continue;
                 const d = Math.abs(x - tile.x) + Math.abs(y - tile.y);
                 if (!best || d < best.d) best = { x, y, d };
             }
@@ -245,7 +301,7 @@ async function view(userId, owned, book) {
     const stock = await stockOf(userId);
     const charges = chargesAt(stock, effects.maxCharges, Date.now(), effects.regenMs);
     const zones = await zonesOf(userId);
-    const tiles = await settle(userId, await tilesOf(userId), zones);
+    const tiles = await settle(userId, await tilesOf(userId), zones, levels);
     const have = new Set(owned);
     const plans = Object.values(SITES).flatMap(s => s.levels.map(l => l.plan)).filter(Boolean);
     const known = book.describe([...tiles.map(t => t.element), ...plans]);
@@ -253,11 +309,15 @@ async function view(userId, owned, book) {
     const sites = Object.entries(SITES).map(([id, site]) => {
         const level = levels[id] || 0;
         const next = site.levels[level];
-        const place = map.SITE_PLACES[id];
+        const place = map.footprintOf(id, level);
         const zone = map.siteZone(id);
         const made = production.find(p => p.site === id);
+        const step = l => ({
+            name: l.name, plan: l.plan, planOwned: !l.plan || have.has(l.plan), planEmoji: l.plan ? known[l.plan]?.emoji || null : null,
+            cost: l.cost, coins: l.coins, chapter: l.chapter, chapterOpen: book.openChapters.has(l.chapter), effect: l.effect
+        });
         return {
-            id, x: place.x, y: place.y, w: 2, h: 2, level, maxLevel: site.levels.length, zone, locked: !zones.has(zone),
+            id, x: place.x, y: place.y, w: place.w, h: place.h, level, maxLevel: site.levels.length, zone, locked: !zones.has(zone),
             name: level ? site.levels[level - 1].name : site.levels[0].name,
             effect: level ? site.levels[level - 1].effect : null,
             emoji: level && site.levels[level - 1].plan ? known[site.levels[level - 1].plan]?.emoji || null : null,
@@ -270,11 +330,11 @@ async function view(userId, owned, book) {
             skin: skins[id] || null,
             bonus: Math.round((bonuses.prod[id] || 0) * 100),
             // Tous les paliers, pour la fiche du bâtiment (atteints, suivant, à venir)
-            levels: site.levels.map(l => ({ name: l.name, plan: l.plan, planOwned: !l.plan || have.has(l.plan), planEmoji: l.plan ? known[l.plan]?.emoji || null : null, cost: l.cost, effect: l.effect })),
+            levels: site.levels.map(step),
             pending: made ? { coins: made.coins, [made.resource]: made.amount } : null,
             // Rendement horaire avec les bonus de la boutique (pour la fiche)
             perHour: site.produce && level ? perHourOf(level, bonuses.prod[id] || 0, bonuses.coins[id] || 0) : null,
-            next: next ? { name: next.name, plan: next.plan, planOwned: !next.plan || have.has(next.plan), planEmoji: next.plan ? known[next.plan]?.emoji || null : null, cost: next.cost, effect: next.effect } : null
+            next: next ? step(next) : null
         };
     });
     const pendingStock = Object.fromEntries(RESOURCES.map(r => [r, production.filter(p => p.resource === r).reduce((sum, p) => sum + p.amount, 0)]));
@@ -315,8 +375,10 @@ async function buyZone(userId, zoneId, openChapters) {
     });
 }
 
-// Construit le niveau suivant d'un chantier ; { status, message } en cas de refus
-async function build(userId, owned, siteId) {
+// Construit le palier suivant d'un chantier : chapitre du palier ouvert dans le Livre, plan découvert, ressources,
+// écus (débités une seule fois, même en double clic). openChapters : Set des chapitres ouverts.
+// Les décorations prises dans une emprise agrandie sont déplacées au prochain affichage (settle). { status, message } si refus
+async function build(userId, owned, siteId, openChapters = new Set()) {
     const site = SITES[siteId];
     if (!site) return { status: 404, message: 'Chantier inconnu.' };
     await migrate(userId);
@@ -327,17 +389,23 @@ async function build(userId, owned, siteId) {
         const level = levels[siteId] || 0;
         const next = site.levels[level];
         if (!next) return db.rollback({ status: 409, message: 'Ce chantier est déjà achevé.' });
+        if (!openChapters.has(next.chapter)) return db.rollback({ status: 403, message: `Ouvre d’abord le chapitre ${next.chapter} du Livre.` });
         if (next.plan && !owned.includes(next.plan)) return db.rollback({ status: 403, message: `Il te faut le plan : découvre « ${next.plan} » dans le Livre.` });
         const missing = Object.entries(next.cost).filter(([r, n]) => stock[r] < n);
         if (missing.length) return db.rollback({ status: 400, message: 'Il te manque des ressources : joue une Récolte.' });
         const costs = RESOURCES.map(r => next.cost[r] || 0);
         // Ce que le bâtiment avait produit est encaissé avant l'évolution (sa production repart de zéro)
         await gather(userId, conn, stock);
+        let coins;
+        if (next.coins) {
+            coins = await ledger.debit(userId, next.coins, `chantier:${siteId}:${level + 1}`, conn);
+            if (coins === null) return db.rollback({ status: 400, message: `Il te faut ${next.coins} écus.` });
+        }
         await conn.query('UPDATE world_stock SET stone = stone - $2, wood = wood - $3, water = water - $4, food = food - $5 WHERE user_id = $1', [userId, ...costs]);
         await conn.query(
             `INSERT INTO world_buildings (user_id, site, level) VALUES ($1, $2, $3)
              ON CONFLICT (user_id, site) DO UPDATE SET level = EXCLUDED.level, built_at = NOW()`, [userId, siteId, level + 1]);
-        return { built: next.name };
+        return { built: next.name, ...(coins !== undefined ? { coins } : {}) };
     });
 }
 
@@ -388,10 +456,10 @@ function finishRun(userId, runId, moves) {
 async function place(userId, owned, element, x, y, price) {
     if (!owned.includes(element)) return { status: 403, message: 'Cet élément n’est pas dans ton carnet.' };
     if (![x, y].every(v => Number.isInteger(v)) || !map.isLand(x, y)) return { status: 400, message: 'Case hors de l’île.' };
-    if (map.inSite(x, y)) return { status: 400, message: 'Cette place est réservée à un chantier.' };
     await migrate(userId);
     return db.transaction(async conn => {
         await stockOf(userId, conn, true);
+        if (map.inFootprint(x, y, (await levelsOf(userId, conn)).levels)) return db.rollback({ status: 400, message: 'Cette place est réservée à un chantier.' });
         if (!(await zonesOf(userId, conn)).has(map.zoneAt(x, y))) return db.rollback({ status: 403, message: 'Achète d’abord ce quartier de l’île.' });
         const occupied = await conn.query('SELECT element FROM world_tiles WHERE user_id = $1 AND x = $2 AND y = $3 FOR UPDATE', [userId, x, y]);
         if (occupied.rows.length && occupied.rows[0].element !== element) return db.rollback({ status: 409, message: 'Cette case est déjà occupée.' });
@@ -475,4 +543,4 @@ async function collect(userId) {
     });
 }
 
-module.exports = { CAP_HOURS, REGEN_MS, DECO_PRICES, isFree, pendingOf, chargesAt, effectsOf, productionOf, view, build, buyZone, buyItem, chooseSkin, startRun, finishRun, place, remove, collect, migrate };
+module.exports = { CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, isFree, pendingOf, chargesAt, effectsOf, productionOf, view, build, buyZone, buyItem, chooseSkin, startRun, finishRun, place, remove, collect, migrate };
