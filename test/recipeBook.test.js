@@ -91,11 +91,10 @@ test('le Livre : difficulté par chapitre (pages ouvertes, profondeur, plateau, 
   assert.equal(reach.length, DIFFICULTY.I.open);
   assert.equal(one.sealed, 5 - DIFFICULTY.I.open);
   for (const page of reach) {
-    // Premiers chapitres : première lettre et ingrédient offert, présent sur le plateau
+    // Premiers chapitres : première lettre ; aucun ingrédient offert d'emblée, l'encre l'est après quelques ratés
     assert.equal(page.first, 'P');
-    assert.ok(BASE.includes(page.given));
-    assert.ok(page.tray.includes(page.given));
-    assert.equal(page.freeInkAfter, undefined);
+    assert.equal(page.given, undefined);
+    assert.equal(page.freeInkAfter, DIFFICULTY.I.freeInkAfter);
     // Plateau : seulement des éléments possédés, bons ingrédients compris, leurres bornés
     assert.ok(page.tray.every(name => BASE.includes(name)));
     assert.ok(page.tray.length <= new Set(page.groups).size + DIFFICULTY.I.decoys);
@@ -117,6 +116,34 @@ test('le Livre : difficulté par chapitre (pages ouvertes, profondeur, plateau, 
   assert.equal(outil.freeInkAfter, DIFFICULTY.V.freeInkAfter);
   assert.equal(outil.tray.length, 2 + DIFFICULTY.V.decoys);
   assert.ok(outil.tray.includes('Matière0') && outil.tray.includes('Terre'));
+});
+
+test('le Livre : la recette d’une page grandit avec le chapitre, sans dépasser les emplacements', () => {
+  const { view, reachableById, aim, pageId } = require('../src/services/bookPages');
+  const meta = new Map(BASE.map(name => [name, { emoji: '·', family: 'Elements Fondamentaux' }]));
+  const add = (name, family) => meta.set(name, { emoji: '·', family });
+  // Trois familles possédées : l'Athanor a 3 emplacements ; cinq découvertes ouvrent le chapitre III
+  ['Brume', 'Rosée', 'Givre'].forEach(name => add(name, 'Phénomènes Naturels'));
+  ['Sel', 'Argile'].forEach(name => add(name, 'Matériaux'));
+  add('Étoile', 'Cosmos');
+  add('Comète', 'Cosmos');
+  const entries = [
+    [['Air', 'Feu'], 'Étoile'],
+    [['Air', 'Feu', 'Brume'], 'Étoile'],
+    [['Eau', 'Feu', 'Sel', 'Argile'], 'Comète']
+  ];
+  const b = { meta, entries };
+  const owned = [...BASE, 'Brume', 'Rosée', 'Givre', 'Sel', 'Argile'];
+  const three = view(b, owned).chapters[2];
+  const etoile = three.pages.find(p => p.id === pageId('Étoile'));
+  // Chapitre III : la recette à 3 ingrédients plutôt que la paire
+  assert.deepEqual(etoile.groups, [0, 1, 2]);
+  assert.deepEqual(reachableById(b, owned, pageId('Étoile')).parts, ['Air', 'Feu', 'Brume']);
+  assert.deepEqual(aim(b, owned, pageId('Étoile'), ['Air', 'Feu']), { name: 'Étoile', right: 2, of: 3 });
+  // Une recette à 4 ne tient pas dans 3 emplacements : la page reste loin
+  assert.equal(three.pages.some(p => p.id === pageId('Comète')), false);
+  assert.equal(reachableById(b, owned, pageId('Comète')), null);
+  assert.equal(three.far, 1);
 });
 
 test('le Monde : écus en attente plafonnés, parties qui reviennent, effets des bâtiments', () => {

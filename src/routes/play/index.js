@@ -40,9 +40,8 @@ async function aimOf(owner, b, inHand, page, ingredients, result) {
     const aimed = bookPages.aim(b, inHand, page, ingredients);
     if (!aimed || aimed.name === result) return null;
     const misses = owner.kind === 'user' ? await bookTries.record(owner.id, page, book.keyOf(ingredients)) : null;
-    // Premiers chapitres : l'ingrédient est déjà offert, l'encre n'entre pas en jeu
-    const rules = bookPages.difficultyOf(b.meta.get(aimed.name)?.family);
-    const need = rules.given ? null : rules.freeInkAfter;
+    // L'encre offerte ne concerne qu'un compte (un invité n'a pas de compteur d'essais)
+    const need = owner.kind === 'user' ? bookPages.difficultyOf(b.meta.get(aimed.name)?.family).freeInkAfter : null;
     return { page, right: aimed.right, of: aimed.of, misses, need, freeInk: need !== null && misses !== null && misses >= need };
 }
 

@@ -16,15 +16,15 @@ const CHAPTERS = [
 ];
 
 // Difficulté de chaque chapitre : leurres du plateau, pages ouvertes à la fois, première lettre,
-// ingrédient offert, et essais ratés avant l'encre offerte (0 : l'ingrédient est déjà donné)
+// essais ratés avant l'encre offerte, et nombre d'ingrédients visé pour la recette de la page
 const DIFFICULTY = {
-    I: { decoys: 2, open: 3, letter: true, given: true, freeInkAfter: 0 },
-    II: { decoys: 3, open: 3, letter: true, given: true, freeInkAfter: 0 },
-    III: { decoys: 4, open: 3, letter: true, given: false, freeInkAfter: 3 },
-    IV: { decoys: 6, open: 3, letter: true, given: false, freeInkAfter: 3 },
-    V: { decoys: 8, open: 3, letter: false, given: false, freeInkAfter: 5 },
-    VI: { decoys: 10, open: 3, letter: false, given: false, freeInkAfter: 5 },
-    VII: { decoys: 12, open: 3, letter: false, given: false, freeInkAfter: 5 }
+    I: { decoys: 2, open: 3, letter: true, freeInkAfter: 3, size: 2 },
+    II: { decoys: 3, open: 3, letter: true, freeInkAfter: 3, size: 2 },
+    III: { decoys: 4, open: 3, letter: true, freeInkAfter: 3, size: 3 },
+    IV: { decoys: 6, open: 3, letter: true, freeInkAfter: 3, size: 3 },
+    V: { decoys: 8, open: 3, letter: false, freeInkAfter: 5, size: 4 },
+    VI: { decoys: 10, open: 3, letter: false, freeInkAfter: 5, size: 4 },
+    VII: { decoys: 12, open: 3, letter: false, freeInkAfter: 5, size: 4 }
 };
 const chapterOf = family => CHAPTERS.find(c => c.families.includes(family)) || CHAPTERS[0];
 const difficultyOf = family => DIFFICULTY[chapterOf(family).id];
@@ -59,7 +59,7 @@ function depthOf(b) {
     return depth;
 }
 
-// Ingrédient montré par l'encre (ou offert) : le moins évident de la recette
+// Ingrédient montré par l'encre : le moins évident de la recette
 const telling = parts => parts.find(p => !BASE_ELEMENTS.includes(p)) || parts[0];
 
 // Plateau d'une page : les bons ingrédients mêlés à des leurres possédés, des mêmes familles d'abord
@@ -73,19 +73,35 @@ function trayOf(b, owned, id, parts, decoys) {
     return [...right, ...pool.slice(0, decoys)].sort((x, y) => rank(id, x).localeCompare(rank(id, y)));
 }
 
-// Première recette faite d'éléments possédés, pour chaque élément (trouvé ou à portée)
+// Recettes faites d'éléments possédés, pour chaque élément (trouvé ou à portée), dans l'ordre du contenu
 function recipesWithin(b, have) {
     const out = new Map();
     for (const [parts, result] of b.entries) {
-        if (!out.has(result) && parts.every(p => have.has(p))) out.set(result, parts);
+        if (parts.every(p => have.has(p))) out.set(result, [...(out.get(result) || []), parts]);
     }
     return out;
+}
+
+// Emplacements de l'Athanor du joueur, comme à l'écran (front utils/eras.js) : 2, un 3e à 3 familles, un 4e à 4
+function slotsFor(b, owned) {
+    const families = new Set(owned.map(name => b.meta.get(name)?.family).filter(Boolean)).size;
+    return families >= 4 ? 4 : families >= 3 ? 3 : 2;
+}
+
+// Recette d'une page : la plus proche du nombre d'ingrédients visé par le chapitre, sans dépasser
+// les emplacements du joueur (à égalité, la première du contenu) ; null si aucune ne tient dans l'Athanor
+function pageRecipe(recipes, size, slots) {
+    const want = Math.min(size, slots);
+    return recipes
+        .filter(parts => parts.length <= slots)
+        .reduce((best, parts) => (!best || Math.abs(parts.length - want) < Math.abs(best.length - want) ? parts : best), null);
 }
 
 // misses : essais ratés par page (compte seulement), pour l'encre offerte
 function view(b, owned, misses = {}) {
     const have = new Set(owned);
     const within = recipesWithin(b, have);
+    const slots = slotsFor(b, owned);
     const depth = depthOf(b);
     const stars = owned.filter(name => !BASE_ELEMENTS.includes(name) && b.meta.has(name)).length;
     // Éléments de chaque famille, dans l'ordre du contenu
@@ -98,8 +114,12 @@ function view(b, owned, misses = {}) {
         const names = chapter.families.flatMap(family => byFamily.get(family) || []);
         const open = stars >= chapter.need;
         const rules = DIFFICULTY[chapter.id];
+        const recipeOf = new Map(names
+            .filter(name => !have.has(name) && within.has(name))
+            .map(name => [name, pageRecipe(within.get(name), rules.size, slots)])
+            .filter(([, parts]) => parts));
         // Pages à portée ouvertes : les plus proches des éléments premiers d'abord, les autres restent scellées
-        const reachable = names.filter(name => !have.has(name) && within.has(name));
+        const reachable = [...recipeOf.keys()];
         const opened = new Set(reachable
             .sort((x, y) => depth.get(x) - depth.get(y) || pageId(x).localeCompare(pageId(y)))
             .slice(0, rules.open));
@@ -110,9 +130,9 @@ function view(b, owned, misses = {}) {
             const info = b.meta.get(name);
             if (have.has(name)) {
                 found++;
-                pages.push({ id: pageId(name), status: 'found', name, emoji: info.emoji, family: info.family, recipe: BASE_ELEMENTS.includes(name) ? null : within.get(name) || null });
+                pages.push({ id: pageId(name), status: 'found', name, emoji: info.emoji, family: info.family, recipe: BASE_ELEMENTS.includes(name) ? null : within.get(name)?.[0] || null });
             } else if (opened.has(name)) {
-                const parts = within.get(name);
+                const parts = recipeOf.get(name);
                 const id = pageId(name);
                 const clue = parts.map(part => b.meta.get(part)?.family).filter(Boolean);
                 // groups : même numéro = même ingrédient (Eau + Eau → [0, 0]), sans dire lequel
@@ -120,12 +140,11 @@ function view(b, owned, misses = {}) {
                 pages.push({
                     id, status: 'reach', family: info.family, letters: [...name].length, clue, groups,
                     ...(rules.letter ? { first: [...name][0] } : {}),
-                    ...(rules.given ? { given: telling(parts) } : {}),
                     tray: trayOf(b, owned, id, parts, rules.decoys),
                     misses: misses[id] || 0,
-                    ...(rules.given ? {} : { freeInkAfter: rules.freeInkAfter })
+                    freeInkAfter: rules.freeInkAfter
                 });
-            } else if (!within.has(name)) {
+            } else if (!recipeOf.has(name)) {
                 far++;
             }
         }
@@ -135,13 +154,19 @@ function view(b, owned, misses = {}) {
     return { stars, chapters };
 }
 
-// Élément inconnu à portée qui porte cet identifiant de page, ou null
+// Élément inconnu à portée qui porte cet identifiant de page, avec la recette que montre sa page, ou null
 function reachableById(b, owned, id) {
     const have = new Set(owned);
+    let name = null;
+    const recipes = [];
     for (const [parts, result] of b.entries) {
-        if (!have.has(result) && parts.every(p => have.has(p)) && pageId(result) === id) return { name: result, parts };
+        if (!have.has(result) && parts.every(p => have.has(p)) && pageId(result) === id) {
+            name = result;
+            recipes.push(parts);
+        }
     }
-    return null;
+    const parts = name && pageRecipe(recipes, difficultyOf(b.meta.get(name)?.family).size, slotsFor(b, owned));
+    return parts ? { name, parts } : null;
 }
 
 // Ingrédients communs à deux mélanges (Eau + Eau contre Eau + Air : 1)
@@ -158,18 +183,11 @@ function overlap(tried, parts) {
     return count;
 }
 
-// Essai visé sur une page à portée : ingrédients justes, comparés à la recette possédée la plus proche
-// (même nombre d'ingrédients d'abord). Le nom ne sort pas d'ici sauf pour savoir si la page est trouvée.
+// Essai visé sur une page à portée : ingrédients justes, comparés à la recette que montre la page.
+// Le nom ne sort pas d'ici sauf pour savoir si la page est trouvée.
 function aim(b, owned, id, tried) {
-    const have = new Set(owned);
-    let best = null;
-    for (const [parts, result] of b.entries) {
-        if (have.has(result) || !parts.every(p => have.has(p)) || pageId(result) !== id) continue;
-        const candidate = { name: result, right: overlap(tried, parts), of: parts.length };
-        const fits = c => (c.of === tried.length ? 1 : 0);
-        if (!best || fits(candidate) > fits(best) || (fits(candidate) === fits(best) && candidate.right > best.right)) best = candidate;
-    }
-    return best;
+    const target = reachableById(b, owned, id);
+    return target && { name: target.name, right: overlap(tried, target.parts), of: target.parts.length };
 }
 
 module.exports = { DIFFICULTY, view, reachableById, pageId, aim, telling, difficultyOf };

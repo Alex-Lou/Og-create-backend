@@ -280,18 +280,17 @@ function recipeOfPage(rules, owned, id) {
 }
 const chapterPages = async (who, id) => (await api('GET', '/play/book', null, who)).data.chapters.find(c => c.id === id).pages.filter(p => p.status === 'reach');
 
-test('l’Encre du Livre : offerte aux premiers chapitres, payée ensuite, compte requis, page à portée seulement', async () => {
+test('l’Encre du Livre : payée d’emblée, compte requis, page à portée seulement', async () => {
   const visitor = await guest();
   const [visitorPage] = await chapterPages(visitor, 'I');
   assert.equal((await api('POST', '/play/ink', { page: visitorPage.id }, visitor)).status, 402);
 
-  // Chapitre I : l'ingrédient est déjà donné sur la page, l'encre ne coûte rien
+  // Chapitre I : aucun ingrédient n'est donné sur la page, l'encre n'est pas offerte d'emblée
   const poor = await newPlayer({ coins: 10 });
   const [easy] = await chapterPages(poor, 'I');
-  const offered = await api('POST', '/play/ink', { page: easy.id }, poor);
-  assert.equal(offered.status, 200);
-  assert.equal(offered.data.free, true);
-  assert.equal(offered.data.ingredient, easy.given);
+  assert.equal(easy.given, undefined);
+  assert.equal(easy.freeInkAfter, 3);
+  assert.equal((await api('POST', '/play/ink', { page: easy.id }, poor)).status, 400);
   assert.equal(await coinsOf(poor), 10);
 
   // Chapitre III : l'encre se paie, et refuse un joueur sans écus
@@ -319,7 +318,8 @@ test('le Livre : pages ouvertes bornées, plateau d’éléments possédés, aid
     assert.ok(reach.length <= DIFFICULTY[chapter.id].open, chapter.id);
     for (const page of reach) {
       assert.ok(page.tray.length > 0 && page.tray.every(name => owned.includes(name)), chapter.id);
-      assert.equal(Boolean(page.given), DIFFICULTY[chapter.id].given);
+      assert.equal(page.given, undefined);
+      assert.equal(page.freeInkAfter, DIFFICULTY[chapter.id].freeInkAfter);
       assert.equal(Boolean(page.first), DIFFICULTY[chapter.id].letter);
     }
   }
@@ -332,7 +332,9 @@ test('le Livre : un mélange visé dit combien d’ingrédients sont justes, pui
   const recipe = recipeOfPage(rules, owned, target.id);
   const page = target.id;
   assert.ok(target.first);
-  assert.ok(recipe.ingredients.every(name => target.tray.includes(name)));
+  // Le plateau porte les ingrédients de la recette montrée (une des recettes de l'élément)
+  const recipesOf = rules.filter(r => r.value.trim() === recipe.result).map(r => r.key.split('+').map(p => p.trim()));
+  assert.ok(recipesOf.some(parts => parts.every(name => target.tray.includes(name))));
   assert.equal(target.misses, 0);
   assert.equal(target.freeInkAfter, 3);
   const makes = new Set(rules.filter(r => r.value.trim() === recipe.result).map(r => r.key.split('+').map(p => p.trim()).sort().join('+')));
@@ -365,7 +367,7 @@ test('le Livre : un mélange visé dit combien d’ingrédients sont justes, pui
   assert.equal(found.data.aim, undefined);
   assert.equal((await sql('SELECT COUNT(*)::int AS n FROM book_tries WHERE user_id = $1', [player.userId]))[0].n, 0);
 
-  // Premiers chapitres : verdict sans encre en jeu ; un invité n'a pas de compteur
+  // Un invité : verdict sans compteur ni encre offerte
   const visitor = await guest();
   const [easy] = await chapterPages(visitor, 'I');
   const easyRecipe = recipeOfPage(rules, BASE, easy.id);
