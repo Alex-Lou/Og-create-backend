@@ -260,6 +260,15 @@ CREATE TABLE IF NOT EXISTS world_buildings (
     built_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (user_id, site)
 );
+-- Le Monde v3 : carte commune de 20 × 20 (services/worldMap.js) et quartiers achetés par le joueur.
+-- map_version : 1 = ancienne île 14 × 14 ; le passage à 2 se fait une fois par joueur (services/world.js, migrate).
+ALTER TABLE world_stock ADD COLUMN IF NOT EXISTS map_version SMALLINT NOT NULL DEFAULT 1;
+CREATE TABLE IF NOT EXISTS world_zones (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    zone VARCHAR(20) NOT NULL,
+    bought_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, zone)
+);
 CREATE TABLE IF NOT EXISTS world_runs (
     id BIGSERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

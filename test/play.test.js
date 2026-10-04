@@ -383,47 +383,101 @@ test('le Livre : un mélange visé dit combien d’ingrédients sont justes, pui
   assert.equal(elsewhere.data.aim, undefined);
 });
 
-test('le Monde : compte requis, pose d’éléments possédés, déplacement et retrait', async () => {
+test('le Monde : compte requis, décorations achetées dans un quartier possédé, déplacées gratuitement', async () => {
   const visitor = await guest();
   assert.equal((await api('GET', '/play/world', null, visitor)).status, 402);
 
   const player = await newPlayer();
   const start = await api('GET', '/play/world', null, player);
   assert.equal(start.status, 200);
-  assert.equal(start.data.size, 14);
+  assert.equal(start.data.size, 20);
   assert.deepEqual(start.data.tiles, []);
+  assert.equal(start.data.map.grid.length, 20);
+  assert.deepEqual(start.data.map.zones.filter(z => z.owned).map(z => z.id), ['coeur']);
+  assert.equal(start.data.decoPrices.I, 10);
 
-  assert.equal((await api('POST', '/play/world/place', { element: 'Dragon', x: 0, y: 0 }, player)).status, 403);
-  assert.equal((await api('POST', '/play/world/place', { element: 'Eau', x: 14, y: 0 }, player)).status, 400);
-  // La place d'un chantier (le Foyer au centre) ne prend pas de décoration
-  assert.equal((await api('POST', '/play/world/place', { element: 'Eau', x: 6, y: 6 }, player)).status, 400);
-  const placed = await api('POST', '/play/world/place', { element: 'Eau', x: 1, y: 2 }, player);
+  assert.equal((await api('POST', '/play/world/place', { element: 'Dragon', x: 8, y: 8 }, player)).status, 403);
+  // Mer, place d'un chantier (le Foyer au centre), quartier non acheté
+  assert.equal((await api('POST', '/play/world/place', { element: 'Eau', x: 0, y: 0 }, player)).status, 400);
+  assert.equal((await api('POST', '/play/world/place', { element: 'Eau', x: 9, y: 9 }, player)).status, 400);
+  assert.equal((await api('POST', '/play/world/place', { element: 'Eau', x: 9, y: 15 }, player)).status, 403);
+  // Une décoration s'achète : sans écus, refusée ; avec, payée une fois
+  assert.equal((await api('POST', '/play/world/place', { element: 'Eau', x: 8, y: 8 }, player)).status, 400);
+  await sql('UPDATE progress SET coins = 25 WHERE user_id = $1', [player.userId]);
+  const placed = await api('POST', '/play/world/place', { element: 'Eau', x: 8, y: 8 }, player);
   assert.equal(placed.status, 200);
-  assert.deepEqual(placed.data.tiles.map(t => [t.element, t.x, t.y]), [['Eau', 1, 2]]);
+  assert.deepEqual(placed.data.tiles.map(t => [t.element, t.x, t.y]), [['Eau', 8, 8]]);
   assert.ok(placed.data.tiles[0].emoji);
-  // Case occupée par un autre élément : refusé ; même élément ailleurs : déplacé
-  assert.equal((await api('POST', '/play/world/place', { element: 'Feu', x: 1, y: 2 }, player)).status, 409);
-  const moved = await api('POST', '/play/world/place', { element: 'Eau', x: 4, y: 4 }, player);
-  assert.deepEqual(moved.data.tiles.map(t => [t.element, t.x, t.y]), [['Eau', 4, 4]]);
-  const removed = await api('POST', '/play/world/remove', { x: 4, y: 4 }, player);
+  assert.equal(await coinsOf(player), 15);
+  // Case occupée par un autre élément : refusé ; même élément ailleurs : déplacé, sans payer
+  assert.equal((await api('POST', '/play/world/place', { element: 'Feu', x: 8, y: 8 }, player)).status, 409);
+  const moved = await api('POST', '/play/world/place', { element: 'Eau', x: 12, y: 12 }, player);
+  assert.deepEqual(moved.data.tiles.map(t => [t.element, t.x, t.y]), [['Eau', 12, 12]]);
+  assert.equal(await coinsOf(player), 15);
+  // Les décorations ne produisent rien
+  await sql(`UPDATE world_tiles SET placed_at = NOW() - INTERVAL '3 hours' WHERE user_id = $1`, [player.userId]);
+  assert.equal((await api('GET', '/play/world', null, player)).data.pending, 0);
+  const removed = await api('POST', '/play/world/remove', { x: 12, y: 12 }, player);
   assert.deepEqual(removed.data.tiles, []);
 });
 
-test('le Monde : la récolte paie les écus produits, une seule fois', async () => {
+test('le Monde : un quartier s’achète avec des écus et un chapitre ouvert, une seule fois', async () => {
+  const player = await newPlayer();
+  const zone = id => api('POST', '/play/world/zone', { zone: id }, player);
+  assert.equal((await zone('coeur')).status, 404);
+  assert.equal((await zone('nimporte')).status, 404);
+  // La Côte est demande le chapitre III : pas encore ouvert
+  assert.equal((await zone('est')).status, 403);
+  assert.equal((await zone('colline')).status, 400);
+  await sql('UPDATE progress SET coins = 300 WHERE user_id = $1', [player.userId]);
+  const [a, b] = await Promise.all([zone('colline'), zone('colline')]);
+  assert.deepEqual([a.status, b.status].sort(), [200, 409]);
+  const ok = a.status === 200 ? a : b;
+  assert.equal(ok.data.bought, 'La Colline');
+  assert.equal(ok.data.coins, 50);
+  assert.ok(ok.data.world.map.zones.find(z => z.id === 'colline').owned);
+  assert.equal(ok.data.world.sites.find(s => s.id === 'carriere').locked, false);
+  assert.equal(await coinsOf(player), 50);
+});
+
+test('le Monde : les bâtiments produisent ressources et écus, encaissés une seule fois', async () => {
   const player = await newPlayer({ coins: 0 });
-  await api('POST', '/play/world/place', { element: 'Eau', x: 0, y: 0 }, player);
-  await api('POST', '/play/world/place', { element: 'Feu', x: 1, y: 0 }, player);
-  // Posés il y a 3 h (simulé) : 2 objets × 3 h × 1 écu
-  await sql(`UPDATE world_tiles SET placed_at = NOW() - INTERVAL '3 hours' WHERE user_id = $1`, [player.userId]);
-  const view = await api('GET', '/play/world', null, player);
-  assert.equal(view.data.pending, 6);
+  await api('GET', '/play/world', null, player);
+  await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'colline')`, [player.userId]);
+  await sql(`INSERT INTO world_buildings (user_id, site, level, built_at) VALUES ($1, 'carriere', 1, NOW() - INTERVAL '3 hours')`, [player.userId]);
+  await sql(`UPDATE world_stock SET collected_at = NOW() - INTERVAL '5 hours' WHERE user_id = $1`, [player.userId]);
+  const view = (await api('GET', '/play/world', null, player)).data;
+  assert.equal(view.pending, 6);
+  assert.equal(view.pendingStock.stone, 9);
+  assert.deepEqual(view.sites.find(s => s.id === 'carriere').pending, { coins: 6, stone: 9 });
   const [first, second] = await Promise.all([
     api('POST', '/play/world/collect', null, player),
     api('POST', '/play/world/collect', null, player)
   ]);
   assert.equal(first.data.gained + second.data.gained, 6);
   assert.equal(await coinsOf(player), 6);
-  assert.equal((await api('GET', '/play/world', null, player)).data.pending, 0);
+  const after = (await api('GET', '/play/world', null, player)).data;
+  assert.equal(after.pending, 0);
+  assert.equal(after.stock.stone, 9);
+});
+
+test('le Monde : une île de l’ancienne carte passe à la nouvelle sans rien perdre', async () => {
+  const player = await newPlayer({ coins: 0 });
+  await api('GET', '/play/world', null, player);
+  // Île v1 simulée : une décoration en (1, 2) posée il y a 3 h, un Potager bâti, rien encore récolté
+  await sql(`UPDATE world_stock SET map_version = 1, collected_at = NULL WHERE user_id = $1`, [player.userId]);
+  await sql(`INSERT INTO world_tiles (user_id, x, y, element, placed_at) VALUES ($1, 1, 2, 'Eau', NOW() - INTERVAL '3 hours')`, [player.userId]);
+  await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'potager', 1)`, [player.userId]);
+  const [a, b] = await Promise.all([api('GET', '/play/world', null, player), api('GET', '/play/world', null, player)]);
+  const view = a.data;
+  // Décalée de 3 cases, quartiers offerts, écus dus par la décoration versés une seule fois
+  assert.deepEqual(view.tiles.map(t => [t.element, t.x, t.y]), [['Eau', 4, 5]]);
+  assert.deepEqual(b.data.tiles.map(t => [t.x, t.y]), [[4, 5]]);
+  const owned = view.map.zones.filter(z => z.owned).map(z => z.id).sort();
+  assert.deepEqual(owned, ['coeur', 'jardins', 'lisiere']);
+  assert.equal(await coinsOf(player), 3);
+  await api('GET', '/play/world', null, player);
+  assert.equal(await coinsOf(player), 3);
 });
 
 // Première chaîne jouable d'un plateau (recherche en profondeur), pour jouer comme un joueur
@@ -490,6 +544,10 @@ test('le Monde : la Récolte se joue contre une partie de la réserve, rejouée 
   const paid = a.status === 200 ? a : b;
   assert.deepEqual(paid.data.gains, expected);
   assert.deepEqual(paid.data.world.stock, expected);
+  // Et des écus : 1 par tranche de 10 ressources
+  const earned = Math.floor(Object.values(expected).reduce((sum, n) => sum + n, 0) / 10);
+  assert.equal(paid.data.coins, earned);
+  assert.equal(await coinsOf(player), earned);
 
   // Coups truqués : partie refusée et perdue
   const cheat = await api('POST', '/play/world/harvest/finish', { run: runs[1].id, moves: [[[0, 0], [0, 1]]] }, player);
@@ -504,19 +562,23 @@ test('le Monde : la Récolte se joue contre une partie de la réserve, rejouée 
   assert.equal((await api('GET', '/play/world', null, player)).data.charges.count, 2);
 });
 
-test('le Monde : un chantier demande son plan du Livre et ses ressources, puis change l’île', async () => {
+test('le Monde : un chantier demande son quartier, son plan du Livre et ses ressources, puis évolue', async () => {
   const player = await newPlayer();
   const siteOf = (world, id) => world.sites.find(s => s.id === id);
   const start = (await api('GET', '/play/world', null, player)).data;
   assert.equal(siteOf(start, 'foyer').level, 1);
   const carriere = siteOf(start, 'carriere');
   assert.equal(carriere.level, 0);
+  assert.equal(carriere.locked, true);
   assert.equal(carriere.next.plan, 'Pierre');
   assert.equal(carriere.next.planOwned, false);
   assert.deepEqual(carriere.next.cost, { wood: 5 });
 
+  // Quartier pas encore à soi : refusé avant tout
   assert.equal((await api('POST', '/play/world/build', { site: 'carriere' }, player)).status, 403);
-  await sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Pierre", "Four"]'::jsonb WHERE user_id = $1`, [player.userId]);
+  await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'colline'), ($1, 'est')`, [player.userId]);
+  assert.equal((await api('POST', '/play/world/build', { site: 'carriere' }, player)).status, 403);
+  await sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Pierre", "Four", "Marteau"]'::jsonb WHERE user_id = $1`, [player.userId]);
   assert.equal((await api('POST', '/play/world/build', { site: 'carriere' }, player)).status, 400);
   assert.equal((await api('POST', '/play/world/build', { site: 'nimporte' }, player)).status, 404);
 
@@ -527,18 +589,26 @@ test('le Monde : un chantier demande son plan du Livre et ses ressources, puis c
   assert.equal(built.data.world.stock.wood, 2);
   assert.equal(siteOf(built.data.world, 'carriere').level, 1);
   assert.deepEqual(built.data.world.harvest.boosts, { stone: 2 });
+  // Niveau 2 : la Mine (plan « Marteau »), pierre ×3
+  assert.equal(siteOf(built.data.world, 'carriere').next.name, 'Mine');
+  await sql('UPDATE world_stock SET stone = 30, wood = 20 WHERE user_id = $1', [player.userId]);
+  const mine = await api('POST', '/play/world/build', { site: 'carriere' }, player);
+  assert.equal(mine.status, 200);
+  assert.equal(mine.data.built, 'Mine');
+  assert.deepEqual(mine.data.world.harvest.boosts, { stone: 3 });
   assert.equal((await api('POST', '/play/world/build', { site: 'carriere' }, player)).status, 409);
 
   // L'Atelier ajoute 3 coups ; deux constructions simultanées ne paient pas deux fois
+  // (la seconde vise alors la Forge, dont le plan manque)
   await sql('UPDATE world_stock SET stone = 15, wood = 10 WHERE user_id = $1', [player.userId]);
   const both = await Promise.all([
     api('POST', '/play/world/build', { site: 'atelier' }, player),
     api('POST', '/play/world/build', { site: 'atelier' }, player)
   ]);
-  assert.deepEqual(both.map(r => r.status).sort(), [200, 409]);
+  assert.deepEqual(both.map(r => r.status).sort(), [200, 403]);
   const after = (await api('GET', '/play/world', null, player)).data;
   assert.equal(after.harvest.maxMoves, 18);
-  assert.deepEqual(after.stock, { stone: 0, wood: 0, water: 0, food: 0 });
+  assert.equal(after.stock.wood, 0);
   // La Cabane demande son plan
   await sql('UPDATE world_stock SET stone = 10, wood = 20 WHERE user_id = $1', [player.userId]);
   assert.equal((await api('POST', '/play/world/build', { site: 'foyer' }, player)).status, 403);

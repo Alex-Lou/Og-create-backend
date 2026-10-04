@@ -186,33 +186,58 @@ test('le pendu : lettre posée dans une case, verdicts, masque et illustration',
   assert.equal(later.misses, 0);
 });
 
-test('le Monde : écus en attente plafonnés, parties qui reviennent, effets des bâtiments', () => {
-  const { pendingOf, chargesAt, effectsOf, isFree, CAP_HOURS, REGEN_MS } = require('../src/services/world');
+test('le Monde : écus dus (ancienne règle), parties qui reviennent, effets et production des bâtiments', () => {
+  const { pendingOf, chargesAt, effectsOf, productionOf, isFree, CAP_HOURS, REGEN_MS } = require('../src/services/world');
   const now = Date.parse('2026-10-03T12:00:00Z');
   const hoursAgo = h => new Date(now - h * 3600000).toISOString();
   const tiles = [{ placed_at: hoursAgo(3) }, { placed_at: hoursAgo(20) }];
-  // 3 h + réservoir plein (8 h) pour le second
+  // Ancienne règle, payée une dernière fois à la migration : 3 h + réservoir plein (8 h) pour le second
   assert.equal(pendingOf(tiles, null, now), 3 + CAP_HOURS);
-  // Après une récolte il y a 1 h, chacun repart de là ; le Foyer (Cabane) produit 2 écus par heure
   assert.equal(pendingOf(tiles, hoursAgo(1), now), 2);
-  assert.equal(pendingOf([...tiles, { placed_at: hoursAgo(2), rate: 2 }], hoursAgo(1), now), 4);
 
   // Parties : une toutes les 30 min, plafonnées ; la progression partielle est gardée
   const stock = { charges: 0, charges_at: new Date(now - REGEN_MS * 1.5).toISOString() };
   assert.deepEqual(chargesAt(stock, 3, now), { count: 1, since: now - REGEN_MS * 0.5 });
   assert.equal(chargesAt({ charges: 2, charges_at: hoursAgo(5) }, 3, now).count, 3);
 
-  // Effets : Foyer seul, puis Maison, Atelier, Ponton, Carrière
-  assert.deepEqual(effectsOf({ foyer: 1 }), { maxCharges: 3, maxMoves: 15, kinds: ['stone', 'wood', 'water', 'food'], boosts: {}, foyerRate: 0 });
+  // Effets : Foyer seul, puis niveau 1 (×2, +3 coups), puis niveau 2 (×3, Forge +5, Port +2)
+  assert.deepEqual(effectsOf({ foyer: 1 }), { maxCharges: 3, maxMoves: 15, kinds: ['stone', 'wood', 'water', 'food'], boosts: {} });
   const grown = effectsOf({ foyer: 3, atelier: 1, ponton: 1, carriere: 1 });
   assert.equal(grown.maxCharges, 5);
   assert.equal(grown.maxMoves, 18);
   assert.ok(grown.kinds.includes('fish'));
   assert.deepEqual(grown.boosts, { stone: 2 });
-  assert.equal(grown.foyerRate, 4);
+  const evolved = effectsOf({ atelier: 2, ponton: 2, carriere: 2, potager: 2 });
+  assert.equal(evolved.maxMoves, 22);
+  assert.deepEqual(evolved.boosts, { stone: 3, food: 3 });
 
-  // Les places de chantier ne prennent pas de décoration
-  assert.equal(isFree(6, 6), false);
-  assert.equal(isFree(0, 0), true);
-  assert.equal(isFree(14, 0), false);
+  // Production : 3 ressources et 2 écus par heure et par niveau, réservoir de 8 h ; l'Atelier ne produit rien
+  assert.deepEqual(productionOf('potager', 1, hoursAgo(3), null, now), { resource: 'food', amount: 9, coins: 6 });
+  assert.deepEqual(productionOf('carriere', 2, hoursAgo(20), null, now), { resource: 'stone', amount: 48, coins: 32 });
+  assert.deepEqual(productionOf('potager', 1, hoursAgo(3), hoursAgo(1), now), { resource: 'food', amount: 3, coins: 2 });
+  assert.equal(productionOf('atelier', 1, hoursAgo(3), null, now), null);
+
+  // Cases libres : terre, hors chantier, dans un quartier possédé
+  const core = new Set(['coeur']);
+  assert.equal(isFree(9, 9, core), false);
+  assert.equal(isFree(8, 8, core), true);
+  assert.equal(isFree(0, 0, core), false);
+  assert.equal(isFree(9, 15, core), false);
+  assert.equal(isFree(9, 15, new Set(['coeur', 'source'])), true);
+});
+
+test('la carte de l’île : côte organique, chaque chantier sur la terre et dans un seul quartier', () => {
+  const map = require('../src/services/worldMap');
+  assert.equal(map.GRID.length, map.SIZE);
+  assert.ok(map.GRID.every(row => row.length === map.SIZE));
+  for (const [id, p] of Object.entries(map.SITE_PLACES)) {
+    const zones = new Set([[0, 0], [1, 0], [0, 1], [1, 1]].map(([dx, dy]) => map.zoneAt(p.x + dx, p.y + dy)));
+    assert.equal(zones.size, 1, id);
+    assert.ok(!zones.has(null), id);
+  }
+  assert.equal(map.siteZone('foyer'), 'coeur');
+  // Chaque quartier a des cases et un panneau ; l'île n'est pas un carré (des cases de mer à l'intérieur de son cadre)
+  map.ZONES.forEach(z => assert.ok(map.ANCHORS[z.id], z.id));
+  assert.equal(map.isLand(1, 1), false);
+  assert.equal(map.isLand(10, 10), true);
 });

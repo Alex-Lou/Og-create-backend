@@ -199,4 +199,10 @@ function aim(b, owned, id, tried) {
     return target && { name: target.name, right: overlap(tried, target.parts), of: target.parts.length };
 }
 
-module.exports = { DIFFICULTY, view, reachableById, pageId, aim, telling, difficultyOf, chapterOf };
+// Chapitres ouverts pour ces éléments possédés (découvertes hors éléments de base ≥ « need »)
+function openChapters(b, owned) {
+    const stars = owned.filter(name => !BASE_ELEMENTS.includes(name) && b.meta.has(name)).length;
+    return new Set(CHAPTERS.filter(c => stars >= c.need).map(c => c.id));
+}
+
+module.exports = { DIFFICULTY, view, reachableById, pageId, aim, telling, difficultyOf, chapterOf, openChapters };
