@@ -462,6 +462,44 @@ test('le Monde : les bâtiments produisent ressources et écus, encaissés une s
   assert.equal(after.stock.stone, 9);
 });
 
+test('le Monde : la boutique d’un atelier vend outils, objets et skins, une seule fois, avec leurs effets', async () => {
+  const player = await newPlayer({ coins: 0 });
+  const buy = item => api('POST', '/play/world/item', { item }, player);
+  const skin = (site, value) => api('POST', '/play/world/skin', { site, skin: value }, player);
+  await api('GET', '/play/world', null, player);
+  assert.equal((await buy('nimporte')).status, 404);
+  // Bâtiment pas encore construit : refusé
+  assert.equal((await buy('pioche')).status, 403);
+  await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'colline'), ($1, 'est')`, [player.userId]);
+  await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'carriere', 1), ($1, 'atelier', 1)`, [player.userId]);
+  assert.equal((await buy('pioche')).status, 400);
+  await sql('UPDATE progress SET coins = 600 WHERE user_id = $1', [player.userId]);
+  const [a, b] = await Promise.all([buy('pioche'), buy('pioche')]);
+  assert.deepEqual([a.status, b.status].sort(), [200, 409]);
+  const ok = a.status === 200 ? a : b;
+  assert.equal(ok.data.coins, 520);
+  const carriere = ok.data.world.sites.find(s => s.id === 'carriere');
+  assert.equal(carriere.bonus, 20);
+  assert.ok(carriere.shop.find(i => i.id === 'pioche').owned);
+  // Niveau 2 requis pour les rails
+  assert.equal((await buy('rails')).status, 403);
+  // Un skin acheté est porté ; on peut l'ôter ; un skin non possédé ou d'un autre bâtiment est refusé
+  const worn = await buy('roche-ocre');
+  assert.equal(worn.data.world.sites.find(s => s.id === 'carriere').skin, 'roche-ocre');
+  assert.equal((await skin('carriere', '')).data.sites.find(s => s.id === 'carriere').skin, null);
+  assert.equal((await skin('carriere', 'roche-granit')).status, 403);
+  assert.equal((await skin('carriere', 'voile-rouge')).status, 400);
+  assert.equal((await skin('carriere', 'roche-ocre')).data.sites.find(s => s.id === 'carriere').skin, 'roche-ocre');
+  // L'établi ajoute un coup à la Récolte (Atelier : +3, établi : +1)
+  const bench = await buy('etabli');
+  assert.equal(bench.data.world.harvest.maxMoves, 19);
+  // Production avec la pioche : +20 %
+  await sql(`UPDATE world_buildings SET built_at = NOW() - INTERVAL '5 hours' WHERE user_id = $1`, [player.userId]);
+  await sql(`UPDATE world_stock SET collected_at = NOW() - INTERVAL '3 hours' WHERE user_id = $1`, [player.userId]);
+  const view = (await api('GET', '/play/world', null, player)).data;
+  assert.deepEqual(view.sites.find(s => s.id === 'carriere').pending, { coins: 7, stone: 10 });
+});
+
 test('le Monde : une île de l’ancienne carte passe à la nouvelle sans rien perdre', async () => {
   const player = await newPlayer({ coins: 0 });
   await api('GET', '/play/world', null, player);

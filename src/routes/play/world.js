@@ -42,6 +42,25 @@ router.post('/world/collect', withAccount(async (req, res, owner, b) => {
     res.json({ gained, stock, coins, world: await worldView(owner, b) });
 }));
 
+// Boutique d'un atelier : achat d'un article
+router.post('/world/item', withAccount(async (req, res, owner, b) => {
+    const item = String(req.body.item || '');
+    if (!/^[a-z-]{1,30}$/.test(item)) return res.status(400).json({ message: 'Article invalide' });
+    const done = await world.buyItem(owner.id, item);
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json({ bought: done.bought, coins: done.coins, world: await worldView(owner, b) });
+}));
+
+// Skin porté par un bâtiment (vide : apparence d'origine)
+router.post('/world/skin', withAccount(async (req, res, owner, b) => {
+    const site = String(req.body.site || '');
+    const skin = String(req.body.skin || '');
+    if (!/^[a-z]{1,20}$/.test(site) || !/^[a-z-]{0,30}$/.test(skin)) return res.status(400).json({ message: 'Skin invalide' });
+    const done = await world.chooseSkin(owner.id, site, skin);
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json(await worldView(owner, b));
+}));
+
 // Quartier : écus et chapitre du Livre ouvert
 router.post('/world/zone', withAccount(async (req, res, owner, b) => {
     const zone = String(req.body.zone || '');

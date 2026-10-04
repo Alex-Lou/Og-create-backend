@@ -201,7 +201,7 @@ test('le Monde : écus dus (ancienne règle), parties qui reviennent, effets et 
   assert.equal(chargesAt({ charges: 2, charges_at: hoursAgo(5) }, 3, now).count, 3);
 
   // Effets : Foyer seul, puis niveau 1 (×2, +3 coups), puis niveau 2 (×3, Forge +5, Port +2)
-  assert.deepEqual(effectsOf({ foyer: 1 }), { maxCharges: 3, maxMoves: 15, kinds: ['stone', 'wood', 'water', 'food'], boosts: {} });
+  assert.deepEqual(effectsOf({ foyer: 1 }), { maxCharges: 3, maxMoves: 15, kinds: ['stone', 'wood', 'water', 'food'], boosts: {}, regenMs: REGEN_MS });
   const grown = effectsOf({ foyer: 3, atelier: 1, ponton: 1, carriere: 1 });
   assert.equal(grown.maxCharges, 5);
   assert.equal(grown.maxMoves, 18);
@@ -224,6 +224,31 @@ test('le Monde : écus dus (ancienne règle), parties qui reviennent, effets et 
   assert.equal(isFree(0, 0, core), false);
   assert.equal(isFree(9, 15, core), false);
   assert.equal(isFree(9, 15, new Set(['coeur', 'source'])), true);
+});
+
+test('la boutique des ateliers : bonus additionnés et plafonnés, effets sur la Récolte et la production', () => {
+  const shop = require('../src/services/worldShop');
+  const { effectsOf, productionOf, REGEN_MS } = require('../src/services/world');
+  assert.equal(new Set(shop.ITEMS.map(i => i.id)).size, shop.ITEMS.length);
+  const potager = shop.bonusesOf(['pelle', 'arrosoir', 'ruche', 'poulailler']);
+  assert.ok(Math.abs(potager.prod.potager - 0.7) < 1e-9);
+  assert.equal(potager.coins.potager, 1);
+  // Plafond : +100 % par bâtiment
+  assert.equal(shop.bonusesOf(['pioche', 'wagonnet', 'lanterne-mine', 'rails', 'pioche', 'rails']).prod.carriere, 1);
+  const home = shop.bonusesOf(['etabli', 'enclume', 'soufflet', 'lit', 'cuisine', 'chat', 'toit-rouge']);
+  assert.equal(home.moves, 4);
+  assert.equal(home.charges, 1);
+  assert.equal(home.regenMs, 25 * 60 * 1000);
+  const eff = effectsOf({ foyer: 1, atelier: 1 }, home);
+  assert.equal(eff.maxMoves, 15 + 3 + 4);
+  assert.equal(eff.maxCharges, 4);
+  assert.equal(eff.regenMs, 25 * 60 * 1000);
+  assert.equal(effectsOf({ foyer: 1 }).regenMs, REGEN_MS);
+  // Production : +40 % et +1 écu par heure sur 3 h
+  const now = Date.parse('2026-10-03T12:00:00Z');
+  const ago = new Date(now - 3 * 3600000).toISOString();
+  assert.deepEqual(productionOf('potager', 1, ago, null, now, { prod: 0.4, coins: 1 }), { resource: 'food', amount: 12, coins: 11 });
+  assert.equal(shop.effectText(shop.ITEM_BY_ID.pelle), '+20 % de production');
 });
 
 test('la carte de l’île : côte organique, chaque chantier sur la terre et dans un seul quartier', () => {
