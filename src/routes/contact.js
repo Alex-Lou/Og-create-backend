@@ -1,20 +1,16 @@
+// Formulaire « Écrire aux créateurs » : le message part par e-mail vers l'adresse du jeu.
 const express = require('express');
-const rateLimit = require('express-rate-limit');
-const router = express.Router();
 const transporter = require('../config/emailConfig');
+const { limiter } = require('../middleware/rateLimit');
 const { log } = require('../utils/logger');
+
+const router = express.Router();
 
 const EMAIL = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
 const MAX_MESSAGE = 5000;
 
 // Chaque message part par e-mail : quelques envois par adresse IP et par heure suffisent
-const contactLimiter = rateLimit({
-    windowMs: 60 * 60 * 1000,
-    max: 5,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { message: 'Trop de messages, réessaie plus tard.' }
-});
+const contactLimiter = limiter({ minutes: 60, max: 5, message: 'Trop de messages, réessaie plus tard.' });
 
 // Le message de l'expéditeur est affiché tel quel, jamais interprété comme du HTML
 const escapeHtml = text => text.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);

@@ -48,8 +48,4 @@ function ensureJWTSecret() {
     }
 }
 
-// Exporter les fonctions utiles
-module.exports = {
-    generateSecureJWTSecret,
-    ensureJWTSecret
-};
+module.exports = { ensureJWTSecret };

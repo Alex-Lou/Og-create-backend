@@ -1,5 +1,5 @@
 // Démarre le vrai serveur sur une base de test et fournit de quoi l'interroger.
-// Variables attendues : DATABASE_URL (ou DB_*), JWT_SECRET, JWT_REFRESH_SECRET ; la base doit avoir reçu `npm run db:setup`.
+// Variables attendues : DATABASE_URL (ou DB_*), JWT_SECRET ; la base doit avoir reçu `npm run db:setup`.
 const { spawn } = require('node:child_process');
 const path = require('node:path');
 const { Client } = require('pg');

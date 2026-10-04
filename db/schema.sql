@@ -46,7 +46,7 @@ CREATE INDEX IF NOT EXISTS idx_auth_sessions_family ON auth_sessions (family);
 CREATE INDEX IF NOT EXISTS idx_auth_sessions_user   ON auth_sessions (user_id);
 
 -- ---------------------------------------------------------------------
--- Carnet d'un joueur sans compte (routes/play.js) : cookie oc_guest, dont
+-- Carnet d'un joueur sans compte (services/players.js) : cookie oc_guest, dont
 -- seule l'empreinte SHA-256 est gardée. Effacé après 30 jours sans jouer.
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS guest_players (
@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS guest_players (
 CREATE INDEX IF NOT EXISTS idx_guest_players_last_seen ON guest_players (last_seen);
 
 -- ---------------------------------------------------------------------
--- Partie en cours de l'Épreuve ou de l'Expédition (routes/play.js) : les
+-- Partie en cours de l'Épreuve (services/trial.js) : les
 -- éléments en main, une par joueur et par mode. owner = 'u:<id>' | 'g:<id>'.
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS play_runs (
@@ -77,7 +77,7 @@ ALTER TABLE play_runs ADD COLUMN IF NOT EXISTS deadline   TIMESTAMPTZ;
 ALTER TABLE play_runs ADD COLUMN IF NOT EXISTS paused_at  TIMESTAMPTZ;
 ALTER TABLE play_runs ADD COLUMN IF NOT EXISTS solved     BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE play_runs ADD COLUMN IF NOT EXISTS solved_ids JSONB   NOT NULL DEFAULT '[]'::jsonb;
--- Expédition (services/expedition.js) : combat d'un gardien tenu par le serveur
+-- Ancienne Expédition (retirée) : colonnes sans usage, à retirer par une migration
 ALTER TABLE play_runs ADD COLUMN IF NOT EXISTS boss_hp    INTEGER;
 ALTER TABLE play_runs ADD COLUMN IF NOT EXISTS player_hp  INTEGER;
 
@@ -95,9 +95,8 @@ CREATE TABLE IF NOT EXISTS password_resets (
 CREATE INDEX IF NOT EXISTS idx_password_resets_user_id ON password_resets (user_id);
 
 -- ---------------------------------------------------------------------
--- Progression (services/progressService.js, services/achievementService.js,
--- routes/progressCoins.js, routes/timerServiceBack.js, routes/explorer.js,
--- routes/customization.js)
+-- Progression (services/progress.js, players.js, ledger.js, timerProgress.js,
+-- achievementService.js, customization.js)
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS progress (
     id                     SERIAL PRIMARY KEY,
@@ -129,13 +128,9 @@ CREATE TABLE IF NOT EXISTS progress (
 );
 
 -- ---------------------------------------------------------------------
--- Données de jeu (routes/gameDataController.js)
--- La route fusionne { ...elements, ...rules, ...metadata } : chaque colonne
--- contient donc un OBJET dont les clés deviennent des clés de premier niveau
--- de la réponse, p.ex. elements = {"elements": {"<Catégorie>": {"<Nom>": "<emoji>"}}}
--- et rules = {"rules": {"A+B": "Résultat"}}.
--- Recherche : LOWER(REPLACE(name,' ','_')) = nom normalisé ([^a-z0-9] -> _),
--- donc name doit être en ASCII minuscule (pas d'accents).
+-- Données de jeu, lues une fois par le Livre des recettes (services/recipeBook.js) :
+-- elements = {"elements": {"<Famille>": {"<Nom>": "<emoji>"}}}, rules = {"rules": {"A+B": "Résultat"}}.
+-- Elles ne quittent jamais le serveur.
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS game_data (
     id          SERIAL PRIMARY KEY,
@@ -149,7 +144,7 @@ CREATE TABLE IF NOT EXISTS game_data (
 );
 
 -- ---------------------------------------------------------------------
--- Questions du mode Timer (routes/gameDataController.js, routes/timerServiceBack.js)
+-- Questions de l'Épreuve (services/timerQuestions.js, services/trial.js)
 --   level            : 'Facile' | 'Moyen' | 'Difficile'
 --   valid_answers    : ["Nom", ...]
 --   initial_elements : {"validationMode":"any"|"multiple"|"all","requiredCount":n?,
@@ -212,8 +207,7 @@ CREATE TABLE IF NOT EXISTS user_items (
 );
 
 -- ---------------------------------------------------------------------
--- Mode Explorer (initRegions.js, routes/explorer.js)
--- Les ids sont fournis explicitement par regionChallenges.json.
+-- Ancien mode Explorer (retiré) : tables sans usage, à retirer par une migration
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS explorer_regions (
     id                 INTEGER PRIMARY KEY,
@@ -253,7 +247,7 @@ CREATE TABLE IF NOT EXISTS user_regions (
 );
 
 -- ---------------------------------------------------------------------
--- Paramètres globaux (routes/explorer.js : setting_name = 'max_energy')
+-- Paramètres globaux de l'ancien mode Explorer (retiré) : sans usage
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS game_settings (
     id            SERIAL PRIMARY KEY,

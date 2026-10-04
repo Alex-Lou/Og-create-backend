@@ -172,4 +172,4 @@ function aim(b, owned, id, tried) {
     return best;
 }
 
-module.exports = { CHAPTERS, DIFFICULTY, view, reachableById, pageId, aim, telling, difficultyOf };
+module.exports = { DIFFICULTY, view, reachableById, pageId, aim, telling, difficultyOf };

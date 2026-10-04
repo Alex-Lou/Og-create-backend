@@ -57,16 +57,6 @@ function describe(b, names) {
     return out;
 }
 
-// Éléments inconnus qu'une seule fusion d'éléments possédés suffit à créer
-function nearby(b, owned) {
-    const have = new Set(owned);
-    const found = new Set();
-    for (const [parts, result] of b.entries) {
-        if (!have.has(result) && parts.every(p => have.has(p))) found.add(result);
-    }
-    return [...found].sort();
-}
-
 // Pour chaque élément possédé : nombre de recettes qui l'utilisent et donnent un élément encore inconnu
 function unexplored(b, owned) {
     const have = new Set(owned);
@@ -78,14 +68,6 @@ function unexplored(b, owned) {
         }
     }
     return count;
-}
-
-// Recettes à portée (ingrédients tous possédés) qui donnent cet élément
-function origins(b, owned, name) {
-    const have = new Set(owned);
-    return b.entries
-        .filter(([parts, result]) => result === name && parts.every(p => have.has(p)))
-        .map(([parts]) => parts);
 }
 
 // Prochaine fusion utile vers l'une des cibles : { ingredients, result } ou null
@@ -116,4 +98,4 @@ function nextStep(b, owned, targets) {
     }
 }
 
-module.exports = { BASE_ELEMENTS, load, combine, describe, nearby, unexplored, origins, nextStep, keyOf };
+module.exports = { BASE_ELEMENTS, load, combine, describe, unexplored, nextStep, keyOf };
