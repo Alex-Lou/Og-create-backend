@@ -487,8 +487,11 @@ test('le Monde : la boutique d’un atelier vend outils, objets et skins, une se
   assert.deepEqual(carriere.perHour, { amount: 3.6, coins: 2.4 });
   assert.equal(ok.data.world.sites.find(s => s.id === 'atelier').perHour, null);
   assert.ok(carriere.shop.find(i => i.id === 'pioche').owned);
-  // Niveau 2 requis pour les rails
-  assert.equal((await buy('rails')).status, 403);
+  // Palier IV requis pour les rails
+  const early = await buy('rails');
+  assert.equal(early.status, 403);
+  assert.match(early.data.message, /palier IV/);
+  assert.deepEqual(carriere.shop.find(i => i.id === 'rails').gain, { prod: 0.3 });
   // Un skin acheté est porté ; on peut l'ôter ; un skin non possédé ou d'un autre bâtiment est refusé
   const worn = await buy('roche-ocre');
   assert.equal(worn.data.world.sites.find(s => s.id === 'carriere').skin, 'roche-ocre');
@@ -502,15 +505,15 @@ test('le Monde : la boutique d’un atelier vend outils, objets et skins, une se
   // Achat en un toucher : annulable juste après, remboursé une seule fois ; un skin porté est retiré ; trop tard, refusé
   const undo = item => api('POST', '/play/world/item/undo', { item }, player);
   const before = await coinsOf(player);
-  const ocre = (await buy('roche-granit')).data.coins;
-  const [u1, u2] = await Promise.all([undo('roche-granit'), undo('roche-granit')]);
+  const paid = (await buy('enseigne-doree')).data.coins;
+  const [u1, u2] = await Promise.all([undo('enseigne-doree'), undo('enseigne-doree')]);
   assert.deepEqual([u1.status, u2.status].sort(), [200, 409]);
   const undone = u1.status === 200 ? u1 : u2;
   assert.equal(undone.data.coins, before);
-  assert.ok(ocre < before);
-  const granit = undone.data.world.sites.find(s => s.id === 'carriere');
-  assert.equal(granit.shop.find(i => i.id === 'roche-granit').owned, false);
-  assert.notEqual(granit.skin, 'roche-granit');
+  assert.ok(paid < before);
+  const atelier = undone.data.world.sites.find(s => s.id === 'atelier');
+  assert.equal(atelier.shop.find(i => i.id === 'enseigne-doree').owned, false);
+  assert.notEqual(atelier.skin, 'enseigne-doree');
   assert.equal((await undo('nimporte')).status, 404);
   await sql(`UPDATE world_items SET bought_at = NOW() - INTERVAL '1 minute' WHERE user_id = $1 AND item = 'etabli'`, [player.userId]);
   assert.equal((await undo('etabli')).status, 409);
