@@ -36,12 +36,11 @@ npm run db:setup          # schéma + seed, rejouable (Node, sans psql)
 - `DB_HOST`
 - `DB_PORT`
 - `DB_NAME`
-- `DB_LOG_LEVEL` (facultative : `ERROR`, `INFO` ou `DEBUG`)
+- `DB_LOG_LEVEL` (facultative : `ERROR` par défaut, `INFO` ou `DEBUG` pour voir chaque requête)
 
 Celles dont le reste du serveur a besoin :
 
 - `JWT_SECRET` (obligatoire : au moins 32 caractères via l’environnement, 64 dans `.env`)
-- `JWT_REFRESH_SECRET` (à définir en production)
 - `PORT`
 - `NODE_ENV`
 - `CORS_ORIGIN`

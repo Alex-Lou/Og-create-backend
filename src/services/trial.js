@@ -108,4 +108,4 @@ async function finish(owner) {
     return { score, ...(await ledger.credit(owner.id, score * RECORD_BONUS, 'timer-record', `${level}:${score}`)) };
 }
 
-module.exports = { question, start, addTime, judge, finish, FREE_JOKERS };
+module.exports = { question, start, addTime, judge, finish };

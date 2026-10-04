@@ -1,14 +1,12 @@
 // Qui joue (compte ou invité) et ce qu'il a en main. Seul ce service ajoute un élément découvert :
 // le navigateur ne peut jamais écrire lui-même son carnet.
-const crypto = require('crypto');
 const db = require('../config/db');
+const { newToken, isToken, digest } = require('../utils/crypto');
 const { verifyAccess, readCookie } = require('./authSession');
 const { BASE_ELEMENTS } = require('./recipeBook');
 
 const GUEST_COOKIE = 'oc_guest';
 const GUEST_DAYS = 30;
-
-const digest = token => crypto.createHash('sha256').update(token).digest('hex');
 
 // Sans durée : res.clearCookie doit recevoir les mêmes options, mais pas maxAge (il annulerait l'effacement)
 function guestCookieOptions() {
@@ -22,7 +20,7 @@ function guestCookieOptions() {
 
 function readGuestToken(req) {
     const token = readCookie(req, GUEST_COOKIE);
-    return token && /^[a-f0-9]{64}$/.test(token) ? token : null;
+    return isToken(token) ? token : null;
 }
 
 // { kind: 'user'|'guest', id, key } ou null
@@ -42,7 +40,7 @@ async function resolve(req) {
 async function createGuest(res) {
     await db.query('DELETE FROM guest_players WHERE last_seen < NOW() - make_interval(days => $1)', [GUEST_DAYS]);
     await db.query(`DELETE FROM play_runs WHERE updated_at < NOW() - INTERVAL '2 days'`);
-    const token = crypto.randomBytes(32).toString('hex');
+    const token = newToken();
     const { rows } = await db.query('INSERT INTO guest_players (token_hash) VALUES ($1) RETURNING id', [digest(token)]);
     res.cookie(GUEST_COOKIE, token, { ...guestCookieOptions(), maxAge: GUEST_DAYS * 24 * 3600 * 1000 });
     return { kind: 'guest', id: rows[0].id, key: `g:${rows[0].id}` };
@@ -73,20 +71,7 @@ async function addElement(owner, name) {
     return rowCount > 0;
 }
 
-// Partie en cours (Épreuve, Expédition)
-async function startRun(owner, mode, context, inventory, freeJokers = null) {
-    const { rows } = await db.query(
-        `INSERT INTO play_runs (owner, mode, context, inventory, free_jokers)
-         VALUES ($1, $2, $3, $4, COALESCE($5, 0))
-         ON CONFLICT (owner, mode) DO UPDATE SET
-           context = EXCLUDED.context, inventory = EXCLUDED.inventory, updated_at = NOW(),
-           free_jokers = COALESCE($5, play_runs.free_jokers)
-         RETURNING free_jokers`,
-        [owner.key, mode, String(context), JSON.stringify(inventory), freeJokers]
-    );
-    return rows[0].free_jokers;
-}
-
+// Partie en cours de l'Épreuve (services/trial.js)
 async function getRun(owner, mode) {
     const { rows } = await db.query('SELECT context, inventory, free_jokers FROM play_runs WHERE owner = $1 AND mode = $2', [owner.key, mode]);
     return rows[0] ? { context: rows[0].context, inventory: asList(rows[0].inventory), freeJokers: rows[0].free_jokers } : null;
@@ -124,4 +109,4 @@ async function adoptGuest(req, res, userId) {
     );
 }
 
-module.exports = { resolve, createGuest, elements, addElement, startRun, getRun, addToRun, takeFreeJoker, adoptGuest };
+module.exports = { resolve, createGuest, elements, addElement, getRun, addToRun, takeFreeJoker, adoptGuest };

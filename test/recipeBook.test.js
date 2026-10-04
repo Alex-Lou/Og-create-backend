@@ -1,7 +1,7 @@
 // Indices calculés par le serveur : fonctions pures sur un petit livre de recettes
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { combine, nearby, unexplored, origins, nextStep, keyOf } = require('../src/services/recipeBook');
+const { combine, unexplored, nextStep, keyOf } = require('../src/services/recipeBook');
 
 const RULES = { 'Eau+Feu': 'Vapeur', 'Air+Vapeur': 'Nuage', 'Eau+Nuage': 'Pluie', 'Feu+Terre': 'Lave' };
 const recipes = new Map(Object.entries(RULES).map(([key, result]) => [keyOf(key.split('+')), result]));
@@ -19,11 +19,20 @@ test('l’étape suivante remonte vers une fusion faisable tout de suite', () =>
   assert.equal(nextStep(BOOK, ['Eau'], ['Pluie']), null);
 });
 
-test('pistes, recettes inexplorées et origines', () => {
-  assert.deepEqual(nearby(BOOK, BASE), ['Lave', 'Vapeur']);
-  assert.deepEqual(nearby(BOOK, [...BASE, 'Vapeur', 'Lave']), ['Nuage']);
+test('recettes inexplorées par élément possédé', () => {
   assert.deepEqual(unexplored(BOOK, [...BASE, 'Vapeur']), { Air: 1, Vapeur: 1, Eau: 1, Feu: 1, Terre: 1 });
-  assert.deepEqual(origins(BOOK, BASE, 'Vapeur'), [['Eau', 'Feu']]);
+});
+
+test('fusion de la progression de l’Épreuve', () => {
+  const { merge } = require('../src/services/timerProgress');
+  const merged = merge(
+    { completedQuestions: { Facile: { A: [1] } }, unlockedCategories: { Facile: ['A'] }, bestScores: { Facile: 5 } },
+    { completedQuestions: { Moyen: { B: [2] } }, unlockedCategories: { Facile: ['A', 'B'], Moyen: ['C'] }, bestScores: { Facile: 3, Moyen: 2 } });
+  assert.deepEqual(merged, {
+    completedQuestions: { Facile: { A: [1] }, Moyen: { B: [2] } },
+    unlockedCategories: { Facile: ['A', 'B'], Moyen: ['C'], Difficile: [] },
+    bestScores: { Facile: 5, Moyen: 2, Difficile: 0 }
+  });
 });
 
 test('le Livre : pages trouvées, pages à portée sans nom, chapitres scellés', () => {

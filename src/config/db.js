@@ -1,10 +1,9 @@
-// config/db.js
+// Accès PostgreSQL : requêtes simples (query) et transactions (transaction).
 const { Pool } = require('pg');
 require('dotenv').config();
 
-// Configuration du niveau de log
-const LOG_LEVEL = process.env.DB_LOG_LEVEL || 'INFO'; // Valeurs possibles: 'ERROR', 'INFO', 'DEBUG'
-
+// Journal des requêtes : ERROR par défaut (seules les erreurs), INFO ou DEBUG à la demande
+const LOG_LEVEL = process.env.DB_LOG_LEVEL || 'ERROR';
 
 // DATABASE_URL (Neon, Render...) prioritaire ; sinon variables DB_* séparées (local).
 // Le SSL est piloté par l'URL (ex. ?sslmode=require).
@@ -18,58 +17,51 @@ const pool = new Pool(process.env.DATABASE_URL
         database: process.env.DB_NAME
     });
 
-// Log des erreurs de connexion
-pool.on('error', (err, client) => {
-    console.error('Erreur inattendue sur le client PostgreSQL', err);
+pool.on('error', error => {
+    console.error('Erreur inattendue sur le client PostgreSQL', error);
 });
 
-module.exports = {
-    query: async (text, params) => {
-        // En mode DEBUG, on log les détails de la requête
-        if (LOG_LEVEL === 'DEBUG') {
-            console.log('Requête SQL :', text);
-            if (params) console.log('Paramètres :', params);
-        } else if (LOG_LEVEL === 'INFO') {
-            // En mode INFO, on log juste la première partie de la requête pour identifier son type
-            const queryType = text.trim().split(' ')[0];
-            console.log(`Exécution ${queryType}${params ? ` avec ${params.length} paramètres` : ''}`);
+async function query(text, params) {
+    if (LOG_LEVEL === 'DEBUG') console.log('Requête SQL :', text, params || '');
+    else if (LOG_LEVEL === 'INFO') console.log(`Exécution ${text.trim().split(' ')[0]}${params ? ` avec ${params.length} paramètres` : ''}`);
+    try {
+        const start = Date.now();
+        const result = await pool.query(text, params);
+        if (LOG_LEVEL !== 'ERROR') console.log(`Requête exécutée en ${Date.now() - start}ms, ${result.rowCount} lignes affectées`);
+        return result;
+    } catch (error) {
+        console.error('Erreur lors de l\'exécution de la requête :', error.message);
+        if (LOG_LEVEL === 'DEBUG') console.error('Requête en échec :', text, params);
+        throw error;
+    }
+}
+
+// Refus au milieu d'une transaction : la transaction est annulée et la valeur renvoyée telle quelle
+class Rollback {
+    constructor(value) {
+        this.value = value;
+    }
+}
+const rollback = value => new Rollback(value);
+
+// Exécute fn(conn) dans une transaction : COMMIT à la fin, ROLLBACK sur erreur ou sur `return rollback(valeur)`
+async function transaction(fn) {
+    const conn = await pool.connect();
+    try {
+        await conn.query('BEGIN');
+        const result = await fn(conn);
+        if (result instanceof Rollback) {
+            await conn.query('ROLLBACK');
+            return result.value;
         }
-        
-        try {
-            const start = Date.now();
-            const result = await pool.query(text, params);
-            const duration = Date.now() - start;
-            
-            // En mode INFO ou DEBUG, on log des informations sur le résultat
-            if (LOG_LEVEL === 'INFO' || LOG_LEVEL === 'DEBUG') {
-                console.log(`Requête exécutée en ${duration}ms, ${result.rowCount} lignes affectées`);
-            }
-            
-            // En mode DEBUG seulement, on log les résultats
-            if (LOG_LEVEL === 'DEBUG') {
-                if (result.rows && result.rows.length <= 5) {
-                    // Limiter l'affichage pour éviter de surcharger la console
-                    console.log('Résultat de la requête :', result.rows);
-                } else if (result.rows) {
-                    console.log(`Résultat: ${result.rows.length} lignes retournées (détails omis)`);
-                }
-            }
-            
-            return result;
-        } catch (error) {
-            // On log toujours les erreurs, quel que soit le niveau de log
-            console.error('Erreur lors de l\'exécution de la requête :', error.message);
-            
-            // Plus de détails en mode DEBUG
-            if (LOG_LEVEL === 'DEBUG') {
-                console.error('Requête en échec :', text);
-                console.error('Paramètres :', params);
-                console.error('Détails de l\'erreur :', error);
-            }
-            
-            throw error;
-        }
-    },
-    // Ajout du pool pour permettre l'utilisation des transactions
-    pool: pool
-};
+        await conn.query('COMMIT');
+        return result;
+    } catch (error) {
+        await conn.query('ROLLBACK').catch(() => {});
+        throw error;
+    } finally {
+        conn.release();
+    }
+}
+
+module.exports = { query, transaction, rollback, pool };

@@ -61,7 +61,6 @@ test('un mélange n’accepte que des ingrédients du carnet, et seul le serveur
   assert.equal(first.data.isNew, true);
   assert.ok(first.data.emoji && first.data.family);
   assert.ok(first.data.unexplored);
-  assert.equal(typeof first.data.reachable, 'number');
   const again = await api('POST', '/play/combine', { mode: 'infinite', ingredients: [...recipe.ingredients].reverse() }, player);
   assert.equal(again.data.isNew, false);
 
@@ -72,7 +71,6 @@ test('un mélange n’accepte que des ingrédients du carnet, et seul le serveur
   const state = await api('GET', '/play/state', null, player);
   assert.ok(state.data.elements.includes(recipe.result));
   assert.equal(state.data.known[recipe.result].emoji, first.data.emoji);
-  assert.equal(state.data.reachable, first.data.reachable);
 });
 
 test('un compte ne peut plus écrire son carnet par la sauvegarde', async () => {
@@ -98,17 +96,26 @@ test('les découvertes d’un invité rejoignent son nouveau compte', async () =
   assert.ok(row.infinite_elements.includes(recipe.result));
 });
 
-test('la piste de l’Infini se paie au serveur, et demande un compte', async () => {
-  assert.equal((await api('POST', '/play/hint', {}, await guest())).status, 402);
-
+test('les routes de l’ancien Registre (piste, origines) n’existent plus', async () => {
   const player = await newPlayer({ coins: 60 });
-  const hint = await api('POST', '/play/hint', {}, player);
-  assert.equal(hint.status, 200);
-  assert.equal(hint.data.coins, 10);
-  assert.equal(typeof hint.data.name, 'string');
-  assert.equal((await api('POST', '/play/hint', {}, player)).status, 400);
-  assert.equal(await coinsOf(player), 10);
+  assert.equal((await api('POST', '/play/hint', {}, player)).status, 404);
+  assert.equal((await api('GET', '/play/origins?name=Eau', null, player)).status, 404);
+  assert.equal(await coinsOf(player), 60);
   assert.equal((await api('POST', '/coins/spend', { reason: 'piste' }, player)).status, 404);
+});
+
+test('la progression de l’Épreuve fusionne : un record ne redescend jamais', async () => {
+  const player = await newPlayer();
+  await api('POST', '/timer/update-timer-progress', { timerProgress: { bestScores: { Facile: 4 }, unlockedCategories: { Facile: ['A'] } } }, player);
+  await api('POST', '/progress/save', { timerProgress: { bestScores: { Facile: 2, Moyen: 1 }, unlockedCategories: { Facile: ['B'] } } }, player);
+  const loaded = await api('GET', '/timer/load-progress', null, player);
+  assert.deepEqual(loaded.data.bestScores, { Facile: 4, Moyen: 1, Difficile: 0 });
+  assert.deepEqual(loaded.data.unlockedCategories.Facile, ['A', 'B']);
+  const progress = await api('GET', '/progress/load', null, player);
+  assert.equal(progress.data.coins, 0);
+  assert.deepEqual(progress.data.timerProgress.bestScores, { Facile: 4, Moyen: 1, Difficile: 0 });
+  assert.equal((await api('POST', '/timer/update-timer-progress', {}, player)).status, 400);
+  assert.equal((await api('POST', '/timer/save-elements', { elements: ['Eau'] }, player)).status, 404);
 });
 
 test('l’Épreuve : éléments de la question, deux jokers offerts puis payants', async () => {

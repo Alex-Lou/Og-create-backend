@@ -6,6 +6,7 @@
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
+const { newToken, isToken, digest } = require('../utils/crypto');
 
 const ACCESS_SECONDS = 15 * 60;
 const REFRESH_DAYS = 30;
@@ -14,8 +15,6 @@ const RACE_SECONDS = Number(process.env.AUTH_RACE_SECONDS ?? 10);
 
 const ACCESS_COOKIE = 'oc_access';
 const REFRESH_COOKIE = 'oc_refresh';
-
-const digest = token => crypto.createHash('sha256').update(token).digest('hex');
 
 function cookieOptions(path, maxAgeMs) {
     return {
@@ -67,7 +66,7 @@ function verifyAccess(req) {
 
 // Ouvre une session (ou continue une famille existante) et pose les deux cookies
 async function issue(res, user, family = crypto.randomUUID(), client = db) {
-    const refresh = crypto.randomBytes(32).toString('hex');
+    const refresh = newToken();
     await client.query(
         `INSERT INTO auth_sessions (user_id, family, token_hash, expires_at)
          VALUES ($1, $2, $3, NOW() + make_interval(days => $4))`,
@@ -86,11 +85,9 @@ function clearCookies(res) {
 // Échange le jeton de rafraîchissement contre un nouveau. Renvoie { user } ou { error, status }.
 async function rotate(req, res) {
     const presented = readCookie(req, REFRESH_COOKIE);
-    if (!presented || !/^[a-f0-9]{64}$/.test(presented)) return { status: 401, error: 'Session absente' };
+    if (!isToken(presented)) return { status: 401, error: 'Session absente' };
 
-    const client = await db.pool.connect();
-    try {
-        await client.query('BEGIN');
+    return db.transaction(async client => {
         const { rows } = await client.query(
             `SELECT s.id, s.family, s.revoked_at, s.expires_at > NOW() AS alive,
                     s.revoked_at > NOW() - make_interval(secs => $2) AS recent, u.id AS user_id, u.username
@@ -99,38 +96,24 @@ async function rotate(req, res) {
             [digest(presented), RACE_SECONDS]
         );
         const session = rows[0];
-        if (!session || !session.alive) {
-            await client.query('ROLLBACK');
-            return { status: 401, error: 'Session expirée' };
-        }
+        if (!session || !session.alive) return db.rollback({ status: 401, error: 'Session expirée' });
         if (session.revoked_at) {
-            if (session.recent) {
-                // Rafraîchissement concurrent d'un autre onglet : le navigateur a déjà le nouveau cookie
-                await client.query('ROLLBACK');
-                return { status: 409, error: 'Session déjà renouvelée', code: 'REFRESH_RACE' };
-            }
+            // Rafraîchissement concurrent d'un autre onglet : le navigateur a déjà le nouveau cookie
+            if (session.recent) return db.rollback({ status: 409, error: 'Session déjà renouvelée', code: 'REFRESH_RACE' });
             // Réutilisation d'un ancien jeton : on coupe toute la famille
             await client.query('DELETE FROM auth_sessions WHERE family = $1', [session.family]);
-            await client.query('COMMIT');
             clearCookies(res);
             return { status: 401, error: 'Session révoquée' };
         }
         await client.query('UPDATE auth_sessions SET revoked_at = NOW() WHERE id = $1', [session.id]);
-        const user = await issue(res, { id: session.user_id, username: session.username }, session.family, client);
-        await client.query('COMMIT');
-        return { user };
-    } catch (error) {
-        await client.query('ROLLBACK').catch(() => {});
-        throw error;
-    } finally {
-        client.release();
-    }
+        return { user: await issue(res, { id: session.user_id, username: session.username }, session.family, client) };
+    });
 }
 
 // Déconnexion : la famille du jeton présenté est supprimée, les cookies effacés
 async function revoke(req, res) {
     const presented = readCookie(req, REFRESH_COOKIE);
-    if (presented && /^[a-f0-9]{64}$/.test(presented)) {
+    if (isToken(presented)) {
         await db.query(
             'DELETE FROM auth_sessions WHERE family IN (SELECT family FROM auth_sessions WHERE token_hash = $1)',
             [digest(presented)]
@@ -144,4 +127,4 @@ async function revokeAll(userId, client = db) {
     await client.query('DELETE FROM auth_sessions WHERE user_id = $1', [userId]);
 }
 
-module.exports = { issue, rotate, revoke, revokeAll, verifyAccess, clearCookies, readCookie };
+module.exports = { issue, rotate, revoke, revokeAll, verifyAccess, readCookie };

@@ -18,6 +18,6 @@ router.get('/balance', async (req, res) => {
 
 // Les points de l'Épreuve et le bonus de record sont versés par le serveur de jeu (services/trial.js)
 
-// Les aides payantes (joker, piste) sont débitées par routes/play.js, qui calcule l'aide elle-même
+// Les aides payantes (encre, joker) sont débitées par routes/play, qui calcule l'aide elle-même
 
 module.exports = router;
