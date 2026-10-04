@@ -7,6 +7,7 @@ const achievementService = require('../../services/achievementService');
 const trial = require('../../services/trial');
 const bookPages = require('../../services/bookPages');
 const bookTries = require('../../services/bookTries');
+const bookLetters = require('../../services/bookLetters');
 const { NAME, PAGE, playLimiter, addressLimiter, guestLimiter, fail, withPlayer } = require('./shared');
 
 const router = express.Router();
@@ -71,8 +72,9 @@ router.post('/combine', playLimiter, withPlayer(async (req, res, owner, b) => {
     if (mode === 'timer') reply.trial = await trial.judge(owner, [...run.inventory, result]);
     if (mode === 'infinite' && isNew) {
         reply.unexplored = book.unexplored(b, [...inHand, result]);
+        // Page trouvée : son pendu et ses essais ratés n'ont plus d'usage
+        await bookLetters.clear(owner.key, bookPages.pageId(result));
         if (owner.kind === 'user') {
-            // Page trouvée : ses essais ratés n'ont plus d'usage
             await bookTries.clear(owner.id, bookPages.pageId(result));
             await achievementService.syncAchievements(owner.id);
         }

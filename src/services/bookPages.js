@@ -3,6 +3,7 @@
 // de l'élément inconnu : seulement un identifiant opaque, sa famille, sa longueur, son énigme et un indice de familles.
 const crypto = require('crypto');
 const { BASE_ELEMENTS } = require('./recipeBook');
+const hangman = require('./hangman');
 
 // Les 15 familles regroupées en 7 chapitres ; « need » = découvertes requises (hors 4 éléments de base),
 // « verse » = la phrase de la page de garde du chapitre
@@ -98,8 +99,8 @@ function pageRecipe(recipes, size, slots) {
         .reduce((best, parts) => (!best || Math.abs(parts.length - want) < Math.abs(best.length - want) ? parts : best), null);
 }
 
-// misses : essais ratés par page (compte seulement), pour l'encre offerte
-function view(b, owned, misses = {}) {
+// misses : essais ratés par page (compte seulement), pour l'encre offerte ; letters : parties de pendu par page
+function view(b, owned, misses = {}, letters = {}) {
     const have = new Set(owned);
     const within = recipesWithin(b, have);
     const slots = slotsFor(b, owned);
@@ -144,7 +145,8 @@ function view(b, owned, misses = {}) {
                     ...(rules.letter ? { first: [...name][0] } : {}),
                     tray: trayOf(b, owned, id, parts, rules.decoys),
                     misses: misses[id] || 0,
-                    freeInkAfter: rules.freeInkAfter
+                    freeInkAfter: rules.freeInkAfter,
+                    hangman: hangman.state(name, letters[id], hangman.maxMisses(chapter.id), rules.letter, info.emoji)
                 });
             } else if (!recipeOf.has(name)) {
                 far++;
@@ -192,4 +194,4 @@ function aim(b, owned, id, tried) {
     return target && { name: target.name, right: overlap(tried, target.parts), of: target.parts.length };
 }
 
-module.exports = { DIFFICULTY, view, reachableById, pageId, aim, telling, difficultyOf };
+module.exports = { DIFFICULTY, view, reachableById, pageId, aim, telling, difficultyOf, chapterOf };

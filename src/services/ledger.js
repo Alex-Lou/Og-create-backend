@@ -19,17 +19,17 @@ async function credit(userId, amount, reason, ref, client = null) {
   return { credited, coins: rows[0]?.coins ?? 0 };
 }
 
-// Débite `amount` si le solde suffit. Retourne le nouveau solde, ou null si le solde est insuffisant.
-function debit(userId, amount, reason) {
-  return db.transaction(async conn => {
-    const { rows } = await conn.query(
-      'UPDATE progress SET coins = coins - $1 WHERE user_id = $2 AND coins >= $1 RETURNING coins',
-      [amount, userId]
-    );
-    if (!rows.length) return db.rollback(null);
-    await conn.query('INSERT INTO coin_ledger (user_id, amount, reason) VALUES ($1, $2, $3)', [userId, -amount, reason]);
-    return rows[0].coins;
-  });
+// Débite `amount` si le solde suffit. Retourne le nouveau solde, ou null si le solde est insuffisant (rien n'est écrit).
+// Sans `client`, ouvre sa propre transaction ; sinon s'inscrit dans celle de l'appelant.
+async function debit(userId, amount, reason, client = null) {
+  if (!client) return db.transaction(conn => debit(userId, amount, reason, conn));
+  const { rows } = await client.query(
+    'UPDATE progress SET coins = coins - $1 WHERE user_id = $2 AND coins >= $1 RETURNING coins',
+    [amount, userId]
+  );
+  if (!rows.length) return null;
+  await client.query('INSERT INTO coin_ledger (user_id, amount, reason) VALUES ($1, $2, $3)', [userId, -amount, reason]);
+  return rows[0].coins;
 }
 
 async function balance(userId) {

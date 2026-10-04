@@ -320,8 +320,8 @@ test('le Livre : pages ouvertes bornées, plateau d’éléments possédés, aid
       assert.ok(page.tray.length > 0 && page.tray.every(name => owned.includes(name)), chapter.id);
       assert.equal(page.given, undefined);
       assert.equal(page.freeInkAfter, DIFFICULTY[chapter.id].freeInkAfter);
-      // Chapitres I et II : chaque page a son énigme (db/content/riddles.py)
-      if (['I', 'II'].includes(chapter.id)) assert.ok(page.riddle && page.riddle.length <= 80, chapter.id);
+      // Chaque page a son énigme (db/content/riddles.py)
+      assert.ok(page.riddle && page.riddle.length <= 80, chapter.id);
       assert.equal(Boolean(page.first), DIFFICULTY[chapter.id].letter);
     }
   }
@@ -543,3 +543,57 @@ test('le Monde : un chantier demande son plan du Livre et ses ressources, puis c
   await sql('UPDATE world_stock SET stone = 10, wood = 20 WHERE user_id = $1', [player.userId]);
   assert.equal((await api('POST', '/play/world/build', { site: 'foyer' }, player)).status, 403);
 });
+
+test('le pendu : lettres jugées par le serveur, trois erreurs, rejouer contre des écus, nom à fabriquer', async () => {
+  const player = await newPlayer();
+  const { rules, owned } = await withStars(player);
+  const page = (await chapterPages(player, 'I')).find(p => recipeOfPage(rules, owned, p.id));
+  const { result: name } = recipeOfPage(rules, owned, page.id);
+  const fold = c => c.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  const letters = [...new Set([...name].map(fold).filter(c => /^[A-Z]$/.test(c)))];
+  const wrong = [...'ZXWKQJVYBHFG'].filter(c => !letters.includes(c));
+  assert.equal(page.hangman.max, 3);
+  assert.equal(page.hangman.mask[0], name[0]);
+  assert.equal(page.hangman.name, undefined);
+  const say = (letter, who = player) => api('POST', '/play/letter', { page: page.id, letter }, who);
+
+  assert.equal((await say('1')).status, 400);
+  const miss = await say(wrong[0]);
+  assert.equal(miss.data.hangman.misses, 1);
+  // La même lettre ne compte qu'une fois
+  assert.equal((await say(wrong[0])).data.hangman.misses, 1);
+  const hit = await say(letters[letters.length - 1]);
+  assert.equal(hit.data.hangman.misses, 1);
+  assert.ok(hit.data.hangman.emoji);
+  assert.equal(hit.data.hangman.name, undefined);
+  await say(wrong[1]);
+  const lost = await say(wrong[2]);
+  assert.ok(lost.data.hangman.failedUntil);
+  assert.equal((await say(letters[0])).status, 409);
+
+  // Rejouer : compte et écus requis, une seule fois payé
+  assert.equal((await api('POST', '/play/letter/retry', { page: page.id }, player)).status, 400);
+  await sql('UPDATE progress SET coins = 30 WHERE user_id = $1', [player.userId]);
+  const again = await api('POST', '/play/letter/retry', { page: page.id }, player);
+  assert.equal(again.status, 200);
+  assert.equal(again.data.coins, 10);
+  assert.equal(again.data.hangman.misses, 0);
+  assert.equal((await api('POST', '/play/letter/retry', { page: page.id }, player)).status, 409);
+
+  // Toutes les lettres : le nom et l'illustration, mais l'élément reste à fabriquer
+  let last;
+  for (const letter of letters) last = await say(letter);
+  assert.equal(last.data.hangman.name, name);
+  assert.ok(!(await api('GET', '/play/book', null, player)).data.chapters[0].pages.some(p => p.status === 'found' && p.name === name));
+  const found = await api('POST', '/play/combine', { mode: 'infinite', ingredients: recipeOfPage(rules, owned, page.id).ingredients }, player);
+  assert.equal(found.data.result, name);
+  assert.equal((await sql('SELECT COUNT(*)::int AS n FROM book_letters WHERE owner = $1', [`u:${player.userId}`]))[0].n, 0);
+
+  // Un invité joue aussi, mais ne peut pas payer pour rejouer
+  const visitor = await guest();
+  const [easy] = await chapterPages(visitor, 'I');
+  assert.equal((await api('POST', '/play/letter', { page: easy.id, letter: 'E' }, visitor)).status, 200);
+  assert.equal((await api('POST', '/play/letter/retry', { page: easy.id }, visitor)).status, 402);
+  assert.equal((await api('POST', '/play/letter', { page: 'nimporte-quoi', letter: 'E' }, visitor)).status, 404);
+});
+
