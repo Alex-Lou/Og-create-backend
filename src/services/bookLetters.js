@@ -2,38 +2,41 @@
 // Chaque lettre passe par une transaction sur la ligne verrouillée : un double envoi ne compte pas deux erreurs.
 const db = require('../config/db');
 const ledger = require('./ledger');
-const { has, solvedBy, failedUntil } = require('./hangman');
+const { judge, solvedBy, failedUntil } = require('./hangman');
 
 const RETRY_PRICE = 20;
 
-// Parties en cours du joueur : { pageId: { letters, misses, failed_at } }
+// Parties en cours du joueur : { pageId: { letters, revealed, misses, failed_at } }
 async function byPage(owner) {
-    const { rows } = await db.query('SELECT page_id, letters, misses, failed_at FROM book_letters WHERE owner = $1', [owner.key]);
+    const { rows } = await db.query('SELECT page_id, letters, revealed, misses, failed_at FROM book_letters WHERE owner = $1', [owner.key]);
     return Object.fromEntries(rows.map(({ page_id: id, ...row }) => [id, row]));
 }
 
-// Propose une lettre. { row } (état à jour) ou { blocked: row } si la partie est perdue depuis moins de 24 h.
-// first : la page donne déjà la première lettre.
-function guess(owner, page, name, letter, max, first) {
+// Pose `letter` en `position` (case encore cachée). { row, verdict, solved } ; { blocked: row } si la partie est perdue
+// depuis moins de 24 h ; { invalid: true } si la case est déjà visible. first : la page donne la première lettre.
+function guess(owner, page, name, position, letter, max, first) {
     return db.transaction(async conn => {
         await conn.query('INSERT INTO book_letters (owner, page_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [owner.key, page]);
         const { rows: [row] } = await conn.query(
-            'SELECT letters, misses, failed_at FROM book_letters WHERE owner = $1 AND page_id = $2 FOR UPDATE', [owner.key, page]);
+            'SELECT letters, revealed, misses, failed_at FROM book_letters WHERE owner = $1 AND page_id = $2 FOR UPDATE', [owner.key, page]);
         if (failedUntil(row)) return { blocked: row };
-        // Échec de la veille : toutes les vies reviennent, les lettres déjà proposées restent
-        let { letters, misses } = row;
-        if (row.failed_at) misses = 0;
+        const revealed = row.revealed || [];
+        if (revealed.includes(position) || (first && position === 0)) return { invalid: true };
+        // Échec de la veille : toutes les vies reviennent, les lettres déjà posées restent
+        let misses = row.failed_at ? 0 : row.misses;
         let failedAt = null;
-        if (!solvedBy(name, letters, first) && !letters.includes(letter)) {
-            letters += letter;
-            if (!has(name, letter)) misses++;
-            if (misses >= max) failedAt = new Date();
-        }
+        const verdict = judge(name, position, letter);
+        const known = row.letters.includes(letter);
+        if (verdict === 'hit') revealed.push(position);
+        // Une lettre absente ne coûte qu'une fois ; une lettre présente mais mal placée ne coûte rien
+        if (verdict === 'miss' && !known) misses++;
+        if (misses >= max) failedAt = new Date();
+        const letters = known ? row.letters : row.letters + letter;
         const { rows: [saved] } = await conn.query(
-            `UPDATE book_letters SET letters = $3, misses = $4, failed_at = $5, updated_at = NOW()
-             WHERE owner = $1 AND page_id = $2 RETURNING letters, misses, failed_at`,
-            [owner.key, page, letters, misses, failedAt]);
-        return { row: saved };
+            `UPDATE book_letters SET letters = $3, revealed = $4, misses = $5, failed_at = $6, updated_at = NOW()
+             WHERE owner = $1 AND page_id = $2 RETURNING letters, revealed, misses, failed_at`,
+            [owner.key, page, letters, revealed, misses, failedAt]);
+        return { row: saved, verdict, solved: solvedBy(name, revealed, first) };
     });
 }
 
@@ -41,13 +44,13 @@ function guess(owner, page, name, letter, max, first) {
 function retry(owner, page) {
     return db.transaction(async conn => {
         const { rows: [row] } = await conn.query(
-            'SELECT letters, misses, failed_at FROM book_letters WHERE owner = $1 AND page_id = $2 FOR UPDATE', [owner.key, page]);
+            'SELECT letters, revealed, misses, failed_at FROM book_letters WHERE owner = $1 AND page_id = $2 FOR UPDATE', [owner.key, page]);
         if (!failedUntil(row)) return { status: 409, message: 'Cette partie n’est pas perdue.' };
         const coins = await ledger.debit(owner.id, RETRY_PRICE, 'pendu', conn);
         if (coins === null) return db.rollback({ status: 400, message: `Il te faut ${RETRY_PRICE} écus.` });
         const { rows: [saved] } = await conn.query(
             `UPDATE book_letters SET misses = 0, failed_at = NULL, updated_at = NOW()
-             WHERE owner = $1 AND page_id = $2 RETURNING letters, misses, failed_at`, [owner.key, page]);
+             WHERE owner = $1 AND page_id = $2 RETURNING letters, revealed, misses, failed_at`, [owner.key, page]);
         return { row: saved, coins };
     });
 }

@@ -6,7 +6,8 @@ const bookPages = require('../../services/bookPages');
 const bookTries = require('../../services/bookTries');
 const bookLetters = require('../../services/bookLetters');
 const hangman = require('../../services/hangman');
-const { PAGE, playLimiter, withPlayer, pay } = require('./shared');
+const book = require('../../services/recipeBook');
+const { PAGE, playLimiter, withPlayer, pay, discovered } = require('./shared');
 
 const router = express.Router();
 
@@ -42,15 +43,27 @@ async function letterTarget(req, res, owner, b) {
     return { id, name: target.name, max, first, view: row => hangman.state(target.name, row, max, first, info.emoji) };
 }
 
-// Pendu : une lettre proposée pour le nom d'une page à portée ; le serveur seul connaît le mot
+// Pendu : une lettre posée dans une case du nom d'une page à portée ; le serveur seul connaît le mot.
+// Mot complet : l'élément est inscrit au carnet, comme après un mélange.
 router.post('/letter', playLimiter, withPlayer(async (req, res, owner, b) => {
     const letter = String(req.body.letter || '').toUpperCase();
+    const position = Number(req.body.position);
     if (!/^[A-Z]$/.test(letter)) return res.status(400).json({ message: 'Lettre invalide' });
     const target = await letterTarget(req, res, owner, b);
     if (!target) return;
-    const played = await bookLetters.guess(owner, target.id, target.name, letter, target.max, target.first);
+    if (!Number.isInteger(position) || position < 0 || position >= [...target.name].length || !hangman.fold([...target.name][position])) {
+        return res.status(400).json({ message: 'Case invalide' });
+    }
+    const played = await bookLetters.guess(owner, target.id, target.name, position, letter, target.max, target.first);
+    if (played.invalid) return res.status(409).json({ message: 'Cette case est déjà remplie.' });
     if (played.blocked) return res.status(409).json({ message: 'Partie perdue : reviens demain, ou rejoue contre des écus.', page: target.id, hangman: target.view(played.blocked) });
-    res.json({ page: target.id, hangman: target.view(played.row) });
+    const reply = { page: target.id, verdict: played.verdict, hangman: target.view(played.row) };
+    if (played.solved) {
+        const owned = await players.elements(owner);
+        const isNew = await players.addElement(owner, target.name);
+        reply.inscribed = { result: target.name, ...book.describe(b, [target.name])[target.name], isNew, unexplored: await discovered(owner, b, owned, target.name) };
+    }
+    res.json(reply);
 }));
 
 // Pendu : rejouer tout de suite une partie perdue, contre des écus (compte)

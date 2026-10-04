@@ -544,32 +544,45 @@ test('le Monde : un chantier demande son plan du Livre et ses ressources, puis c
   assert.equal((await api('POST', '/play/world/build', { site: 'foyer' }, player)).status, 403);
 });
 
-test('le pendu : lettres jugées par le serveur, trois erreurs, rejouer contre des écus, nom à fabriquer', async () => {
+test('le pendu : lettre posée case par case, erreur douce, trois erreurs, rejouer contre des écus, élément inscrit', async () => {
   const player = await newPlayer();
   const { rules, owned } = await withStars(player);
   const page = (await chapterPages(player, 'I')).find(p => recipeOfPage(rules, owned, p.id));
   const { result: name } = recipeOfPage(rules, owned, page.id);
   const fold = c => c.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
-  const letters = [...new Set([...name].map(fold).filter(c => /^[A-Z]$/.test(c)))];
-  const wrong = [...'ZXWKQJVYBHFG'].filter(c => !letters.includes(c));
+  const chars = [...name].map(fold);
+  // Cases à jouer : lettres A-Z, hors première lettre donnée par la page
+  const cells = chars.map((c, i) => i).filter(i => /^[A-Z]$/.test(chars[i]) && i !== 0);
+  const wrong = [...'ZXWKQJVYBHFG'].filter(c => !chars.includes(c));
   assert.equal(page.hangman.max, 3);
   assert.equal(page.hangman.mask[0], name[0]);
-  assert.equal(page.hangman.name, undefined);
-  const say = (letter, who = player) => api('POST', '/play/letter', { page: page.id, letter }, who);
+  const put = (position, letter, who = player, at = page.id) => api('POST', '/play/letter', { page: at, position, letter }, who);
 
-  assert.equal((await say('1')).status, 400);
-  const miss = await say(wrong[0]);
+  assert.equal((await put(cells[0], '1')).status, 400);
+  assert.equal((await put(99, 'E')).status, 400);
+  assert.equal((await put(0, chars[0])).status, 409);
+  // Absente : une goutte, une seule fois par lettre
+  const miss = await put(cells[0], wrong[0]);
+  assert.equal(miss.data.verdict, 'miss');
   assert.equal(miss.data.hangman.misses, 1);
-  // La même lettre ne compte qu'une fois
-  assert.equal((await say(wrong[0])).data.hangman.misses, 1);
-  const hit = await say(letters[letters.length - 1]);
-  assert.equal(hit.data.hangman.misses, 1);
+  assert.equal((await put(cells[0], wrong[0])).data.hangman.misses, 1);
+  // Présente mais ailleurs : aucune goutte (si le mot a au moins deux lettres différentes à jouer)
+  const other = cells.find(i => chars[i] !== chars[cells[0]]);
+  if (other !== undefined) {
+    const elsewhere = await put(cells[0], chars[other]);
+    assert.equal(elsewhere.data.verdict, 'elsewhere');
+    assert.equal(elsewhere.data.hangman.misses, 1);
+    assert.equal(elsewhere.data.hangman.mask[cells[0]], null);
+  }
+  // Juste : seulement cette case, et l'illustration paraît
+  const hit = await put(cells[0], chars[cells[0]]);
+  assert.equal(hit.data.verdict, 'hit');
+  assert.equal(hit.data.hangman.mask[cells[0]], name[cells[0]]);
   assert.ok(hit.data.hangman.emoji);
-  assert.equal(hit.data.hangman.name, undefined);
-  await say(wrong[1]);
-  const lost = await say(wrong[2]);
+  await put(cells[1] ?? cells[0], wrong[1]);
+  const lost = await put(cells[1] ?? cells[0], wrong[2]);
   assert.ok(lost.data.hangman.failedUntil);
-  assert.equal((await say(letters[0])).status, 409);
+  assert.equal((await put(cells[1] ?? cells[0], chars[cells[1] ?? cells[0]])).status, 409);
 
   // Rejouer : compte et écus requis, une seule fois payé
   assert.equal((await api('POST', '/play/letter/retry', { page: page.id }, player)).status, 400);
@@ -580,20 +593,22 @@ test('le pendu : lettres jugées par le serveur, trois erreurs, rejouer contre d
   assert.equal(again.data.hangman.misses, 0);
   assert.equal((await api('POST', '/play/letter/retry', { page: page.id }, player)).status, 409);
 
-  // Toutes les lettres : le nom et l'illustration, mais l'élément reste à fabriquer
+  // Toutes les cases : l'élément est inscrit au carnet, sa page devient trouvée
   let last;
-  for (const letter of letters) last = await say(letter);
-  assert.equal(last.data.hangman.name, name);
-  assert.ok(!(await api('GET', '/play/book', null, player)).data.chapters[0].pages.some(p => p.status === 'found' && p.name === name));
-  const found = await api('POST', '/play/combine', { mode: 'infinite', ingredients: recipeOfPage(rules, owned, page.id).ingredients }, player);
-  assert.equal(found.data.result, name);
+  for (const i of cells.slice(1)) last = await put(i, chars[i]);
+  if (!last) last = hit;
+  assert.equal(last.data.inscribed.result, name);
+  assert.equal(last.data.inscribed.isNew, true);
+  assert.ok(last.data.inscribed.unexplored);
+  const [row] = await sql('SELECT infinite_elements FROM progress WHERE user_id = $1', [player.userId]);
+  assert.ok(row.infinite_elements.includes(name));
+  assert.ok((await api('GET', '/play/book', null, player)).data.chapters[0].pages.some(p => p.status === 'found' && p.name === name));
   assert.equal((await sql('SELECT COUNT(*)::int AS n FROM book_letters WHERE owner = $1', [`u:${player.userId}`]))[0].n, 0);
 
   // Un invité joue aussi, mais ne peut pas payer pour rejouer
   const visitor = await guest();
   const [easy] = await chapterPages(visitor, 'I');
-  assert.equal((await api('POST', '/play/letter', { page: easy.id, letter: 'E' }, visitor)).status, 200);
+  assert.equal((await put(1, 'E', visitor, easy.id)).status, 200);
   assert.equal((await api('POST', '/play/letter/retry', { page: easy.id }, visitor)).status, 402);
-  assert.equal((await api('POST', '/play/letter', { page: 'nimporte-quoi', letter: 'E' }, visitor)).status, 404);
+  assert.equal((await put(1, 'E', visitor, 'nimporte-quoi')).status, 404);
 });
-

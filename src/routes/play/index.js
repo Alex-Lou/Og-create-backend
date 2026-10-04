@@ -3,12 +3,10 @@
 const express = require('express');
 const book = require('../../services/recipeBook');
 const players = require('../../services/players');
-const achievementService = require('../../services/achievementService');
 const trial = require('../../services/trial');
 const bookPages = require('../../services/bookPages');
 const bookTries = require('../../services/bookTries');
-const bookLetters = require('../../services/bookLetters');
-const { NAME, PAGE, playLimiter, addressLimiter, guestLimiter, fail, withPlayer } = require('./shared');
+const { NAME, PAGE, playLimiter, addressLimiter, guestLimiter, fail, withPlayer, discovered } = require('./shared');
 
 const router = express.Router();
 router.use(addressLimiter);
@@ -70,15 +68,7 @@ router.post('/combine', playLimiter, withPlayer(async (req, res, owner, b) => {
     if (aim) reply.aim = aim;
     // Épreuve : le serveur juge la question (réussite, points, progression « 2 / 3 »)
     if (mode === 'timer') reply.trial = await trial.judge(owner, [...run.inventory, result]);
-    if (mode === 'infinite' && isNew) {
-        reply.unexplored = book.unexplored(b, [...inHand, result]);
-        // Page trouvée : son pendu et ses essais ratés n'ont plus d'usage
-        await bookLetters.clear(owner.key, bookPages.pageId(result));
-        if (owner.kind === 'user') {
-            await bookTries.clear(owner.id, bookPages.pageId(result));
-            await achievementService.syncAchievements(owner.id);
-        }
-    }
+    if (mode === 'infinite' && isNew) reply.unexplored = await discovered(owner, b, [...inHand], result);
     res.json(reply);
 }));
 
