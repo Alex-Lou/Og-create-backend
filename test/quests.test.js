@@ -69,6 +69,8 @@ test('la quête active est la première non réclamée ; à la fin, Brume se rep
   assert.equal(active(new Set(), facts({ tiles: 1 })).done, true);
   const second = active(new Set([QUESTS[0].id]), facts());
   assert.equal(second.id, QUESTS[1].id);
+  assert.equal(second.kind, 'runs');
+  assert.equal(second.target, null);
   const source = active(new Set(QUESTS.slice(0, 2).map(q => q.id)), facts());
   assert.deepEqual(source.target, { zone: 'source' });
   const puits = active(new Set(QUESTS.slice(0, 3).map(q => q.id)), facts());
