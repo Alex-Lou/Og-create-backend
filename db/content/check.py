@@ -1,8 +1,8 @@
 # Vérifie les recettes : python3 db/content/check.py [module...]
 # Sans argument : tous les fichiers recipes_*.py présents.
 # Contrôles : noms connus, 2 à 4 ingrédients, clés uniques, résultat != ingrédient,
-# atteignabilité depuis Eau/Feu/Terre/Air, éléments jamais produits.
-import glob, importlib.util, os, sys
+# atteignabilité depuis Eau/Feu/Terre/Air, éléments jamais produits, énigmes des pages.
+import glob, importlib.util, os, re, sys, unicodedata
 from collections import Counter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -36,6 +36,38 @@ def closure(rules, start=BASE):
     return have
 
 
+def norm(text):
+    text = unicodedata.normalize("NFD", text.lower()).replace("’", "'")
+    return "".join(c for c in text if unicodedata.category(c) != "Mn")
+
+
+def named(text, name):
+    """Mots (3 lettres et plus) de `name` présents dans `text`, accents, casse et pluriel ignorés."""
+    words = [w for w in re.split(r"[^a-z0-9]+", norm(name)) if len(w) >= 3]
+    return [w for w in words if re.search(r"(?<![a-z])" + re.escape(w) + r"(s|x|e|es)?(?![a-z])", norm(text))]
+
+
+RIDDLE_MAX = 80
+
+
+def riddle_problems(riddles, rules):
+    """Énigme trop longue, élément inconnu, ou qui nomme l'élément ou l'un de ses ingrédients."""
+    ingredients = {}
+    for ing, res, _ in rules:
+        ingredients.setdefault(res, set()).update(ing.split("+"))
+    problems = []
+    for name, riddle in riddles.items():
+        if name not in FAMILY_OF:
+            problems.append(f"énigme : élément inconnu « {name} »")
+            continue
+        if len(riddle) > RIDDLE_MAX:
+            problems.append(f"énigme de {name} : {len(riddle)} caractères (max {RIDDLE_MAX})")
+        for word in [name] + sorted(ingredients.get(name, ())):
+            if named(riddle, word):
+                problems.append(f"énigme de {name} : nomme « {word} »")
+    return problems
+
+
 def main():
     paths = sorted(glob.glob(os.path.join(HERE, "recipes_*.py")))
     focus = [os.path.join(HERE, a if a.endswith(".py") else a + ".py") for a in sys.argv[1:]]
@@ -62,8 +94,11 @@ def main():
     unreachable = sorted(set(FAMILY_OF) - have)
     never = sorted(set(FAMILY_OF) - produced - set(BASE))
     scope = {os.path.basename(p) for p in focus} or None
+    from riddles import RIDDLES
+    errors += riddle_problems(RIDDLES, rules)
     shown = [e for e in errors if scope is None or e.split(":")[0] in scope]
     print(f"{len(rules)} recettes, {len(FAMILY_OF)} éléments, arités {dict(Counter(len(i.split('+')) for i, _, _ in rules))}")
+    print(f"énigmes : {len(RIDDLES)}")
     print(f"erreurs : {len(shown)}")
     for e in shown[:80]:
         print("  ", e)

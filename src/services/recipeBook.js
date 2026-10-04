@@ -10,7 +10,7 @@ let book = null;
 let loading = null;
 
 async function read() {
-    const { rows } = await db.query('SELECT elements, rules FROM game_data WHERE active = true');
+    const { rows } = await db.query('SELECT elements, rules, metadata FROM game_data WHERE active = true');
     const recipes = new Map(); // clé triée -> résultat
     const meta = new Map(); // nom -> { emoji, family }
     const totals = {}; // famille -> nombre d'éléments
@@ -29,6 +29,12 @@ async function read() {
         }
         for (const [key, result] of Object.entries(row.rules?.rules || {})) {
             recipes.set(keyOf(key.split('+').map(p => p.trim())), result.trim());
+        }
+    }
+    // Énigmes des pages du Livre (ligne « riddles ») : rangées avec l'élément
+    for (const row of rows) {
+        for (const [name, riddle] of Object.entries(row.metadata?.riddles || {})) {
+            if (meta.has(name)) meta.get(name).riddle = riddle;
         }
     }
     // Entrées : [ingrédients, résultat], sans doublon
