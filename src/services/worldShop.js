@@ -1,11 +1,47 @@
 // Boutique des ateliers de l'île : outils (bonus), objets vivants (bonus, visibles et animés sur l'île) et skins
 // (apparence). Catalogue fixe, prix en écus ; chaque article s'ouvre à un palier du bâtiment (minLevel, de I à VII) :
 // les outils aux paliers I et II, les objets aux III et IV, les skins aux I à III, puis un article neuf par palier V,
-// VI et VII (outil, objet, objet légendaire).
+// VI et VII (outil, objet, objet légendaire). S'y ajoutent les teintes (skins qui recolorent le bâtiment, de I à VII)
+// et les pièces rares (skins à accessoire animé, sans prix : elles se trouvent dans les butins).
 // Effets : prod = part de production en plus (ressources et écus du bâtiment), coins = écus par heure en plus,
 // moves = coups de Récolte en plus, charges = parties en réserve en plus, regenMs = délai de retour d'une partie.
 
 const PROD_CAP = 1; // les bonus de production d'un bâtiment s'additionnent jusqu'à +100 %
+const SITE_IDS = ['potager', 'carriere', 'bosquet', 'puits', 'ponton', 'atelier', 'foyer'];
+
+// Teintes : chacune se vend pour chaque bâtiment (« <teinte>-<bâtiment> ») ; le navigateur recolore le dessin
+// du bâtiment à tous ses paliers (src/world/tints.js du front, mêmes identifiants)
+const TINTS = [
+    { id: 'craie', name: 'Craie', minLevel: 1, price: 60 },
+    { id: 'sepia', name: 'Sépia', minLevel: 1, price: 60 },
+    { id: 'corail', name: 'Corail', minLevel: 2, price: 100 },
+    { id: 'ocean', name: 'Océan', minLevel: 2, price: 100 },
+    { id: 'emeraude', name: 'Émeraude', minLevel: 3, price: 160 },
+    { id: 'lavande', name: 'Lavande', minLevel: 3, price: 160 },
+    { id: 'flamboyant', name: 'Flamboyant', minLevel: 4, price: 250 },
+    { id: 'sakura', name: 'Sakura', minLevel: 4, price: 250 },
+    { id: 'frimas', name: 'Frimas', minLevel: 5, price: 400 },
+    { id: 'cristal', name: 'Cristal', minLevel: 5, price: 400 },
+    { id: 'nuit-etoilee', name: 'Nuit étoilée', minLevel: 6, price: 600 },
+    { id: 'or-royal', name: 'Or royal', minLevel: 7, price: 900 }
+];
+// Pièces rares : deux par bâtiment, portées à tous les paliers (src/world/rareSprites.js du front)
+const RARES = [
+    { id: 'papillons', site: 'potager', name: 'Papillons' },
+    { id: 'tournesols', site: 'potager', name: 'Tournesols géants' },
+    { id: 'filon-or', site: 'carriere', name: 'Filon d’or' },
+    { id: 'coeur-lave', site: 'carriere', name: 'Cœur de lave' },
+    { id: 'fees', site: 'bosquet', name: 'Lanternes des fées' },
+    { id: 'petales', site: 'bosquet', name: 'Pluie de pétales' },
+    { id: 'arc-en-ciel', site: 'puits', name: 'Arc-en-ciel' },
+    { id: 'nenuphars', site: 'puits', name: 'Nénuphars et libellules' },
+    { id: 'pavois', site: 'ponton', name: 'Grand pavois' },
+    { id: 'mouettes', site: 'ponton', name: 'Mouettes' },
+    { id: 'etincelles', site: 'atelier', name: 'Gerbe d’étincelles' },
+    { id: 'engrenages', site: 'atelier', name: 'Engrenages d’or' },
+    { id: 'lampions', site: 'foyer', name: 'Lampions de fête' },
+    { id: 'lierre', site: 'foyer', name: 'Lierre et lucioles' }
+];
 
 const ITEMS = [
     // Potager
@@ -82,7 +118,9 @@ const ITEMS = [
     { id: 'grimoire', site: 'foyer', kind: 'objet', name: 'Grimoire volant', price: 2400, minLevel: 7, effect: { charges: 1 } },
     { id: 'toit-rouge', site: 'foyer', kind: 'skin', name: 'Toit rouge', price: 70, minLevel: 2 },
     { id: 'toit-bleu-foyer', site: 'foyer', kind: 'skin', name: 'Toit bleu', price: 70, minLevel: 3 },
-    { id: 'toit-chaume-foyer', site: 'foyer', kind: 'skin', name: 'Toit de chaume', price: 70, minLevel: 4 }
+    { id: 'toit-chaume-foyer', site: 'foyer', kind: 'skin', name: 'Toit de chaume', price: 70, minLevel: 4 },
+    ...TINTS.flatMap(t => SITE_IDS.map(site => ({ id: `${t.id}-${site}`, site, kind: 'skin', name: t.name, price: t.price, minLevel: t.minLevel, tint: true }))),
+    ...RARES.map(rare => ({ ...rare, kind: 'skin', price: null, minLevel: 1, rare: true }))
 ];
 const ITEM_BY_ID = Object.fromEntries(ITEMS.map(item => [item.id, item]));
 
@@ -105,6 +143,8 @@ function bonusesOf(ownedIds) {
 // Texte d'effet d'un article, pour la boutique
 function effectText(item) {
     const e = item.effect;
+    if (item.rare) return 'Pièce rare : elle se trouve dans les butins.';
+    if (item.tint) return 'Recolore le bâtiment, à tous ses paliers.';
     if (!e) return item.kind === 'skin' ? 'Change l’apparence du bâtiment.' : 'Vit sur ton île.';
     if (e.prod) return `+${Math.round(e.prod * 100)} % de production`;
     if (e.coins) return `+${e.coins} écu${e.coins > 1 ? 's' : ''} par heure`;

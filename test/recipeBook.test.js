@@ -262,7 +262,7 @@ test('la boutique par palier : de I à VII, un article neuf aux paliers V, VI et
     assert.ok(items.every(i => Number.isInteger(i.minLevel) && i.minLevel >= 1 && i.minLevel <= 7), site);
     // Outils aux paliers I et II, puis un article par palier V, VI et VII, de plus en plus cher
     assert.deepEqual(items.filter(i => i.kind === 'outil' && i.minLevel <= 2).map(i => i.minLevel).sort(), [1, 2], site);
-    const late = [5, 6, 7].map(level => items.filter(i => i.minLevel === level));
+    const late = [5, 6, 7].map(level => items.filter(i => i.minLevel === level && i.kind !== 'skin'));
     assert.ok(late.every(list => list.length === 1), site);
     assert.ok(late[0][0].price < late[1][0].price && late[1][0].price < late[2][0].price, site);
     // Les bonus de production d'un bâtiment atteignent tout juste le plafond
@@ -275,6 +275,27 @@ test('la boutique par palier : de I à VII, un article neuf aux paliers V, VI et
   assert.equal(shop.effectText(shop.ITEM_BY_ID.golem), '+5 écus par heure');
   assert.equal(shop.effectText(shop.ITEM_BY_ID.poulailler), '+1 écu par heure');
   assert.equal(shop.bonusesOf(['cuisine', 'sablier']).regenMs, 20 * 60 * 1000);
+});
+
+test('les teintes et les pièces rares : douze teintes par bâtiment de I à VII, deux pièces rares sans prix', () => {
+  const shop = require('../src/services/worldShop');
+  const { SITES } = require('../src/services/world');
+  for (const site of Object.keys(SITES)) {
+    const tints = shop.ITEMS.filter(i => i.site === site && i.tint);
+    assert.equal(tints.length, 12, site);
+    assert.ok(tints.every(i => i.kind === 'skin' && i.id.endsWith(`-${site}`) && i.id.length <= 30), site);
+    // Un palier de plus coûte plus cher ; toutes les teintes s'ouvrent entre I et VII
+    const levels = [...new Set(tints.map(i => i.minLevel))].sort();
+    assert.deepEqual(levels, [1, 2, 3, 4, 5, 6, 7], site);
+    for (const a of tints) for (const b of tints) if (a.minLevel < b.minLevel) assert.ok(a.price < b.price, `${a.id} < ${b.id}`);
+    const rares = shop.ITEMS.filter(i => i.site === site && i.rare);
+    assert.equal(rares.length, 2, site);
+    assert.ok(rares.every(i => i.kind === 'skin' && i.price === null && i.minLevel === 1), site);
+  }
+  assert.equal(shop.effectText(shop.ITEM_BY_ID['sakura-foyer']), 'Recolore le bâtiment, à tous ses paliers.');
+  assert.equal(shop.effectText(shop.ITEM_BY_ID.lampions), 'Pièce rare : elle se trouve dans les butins.');
+  // Cosmétiques : aucun bonus
+  assert.deepEqual(shop.bonusesOf(shop.ITEMS.filter(i => i.tint || i.rare).map(i => i.id)), { prod: {}, coins: {}, moves: 0, charges: 0, regenMs: null });
 });
 
 test('la grande île : calques cohérents, chantiers à plat dans leur quartier, anciens quartiers logés', () => {

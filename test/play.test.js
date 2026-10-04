@@ -525,6 +525,40 @@ test('le Monde : la boutique d’un atelier vend outils, objets et skins, une se
   assert.deepEqual(view.sites.find(s => s.id === 'carriere').pending, { coins: 7, stone: 10 });
 });
 
+test('le Monde : une teinte s’achète et se porte ; une pièce rare ne s’achète pas mais se porte une fois trouvée', async () => {
+  const player = await newPlayer({ coins: 500 });
+  const buy = item => api('POST', '/play/world/item', { item }, player);
+  const skin = (site, value) => api('POST', '/play/world/skin', { site, skin: value }, player);
+  await api('GET', '/play/world', null, player);
+  await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'est')`, [player.userId]);
+  await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'atelier', 1)`, [player.userId]);
+  // Teinte du palier I : achetée et portée ; celle du palier II attend le palier
+  const tint = await buy('craie-atelier');
+  assert.equal(tint.status, 200);
+  assert.equal(tint.data.coins, 440);
+  assert.equal(tint.data.world.sites.find(s => s.id === 'atelier').skin, 'craie-atelier');
+  assert.equal((await buy('corail-atelier')).status, 403);
+  // Pièce rare : refusée à l'achat et au port tant qu'elle n'est pas trouvée, sans toucher aux écus
+  const rare = await buy('etincelles');
+  assert.equal(rare.status, 403);
+  assert.match(rare.data.message, /butins/);
+  const notFound = await skin('atelier', 'etincelles');
+  assert.equal(notFound.status, 403);
+  assert.match(notFound.data.message, /butins/);
+  assert.equal(await coinsOf(player), 440);
+  // Trouvée (butin) : elle se porte, ne se rend pas, et la boutique la montre comme rare
+  await sql(`INSERT INTO world_items (user_id, item) VALUES ($1, 'etincelles')`, [player.userId]);
+  const worn = await skin('atelier', 'etincelles');
+  const atelier = worn.data.sites.find(s => s.id === 'atelier');
+  assert.equal(atelier.skin, 'etincelles');
+  assert.deepEqual(atelier.shop.find(i => i.id === 'etincelles'), {
+    id: 'etincelles', kind: 'skin', name: 'Gerbe d’étincelles', price: null, minLevel: 1, rare: true,
+    effect: 'Pièce rare : elle se trouve dans les butins.', gain: null, owned: true
+  });
+  assert.equal(atelier.shop.find(i => i.id === 'craie-atelier').rare, false);
+  assert.equal((await api('POST', '/play/world/item/undo', { item: 'etincelles' }, player)).status, 409);
+});
+
 test('le Monde : une île de l’ancienne carte passe à la nouvelle sans rien perdre', async () => {
   const player = await newPlayer({ coins: 0 });
   await api('GET', '/play/world', null, player);

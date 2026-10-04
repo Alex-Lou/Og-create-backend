@@ -389,7 +389,7 @@ async function view(userId, owned, book) {
             produce: site.produce || null,
             // Boutique de l'atelier : articles (possédés ou non), skin porté, bonus de production
             shop: shop.ITEMS.filter(item => item.site === id).map(item => ({
-                id: item.id, kind: item.kind, name: item.name, price: item.price, minLevel: item.minLevel,
+                id: item.id, kind: item.kind, name: item.name, price: item.price, minLevel: item.minLevel, rare: Boolean(item.rare),
                 effect: shop.effectText(item), gain: item.effect || null, owned: items.has(item.id)
             })),
             skin: skins[id] || null,
@@ -570,6 +570,7 @@ async function remove(userId, x, y) {
 async function buyItem(userId, itemId) {
     const item = shop.ITEM_BY_ID[itemId];
     if (!item) return { status: 404, message: 'Article inconnu.' };
+    if (item.rare) return { status: 403, message: 'Cette pièce rare ne s’achète pas : elle se trouve dans les butins.' };
     await migrate(userId);
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
@@ -595,6 +596,7 @@ async function buyItem(userId, itemId) {
 async function undoItem(userId, itemId) {
     const item = shop.ITEM_BY_ID[itemId];
     if (!item) return { status: 404, message: 'Article inconnu.' };
+    if (item.rare) return { status: 409, message: 'Une pièce rare ne se rend pas.' };
     return db.transaction(async conn => {
         // La production jusqu'ici compte encore avec l'article
         await gather(userId, conn, await stockOf(userId, conn, true));
@@ -617,7 +619,7 @@ async function chooseSkin(userId, siteId, skinId) {
     }
     const item = shop.ITEM_BY_ID[skinId];
     if (!item || item.kind !== 'skin' || item.site !== siteId) return { status: 400, message: 'Ce skin ne va pas sur ce bâtiment.' };
-    if (!(await itemsOf(userId)).has(skinId)) return { status: 403, message: 'Achète d’abord ce skin.' };
+    if (!(await itemsOf(userId)).has(skinId)) return { status: 403, message: item.rare ? 'Trouve d’abord cette pièce rare dans les butins.' : 'Achète d’abord ce skin.' };
     await db.query(`INSERT INTO world_skins (user_id, site, skin) VALUES ($1, $2, $3)
         ON CONFLICT (user_id, site) DO UPDATE SET skin = EXCLUDED.skin`, [userId, siteId, skinId]);
     return {};
