@@ -26,6 +26,8 @@ const OLD_DECO_RATE = 1;
 const DECO_PRICES = { I: 10, II: 15, III: 25, IV: 40, V: 60, VI: 90, VII: 140 };
 // Récolte : 1 écu par tranche de 10 ressources gagnées
 const HARVEST_COIN_EVERY = 10;
+// Un achat de la boutique s'annule dans les secondes qui suivent (le front montre « Annuler » 4 s ; marge réseau)
+const UNDO_SECONDS = 6;
 
 // Chantiers : 7 paliers, un par chapitre du Livre (le palier N demande le chapitre N ouvert), chacun avec son plan
 // (élément découvert), son coût en ressources et en écus (dès le palier III) ; l'emprise passe à 3 × 3 au palier IV.
@@ -588,6 +590,24 @@ async function buyItem(userId, itemId) {
     });
 }
 
+// Annulation d'un achat de la boutique juste après (achat en un toucher) : l'article est rendu, ses écus remboursés
+// une seule fois (même en double clic), son skin retiré s'il était porté. { status, message } si refus ou trop tard
+async function undoItem(userId, itemId) {
+    const item = shop.ITEM_BY_ID[itemId];
+    if (!item) return { status: 404, message: 'Article inconnu.' };
+    return db.transaction(async conn => {
+        // La production jusqu'ici compte encore avec l'article
+        await gather(userId, conn, await stockOf(userId, conn, true));
+        const removed = await conn.query(
+            'DELETE FROM world_items WHERE user_id = $1 AND item = $2 AND bought_at > NOW() - make_interval(secs => $3) RETURNING bought_at',
+            [userId, item.id, UNDO_SECONDS]);
+        if (!removed.rows.length) return db.rollback({ status: 409, message: 'Trop tard pour annuler cet achat.' });
+        await conn.query('DELETE FROM world_skins WHERE user_id = $1 AND site = $2 AND skin = $3', [userId, item.site, item.id]);
+        const { coins } = await ledger.credit(userId, item.price, 'boutique-annulee', `${item.id}:${removed.rows[0].bought_at.getTime()}`, conn);
+        return { undone: item.name, coins };
+    });
+}
+
 // Skin porté par un bâtiment : un skin possédé de ce bâtiment, ou aucun (apparence d'origine)
 async function chooseSkin(userId, siteId, skinId) {
     if (!SITES[siteId]) return { status: 404, message: 'Bâtiment inconnu.' };
@@ -630,5 +650,5 @@ async function collect(userId) {
 
 module.exports = {
     SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, isFree, pendingOf, chargesAt, effectsOf, productionOf,
-    view, build, buyZone, buyItem, chooseSkin, startRun, finishRun, place, remove, collect, migrate, claimQuest, board
+    view, build, buyZone, buyItem, undoItem, chooseSkin, startRun, finishRun, place, remove, collect, migrate, claimQuest, board
 };
