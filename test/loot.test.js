@@ -36,7 +36,7 @@ test('coffre du jour : la série monte du commun au légendaire', () => {
 });
 
 test('chaque chapitre du II au VII offre sa pièce rare ; les quêtes de fin d’acte, un coffre', () => {
-  assert.deepEqual(Object.keys(loot.CHAPTER_RARES).sort(), ['II', 'III', 'IV', 'V', 'VI', 'VII']);
+  assert.deepEqual(Object.keys(loot.CHAPTER_RARES), ['II', 'III', 'IV', 'V', 'VI', 'VII']);
   for (const id of Object.values(loot.CHAPTER_RARES)) assert.ok(shop.ITEM_BY_ID[id].rare, id);
   const acts = QUESTS.filter(q => q.chest).map(q => q.act);
   assert.deepEqual(acts, ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII']);

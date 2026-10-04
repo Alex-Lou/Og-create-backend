@@ -10,10 +10,12 @@ const RESOURCES = ['stone', 'wood', 'water', 'food'];
 const HARVEST = { chance: 1 / 3, minMoves: 5, bigChain: 8, odds: { commun: 60, rare: 28, epique: 10, legendaire: 2 } };
 // Bouteille à la mer : une par tranche de 6 heures (heure de Paris), à ouvrir sur la plage
 const BOTTLE = { hours: 6, odds: { commun: 75, rare: 22, epique: 3 } };
-// Pièce rare offerte par chaque chapitre du Livre (catalogue de la boutique : { chapitre: article }). Les autres pièces
-// rares viennent des coffres légendaires.
+// Pièce rare offerte par chaque chapitre du Livre (catalogue de la boutique : { chapitre: article }, dans l'ordre des
+// chapitres). Les autres pièces rares viennent des coffres légendaires.
 const RARES = shop.ITEMS.filter(item => item.rare);
-const CHAPTER_RARES = Object.fromEntries(RARES.filter(item => item.chapter).map(item => [item.chapter, item.id]));
+const CHAPTERS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
+const CHAPTER_RARES = Object.fromEntries(RARES.filter(item => item.chapter)
+    .sort((a, b) => CHAPTERS.indexOf(a.chapter) - CHAPTERS.indexOf(b.chapter)).map(item => [item.chapter, item.id]));
 // Écus quand il n'y a plus de teinte ou de pièce rare à gagner
 const EPIC_COINS = [200, 300];
 const LEGEND_COINS = 600;
