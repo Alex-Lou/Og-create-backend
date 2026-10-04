@@ -219,11 +219,14 @@ test('le Monde : écus dus (ancienne règle), parties qui reviennent, effets et 
 
   // Cases libres : terre, hors chantier, dans un quartier possédé
   const core = new Set(['coeur']);
-  assert.equal(isFree(9, 9, core), false);
-  assert.equal(isFree(8, 8, core), true);
+  // Grande île : herbe de la Grève libre ; chantier du Foyer, mer, chemin et arbre refusés ; la Source à acheter
+  assert.equal(isFree(30, 32, core), false);
+  assert.equal(isFree(31, 35, core), true);
   assert.equal(isFree(0, 0, core), false);
-  assert.equal(isFree(9, 15, core), false);
-  assert.equal(isFree(9, 15, new Set(['coeur', 'source'])), true);
+  assert.equal(isFree(27, 31, core), false);
+  assert.equal(isFree(30, 35, core), false);
+  assert.equal(isFree(24, 33, core), false);
+  assert.equal(isFree(24, 33, new Set(['coeur', 'source'])), true);
 });
 
 test('la boutique des ateliers : bonus additionnés et plafonnés, effets sur la Récolte et la production', () => {
@@ -251,18 +254,44 @@ test('la boutique des ateliers : bonus additionnés et plafonnés, effets sur la
   assert.equal(shop.effectText(shop.ITEM_BY_ID.pelle), '+20 % de production');
 });
 
-test('la carte de l’île : côte organique, chaque chantier sur la terre et dans un seul quartier', () => {
+test('la grande île : calques cohérents, chantiers à plat dans leur quartier, anciens quartiers logés', () => {
   const map = require('../src/services/worldMap');
-  assert.equal(map.GRID.length, map.SIZE);
-  assert.ok(map.GRID.every(row => row.length === map.SIZE));
-  for (const [id, p] of Object.entries(map.SITE_PLACES)) {
-    const zones = new Set([[0, 0], [1, 0], [0, 1], [1, 1]].map(([dx, dy]) => map.zoneAt(p.x + dx, p.y + dy)));
-    assert.equal(zones.size, 1, id);
-    assert.ok(!zones.has(null), id);
+  const legacy = require('../src/services/worldMapV2');
+  for (const layer of [map.GRID, map.HEIGHT, map.GROUND, map.REGION]) {
+    assert.equal(layer.length, map.SIZE);
+    assert.ok(layer.every(row => row.length === map.SIZE));
+  }
+  // Mer partout où il n'y a ni relief ni quartier (le pont de l'îlot excepté) ; relief de 0 à 3
+  for (let y = 0; y < map.SIZE; y++) {
+    for (let x = 0; x < map.SIZE; x++) {
+      const g = map.groundAt(x, y);
+      assert.ok('~sdgmftrwpkb'.includes(g), `${x},${y} ${g}`);
+      if (g === '~') assert.ok(map.heightAt(x, y) === -1 && map.zoneAt(x, y) === null, `${x},${y}`);
+      else if (g !== 'b') assert.ok(map.heightAt(x, y) >= 0 && map.heightAt(x, y) <= 3 && map.zoneAt(x, y), `${x},${y}`);
+    }
+  }
+  // Chaque chantier : grande emprise 3 × 3 plate, constructible, dans un seul quartier ; la petite y est incluse
+  for (const [id, p] of Object.entries(map.SITE_BIG)) {
+    const cells = [];
+    for (let dy = 0; dy < 3; dy++) for (let dx = 0; dx < 3; dx++) cells.push([p.x + dx, p.y + dy]);
+    assert.equal(new Set(cells.map(([x, y]) => map.zoneAt(x, y))).size, 1, id);
+    assert.equal(new Set(cells.map(([x, y]) => map.heightAt(x, y))).size, 1, id);
+    assert.ok(cells.every(([x, y]) => map.buildable(x, y)), id);
+    const small = map.footprintOf(id, 1);
+    assert.ok(small.x >= p.x && small.y >= p.y && small.x + 2 <= p.x + 3 && small.y + 2 <= p.y + 3, id);
   }
   assert.equal(map.siteZone('foyer'), 'coeur');
-  // Chaque quartier a des cases et un panneau ; l'île n'est pas un carré (des cases de mer à l'intérieur de son cadre)
+  // La Mine s'adosse à la falaise de la Colline : du relief plus haut juste derrière elle
+  const mine = map.SITE_BIG.carriere;
+  assert.ok([0, 1, 2].some(d => map.heightAt(mine.x + d, mine.y - 1) > map.heightAt(mine.x, mine.y)));
+  // Douze quartiers, chacun avec son panneau ; les sept anciens gardent leur identifiant
+  assert.equal(map.ZONES.length, 12);
   map.ZONES.forEach(z => assert.ok(map.ANCHORS[z.id], z.id));
-  assert.equal(map.isLand(1, 1), false);
-  assert.equal(map.isLand(10, 10), true);
+  // Chaque ancien quartier tient dans le nouveau, même avec tous les chantiers au plus grand
+  const all = Object.fromEntries(Object.keys(map.SITE_BIG).map(id => [id, 7]));
+  const old = {};
+  for (let y = 0; y < legacy.SIZE; y++) for (let x = 0; x < legacy.SIZE; x++) { const z = legacy.zoneAt(x, y); if (z) old[z] = (old[z] || 0) + 1; }
+  for (const [zone, count] of Object.entries(old)) assert.ok(map.freeSpots(zone, all).length >= count, zone);
+  assert.equal(map.isLand(0, 0), false);
+  assert.equal(map.isLand(map.SITE_BIG.foyer.x, map.SITE_BIG.foyer.y), true);
 });

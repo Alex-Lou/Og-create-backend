@@ -32,7 +32,7 @@ router.post('/world/place', withAccount(async (req, res, owner, b) => {
 
 router.post('/world/remove', withAccount(async (req, res, owner, b) => {
     const x = Number(req.body.x), y = Number(req.body.y);
-    if (![x, y].every(v => Number.isInteger(v) && v >= 0 && v < 32)) return res.status(400).json({ message: 'Case invalide' });
+    if (![x, y].every(v => Number.isInteger(v) && v >= 0 && v < world.SIZE)) return res.status(400).json({ message: 'Case invalide' });
     await world.remove(owner.id, x, y);
     res.json(await worldView(owner, b));
 }));
