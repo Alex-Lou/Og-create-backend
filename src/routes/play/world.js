@@ -97,6 +97,11 @@ router.post('/world/harvest/finish', withAccount(async (req, res, owner, b) => {
     res.json({ gains: done.gains, coins: done.coins, world: await worldView(owner, b) });
 }));
 
+// Brume seule (la quête active), pour le Livre : une quête accomplie y est annoncée
+router.get('/world/brume', withAccount(async (req, res, owner, b) => {
+    res.json(await world.board(owner.id, bookPages.starsOf(b, await players.elements(owner))));
+}));
+
 // Quête de Brume : réclamer la récompense de la quête active
 router.post('/world/quest', withAccount(async (req, res, owner, b) => {
     const id = String(req.body.id || '');
