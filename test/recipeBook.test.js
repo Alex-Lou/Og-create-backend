@@ -70,6 +70,7 @@ test('le Livre : pages trouvées, pages à portée sans nom, chapitres scellés'
   const after = view(b, [...BASE, 'Vapeur']);
   const vapeur = after.chapters[1].pages.find(p => p.name === 'Vapeur');
   assert.deepEqual(vapeur.recipe, ['Eau', 'Feu']);
+  assert.equal(vapeur.riddle, 'Je m’élève en soupirant.');
   assert.equal(after.stars, 1);
 });
 

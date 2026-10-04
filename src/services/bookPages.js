@@ -132,7 +132,12 @@ function view(b, owned, misses = {}, letters = {}) {
             const info = b.meta.get(name);
             if (have.has(name)) {
                 found++;
-                pages.push({ id: pageId(name), status: 'found', name, emoji: info.emoji, family: info.family, recipe: BASE_ELEMENTS.includes(name) ? null : within.get(name)?.[0] || null });
+                pages.push({
+                    id: pageId(name), status: 'found', name, emoji: info.emoji, family: info.family,
+                    recipe: BASE_ELEMENTS.includes(name) ? null : within.get(name)?.[0] || null,
+                    // L'énigme reste sur la page une fois l'élément trouvé
+                    ...(info.riddle ? { riddle: info.riddle } : {})
+                });
             } else if (opened.has(name)) {
                 const parts = recipeOf.get(name);
                 const id = pageId(name);
