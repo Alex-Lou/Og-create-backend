@@ -3,14 +3,19 @@ const express = require('express');
 const book = require('../../services/recipeBook');
 const players = require('../../services/players');
 const world = require('../../services/world');
+const bookPages = require('../../services/bookPages');
 const { NAME, playLimiter, withAccount } = require('./shared');
 
 const router = express.Router();
 router.use('/world', playLimiter);
 
 async function worldView(owner, b) {
-    return world.view(owner.id, await players.elements(owner), names => book.describe(b, names));
+    const owned = await players.elements(owner);
+    return world.view(owner.id, owned, { describe: names => book.describe(b, names), openChapters: bookPages.openChapters(b, owned) });
 }
+
+// Prix d'une décoration : selon le chapitre de la famille de l'élément
+const decoPrice = (b, element) => world.DECO_PRICES[bookPages.chapterOf(b.meta.get(element)?.family).id];
 
 router.get('/world', withAccount(async (req, res, owner, b) => {
     res.json(await worldView(owner, b));
@@ -19,9 +24,10 @@ router.get('/world', withAccount(async (req, res, owner, b) => {
 router.post('/world/place', withAccount(async (req, res, owner, b) => {
     const { element } = req.body;
     if (typeof element !== 'string' || !NAME.test(element)) return res.status(400).json({ message: 'Élément invalide' });
-    const placed = await world.place(owner.id, await players.elements(owner), element, Number(req.body.x), Number(req.body.y));
+    const placed = await world.place(owner.id, await players.elements(owner), element, Number(req.body.x), Number(req.body.y), decoPrice(b, element));
     if (placed.status) return res.status(placed.status).json({ message: placed.message });
-    res.json(await worldView(owner, b));
+    // Solde après achat (absent pour un simple déplacement)
+    res.json({ ...(await worldView(owner, b)), ...(placed.coins !== undefined ? { coins: placed.coins } : {}) });
 }));
 
 router.post('/world/remove', withAccount(async (req, res, owner, b) => {
@@ -32,8 +38,17 @@ router.post('/world/remove', withAccount(async (req, res, owner, b) => {
 }));
 
 router.post('/world/collect', withAccount(async (req, res, owner, b) => {
-    const { gained, coins } = await world.collect(owner.id);
-    res.json({ gained, coins, world: await worldView(owner, b) });
+    const { gained, stock, coins } = await world.collect(owner.id);
+    res.json({ gained, stock, coins, world: await worldView(owner, b) });
+}));
+
+// Quartier : écus et chapitre du Livre ouvert
+router.post('/world/zone', withAccount(async (req, res, owner, b) => {
+    const zone = String(req.body.zone || '');
+    if (!/^[a-z]{1,20}$/.test(zone)) return res.status(400).json({ message: 'Quartier invalide' });
+    const done = await world.buyZone(owner.id, zone, bookPages.openChapters(b, await players.elements(owner)));
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json({ bought: done.bought, coins: done.coins, world: await worldView(owner, b) });
 }));
 
 // Chantier : niveau suivant, avec son plan (élément du Livre) et ses ressources
@@ -57,7 +72,7 @@ router.post('/world/harvest/finish', withAccount(async (req, res, owner, b) => {
     if (!Number.isSafeInteger(run) || run <= 0 || !Array.isArray(req.body.moves)) return res.status(400).json({ message: 'Partie invalide' });
     const done = await world.finishRun(owner.id, run, req.body.moves);
     if (done.status) return res.status(done.status).json({ message: done.message });
-    res.json({ gains: done.gains, world: await worldView(owner, b) });
+    res.json({ gains: done.gains, coins: done.coins, world: await worldView(owner, b) });
 }));
 
 module.exports = router;
