@@ -95,27 +95,27 @@ FAMILIES = {
   },
 
   "Flore": {
-    "Plante": "🌿", "Arbre": "🌳", "Herbe": "svg:herbe", "Fleur": "🌸", "Rose": "🌹",
-    "Cactus": "🌵", "Bambou": "🎋", "Blé": "🌾", "Riz": "🍚", "Maïs": "🌽", "Vigne": "svg:vigne",
-    "Raisin": "🍇", "Pomme": "🍎", "Olive": "🫒", "Légume": "🥕", "Pomme de terre": "🥔",
-    "Tournesol": "🌻", "Chêne": "svg:chene", "Sapin": "🌲", "Palmier": "🌴", "Lierre": "svg:lierre",
-    "Mousse": "🟩", "Fougère": "svg:fougere", "Champignon": "🍄", "Algue": "svg:algue", "Graine": "🌰",
-    "Fruit": "🍑", "Pollen": "svg:pollen", "Feuille": "🍃", "Racine": "🫚", "Bois": "🪵",
-    "Cotonnier": "svg:cotonnier", "Lin": "svg:lin", "Thé": "🍵", "Café": "☕", "Cacao": "🫘",
-    "Canne à sucre": "svg:canne-a-sucre", "Herbe médicinale": "svg:herbe-medicinale", "Lichen": "svg:lichen", "Nénuphar": "🪷",
+    "Plante": "svg:plante", "Arbre": "svg:arbre", "Herbe": "svg:herbe", "Fleur": "svg:fleur", "Rose": "svg:rose",
+    "Cactus": "svg:cactus", "Bambou": "svg:bambou", "Blé": "svg:ble", "Riz": "svg:riz", "Maïs": "svg:mais", "Vigne": "svg:vigne",
+    "Raisin": "svg:raisin", "Pomme": "svg:pomme", "Olive": "svg:olive", "Légume": "svg:legume", "Pomme de terre": "svg:pomme-de-terre",
+    "Tournesol": "svg:tournesol", "Chêne": "svg:chene", "Sapin": "svg:sapin", "Palmier": "svg:palmier", "Lierre": "svg:lierre",
+    "Mousse": "svg:mousse", "Fougère": "svg:fougere", "Champignon": "svg:champignon", "Algue": "svg:algue", "Graine": "svg:graine",
+    "Fruit": "svg:fruit", "Pollen": "svg:pollen", "Feuille": "svg:feuille", "Racine": "svg:racine", "Bois": "svg:bois",
+    "Cotonnier": "svg:cotonnier", "Lin": "svg:lin", "Thé": "svg:the", "Café": "svg:cafe", "Cacao": "svg:cacao",
+    "Canne à sucre": "svg:canne-a-sucre", "Herbe médicinale": "svg:herbe-medicinale", "Lichen": "svg:lichen", "Nénuphar": "svg:nenuphar",
     # Paquet thématique (culture commune)
-    "Tomate": "🍅", "Laitue": "🥬", "Noix de coco": "🥥", "Érable": "🍁", "Bouquet": "💐",
+    "Tomate": "svg:tomate", "Laitue": "svg:laitue", "Noix de coco": "svg:noix-de-coco", "Érable": "svg:erable", "Bouquet": "svg:bouquet",
     "Citrouille": "svg:citrouille",
   },
 
   "Biologie": {
-    "Vie": "svg:vie", "Cellule": "svg:cellule", "ADN": "🧬", "Gène": "svg:gene", "Bactérie": "svg:bacterie", "Virus": "svg:virus",
-    "Plancton": "🦐", "Protéine": "svg:proteine", "Enzyme": "svg:enzyme", "Photosynthèse": "svg:photosynthese",
-    "Chlorophylle": "🟢", "Évolution": "svg:evolution", "Mutation": "svg:mutation", "Symbiose": "🤝",
-    "Écosystème": "svg:ecosysteme", "Chaîne alimentaire": "🔗", "Décomposition": "🍂", "Fermentation": "svg:fermentation",
-    "Levure": "svg:levure", "Microbe": "🦠", "Organisme": "🧫", "Reproduction": "💞", "Œuf": "🥚",
-    "Embryon": "svg:embryon", "Métamorphose": "svg:metamorphose", "Instinct": "svg:instinct", "Espèce": "svg:espece", "Extinction": "☠️",
-    "Biodiversité": "svg:biodiversite", "Parasite": "svg:parasite", "Pollinisation": "svg:pollinisation", "Respiration": "🫁",
+    "Vie": "svg:vie", "Cellule": "svg:cellule", "ADN": "svg:adn", "Gène": "svg:gene", "Bactérie": "svg:bacterie", "Virus": "svg:virus",
+    "Plancton": "svg:plancton", "Protéine": "svg:proteine", "Enzyme": "svg:enzyme", "Photosynthèse": "svg:photosynthese",
+    "Chlorophylle": "svg:chlorophylle", "Évolution": "svg:evolution", "Mutation": "svg:mutation", "Symbiose": "svg:symbiose",
+    "Écosystème": "svg:ecosysteme", "Chaîne alimentaire": "svg:chaine-alimentaire", "Décomposition": "svg:decomposition", "Fermentation": "svg:fermentation",
+    "Levure": "svg:levure", "Microbe": "svg:microbe", "Organisme": "svg:organisme", "Reproduction": "svg:reproduction", "Œuf": "svg:oeuf",
+    "Embryon": "svg:embryon", "Métamorphose": "svg:metamorphose", "Instinct": "svg:instinct", "Espèce": "svg:espece", "Extinction": "svg:extinction",
+    "Biodiversité": "svg:biodiversite", "Parasite": "svg:parasite", "Pollinisation": "svg:pollinisation", "Respiration": "svg:respiration",
   },
 
   "Vie et Créatures": {
@@ -144,16 +144,16 @@ FAMILIES = {
   },
 
   "Corps et Esprit": {
-    "Sang": "🩸", "Cœur": "❤️", "Cerveau": "🧠", "Œil": "👁️", "Muscle": "💪", "Squelette": "💀",
-    "Neurone": "svg:neurone", "Pensée": "💭", "Mémoire": "📓", "Rêve": "💤", "Sommeil": "😴",
-    "Émotion": "🥲", "Peur": "😱", "Joie": "😄", "Tristesse": "😢", "Colère": "😠",
-    "Amour": "💗", "Naissance": "👶", "Enfant": "🧒", "Famille": "👪", "Vieillesse": "👴",
-    "Maladie": "🤒", "Santé": "🩺", "Remède": "❤️‍🩹", "Mort": "⚰️", "Tombe": "🪦",
-    "Deuil": "🖤", "Langage": "🗣️", "Conscience": "🧘", "Idée": "svg:idee", "Curiosité": "🔍",
-    "Courage": "svg:courage", "Sagesse": "svg:sagesse", "Faim": "🍽️", "Douleur": "🤕",
+    "Sang": "svg:sang", "Cœur": "svg:coeur", "Cerveau": "svg:cerveau", "Œil": "svg:oeil", "Muscle": "svg:muscle", "Squelette": "svg:squelette",
+    "Neurone": "svg:neurone", "Pensée": "svg:pensee", "Mémoire": "svg:memoire", "Rêve": "svg:reve", "Sommeil": "svg:sommeil",
+    "Émotion": "svg:emotion", "Peur": "svg:peur", "Joie": "svg:joie", "Tristesse": "svg:tristesse", "Colère": "svg:colere",
+    "Amour": "svg:amour", "Naissance": "svg:naissance", "Enfant": "svg:enfant", "Famille": "svg:famille", "Vieillesse": "svg:vieillesse",
+    "Maladie": "svg:maladie", "Santé": "svg:sante", "Remède": "svg:remede", "Mort": "svg:mort", "Tombe": "svg:tombe",
+    "Deuil": "svg:deuil", "Langage": "svg:langage", "Conscience": "svg:conscience", "Idée": "svg:idee", "Curiosité": "svg:curiosite",
+    "Courage": "svg:courage", "Sagesse": "svg:sagesse", "Faim": "svg:faim", "Douleur": "svg:douleur",
     # Paquet thématique (culture commune)
-    "Larme": "😭", "Rire": "😂", "Cauchemar": "😨", "Sueur": "😓", "Fatigue": "🥱", "Pansement": "🩹",
-    "Rhume": "🤧",
+    "Larme": "svg:larme", "Rire": "svg:rire", "Cauchemar": "svg:cauchemar", "Sueur": "svg:sueur", "Fatigue": "svg:fatigue", "Pansement": "svg:pansement",
+    "Rhume": "svg:rhume",
   },
 
   "Créations Humaines": {
