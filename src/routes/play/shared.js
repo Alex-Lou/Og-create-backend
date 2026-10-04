@@ -2,6 +2,10 @@
 const players = require('../../services/players');
 const book = require('../../services/recipeBook');
 const ledger = require('../../services/ledger');
+const bookPages = require('../../services/bookPages');
+const bookTries = require('../../services/bookTries');
+const bookLetters = require('../../services/bookLetters');
+const achievementService = require('../../services/achievementService');
 const { verifyAccess, readCookie } = require('../../services/authSession');
 const { limiter } = require('../../middleware/rateLimit');
 const { log } = require('../../utils/logger');
@@ -51,4 +55,16 @@ async function pay(owner, reason) {
     return { coins };
 }
 
-module.exports = { NAME, PAGE, playLimiter, addressLimiter, guestLimiter, fail, withPlayer, withAccount, pay };
+// Nouvelle découverte du Livre (mélange ou pendu) : sa page n'a plus de pendu ni d'essais ratés, les succès
+// sont revus (compte). Renvoie les mélanges encore inexplorés de chaque élément possédé.
+async function discovered(owner, b, owned, name) {
+    const page = bookPages.pageId(name);
+    await bookLetters.clear(owner.key, page);
+    if (owner.kind === 'user') {
+        await bookTries.clear(owner.id, page);
+        await achievementService.syncAchievements(owner.id);
+    }
+    return book.unexplored(b, [...owned, name]);
+}
+
+module.exports = { NAME, PAGE, playLimiter, addressLimiter, guestLimiter, fail, withPlayer, withAccount, pay, discovered };

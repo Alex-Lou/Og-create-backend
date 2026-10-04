@@ -151,34 +151,37 @@ test('le Livre : la recette d’une page grandit avec le chapitre, sans dépasse
   assert.equal(three.far, 1);
 });
 
-test('le pendu : lettres de jeu, masque, illustration et nom seulement mérités', () => {
-  const { fold, state, maxMisses } = require('../src/services/hangman');
+test('le pendu : lettre posée dans une case, verdicts, masque et illustration', () => {
+  const { fold, state, judge, solvedBy, maxMisses } = require('../src/services/hangman');
   assert.equal(fold('É'), 'E');
   assert.equal(fold('ç'), 'C');
   assert.equal(fold('-'), null);
   assert.equal(fold('œ'), null);
   assert.equal(maxMisses('I'), 3);
   assert.equal(maxMisses('V'), 2);
-  // Rien de proposé : la première lettre (donnée par la page), ni emoji ni nom
+  // Juste, présente ailleurs, absente (accents ignorés)
+  assert.equal(judge('Éclair', 0, 'E'), 'hit');
+  assert.equal(judge('Éclair', 1, 'E'), 'elsewhere');
+  assert.equal(judge('Éclair', 1, 'Z'), 'miss');
+  // Rien de posé : la première lettre (donnée par la page) et les tirets, ni emoji ni nom
   const start = state('Arc-en-ciel', null, 3, true, '🌈');
   assert.deepEqual(start.mask, ['A', null, null, '-', null, null, '-', null, null, null, null]);
   assert.equal(start.emoji, undefined);
   assert.equal(start.name, undefined);
-  // Une bonne lettre : toutes ses places (accents ignorés), et l'illustration commence à paraître
-  const one = state('Éclair', { letters: 'EQ', misses: 1 }, 3, false, '⚡');
+  // Une lettre posée : seulement sa case, et l'illustration commence à paraître
+  const one = state('Éclair', { letters: 'EQ', revealed: [0], misses: 1 }, 3, false, '⚡');
   assert.deepEqual(one.mask, ['É', null, null, null, null, null]);
+  assert.deepEqual(one.absent, ['Q']);
   assert.equal(one.emoji, '⚡');
-  assert.equal(one.misses, 1);
   assert.ok(Math.abs(one.share - 1 / 6) < 1e-9);
-  // Mot complet : le nom est donné
-  const done = state('Vent', { letters: 'ENT', misses: 0 }, 3, true, '🌬️');
-  assert.equal(done.name, 'Vent');
-  assert.equal(done.share, 1);
+  // Mot complet (première lettre donnée comprise)
+  assert.equal(solvedBy('Vent', [1, 2, 3], true), true);
+  assert.equal(solvedBy('Vent', [1, 2], true), false);
   // Partie perdue : rejouable 24 h plus tard, avec toutes ses vies
   const now = new Date('2026-10-04T12:00:00Z');
-  const lost = state('Vent', { letters: 'XYZ', misses: 3, failed_at: new Date('2026-10-04T11:00:00Z') }, 3, true, '🌬️', now);
+  const lost = state('Vent', { letters: 'XYZ', revealed: [], misses: 3, failed_at: new Date('2026-10-04T11:00:00Z') }, 3, true, '🌬️', now);
   assert.equal(lost.failedUntil, '2026-10-05T11:00:00.000Z');
-  const later = state('Vent', { letters: 'XYZ', misses: 3, failed_at: new Date('2026-10-03T10:00:00Z') }, 3, true, '🌬️', now);
+  const later = state('Vent', { letters: 'XYZ', revealed: [], misses: 3, failed_at: new Date('2026-10-03T10:00:00Z') }, 3, true, '🌬️', now);
   assert.equal(later.failedUntil, null);
   assert.equal(later.misses, 0);
 });

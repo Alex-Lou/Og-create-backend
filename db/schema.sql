@@ -290,6 +290,8 @@ CREATE TABLE IF NOT EXISTS book_letters (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (owner, page_id)
 );
+-- Lettre posée dans la case de son choix : positions déjà trouvées (letters garde toutes les lettres essayées)
+ALTER TABLE book_letters ADD COLUMN IF NOT EXISTS revealed SMALLINT[] NOT NULL DEFAULT '{}';
 
 -- Garde-fou : pas de solde négatif (NOT VALID : contrôle les écritures futures sans bloquer sur l'existant)
 DO $$
