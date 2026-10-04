@@ -572,6 +572,7 @@ test('le Monde : un chantier demande son quartier, son plan du Livre et ses ress
   assert.equal(carriere.level, 0);
   assert.equal(carriere.locked, true);
   assert.equal(carriere.next.plan, 'Pierre');
+  assert.deepEqual(carriere.levels.map(l => l.name), ['Carrière', 'Mine']);
   assert.equal(carriere.next.planOwned, false);
   assert.deepEqual(carriere.next.cost, { wood: 5 });
 

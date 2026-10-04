@@ -233,6 +233,8 @@ async function view(userId, owned, book) {
             effect: level ? site.levels[level - 1].effect : null,
             emoji: level && site.levels[level - 1].plan ? known[site.levels[level - 1].plan]?.emoji || null : null,
             produce: site.produce || null,
+            // Tous les paliers, pour la fiche du bâtiment (atteints, suivant, à venir)
+            levels: site.levels.map(l => ({ name: l.name, plan: l.plan, planOwned: !l.plan || have.has(l.plan), planEmoji: l.plan ? known[l.plan]?.emoji || null : null, cost: l.cost, effect: l.effect })),
             pending: made ? { coins: made.coins, [made.resource]: made.amount } : null,
             next: next ? { name: next.name, plan: next.plan, planOwned: !next.plan || have.has(next.plan), planEmoji: next.plan ? known[next.plan]?.emoji || null : null, cost: next.cost, effect: next.effect } : null
         };
@@ -251,6 +253,7 @@ async function view(userId, owned, book) {
         stock: Object.fromEntries(RESOURCES.map(r => [r, stock[r]])),
         charges: { count: charges.count, max: effects.maxCharges, nextIn: charges.count < effects.maxCharges ? Math.max(0, charges.since + REGEN_MS - Date.now()) : null },
         harvest: { maxMoves: effects.maxMoves, kinds: effects.kinds, boosts: effects.boosts, coinEvery: HARVEST_COIN_EVERY },
+        rates: { produce: PRODUCE_PER_LEVEL, coins: COINS_PER_LEVEL },
         capHours: CAP_HOURS,
         decoPrices: DECO_PRICES,
         pending: production.reduce((sum, p) => sum + p.coins, 0),
