@@ -1,4 +1,4 @@
-// Le Monde : l'île du joueur, sur une carte commune (worldMap.js) : un cœur ouvert d'office, six quartiers à acheter
+// Le Monde : l'île du joueur, sur une carte commune (worldMap.js) : la Grève ouverte d'office, onze quartiers à acheter
 // (écus + chapitre du Livre). Les chantiers se construisent puis évoluent avec un plan découvert dans le Livre et des
 // ressources tirées de la Récolte. Les bâtiments de production rapportent ressources et écus ; les décorations
 // s'achètent et embellissent, sans rien produire.
@@ -8,6 +8,7 @@ const db = require('../config/db');
 const ledger = require('./ledger');
 const harvest = require('./harvest');
 const map = require('./worldMap');
+const legacy = require('./worldMapV2');
 const shop = require('./worldShop');
 
 const SIZE = map.SIZE;
@@ -16,7 +17,8 @@ const REGEN_MS = 30 * 60 * 1000; // une partie de Récolte revient toutes les 30
 const RUN_TTL_MS = 24 * 3600 * 1000; // une partie non rendue après 24 h est perdue
 const MOVES = 15;
 const RESOURCES = ['stone', 'wood', 'water', 'food'];
-const MAP_VERSION = 2;
+// 1 : île 14 × 14 ; 2 : île 20 × 20 (worldMapV2.js) ; 3 : la grande île 48 × 48 (worldMap.js)
+const MAP_VERSION = 3;
 // Ancienne règle (v1) : une décoration rapportait 1 écu par heure ; payée une dernière fois à la migration
 const OLD_DECO_RATE = 1;
 // Prix d'une décoration selon le chapitre de l'élément posé
@@ -136,8 +138,9 @@ for (const [id, site] of Object.entries(SITES)) {
     site.levels.forEach((l, i) => { l.effect = effectOf(id, i + 1); l.chapter = CHAPTER_OF_LEVEL[i]; });
 }
 
-// Case où l'on peut poser une décoration : terre, hors emprise d'un chantier (selon son niveau), dans un quartier possédé
-const isFree = (x, y, zones, levels) => Number.isInteger(x) && Number.isInteger(y) && map.isLand(x, y) && !map.inFootprint(x, y, levels) && zones.has(map.zoneAt(x, y));
+// Case où l'on peut poser une décoration : sol constructible (herbe, sable, prairie), hors emprise d'un chantier
+// (selon son niveau), dans un quartier possédé
+const isFree = (x, y, zones, levels) => Number.isInteger(x) && Number.isInteger(y) && map.buildable(x, y) && !map.inFootprint(x, y, levels) && zones.has(map.zoneAt(x, y));
 
 // Écus dus selon l'ancienne règle (décorations) : chaque source compte depuis sa pose ou la dernière récolte, plafonnée
 function pendingOf(sources, collectedAt, now = Date.now()) {
@@ -242,31 +245,68 @@ async function zonesOf(userId, conn = db) {
     return new Set(['coeur', ...rows.map(r => r.zone)]);
 }
 
-// Passage à la carte v2, une fois par joueur, au premier passage : les écus encore dus par les décorations
-// (ancienne règle) sont versés, tout ce qui était posé glisse de OFFSET cases, et les quartiers où le joueur
-// avait déjà un bâtiment ou une décoration lui sont offerts. Verrouillé : deux requêtes ne migrent pas deux fois.
+// Passage aux cartes suivantes, une fois par joueur, au premier passage, verrouillé (deux requêtes ne migrent pas
+// deux fois) et d'un seul tenant (tout ou rien) : v1 → v2 puis v2 → v3 selon l'île du joueur.
 function migrate(userId) {
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
         if (stock.map_version >= MAP_VERSION) return false;
-        const tiles = await tilesOf(userId, conn);
-        const { levels, builtAt } = await levelsOf(userId, conn);
-        const oldFoyerRate = ((levels.foyer || 1) - 1) * 2;
-        const owed = pendingOf([...tiles.map(t => ({ ...t, rate: OLD_DECO_RATE })), ...(oldFoyerRate ? [{ placed_at: builtAt.foyer, rate: oldFoyerRate }] : [])], stock.collected_at);
-        if (owed > 0) await ledger.credit(userId, owed, 'monde', 'carte-v2', conn);
-        // Décalage en deux temps : la clé (joueur, x, y) ne se heurte jamais à elle-même pendant la mise à jour
-        await conn.query('UPDATE world_tiles SET x = x + 1000, y = y + 1000 WHERE user_id = $1', [userId]);
-        await conn.query('UPDATE world_tiles SET x = x - 1000 + $2, y = y - 1000 + $2 WHERE user_id = $1', [userId, map.OFFSET]);
-        const gifts = new Set();
-        Object.keys(levels).forEach(id => { if (SITES[id] && levels[id] && id !== 'foyer') gifts.add(map.siteZone(id)); });
-        tiles.forEach(t => { const zone = map.zoneAt(t.x + map.OFFSET, t.y + map.OFFSET); if (zone) gifts.add(zone); });
-        gifts.delete('coeur');
-        for (const zone of gifts) {
-            await conn.query('INSERT INTO world_zones (user_id, zone) VALUES ($1, $2) ON CONFLICT DO NOTHING', [userId, zone]);
-        }
-        await conn.query('UPDATE world_stock SET map_version = $2, collected_at = NOW() WHERE user_id = $1', [userId, MAP_VERSION]);
+        if (stock.map_version < 2) await toV2(userId, stock, conn);
+        await toV3(userId, conn);
+        await conn.query('UPDATE world_stock SET map_version = $2 WHERE user_id = $1', [userId, MAP_VERSION]);
         return true;
     });
+}
+
+// v1 → v2 : les écus encore dus par les décorations (ancienne règle) sont versés, tout ce qui était posé glisse de
+// OFFSET cases, et les quartiers où le joueur avait déjà un bâtiment ou une décoration lui sont offerts
+async function toV2(userId, stock, conn) {
+    const tiles = await tilesOf(userId, conn);
+    const { levels, builtAt } = await levelsOf(userId, conn);
+    const oldFoyerRate = ((levels.foyer || 1) - 1) * 2;
+    const owed = pendingOf([...tiles.map(t => ({ ...t, rate: OLD_DECO_RATE })), ...(oldFoyerRate ? [{ placed_at: builtAt.foyer, rate: oldFoyerRate }] : [])], stock.collected_at);
+    if (owed > 0) await ledger.credit(userId, owed, 'monde', 'carte-v2', conn);
+    // Décalage en deux temps : la clé (joueur, x, y) ne se heurte jamais à elle-même pendant la mise à jour
+    await conn.query('UPDATE world_tiles SET x = x + 1000, y = y + 1000 WHERE user_id = $1', [userId]);
+    await conn.query('UPDATE world_tiles SET x = x - 1000 + $2, y = y - 1000 + $2 WHERE user_id = $1', [userId, legacy.OFFSET]);
+    const gifts = new Set();
+    Object.keys(levels).forEach(id => { if (SITES[id] && levels[id] && id !== 'foyer') gifts.add(legacy.siteZone(id)); });
+    tiles.forEach(t => { const zone = legacy.zoneAt(t.x + legacy.OFFSET, t.y + legacy.OFFSET); if (zone) gifts.add(zone); });
+    gifts.delete('coeur');
+    for (const zone of gifts) {
+        await conn.query('INSERT INTO world_zones (user_id, zone) VALUES ($1, $2) ON CONFLICT DO NOTHING', [userId, zone]);
+    }
+    await conn.query('UPDATE world_stock SET collected_at = NOW() WHERE user_id = $1', [userId]);
+}
+
+// v2 → v3 (la grande île) : les quartiers achetés restent (mêmes identifiants), les bâtiments gardent leur palier
+// (leur place vient de la carte) ; chaque décoration rejoint son quartier, sur une case libre au plus près de son
+// panneau, dans l'ordre où elles étaient rangées (de haut en bas, de gauche à droite). Un quartier trop petit
+// déborde sur la Grève.
+async function toV3(userId, conn) {
+    const tiles = await tilesOf(userId, conn);
+    if (!tiles.length) return;
+    const { levels } = await levelsOf(userId, conn);
+    const byZone = new Map();
+    for (const tile of tiles) {
+        const zone = legacy.zoneAt(tile.x, tile.y) || 'coeur';
+        byZone.set(zone, [...(byZone.get(zone) || []), tile]);
+    }
+    // Décalage en deux temps : la clé (joueur, x, y) ne se heurte jamais à une case encore occupée
+    await conn.query('UPDATE world_tiles SET x = x + 1000, y = y + 1000 WHERE user_id = $1', [userId]);
+    const taken = new Set();
+    const spare = map.freeSpots('coeur', levels);
+    for (const [zone, list] of byZone) {
+        const spots = [...map.freeSpots(zone, levels), ...spare];
+        for (const tile of list) {
+            const spot = spots.find(s => !taken.has(s.y * SIZE + s.x));
+            if (!spot) break;
+            taken.add(spot.y * SIZE + spot.x);
+            await conn.query('UPDATE world_tiles SET x = $4, y = $5 WHERE user_id = $1 AND x = $2 AND y = $3', [userId, tile.x + 1000, tile.y + 1000, spot.x, spot.y]);
+        }
+    }
+    // Chaque ancien quartier tient dans le nouveau (test/play.test.js) ; une décoration restée sans place serait
+    // replacée par settle() à la vue suivante, jamais supprimée
 }
 
 // Décorations hors d'une case libre (mer, chantier agrandi, quartier non possédé) : déplacées vers la case libre la plus proche
@@ -341,9 +381,13 @@ async function view(userId, owned, book) {
     return {
         size: SIZE,
         map: {
+            // Calques de la grande île (relief, sol, quartiers : voir islandData.js) ; grid : index des quartiers
             grid: map.GRID,
+            height: map.HEIGHT,
+            ground: map.GROUND,
+            region: map.REGION,
             zones: map.ZONES.map(z => ({
-                id: z.id, name: z.name, price: z.price, chapter: z.chapter, anchor: map.ANCHORS[z.id],
+                id: z.id, name: z.name, price: z.price, chapter: z.chapter, code: z.code, anchor: map.ANCHORS[z.id],
                 owned: zones.has(z.id), open: !z.chapter || book.openChapters.has(z.chapter)
             }))
         },
@@ -456,6 +500,7 @@ function finishRun(userId, runId, moves) {
 async function place(userId, owned, element, x, y, price) {
     if (!owned.includes(element)) return { status: 403, message: 'Cet élément n’est pas dans ton carnet.' };
     if (![x, y].every(v => Number.isInteger(v)) || !map.isLand(x, y)) return { status: 400, message: 'Case hors de l’île.' };
+    if (!map.buildable(x, y)) return { status: 400, message: 'Rien ne se pose ici (chemin, eau, forêt ou rocher).' };
     await migrate(userId);
     return db.transaction(async conn => {
         await stockOf(userId, conn, true);
@@ -543,4 +588,4 @@ async function collect(userId) {
     });
 }
 
-module.exports = { CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, isFree, pendingOf, chargesAt, effectsOf, productionOf, view, build, buyZone, buyItem, chooseSkin, startRun, finishRun, place, remove, collect, migrate };
+module.exports = { SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, isFree, pendingOf, chargesAt, effectsOf, productionOf, view, build, buyZone, buyItem, chooseSkin, startRun, finishRun, place, remove, collect, migrate };
