@@ -254,6 +254,29 @@ test('la boutique des ateliers : bonus additionnés et plafonnés, effets sur la
   assert.equal(shop.effectText(shop.ITEM_BY_ID.pelle), '+20 % de production');
 });
 
+test('la boutique par palier : de I à VII, un article neuf aux paliers V, VI et VII, tout le bonus de production utile', () => {
+  const shop = require('../src/services/worldShop');
+  const { SITES } = require('../src/services/world');
+  for (const site of Object.keys(SITES)) {
+    const items = shop.ITEMS.filter(i => i.site === site);
+    assert.ok(items.every(i => Number.isInteger(i.minLevel) && i.minLevel >= 1 && i.minLevel <= 7), site);
+    // Outils aux paliers I et II, puis un article par palier V, VI et VII, de plus en plus cher
+    assert.deepEqual(items.filter(i => i.kind === 'outil' && i.minLevel <= 2).map(i => i.minLevel).sort(), [1, 2], site);
+    const late = [5, 6, 7].map(level => items.filter(i => i.minLevel === level));
+    assert.ok(late.every(list => list.length === 1), site);
+    assert.ok(late[0][0].price < late[1][0].price && late[1][0].price < late[2][0].price, site);
+    // Les bonus de production d'un bâtiment atteignent tout juste le plafond
+    if (SITES[site].produce) {
+      const all = shop.bonusesOf(items.map(i => i.id));
+      assert.ok(Math.abs(all.prod[site] - shop.PROD_CAP) < 1e-9, site);
+      assert.equal(all.coins[site], 3 + 5 + (site === 'potager' ? 1 : 0), site);
+    }
+  }
+  assert.equal(shop.effectText(shop.ITEM_BY_ID.golem), '+5 écus par heure');
+  assert.equal(shop.effectText(shop.ITEM_BY_ID.poulailler), '+1 écu par heure');
+  assert.equal(shop.bonusesOf(['cuisine', 'sablier']).regenMs, 20 * 60 * 1000);
+});
+
 test('la grande île : calques cohérents, chantiers à plat dans leur quartier, anciens quartiers logés', () => {
   const map = require('../src/services/worldMap');
   const legacy = require('../src/services/worldMapV2');
