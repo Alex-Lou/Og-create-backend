@@ -53,6 +53,15 @@ router.post('/world/item', withAccount(async (req, res, owner, b) => {
     res.json({ bought: done.bought, coins: done.coins, world: await worldView(owner, b) });
 }));
 
+// Boutique : annuler un achat juste après (achat en un toucher)
+router.post('/world/item/undo', withAccount(async (req, res, owner, b) => {
+    const item = String(req.body.item || '');
+    if (!/^[a-z-]{1,30}$/.test(item)) return res.status(400).json({ message: 'Article invalide' });
+    const done = await world.undoItem(owner.id, item);
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json({ undone: done.undone, coins: done.coins, world: await worldView(owner, b) });
+}));
+
 // Skin porté par un bâtiment (vide : apparence d'origine)
 router.post('/world/skin', withAccount(async (req, res, owner, b) => {
     const site = String(req.body.site || '');

@@ -499,6 +499,22 @@ test('le Monde : la boutique d’un atelier vend outils, objets et skins, une se
   // L'établi ajoute un coup à la Récolte (Atelier : +3, établi : +1)
   const bench = await buy('etabli');
   assert.equal(bench.data.world.harvest.maxMoves, 19);
+  // Achat en un toucher : annulable juste après, remboursé une seule fois ; un skin porté est retiré ; trop tard, refusé
+  const undo = item => api('POST', '/play/world/item/undo', { item }, player);
+  const before = await coinsOf(player);
+  const ocre = (await buy('roche-granit')).data.coins;
+  const [u1, u2] = await Promise.all([undo('roche-granit'), undo('roche-granit')]);
+  assert.deepEqual([u1.status, u2.status].sort(), [200, 409]);
+  const undone = u1.status === 200 ? u1 : u2;
+  assert.equal(undone.data.coins, before);
+  assert.ok(ocre < before);
+  const granit = undone.data.world.sites.find(s => s.id === 'carriere');
+  assert.equal(granit.shop.find(i => i.id === 'roche-granit').owned, false);
+  assert.notEqual(granit.skin, 'roche-granit');
+  assert.equal((await undo('nimporte')).status, 404);
+  await sql(`UPDATE world_items SET bought_at = NOW() - INTERVAL '1 minute' WHERE user_id = $1 AND item = 'etabli'`, [player.userId]);
+  assert.equal((await undo('etabli')).status, 409);
+  assert.equal(await coinsOf(player), before);
   // Production avec la pioche : +20 %
   await sql(`UPDATE world_buildings SET built_at = NOW() - INTERVAL '5 hours' WHERE user_id = $1`, [player.userId]);
   await sql(`UPDATE world_stock SET collected_at = NOW() - INTERVAL '3 hours' WHERE user_id = $1`, [player.userId]);
