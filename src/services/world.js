@@ -255,6 +255,18 @@ async function runsOf(userId, conn = db) {
     const { rows } = await conn.query('SELECT COUNT(*)::int AS n FROM world_runs WHERE user_id = $1 AND finished_at IS NOT NULL', [userId]);
     return rows[0].n;
 }
+// Ce que lisent les objectifs des quêtes (stars : découvertes du Livre)
+async function factsOf(userId, stars, conn = db) {
+    return {
+        tiles: (await tilesOf(userId, conn)).length, runs: await runsOf(userId, conn), stars,
+        zones: await zonesOf(userId, conn), levels: (await levelsOf(userId, conn)).levels
+    };
+}
+
+// Brume seule (quête active), sans le reste de l'île : le Livre la consulte après une découverte
+async function board(userId, stars) {
+    return quests.boardOf(await claimedOf(userId), await factsOf(userId, stars));
+}
 
 // Passage aux cartes suivantes, une fois par joueur, au premier passage, verrouillé (deux requêtes ne migrent pas
 // deux fois) et d'un seul tenant (tout ou rien) : v1 → v2 puis v2 → v3 selon l'île du joueur.
@@ -422,11 +434,7 @@ async function view(userId, owned, book) {
 async function claimQuest(userId, questId, stars) {
     await migrate(userId);
     return db.transaction(async conn => {
-        const facts = {
-            tiles: (await tilesOf(userId, conn)).length, runs: await runsOf(userId, conn), stars,
-            zones: await zonesOf(userId, conn), levels: (await levelsOf(userId, conn)).levels
-        };
-        const quest = quests.active(await claimedOf(userId, conn), facts);
+        const quest = quests.active(await claimedOf(userId, conn), await factsOf(userId, stars, conn));
         if (!quest || quest.id !== questId) return db.rollback({ status: 409, message: 'Ce n’est pas la quête en cours.' });
         if (!quest.done) return db.rollback({ status: 403, message: `Pas encore : ${quest.label.toLowerCase()} (${quest.have}/${quest.need}).` });
         const added = await conn.query('INSERT INTO world_quests (user_id, quest) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING quest', [userId, questId]);
@@ -622,5 +630,5 @@ async function collect(userId) {
 
 module.exports = {
     SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, isFree, pendingOf, chargesAt, effectsOf, productionOf,
-    view, build, buyZone, buyItem, chooseSkin, startRun, finishRun, place, remove, collect, migrate, claimQuest
+    view, build, buyZone, buyItem, chooseSkin, startRun, finishRun, place, remove, collect, migrate, claimQuest, board
 };

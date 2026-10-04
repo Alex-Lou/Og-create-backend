@@ -836,5 +836,13 @@ test('quêtes de Brume : la quête active se réclame une fois, son objectif att
   assert.equal(ok.data.world.brume.quest.id, 'recolte');
   assert.equal(ok.data.world.brume.done, 1);
   assert.equal((await api('POST', '/play/world/quest', { id: 'deco' }, player)).status, 409);
+  // Brume seule, pour le Livre : la même quête active, sans le reste de l'île
+  const brume = await api('GET', '/play/world/brume', null, player);
+  assert.equal(brume.status, 200);
+  assert.equal(brume.data.quest.id, 'recolte');
+  assert.equal(brume.data.quest.kind, 'runs');
+  assert.equal(brume.data.done, 1);
+  assert.equal(brume.data.tiles, undefined);
+  assert.equal((await api('GET', '/play/world/brume', null, { cookies: {} })).status, 401);
 });
 
