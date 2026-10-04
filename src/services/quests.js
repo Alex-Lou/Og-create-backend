@@ -68,7 +68,8 @@ function progressOf(goal, facts) {
 }
 
 // La quête active (la première de la chaîne pas encore réclamée) vue par le joueur, ou null si tout est fait.
-// target : ce que l'objectif désigne sur l'île (un bâtiment ou un quartier), pour y placer Brume
+// kind : le type d'objectif (le front propose l'action qui va avec) ; target : ce que l'objectif désigne sur l'île
+// (un bâtiment ou un quartier), pour y placer Brume
 function active(claimed, facts) {
     const step = QUESTS.findIndex(q => !claimed.has(q.id));
     if (step < 0) return null;
@@ -76,7 +77,7 @@ function active(claimed, facts) {
     const { have, need } = progressOf(quest.goal, facts);
     const { site, zone } = quest.goal;
     return {
-        id: quest.id, act: quest.act, step: step + 1, total: QUESTS.length, say: quest.say, label: quest.label,
+        id: quest.id, act: quest.act, step: step + 1, total: QUESTS.length, say: quest.say, label: quest.label, kind: quest.goal.kind,
         coins: quest.coins, have, need, done: have >= need, target: site ? { site } : zone ? { zone } : null
     };
 }
