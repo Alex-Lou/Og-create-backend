@@ -43,25 +43,25 @@ const tier = (name, plan, cost, coins = 0) => ({ name, plan, cost, coins });
 const SITES = {
     foyer: {
         levels: [
-            tier('Foyer', null, {}),
-            tier('Cabane', 'Cabane', { wood: 20, stone: 10 }),
-            tier('Maison', 'Maison', { stone: 40, wood: 30, water: 20 }, 150),
-            tier('Maison à étage', 'Fenêtre', { stone: 60, wood: 50, water: 30, food: 20 }, 300),
-            tier('Manoir', 'Horloge', { stone: 100, wood: 90, water: 50, food: 40 }, 600),
-            tier('Demeure', 'Bibliothèque', { stone: 170, wood: 150, water: 90, food: 70 }, 1000),
-            tier('Château', 'Château', { stone: 300, wood: 240, water: 140, food: 120 }, 1800)
+            tier('Feu de camp', null, {}),
+            tier('Abri', 'Bois', { wood: 20, stone: 10 }),
+            tier('Cabane', 'Cabane', { stone: 40, wood: 30, water: 20 }, 150),
+            tier('Maison de l’alchimiste', 'Potion', { stone: 60, wood: 50, water: 30, food: 20 }, 300),
+            tier('Tour d’étude', 'Livre', { stone: 100, wood: 90, water: 50, food: 40 }, 600),
+            tier('Grande tour', 'Télescope', { stone: 170, wood: 150, water: 90, food: 70 }, 1000),
+            tier('Phare de Brume', 'Feu follet', { stone: 300, wood: 240, water: 140, food: 120 }, 1800)
         ]
     },
     carriere: {
         produce: 'stone',
         levels: [
-            tier('Carrière', 'Pierre', { wood: 5 }),
-            tier('Mine', 'Marteau', { stone: 30, wood: 20 }),
-            tier('Galerie', 'Rails', { wood: 45, stone: 30, food: 15 }, 150),
-            tier('Puits de mine', 'Poulie', { wood: 70, stone: 50, water: 20, food: 20 }, 300),
-            tier('Mine de cristal', 'Cristal', { wood: 110, stone: 90, water: 40, food: 40 }, 600),
-            tier('Mine à vapeur', 'Machine à vapeur', { wood: 180, stone: 150, water: 90, food: 60 }, 1000),
-            tier('Mine des Géants', 'Géant', { wood: 300, stone: 250, water: 130, food: 120 }, 1800)
+            tier('Fissure', 'Pierre', { wood: 5 }),
+            tier('Carrière', 'Marteau', { stone: 30, wood: 20 }),
+            tier('Mine', 'Poulie', { wood: 45, stone: 30, food: 15 }, 150),
+            tier('Galerie', 'Rails', { wood: 70, stone: 50, water: 20, food: 20 }, 300),
+            tier('Puits de mine', 'Fer', { wood: 110, stone: 90, water: 40, food: 40 }, 600),
+            tier('Mine de cristal', 'Cristal', { wood: 180, stone: 150, water: 90, food: 60 }, 1000),
+            tier('Cité minière', 'Ville', { wood: 300, stone: 250, water: 130, food: 120 }, 1800)
         ]
     },
     bosquet: {
