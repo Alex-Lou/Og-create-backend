@@ -2,7 +2,7 @@
 
 Le schéma et le contenu n'étaient versionnés nulle part : `schema.sql` a été reconstruit à partir des requêtes SQL de `src/`, et `seed.sql` contient des données de démo.
 
-- `schema.sql` : les tables (users, auth_sessions, progress, game_data, timer_questions, achievements_list, customization_items, user_items, explorer_regions, user_regions, game_settings). Les tables et colonnes de l'ancienne Expédition (`explorer_regions`, `user_regions`, `game_settings`, énergie de `progress`) n'ont plus d'usage et seront retirées par une migration. Vous pouvez le rejouer sans risque, il utilise `IF NOT EXISTS`.
+- `schema.sql` : les tables (comptes et sessions, progress, game_data, timer_questions, achievements_list, customization_items, user_items, coin_ledger, play_runs, tables du Monde et du Livre). Il retire aussi les tables et colonnes de l'ancien mode Explorer (`DROP … IF EXISTS`). Vous pouvez le rejouer sans risque : `IF NOT EXISTS` et `IF EXISTS` partout.
 - `seed.sql` : généré, ne pas modifier à la main. 827 éléments répartis en 15 familles et 2 766 recettes (de 2 à 4 ingrédients), tous atteignables depuis Eau, Feu, Terre et Air. Il contient aussi les questions Timer, les succès, et les items de personnalisation. Aucun utilisateur n'est créé. Vous pouvez le rejouer : il fait des upserts.
 - `content/` : la source du contenu.
   - `elements.py` : les éléments par famille. Ne jamais renommer un élément existant : les sauvegardes, le Timer et les succès s'appuient sur les noms.

@@ -4,9 +4,6 @@
 --
 -- Conventions déduites du code :
 --   * colonnes passées via JSON.stringify(...)  -> JSONB
---   * colonnes passées comme tableau JS brut    -> TEXT[]
---     (progress.discovered_categories, explorer_regions.required_elements /
---      unlocked_elements, user_regions.required_elements)
 --   * progress est une ligne par utilisateur (user_id UNIQUE) ; plusieurs
 --     routes y font des INSERT partiels, d'où des DEFAULT sur toutes les
 --     colonnes.
@@ -77,9 +74,9 @@ ALTER TABLE play_runs ADD COLUMN IF NOT EXISTS deadline   TIMESTAMPTZ;
 ALTER TABLE play_runs ADD COLUMN IF NOT EXISTS paused_at  TIMESTAMPTZ;
 ALTER TABLE play_runs ADD COLUMN IF NOT EXISTS solved     BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE play_runs ADD COLUMN IF NOT EXISTS solved_ids JSONB   NOT NULL DEFAULT '[]'::jsonb;
--- Ancienne Expédition (retirée) : colonnes sans usage, à retirer par une migration
-ALTER TABLE play_runs ADD COLUMN IF NOT EXISTS boss_hp    INTEGER;
-ALTER TABLE play_runs ADD COLUMN IF NOT EXISTS player_hp  INTEGER;
+-- Ancienne Expédition (retirée) : ses colonnes sont supprimées
+ALTER TABLE play_runs DROP COLUMN IF EXISTS boss_hp;
+ALTER TABLE play_runs DROP COLUMN IF EXISTS player_hp;
 
 -- ---------------------------------------------------------------------
 -- Mot de passe oublié (routes/passwordReset.js) : empreinte SHA-256 du
@@ -102,24 +99,14 @@ CREATE TABLE IF NOT EXISTS progress (
     id                     SERIAL PRIMARY KEY,
     user_id                INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
 
-    -- éléments découverts par mode de jeu : tableaux JSON de noms
+    -- éléments découverts : tableau JSON de noms
     infinite_elements      JSONB   NOT NULL DEFAULT '["Eau","Feu","Terre","Air"]'::jsonb,
-    timer_elements         JSONB   NOT NULL DEFAULT '[]'::jsonb,
-    explorer_elements      JSONB   NOT NULL DEFAULT '[]'::jsonb,
-
-    discovered_categories  TEXT[]  NOT NULL DEFAULT ARRAY['Elements Fondamentaux']::TEXT[],
     -- { "<nom achievement>": { "unlocked": bool, "unlockedAt": iso|null } }
     achievements           JSONB   NOT NULL DEFAULT '{}'::jsonb,
-    -- { "<catégorie>": pourcentage }
-    category_progress      JSONB   NOT NULL DEFAULT '{"Elements Fondamentaux":100}'::jsonb,
     coins                  INTEGER NOT NULL DEFAULT 0,
-    -- { completedQuestions:{niveau:{catégorie:[ids]}}, unlockedCategories:{niveau:[catégories]}, bestScores:{Facile,Moyen,Difficile} }
+    -- { completedQuestions:{niveau:{catégorie:[ids]}}, unlockedCategories:{niveau:[catégories]} }
+    -- (son ancien champ bestScores n'est plus lu : les records viennent de coin_ledger, 'timer-record')
     timer_progress         JSONB   NOT NULL DEFAULT '{"completedQuestions":{},"unlockedCategories":{},"bestScores":{"Facile":0,"Moyen":0,"Difficile":0}}'::jsonb,
-
-    -- mode Explorer
-    explorer_energy        INTEGER     NOT NULL DEFAULT 10,
-    last_energy_update     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    max_energy             INTEGER     NOT NULL DEFAULT 20,
 
     -- { "selectedFrame": "basicCadre.png", "selectedAvatar": "coin.png" } (NULL => valeurs par défaut côté route)
     user_customization     JSONB,
@@ -207,54 +194,21 @@ CREATE TABLE IF NOT EXISTS user_items (
 );
 
 -- ---------------------------------------------------------------------
--- Ancien mode Explorer (retiré) : tables sans usage, à retirer par une migration
+-- Ancien mode Explorer et ancienne Expédition (retirés) : tables et colonnes supprimées
 -- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS explorer_regions (
-    id                 INTEGER PRIMARY KEY,
-    name               VARCHAR(150) NOT NULL,
-    description        TEXT         NOT NULL DEFAULT '',
-    image_path         VARCHAR(255),
-    is_default         BOOLEAN      NOT NULL DEFAULT FALSE,
-    required_level     INTEGER      NOT NULL DEFAULT 1,
-    parent_region_id   INTEGER      REFERENCES explorer_regions(id) ON DELETE SET NULL,
-    required_elements  TEXT[]       NOT NULL DEFAULT '{}',
-    unlocked_elements  TEXT[]       NOT NULL DEFAULT '{}',
-    position_x         INTEGER      NOT NULL DEFAULT 50,
-    position_y         INTEGER      NOT NULL DEFAULT 50,
-    is_boss            BOOLEAN      NOT NULL DEFAULT FALSE,
-    energy_cost        INTEGER      NOT NULL DEFAULT 2,
-    energy_reward      INTEGER      NOT NULL DEFAULT 5,
-    map_id             INTEGER      NOT NULL DEFAULT 1
-);
-CREATE INDEX IF NOT EXISTS idx_explorer_regions_parent ON explorer_regions (parent_region_id);
-CREATE INDEX IF NOT EXISTS idx_explorer_regions_map    ON explorer_regions (map_id);
--- Écus versés à la première réussite de la région (ou du gardien), lus par le serveur
-ALTER TABLE explorer_regions ADD COLUMN IF NOT EXISTS coin_reward INTEGER NOT NULL DEFAULT 50;
-
-CREATE TABLE IF NOT EXISTS user_regions (
-    id                 SERIAL PRIMARY KEY,
-    user_id            INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    region_id          INTEGER NOT NULL REFERENCES explorer_regions(id) ON DELETE CASCADE,
-    visited            BOOLEAN NOT NULL DEFAULT FALSE,
-    completed          BOOLEAN NOT NULL DEFAULT FALSE,
-    progress           INTEGER NOT NULL DEFAULT 0,
-    -- éléments découverts par l'utilisateur dans cette région
-    required_elements  TEXT[]  NOT NULL DEFAULT '{}',
-    is_boss            BOOLEAN NOT NULL DEFAULT FALSE,
-    boss_defeated      BOOLEAN NOT NULL DEFAULT FALSE,
-    last_visited       TIMESTAMPTZ,
-    CONSTRAINT uq_user_regions UNIQUE (user_id, region_id)
-);
-
--- ---------------------------------------------------------------------
--- Paramètres globaux de l'ancien mode Explorer (retiré) : sans usage
--- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS game_settings (
-    id            SERIAL PRIMARY KEY,
-    setting_name  VARCHAR(100) NOT NULL UNIQUE,
-    value         TEXT         NOT NULL,
-    description   TEXT
-);
+DROP TABLE IF EXISTS user_regions;
+DROP TABLE IF EXISTS explorer_regions;
+DROP TABLE IF EXISTS game_settings;
+-- Garde-fou de l'ancien solde d'énergie, remplacé plus bas par chk_progress_coins
+ALTER TABLE progress DROP CONSTRAINT IF EXISTS chk_progress_non_negative;
+ALTER TABLE progress
+    DROP COLUMN IF EXISTS timer_elements,
+    DROP COLUMN IF EXISTS explorer_elements,
+    DROP COLUMN IF EXISTS discovered_categories,
+    DROP COLUMN IF EXISTS category_progress,
+    DROP COLUMN IF EXISTS explorer_energy,
+    DROP COLUMN IF EXISTS last_energy_update,
+    DROP COLUMN IF EXISTS max_energy;
 
 -- ---------------------------------------------------------------------
 -- Grand livre des écus (src/services/ledger.js) : seul le serveur fait
@@ -325,10 +279,10 @@ CREATE TABLE IF NOT EXISTS book_tries (
     PRIMARY KEY (user_id, page_id, combo)
 );
 
--- Garde-fou : ni solde ni énergie négatifs (NOT VALID : contrôle les écritures futures sans bloquer sur l'existant)
+-- Garde-fou : pas de solde négatif (NOT VALID : contrôle les écritures futures sans bloquer sur l'existant)
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_progress_non_negative') THEN
-    ALTER TABLE progress ADD CONSTRAINT chk_progress_non_negative CHECK (coins >= 0 AND explorer_energy >= 0) NOT VALID;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_progress_coins') THEN
+    ALTER TABLE progress ADD CONSTRAINT chk_progress_coins CHECK (coins >= 0) NOT VALID;
   END IF;
 END $$;

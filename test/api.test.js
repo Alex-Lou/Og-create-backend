@@ -37,6 +37,19 @@ test('un succès se mérite côté serveur, pas en le déclarant', async () => {
   assert.ok(owned.includes('ouroboros'));
 });
 
+test('un achat au Cabinet est inscrit au grand livre', async () => {
+  const items = (await api('GET', '/customization/items', null, await newPlayer())).data;
+  const item = items.find(entry => !entry.is_default && !entry.achievement && entry.price > 0);
+  const player = await newPlayer({ coins: item.price + 5 });
+  assert.equal((await api('POST', '/customization/purchase', { itemId: item.id }, player)).status, 200);
+  assert.equal(await coinsOf(player), 5);
+  const entries = await sql('SELECT amount, reason FROM coin_ledger WHERE user_id = $1', [player.userId]);
+  assert.deepEqual(entries, [{ amount: -item.price, reason: `cabinet:${item.id}` }]);
+  // Un second achat est refusé et n'inscrit rien
+  assert.equal((await api('POST', '/customization/purchase', { itemId: item.id }, player)).status, 400);
+  assert.equal((await sql('SELECT 1 FROM coin_ledger WHERE user_id = $1', [player.userId])).length, 1);
+});
+
 test('la déconnexion d’un autre joueur est impossible', async () => {
   const victim = await newPlayer();
   await api('POST', '/auth/logout', { userId: victim.userId, refreshToken: 'x' });
