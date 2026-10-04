@@ -408,6 +408,7 @@ test('le Monde : compte requis, décorations achetées dans un quartier posséd�
   assert.equal(placed.status, 200);
   assert.deepEqual(placed.data.tiles.map(t => [t.element, t.x, t.y]), [['Eau', 8, 8]]);
   assert.ok(placed.data.tiles[0].emoji);
+  assert.equal(placed.data.coins, 15);
   assert.equal(await coinsOf(player), 15);
   // Case occupée par un autre élément : refusé ; même élément ailleurs : déplacé, sans payer
   assert.equal((await api('POST', '/play/world/place', { element: 'Feu', x: 8, y: 8 }, player)).status, 409);

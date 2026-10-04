@@ -26,7 +26,8 @@ router.post('/world/place', withAccount(async (req, res, owner, b) => {
     if (typeof element !== 'string' || !NAME.test(element)) return res.status(400).json({ message: 'Élément invalide' });
     const placed = await world.place(owner.id, await players.elements(owner), element, Number(req.body.x), Number(req.body.y), decoPrice(b, element));
     if (placed.status) return res.status(placed.status).json({ message: placed.message });
-    res.json(await worldView(owner, b));
+    // Solde après achat (absent pour un simple déplacement)
+    res.json({ ...(await worldView(owner, b)), ...(placed.coins !== undefined ? { coins: placed.coins } : {}) });
 }));
 
 router.post('/world/remove', withAccount(async (req, res, owner, b) => {
