@@ -293,7 +293,8 @@ test('les teintes et les pièces rares : douze teintes par bâtiment de I à VII
     assert.ok(rares.every(i => i.kind === 'skin' && i.price === null && i.minLevel === 1), site);
   }
   assert.equal(shop.effectText(shop.ITEM_BY_ID['sakura-foyer']), 'Recolore le bâtiment, à tous ses paliers.');
-  assert.equal(shop.effectText(shop.ITEM_BY_ID.lampions), 'Pièce rare : elle se trouve dans les butins.');
+  assert.equal(shop.effectText(shop.ITEM_BY_ID.lampions), 'Pièce rare : offerte par le chapitre V du Livre.');
+  assert.equal(shop.effectText(shop.ITEM_BY_ID.lierre), 'Pièce rare : elle se trouve dans les coffres légendaires.');
   // Cosmétiques : aucun bonus
   assert.deepEqual(shop.bonusesOf(shop.ITEMS.filter(i => i.tint || i.rare).map(i => i.id)), { prod: {}, coins: {}, moves: 0, charges: 0, regenMs: null });
 });

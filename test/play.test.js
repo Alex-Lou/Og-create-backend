@@ -2,6 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { startServer, api, sql, newPlayer, coinsOf, randomPassword } = require('./helpers');
+const loot = require('../src/services/loot');
 
 const BASE = ['Eau', 'Feu', 'Terre', 'Air'];
 
@@ -552,9 +553,10 @@ test('le Monde : une teinte s’achète et se porte ; une pièce rare ne s’ach
   const atelier = worn.data.sites.find(s => s.id === 'atelier');
   assert.equal(atelier.skin, 'etincelles');
   assert.deepEqual(atelier.shop.find(i => i.id === 'etincelles'), {
-    id: 'etincelles', kind: 'skin', name: 'Gerbe d’étincelles', price: null, minLevel: 1, rare: true,
-    effect: 'Pièce rare : elle se trouve dans les butins.', gain: null, owned: true
+    id: 'etincelles', kind: 'skin', name: 'Gerbe d’étincelles', price: null, minLevel: 1, rare: true, chapter: 'II',
+    effect: 'Pièce rare : offerte par le chapitre II du Livre.', gain: null, owned: true
   });
+  assert.equal(atelier.shop.find(i => i.id === 'engrenages').chapter, 'VI');
   assert.equal(atelier.shop.find(i => i.id === 'craie-atelier').rare, false);
   assert.equal((await api('POST', '/play/world/item/undo', { item: 'etincelles' }, player)).status, 409);
 });
@@ -669,11 +671,16 @@ test('le Monde : la Récolte se joue contre une partie de la réserve, rejouée 
   assert.deepEqual([a.status, b.status].sort(), [200, 404]);
   const paid = a.status === 200 ? a : b;
   assert.deepEqual(paid.data.gains, expected);
-  assert.deepEqual(paid.data.world.stock, expected);
-  // Et des écus : 1 par tranche de 10 ressources
+  // Parfois un coffre (6 coups joués) : son lot s'ajoute au stock ou aux écus
+  const prize = paid.data.chest?.prize || {};
+  if (paid.data.chest) assert.equal(paid.data.chest.source, `recolte:${runs[0].id}`);
+  assert.deepEqual(paid.data.world.stock, Object.fromEntries(Object.entries(expected).map(([r, n]) => [r, n + (prize.stock?.[r] || 0)])));
+  // Et des écus : 1 par tranche de 10 ressources ; coins est le solde
   const earned = Math.floor(Object.values(expected).reduce((sum, n) => sum + n, 0) / 10);
-  assert.equal(paid.data.coins, earned);
-  assert.equal(await coinsOf(player), earned);
+  assert.equal(paid.data.earned, earned);
+  const balance = earned + (prize.kind === 'coins' ? prize.amount : 0);
+  assert.equal(paid.data.coins, balance);
+  assert.equal(await coinsOf(player), balance);
 
   // Coups truqués : partie refusée et perdue
   const cheat = await api('POST', '/play/world/harvest/finish', { run: runs[1].id, moves: [[[0, 0], [0, 1]]] }, player);
@@ -865,6 +872,92 @@ test('le pendu : lettre posée case par case, erreur douce, trois erreurs, rejou
   assert.equal((await put(1, 'E', visitor, easy.id)).status, 200);
   assert.equal((await api('POST', '/play/letter/retry', { page: easy.id }, visitor)).status, 402);
   assert.equal((await put(1, 'E', visitor, 'nimporte-quoi')).status, 404);
+});
+
+test('butins : le coffre du jour s’ouvre une fois par jour, sa série monte et repart à 1 après un jour manqué', async () => {
+  const player = await newPlayer();
+  const open = source => api('POST', '/play/world/chest', { source }, player);
+  const start = (await api('GET', '/play/world', null, player)).data.chests.daily;
+  assert.deepEqual(start, { available: true, streak: 1, rarity: 'commun', tomorrow: 'commun', week: ['commun', 'commun', 'rare', 'rare', 'rare', 'rare', 'epique'] });
+  // Deux ouvertures simultanées : un seul coffre
+  const [a, b] = await Promise.all([1, 2].map(() => open('jour')));
+  assert.deepEqual([a.status, b.status].sort(), [200, 409]);
+  const ok = a.status === 200 ? a : b;
+  const { day } = loot.parisOf(Date.now());
+  assert.equal(ok.data.chest.source, `jour:${day}`);
+  assert.equal(ok.data.chest.rarity, 'commun');
+  const prize = ok.data.chest.prize;
+  assert.ok(['coins', 'stock'].includes(prize.kind));
+  assert.equal(ok.data.coins, prize.kind === 'coins' ? prize.amount : 0);
+  assert.equal(await coinsOf(player), ok.data.coins);
+  if (prize.kind === 'stock') for (const [r, n] of Object.entries(prize.stock)) assert.equal(ok.data.world.stock[r], n);
+  assert.equal(ok.data.world.chests.daily.available, false);
+  assert.equal(ok.data.world.chests.daily.streak, 1);
+  // Série : hier au 6e jour, aujourd'hui le 7e (épique) ; sans hier, retour à 1
+  const other = await newPlayer();
+  await api('GET', '/play/world', null, other);
+  await sql(`INSERT INTO world_chests (user_id, source, rarity, prize, streak) VALUES ($1, $2, 'rare', '{"kind":"coins","amount":50}', 6)`, [other.userId, `jour:${loot.dayBefore(day)}`]);
+  const seventh = (await api('GET', '/play/world', null, other)).data.chests.daily;
+  assert.equal(seventh.streak, 7);
+  assert.equal(seventh.rarity, 'epique');
+  assert.equal(seventh.tomorrow, 'commun');
+  const epic = await api('POST', '/play/world/chest', { source: 'jour' }, other);
+  assert.equal(epic.data.chest.rarity, 'epique');
+  await sql(`INSERT INTO world_chests (user_id, source, rarity, prize, streak) VALUES ($1, $2, 'rare', '{"kind":"coins","amount":50}', 6)`, [player.userId, `jour:${loot.dayBefore(loot.dayBefore(day))}`]);
+  assert.equal((await api('GET', '/play/world', null, player)).data.chests.daily.streak, 1);
+});
+
+test('butins : chapitres ouverts, quêtes réclamées et bouteille donnent leur coffre une seule fois', async () => {
+  const player = await newPlayer();
+  const open = source => api('POST', '/play/world/chest', { source }, player);
+  const view = (await api('GET', '/play/world', null, player)).data;
+  // Chapitres I et II ouverts d'emblée : le II offre sa pièce rare
+  assert.deepEqual(view.chests.pending, [{ source: 'chapitre:II', rarity: 'legendaire', label: 'Chapitre II du Livre' }]);
+  const chapter = await open('chapitre:II');
+  assert.equal(chapter.status, 200);
+  assert.deepEqual(chapter.data.chest.prize, { kind: 'rare', item: 'etincelles', site: 'atelier', name: 'Gerbe d’étincelles' });
+  assert.equal(chapter.data.world.sites.find(s => s.id === 'atelier').shop.find(i => i.id === 'etincelles').owned, true);
+  assert.deepEqual(chapter.data.world.chests.pending, []);
+  assert.equal((await open('chapitre:II')).status, 409);
+  assert.equal((await open('chapitre:III')).status, 403);
+  assert.equal((await open('chapitre:I')).status, 404);
+  // Une pièce gagnée ne se rend pas contre des écus
+  assert.equal((await api('POST', '/play/world/item/undo', { item: 'etincelles' }, player)).status, 409);
+  // Quête de fin d'acte réclamée : son coffre attend ; une quête sans coffre ou pas réclamée, non
+  assert.equal((await open('quete:source')).status, 403);
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'deco'), ($1, 'recolte'), ($1, 'source')`, [player.userId]);
+  const pending = (await api('GET', '/play/world', null, player)).data.chests.pending;
+  assert.deepEqual(pending, [{ source: 'quete:source', rarity: 'rare', label: 'Quête : Achète La Source' }]);
+  const quest = await open('quete:source');
+  assert.equal(quest.status, 200);
+  assert.equal(quest.data.chest.rarity, 'rare');
+  assert.equal((await open('quete:source')).status, 409);
+  assert.equal((await open('quete:deco')).status, 404);
+  // Bouteille à la mer : une par tranche de 6 heures
+  assert.equal(quest.data.world.chests.bottle.available, true);
+  const bottle = await open('bouteille');
+  assert.equal(bottle.status, 200);
+  assert.ok(['commun', 'rare', 'epique'].includes(bottle.data.chest.rarity));
+  assert.equal(bottle.data.world.chests.bottle.available, false);
+  assert.equal((await open('bouteille')).status, 409);
+  // Sources invalides ; compte requis
+  assert.equal((await open('DROP TABLE')).status, 400);
+  assert.equal((await open('chapitre:IX')).status, 404);
+  assert.equal((await api('POST', '/play/world/chest', { source: 'jour' }, await guest())).status, 402);
+});
+
+test('butins : une teinte gagnée ne s’annule pas comme un achat', async () => {
+  const player = await newPlayer({ coins: 500 });
+  await api('GET', '/play/world', null, player);
+  await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'est')`, [player.userId]);
+  await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'atelier', 1)`, [player.userId]);
+  await sql(`INSERT INTO world_items (user_id, item, source) VALUES ($1, 'craie-atelier', 'butin')`, [player.userId]);
+  assert.equal((await api('POST', '/play/world/item/undo', { item: 'craie-atelier' }, player)).status, 409);
+  assert.equal(await coinsOf(player), 500);
+  // Un achat, lui, s'annule toujours
+  assert.equal((await api('POST', '/play/world/item', { item: 'sepia-atelier' }, player)).status, 200);
+  assert.equal((await api('POST', '/play/world/item/undo', { item: 'sepia-atelier' }, player)).status, 200);
+  assert.equal(await coinsOf(player), 500);
 });
 
 test('quêtes de Brume : la quête active se réclame une fois, son objectif atteint ; pas une autre', async () => {

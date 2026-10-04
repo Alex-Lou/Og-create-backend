@@ -103,7 +103,16 @@ router.post('/world/harvest/finish', withAccount(async (req, res, owner, b) => {
     if (!Number.isSafeInteger(run) || run <= 0 || !Array.isArray(req.body.moves)) return res.status(400).json({ message: 'Partie invalide' });
     const done = await world.finishRun(owner.id, run, req.body.moves);
     if (done.status) return res.status(done.status).json({ message: done.message });
-    res.json({ gains: done.gains, coins: done.coins, world: await worldView(owner, b) });
+    res.json({ gains: done.gains, earned: done.earned, coins: done.coins, chest: done.chest, world: await worldView(owner, b) });
+}));
+
+// Coffre qui attend : du jour, bouteille à la mer, chapitre du Livre ouvert, quête de Brume réclamée
+router.post('/world/chest', withAccount(async (req, res, owner, b) => {
+    const source = String(req.body.source || '');
+    if (!/^(jour|bouteille|chapitre:[IVX]{1,4}|quete:[a-z0-9]{1,30})$/.test(source)) return res.status(400).json({ message: 'Coffre invalide' });
+    const done = await world.openChest(owner.id, source, bookPages.openChapters(b, await players.elements(owner)));
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json({ chest: done.chest, coins: done.coins, world: await worldView(owner, b) });
 }));
 
 // Brume seule (la quête active), pour le Livre : une quête accomplie y est annoncée
