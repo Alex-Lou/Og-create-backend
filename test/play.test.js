@@ -104,16 +104,18 @@ test('les routes de l’ancien Registre (piste, origines) n’existent plus', as
   assert.equal((await api('POST', '/coins/spend', { reason: 'piste' }, player)).status, 404);
 });
 
-test('la progression de l’Épreuve fusionne : un record ne redescend jamais', async () => {
+test('la progression de l’Épreuve fusionne ; les records envoyés par le navigateur sont ignorés', async () => {
   const player = await newPlayer();
   await api('POST', '/timer/update-timer-progress', { timerProgress: { bestScores: { Facile: 4 }, unlockedCategories: { Facile: ['A'] } } }, player);
   await api('POST', '/progress/save', { timerProgress: { bestScores: { Facile: 2, Moyen: 1 }, unlockedCategories: { Facile: ['B'] } } }, player);
   const loaded = await api('GET', '/timer/load-progress', null, player);
-  assert.deepEqual(loaded.data.bestScores, { Facile: 4, Moyen: 1, Difficile: 0 });
+  assert.deepEqual(loaded.data.bestScores, { Facile: 0, Moyen: 0, Difficile: 0 });
   assert.deepEqual(loaded.data.unlockedCategories.Facile, ['A', 'B']);
+  // Un ancien record gonflé resté en base n'est plus lu
+  await sql(`UPDATE progress SET timer_progress = timer_progress || '{"bestScores":{"Facile":80}}' WHERE user_id = $1`, [player.userId]);
   const progress = await api('GET', '/progress/load', null, player);
   assert.equal(progress.data.coins, 0);
-  assert.deepEqual(progress.data.timerProgress.bestScores, { Facile: 4, Moyen: 1, Difficile: 0 });
+  assert.deepEqual(progress.data.timerProgress.bestScores, { Facile: 0, Moyen: 0, Difficile: 0 });
   assert.equal((await api('POST', '/timer/update-timer-progress', {}, player)).status, 400);
   assert.equal((await api('POST', '/timer/save-elements', { elements: ['Eau'] }, player)).status, 404);
 });
@@ -228,6 +230,9 @@ test('l’Épreuve : le bonus de record vient du score compté par le serveur', 
   const end = await api('POST', '/play/timer/finish', { score: 999 }, player);
   assert.equal(end.data.score, 1);
   assert.equal(end.data.coins, q.points + 5);
+  // Le record affiché est celui compté par le serveur
+  const records = await api('GET', '/timer/load-progress', null, player);
+  assert.equal(records.data.bestScores[q.level], 1);
   // Rejouer la fin ne paie rien : la partie est close
   const twice = await api('POST', '/play/timer/finish', {}, player);
   assert.equal(twice.data.score, 0);

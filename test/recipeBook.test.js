@@ -28,10 +28,10 @@ test('fusion de la progression de l’Épreuve', () => {
   const merged = merge(
     { completedQuestions: { Facile: { A: [1] } }, unlockedCategories: { Facile: ['A'] }, bestScores: { Facile: 5 } },
     { completedQuestions: { Moyen: { B: [2] } }, unlockedCategories: { Facile: ['A', 'B'], Moyen: ['C'] }, bestScores: { Facile: 3, Moyen: 2 } });
+  // Les records envoyés par le navigateur ne sont pas gardés
   assert.deepEqual(merged, {
     completedQuestions: { Facile: { A: [1] }, Moyen: { B: [2] } },
-    unlockedCategories: { Facile: ['A', 'B'], Moyen: ['C'], Difficile: [] },
-    bestScores: { Facile: 5, Moyen: 2, Difficile: 0 }
+    unlockedCategories: { Facile: ['A', 'B'], Moyen: ['C'], Difficile: [] }
   });
 });
 

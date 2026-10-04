@@ -53,6 +53,8 @@ async function purchase(userId, itemId) {
             'UPDATE progress SET coins = coins - $1 WHERE user_id = $2 AND coins >= $1 RETURNING coins',
             [item.price, userId]);
         if (!debit.rows.length) return db.rollback({ status: 400, message: 'Vous n\'avez pas assez de pièces', required: item.price });
+        // Inscrit au grand livre, comme tout mouvement d'écus (ref vide : l'unicité est tenue par user_items)
+        await conn.query('INSERT INTO coin_ledger (user_id, amount, reason) VALUES ($1, $2, $3)', [userId, -item.price, `cabinet:${item.id}`]);
         return { item, remainingCoins: debit.rows[0].coins };
     });
 }

@@ -6,11 +6,11 @@ const timerProgress = require('./timerProgress');
 
 async function load(userId) {
     const discoveredElements = await players.elements({ kind: 'user', id: userId });
-    const { rows } = await db.query('SELECT coins, timer_progress, last_saved FROM progress WHERE user_id = $1', [userId]);
+    const { rows } = await db.query('SELECT coins, last_saved FROM progress WHERE user_id = $1', [userId]);
     return {
         discoveredElements,
         coins: rows[0].coins,
-        timerProgress: rows[0].timer_progress,
+        timerProgress: await timerProgress.load(userId),
         lastSaved: rows[0].last_saved
     };
 }
