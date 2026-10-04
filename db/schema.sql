@@ -300,6 +300,20 @@ CREATE TABLE IF NOT EXISTS world_quests (
     PRIMARY KEY (user_id, quest)
 );
 
+-- Butins (services/loot.js) : un coffre par source, ouvert une seule fois. source : recolte:<partie>, jour:<date>,
+-- bouteille:<date>-<tranche>, chapitre:<id>, quete:<id> ; prize : le lot tiré ; streak : série du coffre du jour
+CREATE TABLE IF NOT EXISTS world_chests (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    source VARCHAR(40) NOT NULL,
+    rarity VARCHAR(12) NOT NULL,
+    prize JSONB NOT NULL,
+    streak SMALLINT,
+    opened_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, source)
+);
+-- Article acheté ('boutique') ou gagné dans un coffre ('butin') : seul un achat s'annule
+ALTER TABLE world_items ADD COLUMN IF NOT EXISTS source VARCHAR(10) NOT NULL DEFAULT 'boutique';
+
 -- Le Livre : mélanges ratés sur une page à portée (l'encre de la page devient offerte après quelques essais différents)
 CREATE TABLE IF NOT EXISTS book_tries (
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

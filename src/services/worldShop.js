@@ -25,21 +25,22 @@ const TINTS = [
     { id: 'nuit-etoilee', name: 'Nuit étoilée', minLevel: 6, price: 600 },
     { id: 'or-royal', name: 'Or royal', minLevel: 7, price: 900 }
 ];
-// Pièces rares : deux par bâtiment, portées à tous les paliers (src/world/rareSprites.js du front)
+// Pièces rares : deux par bâtiment, portées à tous les paliers (src/world/rareSprites.js du front). chapter : le
+// chapitre du Livre qui l'offre en s'ouvrant (loot.js) ; les autres se trouvent dans les coffres légendaires
 const RARES = [
-    { id: 'papillons', site: 'potager', name: 'Papillons' },
+    { id: 'papillons', site: 'potager', name: 'Papillons', chapter: 'IV' },
     { id: 'tournesols', site: 'potager', name: 'Tournesols géants' },
     { id: 'filon-or', site: 'carriere', name: 'Filon d’or' },
     { id: 'coeur-lave', site: 'carriere', name: 'Cœur de lave' },
-    { id: 'fees', site: 'bosquet', name: 'Lanternes des fées' },
+    { id: 'fees', site: 'bosquet', name: 'Lanternes des fées', chapter: 'VII' },
     { id: 'petales', site: 'bosquet', name: 'Pluie de pétales' },
-    { id: 'arc-en-ciel', site: 'puits', name: 'Arc-en-ciel' },
+    { id: 'arc-en-ciel', site: 'puits', name: 'Arc-en-ciel', chapter: 'III' },
     { id: 'nenuphars', site: 'puits', name: 'Nénuphars et libellules' },
     { id: 'pavois', site: 'ponton', name: 'Grand pavois' },
     { id: 'mouettes', site: 'ponton', name: 'Mouettes' },
-    { id: 'etincelles', site: 'atelier', name: 'Gerbe d’étincelles' },
-    { id: 'engrenages', site: 'atelier', name: 'Engrenages d’or' },
-    { id: 'lampions', site: 'foyer', name: 'Lampions de fête' },
+    { id: 'etincelles', site: 'atelier', name: 'Gerbe d’étincelles', chapter: 'II' },
+    { id: 'engrenages', site: 'atelier', name: 'Engrenages d’or', chapter: 'VI' },
+    { id: 'lampions', site: 'foyer', name: 'Lampions de fête', chapter: 'V' },
     { id: 'lierre', site: 'foyer', name: 'Lierre et lucioles' }
 ];
 
@@ -143,7 +144,7 @@ function bonusesOf(ownedIds) {
 // Texte d'effet d'un article, pour la boutique
 function effectText(item) {
     const e = item.effect;
-    if (item.rare) return 'Pièce rare : elle se trouve dans les butins.';
+    if (item.rare) return item.chapter ? `Pièce rare : offerte par le chapitre ${item.chapter} du Livre.` : 'Pièce rare : elle se trouve dans les coffres légendaires.';
     if (item.tint) return 'Recolore le bâtiment, à tous ses paliers.';
     if (!e) return item.kind === 'skin' ? 'Change l’apparence du bâtiment.' : 'Vit sur ton île.';
     if (e.prod) return `+${Math.round(e.prod * 100)} % de production`;

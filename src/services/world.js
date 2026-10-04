@@ -2,7 +2,7 @@
 // (écus + chapitre du Livre). Les chantiers se construisent puis évoluent avec un plan découvert dans le Livre et des
 // ressources tirées de la Récolte. Les bâtiments de production rapportent ressources et écus ; les décorations
 // s'achètent et embellissent, sans rien produire.
-// Tout ce qui compte (stock, quartiers, parties, gains, écus) est décidé ici, dans des transactions verrouillées.
+// Tout ce qui compte (stock, quartiers, parties, gains, écus, coffres) est décidé ici, dans des transactions verrouillées.
 const crypto = require('crypto');
 const db = require('../config/db');
 const ledger = require('./ledger');
@@ -11,6 +11,7 @@ const map = require('./worldMap');
 const legacy = require('./worldMapV2');
 const shop = require('./worldShop');
 const quests = require('./quests');
+const loot = require('./loot');
 
 const SIZE = map.SIZE;
 const CAP_HOURS = 8;
@@ -28,6 +29,8 @@ const DECO_PRICES = { I: 10, II: 15, III: 25, IV: 40, V: 60, VI: 90, VII: 140 };
 const HARVEST_COIN_EVERY = 10;
 // Un achat de la boutique s'annule dans les secondes qui suivent (le front montre « Annuler » 4 s ; marge réseau)
 const UNDO_SECONDS = 6;
+// Hasard des coffres (loot.js) : rand() dans [0, 1), tiré par le serveur
+const random = () => crypto.randomInt(0, 2 ** 32) / 2 ** 32;
 
 // Chantiers : 7 paliers, un par chapitre du Livre (le palier N demande le chapitre N ouvert), chacun avec son plan
 // (élément découvert), son coût en ressources et en écus (dès le palier III) ; l'emprise passe à 3 × 3 au palier IV.
@@ -355,6 +358,39 @@ async function settle(userId, tiles, zones, levels) {
     return moved ? tilesOf(userId) : tiles;
 }
 
+// Coffres déjà ouverts parmi les sources à surveiller : chapitres, quêtes, jour (et veille), bouteille. Map source → ligne
+const QUEST_CHESTS = quests.QUESTS.filter(q => q.chest);
+async function openedOf(userId, now, conn = db) {
+    const { day, slot } = loot.parisOf(now);
+    const keys = [
+        ...Object.keys(loot.CHAPTER_RARES).map(c => `chapitre:${c}`), ...QUEST_CHESTS.map(q => `quete:${q.id}`),
+        `jour:${day}`, `jour:${loot.dayBefore(day)}`, `bouteille:${day}-${slot}`
+    ];
+    const { rows } = await conn.query('SELECT source, streak FROM world_chests WHERE user_id = $1 AND source = ANY($2)', [userId, keys]);
+    return { day, slot, opened: new Map(rows.map(r => [r.source, r])) };
+}
+
+// Série du coffre du jour : celle d'hier plus un, sinon 1 (un jour manqué la remet à 1)
+const streakOf = (opened, day) => (opened.get(`jour:${loot.dayBefore(day)}`)?.streak || 0) + 1;
+
+// Ce que la vue montre des coffres : ceux qui attendent (chapitres ouverts, quêtes réclamées), le coffre du jour (série,
+// semaine en cours) et la bouteille de la tranche
+function chestsView({ day, slot, opened }, openChapters, claimed) {
+    const today = opened.get(`jour:${day}`);
+    const streak = today ? today.streak : streakOf(opened, day);
+    const first = streak - ((streak - 1) % 7);
+    return {
+        pending: [
+            ...Object.entries(loot.CHAPTER_RARES).filter(([c]) => openChapters.has(c) && !opened.has(`chapitre:${c}`))
+                .map(([c]) => ({ source: `chapitre:${c}`, rarity: 'legendaire', label: `Chapitre ${c} du Livre` })),
+            ...QUEST_CHESTS.filter(q => claimed.has(q.id) && !opened.has(`quete:${q.id}`))
+                .map(q => ({ source: `quete:${q.id}`, rarity: q.chest, label: `Quête : ${q.label}` }))
+        ],
+        daily: { available: !today, streak, rarity: loot.dailyRarity(streak), week: Array.from({ length: 7 }, (_, i) => loot.dailyRarity(first + i)) },
+        bottle: { key: `${day}-${slot}`, available: !opened.has(`bouteille:${day}-${slot}`) }
+    };
+}
+
 // Vue de l'île pour le navigateur. book = { describe(noms), openChapters: Set des chapitres ouverts }
 async function view(userId, owned, book) {
     await migrate(userId);
@@ -390,6 +426,7 @@ async function view(userId, owned, book) {
             // Boutique de l'atelier : articles (possédés ou non), skin porté, bonus de production
             shop: shop.ITEMS.filter(item => item.site === id).map(item => ({
                 id: item.id, kind: item.kind, name: item.name, price: item.price, minLevel: item.minLevel, rare: Boolean(item.rare),
+                ...(item.chapter ? { chapter: item.chapter } : {}),
                 effect: shop.effectText(item), gain: item.effect || null, owned: items.has(item.id)
             })),
             skin: skins[id] || null,
@@ -403,6 +440,7 @@ async function view(userId, owned, book) {
         };
     });
     const pendingStock = Object.fromEntries(RESOURCES.map(r => [r, production.filter(p => p.resource === r).reduce((sum, p) => sum + p.amount, 0)]));
+    const claimed = await claimedOf(userId);
     return {
         size: SIZE,
         map: {
@@ -427,7 +465,9 @@ async function view(userId, owned, book) {
         pendingStock,
         tiles: tiles.map(t => ({ x: t.x, y: t.y, element: t.element, ...(known[t.element] || {}) })),
         // Brume, l'esprit de la brume : la quête active (ou son dernier mot)
-        brume: quests.boardOf(await claimedOf(userId), { tiles: tiles.length, runs: await runsOf(userId), stars: book.stars ?? 0, zones, levels })
+        brume: quests.boardOf(claimed, { tiles: tiles.length, runs: await runsOf(userId), stars: book.stars ?? 0, zones, levels }),
+        // Coffres : en attente, du jour, bouteille à la mer
+        chests: chestsView(await openedOf(userId, Date.now()), book.openChapters, claimed)
     };
 }
 
@@ -527,12 +567,69 @@ function finishRun(userId, runId, moves) {
         if (!played.ok) return { status: 400, message: `Partie refusée : ${played.error.toLowerCase()}.` };
         await stockOf(userId, conn, true);
         const g = played.gains;
-        await conn.query('UPDATE world_stock SET stone = stone + $2, wood = wood + $3, water = water + $4, food = food + $5 WHERE user_id = $1',
-            [userId, g.stone, g.wood, g.water, g.food]);
+        await addStock(userId, g, conn);
         // Et des écus : 1 par tranche de 10 ressources gagnées, versés une seule fois pour cette partie
-        const coins = Math.floor((g.stone + g.wood + g.water + g.food) / HARVEST_COIN_EVERY);
-        if (coins > 0) await ledger.credit(userId, coins, 'recolte', runId, conn);
-        return { gains: g, coins };
+        const earned = Math.floor((g.stone + g.wood + g.water + g.food) / HARVEST_COIN_EVERY);
+        if (earned > 0) await ledger.credit(userId, earned, 'recolte', runId, conn);
+        // Parfois un coffre (sûr avec une grande chaîne)
+        const rarity = loot.harvestChest(moves.length, Math.max(0, ...moves.map(path => path.length)), random);
+        const chest = rarity ? await grant(userId, `recolte:${runId}`, rarity, conn) : null;
+        // coins : le solde (écus de la partie et du coffre compris)
+        return { gains: g, earned, coins: await balanceOf(userId, conn), chest };
+    });
+}
+
+// Ajoute des ressources au stock (ligne verrouillée par l'appelant)
+function addStock(userId, add, conn) {
+    const n = r => add[r] || 0;
+    return conn.query('UPDATE world_stock SET stone = stone + $2, wood = wood + $3, water = water + $4, food = food + $5 WHERE user_id = $1',
+        [userId, n('stone'), n('wood'), n('water'), n('food')]);
+}
+async function balanceOf(userId, conn) {
+    const { rows } = await conn.query('SELECT coins FROM progress WHERE user_id = $1', [userId]);
+    return rows[0]?.coins ?? 0;
+}
+
+// Donne un coffre, une seule fois par source (même en double clic) : tire son lot selon l'île, l'applique (écus au
+// grand livre, ressources au stock, teinte ou pièce rare à la collection) et l'inscrit. Dans la transaction de
+// l'appelant, ligne de stock verrouillée. { source, rarity, prize }, ou null si ce coffre est déjà ouvert
+async function grant(userId, source, rarity, conn, { wanted = null, streak = null } = {}) {
+    const prize = loot.prizeOf(rarity, { levels: (await levelsOf(userId, conn)).levels, owned: await itemsOf(userId, conn) }, random, wanted);
+    const added = await conn.query(
+        `INSERT INTO world_chests (user_id, source, rarity, prize, streak) VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT DO NOTHING RETURNING source`, [userId, source, rarity, JSON.stringify(prize), streak]);
+    if (!added.rows.length) return null;
+    if (prize.kind === 'coins') await ledger.credit(userId, prize.amount, 'butin', source, conn);
+    if (prize.kind === 'stock') await addStock(userId, prize.stock, conn);
+    if (prize.item) await conn.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'butin') ON CONFLICT DO NOTHING`, [userId, prize.item]);
+    return { source, rarity, prize };
+}
+
+// Ouvre un coffre qui attend : 'jour' (série), 'bouteille' (tranche de 6 h), 'chapitre:<id>' (chapitre ouvert, sa
+// pièce rare), 'quete:<id>' (quête réclamée qui en donne un). openChapters : Set des chapitres ouverts.
+// { chest, coins } ou { status, message } si refus
+async function openChest(userId, source, openChapters, now = Date.now()) {
+    const [kind, id] = source.split(':');
+    const chapter = kind === 'chapitre' ? loot.CHAPTER_RARES[id] : null;
+    const quest = kind === 'quete' ? QUEST_CHESTS.find(q => q.id === id) : null;
+    if (!['jour', 'bouteille'].includes(source) && !chapter && !quest) return { status: 404, message: 'Coffre inconnu.' };
+    if (chapter && !openChapters.has(id)) return { status: 403, message: `Ouvre d’abord le chapitre ${id} du Livre.` };
+    await migrate(userId);
+    return db.transaction(async conn => {
+        await stockOf(userId, conn, true);
+        const { day, slot, opened } = await openedOf(userId, now, conn);
+        if (quest && !(await claimedOf(userId, conn)).has(quest.id)) return db.rollback({ status: 403, message: 'Réclame d’abord cette quête de Brume.' });
+        let chest;
+        if (source === 'jour') {
+            const streak = streakOf(opened, day);
+            chest = await grant(userId, `jour:${day}`, loot.dailyRarity(streak), conn, { streak });
+        } else if (source === 'bouteille') {
+            chest = await grant(userId, `bouteille:${day}-${slot}`, loot.rarityOf(loot.BOTTLE.odds, random), conn);
+        } else {
+            chest = await grant(userId, source, chapter ? 'legendaire' : quest.chest, conn, { wanted: chapter });
+        }
+        if (!chest) return db.rollback({ status: 409, message: source === 'bouteille' ? 'La prochaine bouteille n’est pas encore arrivée.' : 'Ce coffre est déjà ouvert.' });
+        return { chest, coins: await balanceOf(userId, conn) };
     });
 }
 
@@ -592,7 +689,8 @@ async function buyItem(userId, itemId) {
 }
 
 // Annulation d'un achat de la boutique juste après (achat en un toucher) : l'article est rendu, ses écus remboursés
-// une seule fois (même en double clic), son skin retiré s'il était porté. { status, message } si refus ou trop tard
+// une seule fois (même en double clic), son skin retiré s'il était porté. Un article gagné dans un coffre ne se rend
+// pas. { status, message } si refus ou trop tard
 async function undoItem(userId, itemId) {
     const item = shop.ITEM_BY_ID[itemId];
     if (!item) return { status: 404, message: 'Article inconnu.' };
@@ -601,7 +699,7 @@ async function undoItem(userId, itemId) {
         // La production jusqu'ici compte encore avec l'article
         await gather(userId, conn, await stockOf(userId, conn, true));
         const removed = await conn.query(
-            'DELETE FROM world_items WHERE user_id = $1 AND item = $2 AND bought_at > NOW() - make_interval(secs => $3) RETURNING bought_at',
+            `DELETE FROM world_items WHERE user_id = $1 AND item = $2 AND source = 'boutique' AND bought_at > NOW() - make_interval(secs => $3) RETURNING bought_at`,
             [userId, item.id, UNDO_SECONDS]);
         if (!removed.rows.length) return db.rollback({ status: 409, message: 'Trop tard pour annuler cet achat.' });
         await conn.query('DELETE FROM world_skins WHERE user_id = $1 AND site = $2 AND skin = $3', [userId, item.site, item.id]);
@@ -652,5 +750,5 @@ async function collect(userId) {
 
 module.exports = {
     SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, isFree, pendingOf, chargesAt, effectsOf, productionOf,
-    view, build, buyZone, buyItem, undoItem, chooseSkin, startRun, finishRun, place, remove, collect, migrate, claimQuest, board
+    view, build, buyZone, buyItem, undoItem, chooseSkin, startRun, finishRun, place, remove, collect, migrate, claimQuest, board, openChest
 };
