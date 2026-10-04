@@ -133,6 +133,12 @@ function productionOf(siteId, level, builtAt, collectedAt, now = Date.now(), bon
         coins: Math.floor(hours * (COINS_PER_LEVEL * level * boost + (bonus.coins || 0)) + 1e-9)
     };
 }
+// Rendement par heure d'un bâtiment producteur : { amount, coins }, arrondis au dixième
+function perHourOf(level, prod = 0, coins = 0) {
+    const boost = 1 + prod;
+    const round = n => Math.round(n * 10) / 10;
+    return { amount: round(PRODUCE_PER_LEVEL * level * boost), coins: round(COINS_PER_LEVEL * level * boost + coins) };
+}
 function productionAll(levels, builtAt, collectedAt, now = Date.now(), bonuses = NO_BONUS) {
     return Object.keys(SITES)
         .map(id => ({ site: id, ...productionOf(id, levels[id] || 0, builtAt[id], collectedAt, now, { prod: bonuses.prod[id] || 0, coins: bonuses.coins[id] || 0 }) }))
@@ -266,6 +272,8 @@ async function view(userId, owned, book) {
             // Tous les paliers, pour la fiche du bâtiment (atteints, suivant, à venir)
             levels: site.levels.map(l => ({ name: l.name, plan: l.plan, planOwned: !l.plan || have.has(l.plan), planEmoji: l.plan ? known[l.plan]?.emoji || null : null, cost: l.cost, effect: l.effect })),
             pending: made ? { coins: made.coins, [made.resource]: made.amount } : null,
+            // Rendement horaire avec les bonus de la boutique (pour la fiche)
+            perHour: site.produce && level ? perHourOf(level, bonuses.prod[id] || 0, bonuses.coins[id] || 0) : null,
             next: next ? { name: next.name, plan: next.plan, planOwned: !next.plan || have.has(next.plan), planEmoji: next.plan ? known[next.plan]?.emoji || null : null, cost: next.cost, effect: next.effect } : null
         };
     });
