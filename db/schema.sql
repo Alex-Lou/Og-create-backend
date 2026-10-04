@@ -279,6 +279,18 @@ CREATE TABLE IF NOT EXISTS book_tries (
     PRIMARY KEY (user_id, page_id, combo)
 );
 
+-- Le Livre : pendu d'une page à portée (services/bookLetters.js). owner = 'u:<id>' | 'g:<id>'.
+-- letters : lettres proposées (A-Z) ; failed_at : partie perdue, rejouable le lendemain ou contre des écus.
+CREATE TABLE IF NOT EXISTS book_letters (
+    owner       TEXT        NOT NULL,
+    page_id     VARCHAR(32) NOT NULL,
+    letters     VARCHAR(26) NOT NULL DEFAULT '',
+    misses      SMALLINT    NOT NULL DEFAULT 0 CHECK (misses >= 0),
+    failed_at   TIMESTAMPTZ,
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (owner, page_id)
+);
+
 -- Garde-fou : pas de solde négatif (NOT VALID : contrôle les écritures futures sans bloquer sur l'existant)
 DO $$
 BEGIN

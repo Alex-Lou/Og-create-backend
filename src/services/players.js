@@ -40,6 +40,7 @@ async function resolve(req) {
 async function createGuest(res) {
     await db.query('DELETE FROM guest_players WHERE last_seen < NOW() - make_interval(days => $1)', [GUEST_DAYS]);
     await db.query(`DELETE FROM play_runs WHERE updated_at < NOW() - INTERVAL '2 days'`);
+    await db.query(`DELETE FROM book_letters WHERE owner LIKE 'g:%' AND updated_at < NOW() - make_interval(days => $1)`, [GUEST_DAYS]);
     const token = newToken();
     const { rows } = await db.query('INSERT INTO guest_players (token_hash) VALUES ($1) RETURNING id', [digest(token)]);
     res.cookie(GUEST_COOKIE, token, { ...guestCookieOptions(), maxAge: GUEST_DAYS * 24 * 3600 * 1000 });
@@ -100,6 +101,7 @@ async function adoptGuest(req, res, userId) {
     res.clearCookie(GUEST_COOKIE, guestCookieOptions());
     if (!rows.length) return;
     await db.query(`DELETE FROM play_runs WHERE owner = $1`, [`g:${rows[0].id}`]);
+    await db.query(`DELETE FROM book_letters WHERE owner = $1`, [`g:${rows[0].id}`]);
     await db.query('INSERT INTO progress (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING', [userId]);
     await db.query(
         `UPDATE progress SET infinite_elements = (
