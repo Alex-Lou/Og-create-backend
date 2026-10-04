@@ -10,6 +10,7 @@ const harvest = require('./harvest');
 const map = require('./worldMap');
 const legacy = require('./worldMapV2');
 const shop = require('./worldShop');
+const quests = require('./quests');
 
 const SIZE = map.SIZE;
 const CAP_HOURS = 8;
@@ -245,6 +246,16 @@ async function zonesOf(userId, conn = db) {
     return new Set(['coeur', ...rows.map(r => r.zone)]);
 }
 
+// Quêtes de Brume réclamées, et récoltes terminées (objectifs des quêtes)
+async function claimedOf(userId, conn = db) {
+    const { rows } = await conn.query('SELECT quest FROM world_quests WHERE user_id = $1', [userId]);
+    return new Set(rows.map(r => r.quest));
+}
+async function runsOf(userId, conn = db) {
+    const { rows } = await conn.query('SELECT COUNT(*)::int AS n FROM world_runs WHERE user_id = $1 AND finished_at IS NOT NULL', [userId]);
+    return rows[0].n;
+}
+
 // Passage aux cartes suivantes, une fois par joueur, au premier passage, verrouillé (deux requêtes ne migrent pas
 // deux fois) et d'un seul tenant (tout ou rien) : v1 → v2 puis v2 → v3 selon l'île du joueur.
 function migrate(userId) {
@@ -400,8 +411,29 @@ async function view(userId, owned, book) {
         decoPrices: DECO_PRICES,
         pending: production.reduce((sum, p) => sum + p.coins, 0),
         pendingStock,
-        tiles: tiles.map(t => ({ x: t.x, y: t.y, element: t.element, ...(known[t.element] || {}) }))
+        tiles: tiles.map(t => ({ x: t.x, y: t.y, element: t.element, ...(known[t.element] || {}) })),
+        // Brume, l'esprit de la brume : la quête active (ou son dernier mot)
+        brume: quests.boardOf(await claimedOf(userId), { tiles: tiles.length, runs: await runsOf(userId), stars: book.stars ?? 0, zones, levels })
     };
+}
+
+// Réclame la récompense de la quête active de Brume : c'est bien elle, son objectif est atteint, versée une seule
+// fois (même en double clic). stars : découvertes du Livre. { status, message } si refus
+async function claimQuest(userId, questId, stars) {
+    await migrate(userId);
+    return db.transaction(async conn => {
+        const facts = {
+            tiles: (await tilesOf(userId, conn)).length, runs: await runsOf(userId, conn), stars,
+            zones: await zonesOf(userId, conn), levels: (await levelsOf(userId, conn)).levels
+        };
+        const quest = quests.active(await claimedOf(userId, conn), facts);
+        if (!quest || quest.id !== questId) return db.rollback({ status: 409, message: 'Ce n’est pas la quête en cours.' });
+        if (!quest.done) return db.rollback({ status: 403, message: `Pas encore : ${quest.label.toLowerCase()} (${quest.have}/${quest.need}).` });
+        const added = await conn.query('INSERT INTO world_quests (user_id, quest) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING quest', [userId, questId]);
+        if (!added.rows.length) return db.rollback({ status: 409, message: 'Récompense déjà reçue.' });
+        const { coins } = await ledger.credit(userId, quest.coins, 'quete', questId, conn);
+        return { gained: quest.coins, coins };
+    });
 }
 
 // Achat d'un quartier : chapitre ouvert, écus débités une fois (même en double clic) ; { status, message } si refus
@@ -588,4 +620,7 @@ async function collect(userId) {
     });
 }
 
-module.exports = { SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, isFree, pendingOf, chargesAt, effectsOf, productionOf, view, build, buyZone, buyItem, chooseSkin, startRun, finishRun, place, remove, collect, migrate };
+module.exports = {
+    SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, isFree, pendingOf, chargesAt, effectsOf, productionOf,
+    view, build, buyZone, buyItem, chooseSkin, startRun, finishRun, place, remove, collect, migrate, claimQuest
+};

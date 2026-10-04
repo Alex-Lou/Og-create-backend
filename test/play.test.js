@@ -813,3 +813,28 @@ test('le pendu : lettre posée case par case, erreur douce, trois erreurs, rejou
   assert.equal((await api('POST', '/play/letter/retry', { page: easy.id }, visitor)).status, 402);
   assert.equal((await put(1, 'E', visitor, 'nimporte-quoi')).status, 404);
 });
+
+test('quêtes de Brume : la quête active se réclame une fois, son objectif atteint ; pas une autre', async () => {
+  const player = await newPlayer();
+  const start = await api('GET', '/play/world', null, player);
+  assert.equal(start.status, 200);
+  assert.equal(start.data.brume.quest.id, 'deco');
+  assert.equal(start.data.brume.quest.done, false);
+  assert.equal(start.data.brume.done, 0);
+  // Objectif pas encore atteint ; quête qui n'est pas l'active ; identifiant invalide
+  assert.equal((await api('POST', '/play/world/quest', { id: 'deco' }, player)).status, 403);
+  assert.equal((await api('POST', '/play/world/quest', { id: 'source' }, player)).status, 409);
+  assert.equal((await api('POST', '/play/world/quest', { id: 'DROP TABLE' }, player)).status, 400);
+  // Une décoration posée : deux réclamations simultanées, une seule récompense
+  await sql(`INSERT INTO world_tiles (user_id, x, y, element) VALUES ($1, 31, 35, 'Eau')`, [player.userId]);
+  const [a, b] = await Promise.all([1, 2].map(() => api('POST', '/play/world/quest', { id: 'deco' }, player)));
+  assert.deepEqual([a.status, b.status].sort(), [200, 409]);
+  const ok = a.status === 200 ? a : b;
+  assert.equal(ok.data.gained, 20);
+  assert.equal(ok.data.coins, 20);
+  assert.equal(await coinsOf(player), 20);
+  assert.equal(ok.data.world.brume.quest.id, 'recolte');
+  assert.equal(ok.data.world.brume.done, 1);
+  assert.equal((await api('POST', '/play/world/quest', { id: 'deco' }, player)).status, 409);
+});
+

@@ -292,6 +292,13 @@ CREATE TABLE IF NOT EXISTS world_runs (
     finished_at TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS idx_world_runs_user ON world_runs (user_id, created_at);
+-- Quêtes de Brume réclamées (services/quests.js : la chaîne ; l'avancée se lit dans l'état de l'île et du Livre)
+CREATE TABLE IF NOT EXISTS world_quests (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    quest VARCHAR(30) NOT NULL,
+    claimed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, quest)
+);
 
 -- Le Livre : mélanges ratés sur une page à portée (l'encre de la page devient offerte après quelques essais différents)
 CREATE TABLE IF NOT EXISTS book_tries (

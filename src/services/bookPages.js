@@ -200,9 +200,12 @@ function aim(b, owned, id, tried) {
 }
 
 // Chapitres ouverts pour ces éléments possédés (découvertes hors éléments de base ≥ « need »)
+// Découvertes inscrites au Livre (les éléments de base n'en sont pas)
+const starsOf = (b, owned) => owned.filter(name => !BASE_ELEMENTS.includes(name) && b.meta.has(name)).length;
+
 function openChapters(b, owned) {
-    const stars = owned.filter(name => !BASE_ELEMENTS.includes(name) && b.meta.has(name)).length;
+    const stars = starsOf(b, owned);
     return new Set(CHAPTERS.filter(c => stars >= c.need).map(c => c.id));
 }
 
-module.exports = { DIFFICULTY, view, reachableById, pageId, aim, telling, difficultyOf, chapterOf, openChapters };
+module.exports = { DIFFICULTY, view, reachableById, pageId, aim, telling, difficultyOf, chapterOf, openChapters, starsOf };

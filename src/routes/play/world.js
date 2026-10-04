@@ -11,7 +11,9 @@ router.use('/world', playLimiter);
 
 async function worldView(owner, b) {
     const owned = await players.elements(owner);
-    return world.view(owner.id, owned, { describe: names => book.describe(b, names), openChapters: bookPages.openChapters(b, owned) });
+    return world.view(owner.id, owned, {
+        describe: names => book.describe(b, names), openChapters: bookPages.openChapters(b, owned), stars: bookPages.starsOf(b, owned)
+    });
 }
 
 // Prix d'une décoration : selon le chapitre de la famille de l'élément
@@ -93,6 +95,15 @@ router.post('/world/harvest/finish', withAccount(async (req, res, owner, b) => {
     const done = await world.finishRun(owner.id, run, req.body.moves);
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ gains: done.gains, coins: done.coins, world: await worldView(owner, b) });
+}));
+
+// Quête de Brume : réclamer la récompense de la quête active
+router.post('/world/quest', withAccount(async (req, res, owner, b) => {
+    const id = String(req.body.id || '');
+    if (!/^[a-z0-9]{1,30}$/.test(id)) return res.status(400).json({ message: 'Quête invalide' });
+    const done = await world.claimQuest(owner.id, id, bookPages.starsOf(b, await players.elements(owner)));
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json({ gained: done.gained, coins: done.coins, world: await worldView(owner, b) });
 }));
 
 module.exports = router;
