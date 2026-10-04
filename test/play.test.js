@@ -480,6 +480,9 @@ test('le Monde : la boutique d’un atelier vend outils, objets et skins, une se
   assert.equal(ok.data.coins, 520);
   const carriere = ok.data.world.sites.find(s => s.id === 'carriere');
   assert.equal(carriere.bonus, 20);
+  // Rendement affiché dans la fiche : 3 pierres et 2 écus par heure au niveau 1, +20 %
+  assert.deepEqual(carriere.perHour, { amount: 3.6, coins: 2.4 });
+  assert.equal(ok.data.world.sites.find(s => s.id === 'atelier').perHour, null);
   assert.ok(carriere.shop.find(i => i.id === 'pioche').owned);
   // Niveau 2 requis pour les rails
   assert.equal((await buy('rails')).status, 403);
