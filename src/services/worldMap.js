@@ -18,7 +18,7 @@ const ZONES = [
     { id: 'crique', name: 'La Crique', price: 900, chapter: 'IV', code: 'h' },
     { id: 'foret', name: 'La Grande Forêt', price: 1200, chapter: 'IV', code: 'i' },
     { id: 'hameau', name: 'Le Hameau', price: 1800, chapter: 'V', code: 'j' },
-    { id: 'phare', name: 'L’Îlot du Phare', price: 2800, chapter: 'VI', code: 'k' },
+    { id: 'phare', name: 'L’Îlot aux Mouettes', price: 2800, chapter: 'VI', code: 'k' },
     { id: 'legendes', name: 'L’Île des Légendes', price: 4500, chapter: 'VII', code: 'l' }
 ];
 const ZONE_BY_ID = Object.fromEntries(ZONES.map(z => [z.id, z]));
