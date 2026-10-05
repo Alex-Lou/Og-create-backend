@@ -47,3 +47,21 @@ test('besoins : manger tient 24 h et se renouvelle à mi-chemin ; travailler vie
   assert.equal(v.moodEffect('foyer', false, 'heureux'), 'Une partie de Récolte revient 3 min plus vite');
   assert.equal(v.moodEffect('potager', true, 'content'), null);
 });
+
+test('visiteurs : un métier parmi les bâtiments de l’île, 1 à 3 jours, une demande à la mesure du Ponton', () => {
+  const vis = require('../src/services/visitors');
+  const kinds = new Set();
+  for (let seed = 1; seed <= 300; seed++) {
+    const v = vis.visitorOf(seed, ['foyer', 'ponton'], 3);
+    assert.ok(['foyer', 'ponton'].includes(v.site));
+    assert.equal(v.role, vis.ROLES[v.site].role);
+    assert.ok(v.days >= 1 && v.days <= 3);
+    assert.equal(v.request.reward, 75);
+    if (v.request.kind === 'livrer') assert.deepEqual([v.request.resource, v.request.amount], [vis.ROLES[v.site].wants, 40]);
+    else assert.ok(vis.RUNS.includes(v.request.count));
+    kinds.add(v.request.kind);
+    assert.ok(vis.NAMES.includes(vis.nameOf(seed)));
+  }
+  assert.deepEqual([...kinds].sort(), ['livrer', 'recolter']);
+  assert.deepEqual(vis.visitorOf(42, ['foyer'], 1), vis.visitorOf(42, ['foyer'], 1));
+});

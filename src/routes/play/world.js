@@ -197,6 +197,14 @@ router.post('/world/villager/need', withAccount(async (req, res, owner, b) => {
 router.post('/world/villagers/needs', withAccount(async (req, res, owner, b) => {
     await fed(res, owner, b, await world.fillNeeds(owner.id));
 }));
+// Visiteur : combler sa demande (livrer, ou ses Récoltes faites) → { reward, coins, world }
+router.post('/world/visitor', withAccount(async (req, res, owner, b) => {
+    const id = Number(req.body.id);
+    if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ message: 'Visiteur invalide' });
+    const done = await world.satisfyVisitor(owner.id, id);
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json({ reward: done.reward, coins: done.coins, world: await worldView(owner, b) });
+}));
 
 // Coffre qui attend : du jour, bouteille à la mer, chapitre du Livre ouvert, quête de Brume réclamée
 router.post('/world/chest', withAccount(async (req, res, owner, b) => {

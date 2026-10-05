@@ -987,6 +987,59 @@ test('besoins des habitants : manger, travailler, se distraire ; l’humeur chan
   assert.equal((await api('POST', '/play/world/villagers/needs', {}, await guest())).status, 402);
 });
 
+test('visiteurs : un voyageur débarque au Ponton avec une demande, la comble une fois, repart ; le suivant arrive après', async () => {
+  const player = await newPlayer();
+  const view = async () => (await api('GET', '/play/world', null, player)).data;
+  const satisfy = id => api('POST', '/play/world/visitor', { id }, player);
+  // Pas de Ponton : personne
+  assert.equal((await view()).visitor, null);
+  await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'crique')`, [player.userId]);
+  await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'ponton', 2)`, [player.userId]);
+  const first = (await view()).visitor;
+  assert.ok(first && first.id && first.seed && first.name);
+  assert.ok(['foyer', 'ponton'].includes(first.site), first.site);
+  assert.ok(first.leavesIn > 23 * 3600000 && first.leavesIn <= 72 * 3600000);
+  assert.equal(first.satisfied, false);
+  // Une seule visite à la fois : la vue suivante montre le même
+  assert.equal((await view()).visitor.id, first.id);
+  // Livrer 30 vivres (palier II du Ponton) : sans stock, refusé ; puis versé une fois
+  await sql(`UPDATE world_visitors SET request = '{"kind":"livrer","resource":"food","amount":30,"reward":60}' WHERE id = $1`, [first.id]);
+  const poor = await satisfy(first.id);
+  assert.equal(poor.status, 400);
+  assert.match(poor.data.message, /30 vivres/);
+  await sql('UPDATE world_stock SET food = 50 WHERE user_id = $1', [player.userId]);
+  const done = await satisfy(first.id);
+  assert.equal(done.status, 200);
+  assert.deepEqual([done.data.reward, done.data.coins, done.data.world.stock.food], [60, 60, 20]);
+  assert.equal(done.data.world.visitor.satisfied, true);
+  assert.equal((await satisfy(first.id)).status, 409);
+  assert.equal(await coinsOf(player), 60);
+  // Reparti : personne pendant quelques heures, puis un autre arrive
+  await sql(`UPDATE world_visitors SET leaves_at = NOW() - INTERVAL '1 hour' WHERE id = $1`, [first.id]);
+  assert.equal((await view()).visitor, null);
+  assert.equal((await satisfy(first.id)).status, 404);
+  await sql(`UPDATE world_visitors SET leaves_at = NOW() - INTERVAL '5 hours' WHERE id = $1`, [first.id]);
+  const second = (await view()).visitor;
+  assert.ok(second && second.id !== first.id);
+  // Demande de Récoltes : comptées depuis son arrivée
+  await sql(`UPDATE world_visitors SET request = '{"kind":"recolter","count":2,"reward":60}' WHERE id = $1`, [second.id]);
+  assert.deepEqual((await view()).visitor.request, { kind: 'recolter', count: 2, reward: 60, have: 0 });
+  const early = await satisfy(second.id);
+  assert.equal(early.status, 403);
+  assert.match(early.data.message, /Encore 2 Récoltes/);
+  const run = `INSERT INTO world_runs (user_id, seed, config, finished_at) VALUES ($1, 1, '{}', NOW())`;
+  await sql(run, [player.userId]);
+  await sql(run, [player.userId]);
+  assert.equal((await view()).visitor.request.have, 2);
+  assert.equal((await satisfy(second.id)).status, 200);
+  // Entrées invalides ; le visiteur d'un autre ; compte requis
+  assert.equal((await satisfy('x')).status, 400);
+  assert.equal((await satisfy(-1)).status, 400);
+  const other = await newPlayer();
+  assert.equal((await api('POST', '/play/world/visitor', { id: second.id }, other)).status, 404);
+  assert.equal((await api('POST', '/play/world/visitor', { id: 1 }, await guest())).status, 402);
+});
+
 test('mini-jeux : au palier III, trois parties en réserve, gestes rejoués par le serveur, écus versés une fois', async () => {
   const player = await newPlayer();
   const start = game => api('POST', '/play/world/game/start', { game }, player);

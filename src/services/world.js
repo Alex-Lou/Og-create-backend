@@ -17,6 +17,7 @@ const annexes = require('./annexes');
 const signs = require('./signs');
 const minigames = require('./minigames');
 const villagers = require('./villagers');
+const visitors = require('./visitors');
 const naming = require('./naming');
 
 const SIZE = map.SIZE;
@@ -315,6 +316,44 @@ async function welcome(userId, moods, filled) {
     for (const [villager, need] of fresh) {
         await db.query('INSERT INTO world_needs (user_id, villager, need) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING', [userId, villager, need]);
     }
+}
+// Récoltes terminées depuis une date (demande d'un visiteur)
+async function runsSince(userId, since, conn = db) {
+    const { rows } = await conn.query('SELECT COUNT(*)::int AS n FROM world_runs WHERE user_id = $1 AND finished_at >= $2', [userId, since]);
+    return rows[0].n;
+}
+// Visiteur du moment : celui qui est là, ou un nouveau qui débarque (Ponton bâti, quelques heures après le dernier
+// départ). L'arrivée se décide dans une transaction verrouillée : deux vues en même temps n'en font pas venir deux.
+// Ligne de world_visitors, ou null
+async function visitorNow(userId, now = Date.now()) {
+    const lastOf = async conn => (await conn.query('SELECT * FROM world_visitors WHERE user_id = $1 ORDER BY arrived_at DESC LIMIT 1', [userId])).rows[0];
+    const here = row => row && now < new Date(row.leaves_at).getTime();
+    const seen = await lastOf(db);
+    if (here(seen)) return seen;
+    return db.transaction(async conn => {
+        await stockOf(userId, conn, true);
+        const last = await lastOf(conn);
+        if (here(last)) return last;
+        const { levels } = await levelsOf(userId, conn);
+        const zones = await zonesOf(userId, conn);
+        if (!livesHere('ponton', levels, zones)) return null;
+        if (last && now < new Date(last.leaves_at).getTime() + visitors.GAP_HOURS * visitors.HOUR_MS) return null;
+        const seed = crypto.randomInt(1, 2147483647);
+        const v = visitors.visitorOf(seed, Object.keys(visitors.ROLES).filter(id => livesHere(id, levels, zones)), levels.ponton);
+        const { rows } = await conn.query(
+            'INSERT INTO world_visitors (user_id, seed, site, request, arrived_at, leaves_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+            [userId, seed, v.site, JSON.stringify(v.request), new Date(now), new Date(now + v.days * 24 * visitors.HOUR_MS)]);
+        return rows[0];
+    });
+}
+// Ce que la vue montre d'un visiteur : prénom, métier, demande (et où elle en est), départ, comblé
+function visitorView(row, runs, now = Date.now()) {
+    if (!row) return null;
+    const request = row.request.kind === 'recolter' ? { ...row.request, have: Math.min(row.request.count, runs) } : row.request;
+    return {
+        id: Number(row.id), seed: row.seed, name: visitors.nameOf(row.seed), site: row.site, role: visitors.ROLES[row.site].role,
+        request, leavesIn: Math.max(0, new Date(row.leaves_at).getTime() - now), satisfied: Boolean(row.satisfied_at)
+    };
 }
 // Mini-jeux : réserve de parties de chaque jeu ({ jeu: { plays, plays_at } } ; absent : réserve pleine)
 async function gamesOf(userId, conn = db) {
@@ -616,6 +655,7 @@ async function view(userId, owned, book) {
     });
     const pendingStock = Object.fromEntries(RESOURCES.map(r => [r, production.filter(p => p.resource === r).reduce((sum, p) => sum + p.amount, 0)]));
     const claimed = await claimedOf(userId);
+    const visiting = await visitorNow(userId);
     return {
         size: SIZE,
         map: {
@@ -657,6 +697,8 @@ async function view(userId, owned, book) {
             });
         })(),
         friendship: { talk: villagers.TALK, gift: villagers.GIFT, hearts: villagers.HEARTS, rewards: villagers.REWARDS },
+        // Visiteur arrivé en bateau au Ponton (ou null) : sa demande, son départ
+        visitor: visitorView(visiting, visiting ? await runsSince(userId, visiting.arrived_at) : 0),
         // Besoins : nom, durée et prix de chacun (se distraire : décorations, à tant de cases)
         needs: {
             kinds: Object.fromEntries(Object.entries(villagers.NEEDS).map(([id, n]) => [id, { label: n.label, ...(n.hours ? { hours: n.hours, cost: n.cost } : { decos: n.decos, reach: n.reach }) }]))
@@ -939,6 +981,33 @@ async function fillNeeds(userId, targets = null, now = Date.now()) {
                  ON CONFLICT (user_id, villager, need) DO UPDATE SET filled_at = EXCLUDED.filled_at`, [userId, villager, need, new Date(now)]);
         }
         return { filled };
+    });
+}
+
+// Combler la demande du visiteur : livrer les ressources (prises au stock) ou avoir fait ses Récoltes depuis son
+// arrivée ; il remercie en écus, une seule fois. { reward, coins } ou { status, message }
+async function satisfyVisitor(userId, visitorId, now = Date.now()) {
+    await migrate(userId);
+    return db.transaction(async conn => {
+        const stock = await stockOf(userId, conn, true);
+        const { rows } = await conn.query('SELECT * FROM world_visitors WHERE id = $1 AND user_id = $2 FOR UPDATE', [visitorId, userId]);
+        const row = rows[0];
+        if (!row || now >= new Date(row.leaves_at).getTime()) return db.rollback({ status: 404, message: 'Ce visiteur est déjà reparti.' });
+        const name = visitors.nameOf(row.seed);
+        if (row.satisfied_at) return db.rollback({ status: 409, message: `${name} a déjà ce qu’il lui faut. Merci encore !` });
+        const r = row.request;
+        if (r.kind === 'livrer') {
+            if (!RESOURCES.includes(r.resource)) return db.rollback({ status: 400, message: 'Demande invalide.' });
+            if (stock[r.resource] < r.amount) return db.rollback({ status: 400, message: `Il te faut ${r.amount} ${WORDS[r.resource][0]}.` });
+            // r.resource est l'une des quatre colonnes du stock (vérifié ci-dessus)
+            await conn.query(`UPDATE world_stock SET ${r.resource} = ${r.resource} - $2 WHERE user_id = $1`, [userId, r.amount]);
+        } else {
+            const left = r.count - await runsSince(userId, row.arrived_at, conn);
+            if (left > 0) return db.rollback({ status: 403, message: `Encore ${left} Récolte${left > 1 ? 's' : ''} à faire pour ${name}.` });
+        }
+        await conn.query('UPDATE world_visitors SET satisfied_at = $2 WHERE id = $1', [visitorId, new Date(now)]);
+        const { coins } = await ledger.credit(userId, r.reward, 'visiteur', String(visitorId), conn);
+        return { reward: r.reward, coins };
     });
 }
 
@@ -1258,5 +1327,5 @@ async function collect(userId) {
 module.exports = {
     SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, isFree, pendingOf, chargesAt, effectsOf, productionOf,
     view, build, buyZone, buyItem, undoItem, chooseSkin, startRun, finishRun, place, remove, collect, migrate, claimQuest, board, openChest, openAll,
-    placeAnnex, moveAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, rename
+    placeAnnex, moveAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, rename
 };
