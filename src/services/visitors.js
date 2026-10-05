@@ -1,6 +1,7 @@
 // Visiteurs (lot 7d) : un voyageur arrive en bateau au Ponton et reste 1 à 3 jours avec une demande claire :
 // livrer des ressources, ou faire des Récoltes pendant son séjour. Comblé, il remercie en écus. Le suivant arrive
-// quelques heures après son départ. Chacun a un métier lié à un bâtiment de l'île (là où il travaillerait s'il restait).
+// quelques heures après son départ. Chacun a un métier lié à un bâtiment de l'île : comblé, il peut rester si une
+// maison est libre (annexes.js) ; il devient alors un habitant (besoins, humeur, amitié) qui travaille à ce bâtiment.
 // Le navigateur dessine son allure d'après sa graine (src/world/villagers.js, personOf) ; ses paroles : src/world/visitors.js.
 
 const ROLES = {
@@ -31,6 +32,12 @@ function pick(seed, k) {
     return ((h ^ (h >>> 16)) >>> 0) / 2 ** 32;
 }
 const nameOf = seed => NAMES[Math.floor(pick(seed, 1) * NAMES.length)];
+// Goûts d'un visiteur installé (cadeaux) : il adore ce qu'il demandait, aime la ressource suivante
+const RESOURCES = ['stone', 'wood', 'water', 'food'];
+function tastesOf(site) {
+    const loves = ROLES[site].wants;
+    return { loves, likes: RESOURCES[(RESOURCES.indexOf(loves) + 1) % RESOURCES.length] };
+}
 
 // Nouveau visiteur : graine, bâtiments où il pourrait travailler (bâtis, dans un quartier à soi), palier du Ponton.
 // { site, role, days, request: { kind: 'livrer', resource, amount, reward } | { kind: 'recolter', count, reward } }
@@ -44,4 +51,4 @@ function visitorOf(seed, sites, ponton) {
     return { site, role: ROLES[site].role, days, request };
 }
 
-module.exports = { ROLES, NAMES, HOUR_MS, GAP_HOURS, AMOUNTS, RUNS, rewardOf, pick, nameOf, visitorOf };
+module.exports = { ROLES, NAMES, HOUR_MS, GAP_HOURS, AMOUNTS, RUNS, rewardOf, pick, nameOf, tastesOf, visitorOf };

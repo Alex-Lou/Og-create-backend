@@ -286,26 +286,46 @@ function decosNear(tiles, siteId, level, reach) {
     const gap = (v, from, size) => Math.max(from - v, 0, v - (from + size - 1));
     return tiles.filter(t => Math.max(gap(t.x, at.x, at.w), gap(t.y, at.y, at.h)) <= reach).length;
 }
-// Besoins et humeur de chaque habitant de l'île à l'instant now : { habitant: { needs, mood } }
-function moodsOf(levels, zones, tiles, filled, now = Date.now()) {
+// Visiteurs installés (lot 7d), dans l'ordre où ils sont restés : [{ id, seed, site, settled_at }]
+async function settlersOf(userId, conn = db) {
+    const { rows } = await conn.query('SELECT id, seed, site, settled_at FROM world_visitors WHERE user_id = $1 AND settled_at IS NOT NULL ORDER BY settled_at, id', [userId]);
+    return rows;
+}
+// Identifiant d'un visiteur installé, parmi les habitants : 'v<numéro de sa visite>'
+const SETTLER_ID = /^v\d{1,9}$/;
+const knownResident = id => Object.hasOwn(villagers.VILLAGERS, id) || SETTLER_ID.test(id);
+// Habitants de l'île : un par bâtiment bâti (dans un quartier à soi), puis les visiteurs installés, qui travaillent
+// au bâtiment de leur métier : [{ id, name, role, loves, likes, site, seed? }]
+function residentsOf(levels, zones, settlers) {
+    const base = Object.entries(villagers.VILLAGERS).filter(([id]) => livesHere(id, levels, zones))
+        .map(([id, v]) => ({ id, name: v.name, role: v.role, loves: v.loves, likes: v.likes, site: id }));
+    const settled = settlers.map(row => ({
+        id: `v${row.id}`, name: visitors.nameOf(row.seed), role: visitors.ROLES[row.site].role, ...visitors.tastesOf(row.site), site: row.site, seed: row.seed
+    }));
+    return [...base, ...settled];
+}
+// Besoins et humeur de chaque habitant à l'instant now : { habitant: { needs, mood, site } } (se distraire : autour
+// du bâtiment où il travaille)
+function moodsOf(residents, levels, zones, tiles, filled, now = Date.now()) {
     const atelier = livesHere('atelier', levels, zones);
     const out = {};
-    for (const id of Object.keys(villagers.VILLAGERS).filter(v => livesHere(v, levels, zones))) {
-        const needs = villagers.needsOf(filled[id] || {}, decosNear(tiles, id, levels[id], villagers.NEEDS.deco.reach), atelier, now);
-        out[id] = { needs, mood: villagers.moodOf(needs) };
+    for (const { id, site } of residents) {
+        const needs = villagers.needsOf(filled[id] || {}, decosNear(tiles, site, levels[site], villagers.NEEDS.deco.reach), atelier, now);
+        out[id] = { needs, mood: villagers.moodOf(needs), site };
     }
     return out;
 }
-// Bonus avec l'humeur des habitants : production de leur bâtiment, coups (Atelier), retour des parties (Foyer)
+// Bonus avec l'humeur des habitants : production du bâtiment où ils travaillent, coups (Atelier), retour des parties
+// (Foyer)
 function withMoods(bonuses, extra, moods) {
     const prod = { ...bonuses.prod };
     let moves = bonuses.moves;
     let regenCut = extra.regenCut;
-    for (const [id, { mood }] of Object.entries(moods)) {
+    for (const { mood, site } of Object.values(moods)) {
         const sign = villagers.moodSign(mood);
-        if (SITES[id].produce) prod[id] = (prod[id] || 0) + sign * villagers.MOOD_STEP.prod;
-        else if (id === 'atelier') moves += sign * villagers.MOOD_STEP.moves;
-        else if (id === 'foyer') regenCut += sign * villagers.MOOD_STEP.regenMs;
+        if (SITES[site].produce) prod[site] = (prod[site] || 0) + sign * villagers.MOOD_STEP.prod;
+        else if (site === 'atelier') moves += sign * villagers.MOOD_STEP.moves;
+        else if (site === 'foyer') regenCut += sign * villagers.MOOD_STEP.regenMs;
     }
     return { bonuses: { ...bonuses, prod, moves }, extra: { ...extra, regenCut } };
 }
@@ -327,7 +347,7 @@ async function runsSince(userId, since, conn = db) {
 // Ligne de world_visitors, ou null
 async function visitorNow(userId, now = Date.now()) {
     const lastOf = async conn => (await conn.query('SELECT * FROM world_visitors WHERE user_id = $1 ORDER BY arrived_at DESC LIMIT 1', [userId])).rows[0];
-    const here = row => row && now < new Date(row.leaves_at).getTime();
+    const here = row => row && !row.settled_at && now < new Date(row.leaves_at).getTime();
     const seen = await lastOf(db);
     if (here(seen)) return seen;
     return db.transaction(async conn => {
@@ -337,7 +357,8 @@ async function visitorNow(userId, now = Date.now()) {
         const { levels } = await levelsOf(userId, conn);
         const zones = await zonesOf(userId, conn);
         if (!livesHere('ponton', levels, zones)) return null;
-        if (last && now < new Date(last.leaves_at).getTime() + visitors.GAP_HOURS * visitors.HOUR_MS) return null;
+        const gone = last && new Date(last.settled_at || last.leaves_at).getTime();
+        if (last && now < gone + visitors.GAP_HOURS * visitors.HOUR_MS) return null;
         const seed = crypto.randomInt(1, 2147483647);
         const v = visitors.visitorOf(seed, Object.keys(visitors.ROLES).filter(id => livesHere(id, levels, zones)), levels.ponton);
         const { rows } = await conn.query(
@@ -371,7 +392,9 @@ async function annexesOf(userId, conn = db) {
 // productionAll)
 async function bonusesFor(userId, conn = db) {
     const { levels } = await levelsOf(userId, conn);
-    const moods = moodsOf(levels, await zonesOf(userId, conn), await tilesOf(userId, conn), await needRowsOf(userId, conn));
+    const zones = await zonesOf(userId, conn);
+    const residents = residentsOf(levels, zones, await settlersOf(userId, conn));
+    const moods = moodsOf(residents, levels, zones, await tilesOf(userId, conn), await needRowsOf(userId, conn));
     return withMoods(shop.bonusesOf(await itemsOf(userId, conn)), annexes.bonusesOf(await annexesOf(userId, conn)), moods);
 }
 
@@ -600,7 +623,9 @@ async function view(userId, owned, book) {
     const annexCells = new Set(annexRows.map(keyOf));
     const tiles = await settle(userId, await tilesOf(userId), zones, levels, annexCells);
     const filled = await needRowsOf(userId);
-    const moods = moodsOf(levels, zones, tiles, filled);
+    const settlers = await settlersOf(userId);
+    const residents = residentsOf(levels, zones, settlers);
+    const moods = moodsOf(residents, levels, zones, tiles, filled);
     await welcome(userId, moods, filled);
     const { bonuses, extra } = withMoods(shopBonuses, annexes.bonusesOf(annexRows), moods);
     const effects = effectsOf(levels, bonuses, extra);
@@ -640,7 +665,7 @@ async function view(userId, owned, book) {
             sign: level >= signs.SIGN_LEVEL ? signed.worn[id] || 'bois' : null,
             bonus: Math.round((shopBonuses.prod[id] || 0) * 100),
             // Part de production en plus (ou en moins) selon l'humeur de son habitant
-            moodBonus: site.produce && moods[id] ? villagers.moodSign(moods[id].mood) * Math.round(villagers.MOOD_STEP.prod * 100) : 0,
+            moodBonus: site.produce ? Object.values(moods).filter(m => m.site === id).reduce((sum, m) => sum + villagers.moodSign(m.mood), 0) * Math.round(villagers.MOOD_STEP.prod * 100) : 0,
             // Tous les paliers, pour la fiche du bâtiment (atteints, suivant, à venir)
             levels: site.levels.map(step),
             pending: made ? { coins: made.coins, [made.resource]: made.amount } : null,
@@ -684,18 +709,25 @@ async function view(userId, owned, book) {
         // besoins, leur humeur et ce qu'elle fait
         villagers: (() => {
             const { day } = loot.parisOf(Date.now());
-            return Object.entries(villagers.VILLAGERS).filter(([id]) => moods[id]).map(([id, v]) => {
-                const friend = friends[id] || { points: 0 };
+            // Maisons dans l'ordre où elles sont posées : le premier visiteur installé loge dans la première
+            const houses = annexRows.filter(r => r.annex === 'maison');
+            return residents.map(v => {
+                const friend = friends[v.id] || { points: 0 };
                 const hearts = villagers.heartsOf(friend.points);
-                const { needs, mood } = moods[id];
+                const { needs, mood } = moods[v.id];
+                const produces = Boolean(SITES[v.site].produce);
+                const settled = v.seed !== undefined;
+                const home = settled ? houses[settlers.findIndex(row => `v${row.id}` === v.id)] : null;
                 return {
-                    id, name: v.name, role: v.role, loves: v.loves, likes: v.likes, points: friend.points, hearts,
+                    id: v.id, name: v.name, role: v.role, loves: v.loves, likes: v.likes, site: v.site, points: friend.points, hearts,
                     next: villagers.HEARTS[hearts] ?? null, talked: friend.talked === day, gifted: friend.gifted === day,
-                    needs, mood, moodEffect: villagers.moodEffect(id, Boolean(SITES[id].produce), mood),
-                    happyEffect: villagers.moodEffect(id, Boolean(SITES[id].produce), 'heureux')
+                    needs, mood, moodEffect: villagers.moodEffect(v.site, produces, mood), happyEffect: villagers.moodEffect(v.site, produces, 'heureux'),
+                    ...(settled ? { seed: v.seed, home: home ? { x: home.x, y: home.y } : null } : {})
                 };
             });
         })(),
+        // Maisons du Foyer : posées, occupées par des visiteurs installés
+        houses: { total: annexRows.filter(r => r.annex === 'maison').length, used: settlers.length },
         friendship: { talk: villagers.TALK, gift: villagers.GIFT, hearts: villagers.HEARTS, rewards: villagers.REWARDS },
         // Visiteur arrivé en bateau au Ponton (ou null) : sa demande, son départ
         visitor: visitorView(visiting, visiting ? await runsSince(userId, visiting.arrived_at) : 0),
@@ -898,15 +930,16 @@ async function friendRewards(userId, villagerId, from, to, conn) {
 // ressources, chacun une fois par jour (heure de Paris). Points d'amitié, puis les récompenses des cœurs gagnés.
 // { gained, points, hearts, rewards, coins } ou { status, message }
 async function befriend(userId, villagerId, resource = null, now = Date.now()) {
-    const villager = villagers.VILLAGERS[villagerId];
-    if (!villager) return { status: 404, message: 'Habitant inconnu.' };
+    if (!knownResident(villagerId)) return { status: 404, message: 'Habitant inconnu.' };
     if (resource !== null && !villagers.RESOURCES.includes(resource)) return { status: 400, message: 'Cadeau invalide.' };
     await migrate(userId);
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
         const { levels } = await levelsOf(userId, conn);
-        if (!(levels[villagerId] >= 1) || !(await zonesOf(userId, conn)).has(map.siteZone(villagerId))) {
-            return db.rollback({ status: 403, message: `${villager.name} n’habite pas encore ton île.` });
+        const villager = residentsOf(levels, await zonesOf(userId, conn), await settlersOf(userId, conn)).find(r => r.id === villagerId);
+        if (!villager) {
+            const base = villagers.VILLAGERS[villagerId];
+            return db.rollback(base ? { status: 403, message: `${base.name} n’habite pas encore ton île.` } : { status: 404, message: 'Habitant inconnu.' });
         }
         const { day } = loot.parisOf(now);
         const { rows } = await conn.query(
@@ -941,23 +974,26 @@ async function befriend(userId, villagerId, resource = null, now = Date.now()) {
 // habitant, tant que le stock suffit. { filled: [{ villager, need }] } ou { status, message }
 async function fillNeeds(userId, targets = null, now = Date.now()) {
     for (const { villager, need } of targets || []) {
-        if (!Object.hasOwn(villagers.VILLAGERS, villager)) return { status: 404, message: 'Habitant inconnu.' };
+        if (!knownResident(villager)) return { status: 404, message: 'Habitant inconnu.' };
         if (!villagers.FILLABLE.includes(need)) return { status: 400, message: 'Besoin inconnu.' };
     }
     await migrate(userId);
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
         const { levels } = await levelsOf(userId, conn);
-        const moods = moodsOf(levels, await zonesOf(userId, conn), await tilesOf(userId, conn), await needRowsOf(userId, conn), now);
+        const zones = await zonesOf(userId, conn);
+        const residents = residentsOf(levels, zones, await settlersOf(userId, conn));
+        const moods = moodsOf(residents, levels, zones, await tilesOf(userId, conn), await needRowsOf(userId, conn), now);
         const wanted = targets || Object.entries(moods).flatMap(([villager, m]) => m.needs.filter(n => n.cost).map(n => ({ villager, need: n.id })));
         const spent = Object.fromEntries(RESOURCES.map(r => [r, 0]));
         const filled = [];
         let short = false;
         for (const { villager, need } of wanted) {
-            const { name } = villagers.VILLAGERS[villager];
+            const who = residents.find(r => r.id === villager);
+            const name = who ? who.name : villagers.VILLAGERS[villager]?.name;
             const state = moods[villager]?.needs.find(n => n.id === need);
             let refusal = null;
-            if (!moods[villager]) refusal = { status: 403, message: `${name} n’habite pas encore ton île.` };
+            if (!who) refusal = name ? { status: 403, message: `${name} n’habite pas encore ton île.` } : { status: 404, message: 'Habitant inconnu.' };
             else if (!state) refusal = { status: 403, message: 'Bâtis d’abord l’Atelier : c’est lui qui forge les outils.' };
             else if (!state.refill) refusal = { status: 409, message: `${name} n’en a pas encore besoin.` };
             else if (Object.entries(state.cost).some(([r, n]) => stock[r] - spent[r] < n)) {
@@ -1008,6 +1044,31 @@ async function satisfyVisitor(userId, visitorId, now = Date.now()) {
         await conn.query('UPDATE world_visitors SET satisfied_at = $2 WHERE id = $1', [visitorId, new Date(now)]);
         const { coins } = await ledger.credit(userId, r.reward, 'visiteur', String(visitorId), conn);
         return { reward: r.reward, coins };
+    });
+}
+
+// Maisons du Foyer posées et occupées : { total, used }
+async function housesOf(userId, conn) {
+    const { rows } = await conn.query(
+        `SELECT (SELECT COUNT(*)::int FROM world_annexes WHERE user_id = $1 AND annex = 'maison') AS total,
+                (SELECT COUNT(*)::int FROM world_visitors WHERE user_id = $1 AND settled_at IS NOT NULL) AS used`, [userId]);
+    return rows[0];
+}
+// Un visiteur comblé reste sur l'île : il prend une maison libre et devient habitant (pour toujours).
+// { settled: prénom } ou { status, message }
+async function settleVisitor(userId, visitorId, now = Date.now()) {
+    await migrate(userId);
+    return db.transaction(async conn => {
+        await stockOf(userId, conn, true);
+        const { rows } = await conn.query('SELECT * FROM world_visitors WHERE id = $1 AND user_id = $2 FOR UPDATE', [visitorId, userId]);
+        const row = rows[0];
+        if (!row || row.settled_at || now >= new Date(row.leaves_at).getTime()) return db.rollback({ status: 404, message: 'Ce visiteur est déjà reparti.' });
+        const name = visitors.nameOf(row.seed);
+        if (!row.satisfied_at) return db.rollback({ status: 403, message: `Comble d’abord la demande de ${name}.` });
+        const houses = await housesOf(userId, conn);
+        if (houses.used >= houses.total) return db.rollback({ status: 409, message: 'Aucune maison libre : pose une Maison près du Foyer (annexes du Foyer).' });
+        await conn.query('UPDATE world_visitors SET settled_at = $2 WHERE id = $1', [visitorId, new Date(now)]);
+        return { settled: name };
     });
 }
 
@@ -1327,5 +1388,5 @@ async function collect(userId) {
 module.exports = {
     SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, isFree, pendingOf, chargesAt, effectsOf, productionOf,
     view, build, buyZone, buyItem, undoItem, chooseSkin, startRun, finishRun, place, remove, collect, migrate, claimQuest, board, openChest, openAll,
-    placeAnnex, moveAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, rename
+    placeAnnex, moveAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename
 };

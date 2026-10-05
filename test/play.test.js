@@ -1040,6 +1040,52 @@ test('visiteurs : un voyageur débarque au Ponton avec une demande, la comble un
   assert.equal((await api('POST', '/play/world/visitor', { id: 1 }, await guest())).status, 402);
 });
 
+test('maisons : un visiteur comblé reste dans une maison libre et devient habitant (amitié, besoins)', async () => {
+  const player = await newPlayer();
+  const view = async () => (await api('GET', '/play/world', null, player)).data;
+  const settle = id => api('POST', '/play/world/visitor/settle', { id }, player);
+  await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'crique')`, [player.userId]);
+  await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'ponton', 2)`, [player.userId]);
+  const traveller = (await view()).visitor;
+  await sql('UPDATE world_stock SET food = 100 WHERE user_id = $1', [player.userId]);
+  await sql(`UPDATE world_visitors SET request = '{"kind":"livrer","resource":"food","amount":10,"reward":60}' WHERE id = $1`, [traveller.id]);
+  // Pas encore comblé : il ne reste pas ; comblé mais sans maison libre : non plus
+  assert.equal((await settle(traveller.id)).status, 403);
+  assert.equal((await api('POST', '/play/world/visitor', { id: traveller.id }, player)).status, 200);
+  const homeless = await settle(traveller.id);
+  assert.equal(homeless.status, 409);
+  assert.match(homeless.data.message, /Maison/);
+  // Une maison près du Foyer : il s'installe, la visite s'achève, il devient habitant
+  await sql(`INSERT INTO world_annexes (user_id, x, y, annex) VALUES ($1, 28, 31, 'maison')`, [player.userId]);
+  assert.deepEqual((await view()).houses, { total: 1, used: 0 });
+  const stayed = await settle(traveller.id);
+  assert.equal(stayed.status, 200);
+  assert.equal(stayed.data.settled, traveller.name);
+  assert.equal(stayed.data.world.visitor, null);
+  assert.deepEqual(stayed.data.world.houses, { total: 1, used: 1 });
+  const id = `v${traveller.id}`;
+  const settler = stayed.data.world.villagers.find(v => v.id === id);
+  assert.deepEqual([settler.name, settler.role, settler.site, settler.seed, settler.home], [traveller.name, traveller.role, traveller.site, traveller.seed, { x: 28, y: 31 }]);
+  assert.deepEqual(settler.needs.map(n => n.id), ['manger', 'deco']);
+  assert.equal((await settle(traveller.id)).status, 404);
+  // Comme les autres habitants : on lui parle, on comble ses besoins
+  const hello = await api('POST', '/play/world/villager/talk', { villager: id }, player);
+  assert.deepEqual([hello.status, hello.data.gained], [200, 8]);
+  await sql(`UPDATE world_needs SET filled_at = NOW() - INTERVAL '13 hours' WHERE user_id = $1 AND villager = $2`, [player.userId, id]);
+  assert.equal((await api('POST', '/play/world/villager/need', { villager: id, need: 'manger' }, player)).status, 200);
+  assert.equal((await api('POST', '/play/world/villager/talk', { villager: 'v999999' }, player)).status, 404);
+  // Le visiteur suivant arrive quelques heures après ; sans seconde maison, il ne pourra pas rester
+  assert.equal((await view()).visitor, null);
+  await sql(`UPDATE world_visitors SET settled_at = NOW() - INTERVAL '5 hours' WHERE id = $1`, [traveller.id]);
+  const next = (await view()).visitor;
+  assert.ok(next && next.id !== traveller.id);
+  await sql(`UPDATE world_visitors SET request = '{"kind":"livrer","resource":"food","amount":10,"reward":60}' WHERE id = $1`, [next.id]);
+  assert.equal((await api('POST', '/play/world/visitor', { id: next.id }, player)).status, 200);
+  assert.equal((await settle(next.id)).status, 409);
+  assert.equal((await api('POST', '/play/world/visitor/settle', { id: 'x' }, player)).status, 400);
+  assert.equal((await api('POST', '/play/world/visitor/settle', { id: 1 }, await guest())).status, 402);
+});
+
 test('mini-jeux : au palier III, trois parties en réserve, gestes rejoués par le serveur, écus versés une fois', async () => {
   const player = await newPlayer();
   const start = game => api('POST', '/play/world/game/start', { game }, player);
