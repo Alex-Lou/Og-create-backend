@@ -539,6 +539,21 @@ async function factsOf(userId, owned, stars, conn = db, moods = null) {
     };
 }
 
+// Les cibles du fil d'Ariane (bible, § 6.1 à 6.3) : ce que demande la quête active. L'élément à écrire (ou l'une des
+// bêtes), le plan du prochain palier du bâtiment demandé (une invention), les savoir-faire de la création demandée ;
+// [] sinon. bookPages.arianeOf en tire le chemin le plus court
+async function arianeTargets(userId) {
+    const quest = quests.currentOf(await claimedOf(userId));
+    const goal = quest && quest.goal;
+    if (!goal) return [];
+    if (goal.kind === 'element') return goal.any || [goal.element];
+    if (goal.kind === 'craft') return crafts.CRAFT_BY_ID[goal.craft].elements;
+    if (goal.kind !== 'level') return [];
+    const level = (await levelsOf(userId)).levels[goal.site] || 0;
+    const plan = level < goal.need ? SITES[goal.site].levels[level]?.plan : null;
+    return plan ? [plan] : [];
+}
+
 // Le tableau de Brume, avec le chapitre encore fermé qu'attend la quête active (un quartier ou un palier d'un
 // chapitre pas encore ouvert : le joueur doit d'abord écrire des découvertes). openChapters : Set des chapitres ouverts
 function boardWith(claimed, facts, openChapters) {
@@ -945,6 +960,7 @@ async function view(userId, owned, book) {
     });
     const pendingStock = Object.fromEntries(RESOURCES.map(r => [r, production.filter(p => p.resource === r).reduce((sum, p) => sum + p.amount, 0)]));
     const claimed = await claimedOf(userId);
+    const facts = await factsOf(userId, owned, book.stars ?? 0, db, moods);
     const visiting = await visitorNow(userId);
     const epreuves = await epreuvesOf(userId);
     const discovered = await discoveredOf(userId);
@@ -1049,7 +1065,12 @@ async function view(userId, owned, book) {
         // Le nom du peuple (bible, § 6.11), une fois choisi
         people: named.peuple || null,
         // Brume, le feu follet : la quête active (ou son dernier mot)
-        brume: boardWith(claimed, await factsOf(userId, owned, book.stars ?? 0, db, moods), book.openChapters),
+        brume: (() => {
+            const out = boardWith(claimed, facts, book.openChapters);
+            // Le fil d'Ariane de la quête active : la cible et les pages qui restent (le Grimoire montre la page marquée)
+            if (out.quest && !out.quest.done && book.ariane) out.quest.ariane = { target: book.ariane.target, remaining: book.ariane.remaining };
+            return out;
+        })(),
         // Coffres : en attente, du jour, bouteille à la mer
         chests: chestsView(await openedOf(userId, Date.now()), book.openChapters, claimed, found)
     };
@@ -1781,6 +1802,6 @@ async function collect(userId) {
 module.exports = {
     SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, pendingOf, chargesAt, effectsOf, productionOf,
     view, build, buyZone, buyItem, undoItem, chooseSkin, startRun, finishRun, collect, migrate, claimQuest, board, openChest, openAll,
-    placeAnnex, moveAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople,
+    placeAnnex, moveAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople, arianeTargets,
     refundDecorations, startCraft, finishCraft, placeCraft, moveCraft, storeCraft, startExpedition, findLandmark, gatherDeposit
 };

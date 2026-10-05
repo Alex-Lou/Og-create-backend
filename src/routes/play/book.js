@@ -5,6 +5,7 @@ const ledger = require('../../services/ledger');
 const bookPages = require('../../services/bookPages');
 const bookTries = require('../../services/bookTries');
 const bookLetters = require('../../services/bookLetters');
+const world = require('../../services/world');
 const hangman = require('../../services/hangman');
 const book = require('../../services/recipeBook');
 const { PAGE, playLimiter, withPlayer, pay, discovered } = require('./shared');
@@ -14,7 +15,10 @@ const router = express.Router();
 // Une page à portée ne révèle jamais le nom de l'élément inconnu
 router.get('/book', playLimiter, withPlayer(async (req, res, owner, b) => {
     const misses = owner.kind === 'user' ? await bookTries.missesByPage(owner.id) : {};
-    res.json(bookPages.view(b, await players.elements(owner), misses, await bookLetters.byPage(owner), await players.isVeteran(owner)));
+    const owned = await players.elements(owner);
+    // Le fil d'Ariane suit la quête active de l'île (compte seulement)
+    const ariane = owner.kind === 'user' ? bookPages.arianeOf(b, owned, await world.arianeTargets(owner.id)) : null;
+    res.json(bookPages.view(b, owned, misses, await bookLetters.byPage(owner), await players.isVeteran(owner), ariane));
 }));
 
 // Encre : révèle un ingrédient (déjà possédé) d'une page à portée ; offerte à un compte

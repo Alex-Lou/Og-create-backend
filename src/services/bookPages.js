@@ -102,9 +102,57 @@ function pageRecipe(recipes, size, slots) {
         .reduce((best, parts) => (!best || Math.abs(parts.length - want) < Math.abs(best.length - want) ? parts : best), null);
 }
 
+// Fil d'Ariane (bible, § 6.1) : le chemin de recettes le plus court des éléments possédés vers une cible. Recherche
+// par générations : un élément naît à la génération qui suit la plus tardive de ses ingrédients ; d'abord avec les
+// seules recettes qui tiennent dans l'Athanor du joueur (les emplacements ne font que grandir), sinon avec toutes.
+// targets : les cibles (une bête au choix : plusieurs) ; la plus proche l'emporte. { target, next, remaining } :
+// next = la première page manquante dont les ingrédients sont tous possédés (la page marquée), remaining = les pages
+// qui restent jusqu'à la cible (elle comprise) ; null si toutes sont possédées ou hors d'atteinte. Rien n'est stocké.
+function arianeOf(b, owned, targets) {
+    const have = new Set(owned);
+    const wanted = targets.filter(name => !have.has(name) && b.meta.has(name));
+    if (!wanted.length) return null;
+    const search = max => {
+        const depth = new Map([...have].map(name => [name, 0]));
+        const via = new Map();
+        for (let d = 1; !wanted.some(name => depth.has(name)); d++) {
+            const born = [];
+            for (const [parts, result] of b.entries) {
+                if (!depth.has(result) && parts.length <= max && parts.every(p => depth.has(p) && depth.get(p) < d)) born.push([result, parts]);
+            }
+            if (!born.length) return null;
+            for (const [result, parts] of born) {
+                if (!depth.has(result)) {
+                    depth.set(result, d);
+                    via.set(result, parts);
+                }
+            }
+        }
+        // Les pages manquantes, dans l'ordre où on les écrit (les ingrédients d'abord)
+        const chainOf = target => {
+            const order = [];
+            const seen = new Set();
+            const visit = name => {
+                if (seen.has(name) || have.has(name)) return;
+                seen.add(name);
+                via.get(name).forEach(visit);
+                order.push(name);
+            };
+            visit(target);
+            return order;
+        };
+        const best = wanted.filter(name => depth.has(name)).map(target => ({ target, chain: chainOf(target) }))
+            .sort((x, y) => x.chain.length - y.chain.length)[0];
+        return { target: best.target, next: best.chain[0], remaining: best.chain.length };
+    };
+    return search(slotsFor(b, owned)) || search(Infinity);
+}
+
 // misses : essais ratés par page (compte seulement), pour l'encre offerte ; letters : parties de pendu par page ;
-// veteran : compte d'avant la bible (le chapitre II lui reste ouvert d'emblée)
-function view(b, owned, misses = {}, letters = {}, veteran = false) {
+// veteran : compte d'avant la bible (le chapitre II lui reste ouvert d'emblée) ; ariane : le fil d'Ariane (arianeOf)
+// ou null. La page marquée s'ajoute aux pages ouvertes de son chapitre, même scellé ; elle ne dit rien de plus
+// qu'une autre page
+function view(b, owned, misses = {}, letters = {}, veteran = false, ariane = null) {
     const have = new Set(owned);
     const within = recipesWithin(b, have);
     const slots = slotsFor(b, owned);
@@ -130,6 +178,8 @@ function view(b, owned, misses = {}, letters = {}, veteran = false) {
         const opened = new Set(reachable
             .sort((x, y) => depth.get(x) - depth.get(y) || pageId(x).localeCompare(pageId(y)))
             .slice(0, rules.open));
+        const marked = ariane && recipeOf.has(ariane.next) ? ariane.next : null;
+        if (marked) opened.add(marked);
         const pages = [];
         let found = 0;
         let far = 0;
@@ -150,7 +200,7 @@ function view(b, owned, misses = {}, letters = {}, veteran = false) {
                 // groups : même numéro = même ingrédient (Eau + Eau → [0, 0]), sans dire lequel
                 const groups = parts.map(part => [...new Set(parts)].indexOf(part));
                 pages.push({
-                    id, status: 'reach', family: info.family, letters: [...name].length, clue, groups,
+                    id, status: 'reach', family: info.family, letters: [...name].length, clue, groups, ...(name === marked ? { marked: true } : {}),
                     ...(info.riddle ? { riddle: info.riddle } : {}),
                     ...(rules.letter ? { first: [...name][0] } : {}),
                     tray: trayOf(b, owned, id, parts, rules.decoys),
@@ -163,9 +213,11 @@ function view(b, owned, misses = {}, letters = {}, veteran = false) {
             }
         }
         const sealed = reachable.length - opened.size;
-        return { id: chapter.id, name: chapter.name, verse: chapter.verse, families: chapter.families, need, open, total: names.length, found, far, sealed, pages: open ? pages : [] };
+        return { id: chapter.id, name: chapter.name, verse: chapter.verse, families: chapter.families, need, open, total: names.length, found, far, sealed, pages: open ? pages : pages.filter(p => p.marked) };
     });
-    return { stars, chapters };
+    // Le ruban du fil d'Ariane : la cible (déjà nommée par la quête), les pages qui restent, la page marquée
+    const marked = ariane && chapters.flatMap(c => c.pages).find(p => p.marked);
+    return { stars, chapters, ariane: marked ? { target: ariane.target, remaining: ariane.remaining, page: marked.id, chapter: chapterOf(b.meta.get(ariane.next).family).id } : null };
 }
 
 // Élément inconnu à portée qui porte cet identifiant de page, avec la recette que montre sa page, ou null
@@ -226,4 +278,4 @@ function finishedChapters(b, owned) {
     }).map(c => c.id));
 }
 
-module.exports = { DIFFICULTY, view, reachableById, pageId, aim, telling, difficultyOf, chapterOf, openChapters, finishedChapters, starsOf };
+module.exports = { DIFFICULTY, view, arianeOf, reachableById, pageId, aim, telling, difficultyOf, chapterOf, openChapters, finishedChapters, starsOf };
