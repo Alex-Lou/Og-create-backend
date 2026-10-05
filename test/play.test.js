@@ -1260,6 +1260,7 @@ test('Anya : la Révélation une seule fois, le Souffle une fois par jour, la B�
   assert.equal(seen.status, 200);
   assert.equal(seen.data.anya.revealed, true);
   assert.equal((await reveal()).data.anya.revealed, true);
+  assert.equal((await api('GET', '/play/world/brume', null, player)).data.anya.revealed, true);
   // Le Souffle : un ingrédient, une fois par jour
   const breath = await talk();
   assert.equal(breath.status, 200);

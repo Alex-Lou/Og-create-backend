@@ -585,7 +585,8 @@ function boardWith(claimed, facts, openChapters) {
 // peuple, pour l'étape de civilisation (l'Ex libris du Grimoire)
 async function board(userId, owned, stars, openChapters) {
     const out = boardWith(await claimedOf(userId), await factsOf(userId, owned, stars), openChapters);
-    return { ...out, people: (await namesOf(userId)).peuple || null };
+    // Anya : le Grimoire allume sa gemme une fois la Révélation vue
+    return { ...out, people: (await namesOf(userId)).peuple || null, anya: await anyaOf(userId) };
 }
 
 // Passage aux cartes suivantes, une fois par joueur, au premier passage, verrouillé (deux requêtes ne migrent pas
