@@ -31,8 +31,11 @@ const GAME_SLACK_MS = 3000; // tolérance d'horloge : un geste ne peut dater de 
 const CRAFT_TTL_MS = 30 * 60 * 1000; // un assemblage non rendu après 30 min est perdu (rien n'est encore payé)
 const MOVES = 15;
 const RESOURCES = ['stone', 'wood', 'water', 'food'];
-// 1 : île 14 × 14 ; 2 : île 20 × 20 (worldMapV2.js) ; 3 : la grande île 48 × 48 (worldMap.js)
-const MAP_VERSION = 3;
+// 1 : île 14 × 14 ; 2 : île 20 × 20 (worldMapV2.js) ; 3 : la grande île 48 × 48 ; 4 : la très grande île 96 × 96, dont
+// la précédente est le cœur (worldMap.js)
+const MAP_VERSION = 4;
+// Expédition vers un quartier des terres nouvelles : par heure de voyage, ce qu'elle emporte (et une partie de Récolte)
+const EXPEDITION_COST = { food: 10, wood: 5 };
 // Ancienne règle (v1) : une décoration rapportait 1 écu par heure ; payée une dernière fois à la migration
 const OLD_DECO_RATE = 1;
 // Prix d'une décoration selon le chapitre de l'élément posé
@@ -455,13 +458,14 @@ async function board(userId, stars) {
 }
 
 // Passage aux cartes suivantes, une fois par joueur, au premier passage, verrouillé (deux requêtes ne migrent pas
-// deux fois) et d'un seul tenant (tout ou rien) : v1 → v2 puis v2 → v3 selon l'île du joueur.
+// deux fois) et d'un seul tenant (tout ou rien) : v1 → v2 → v3 → v4 selon l'île du joueur.
 function migrate(userId) {
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
         if (stock.map_version >= MAP_VERSION) return false;
         if (stock.map_version < 2) await toV2(userId, stock, conn);
-        await toV3(userId, conn);
+        if (stock.map_version < 3) await toV3(userId, conn);
+        await toV4(userId, conn);
         await conn.query('UPDATE world_stock SET map_version = $2 WHERE user_id = $1', [userId, MAP_VERSION]);
         return true;
     });
@@ -504,9 +508,11 @@ async function toV3(userId, conn) {
     // Décalage en deux temps : la clé (joueur, x, y) ne se heurte jamais à une case encore occupée
     await conn.query('UPDATE world_tiles SET x = x + 1000, y = y + 1000 WHERE user_id = $1', [userId]);
     const taken = new Set();
-    const spare = map.freeSpots('coeur', levels);
+    // Cases de la carte v3 : celles du cœur de la carte v4, moins son décalage (toV4 les replace ensuite)
+    const v3Spots = zone => map.freeSpots(zone, levels).map(sp => ({ x: sp.x - map.OFFSET.x, y: sp.y - map.OFFSET.y }));
+    const spare = v3Spots('coeur');
     for (const [zone, list] of byZone) {
-        const spots = [...map.freeSpots(zone, levels), ...spare];
+        const spots = [...v3Spots(zone), ...spare];
         for (const tile of list) {
             const spot = spots.find(s => !taken.has(s.y * SIZE + s.x));
             if (!spot) break;
@@ -516,6 +522,61 @@ async function toV3(userId, conn) {
     }
     // Chaque ancien quartier tient dans le nouveau (test/play.test.js) ; les décorations sont ensuite remboursées
     // (refundDecorations, lot 8)
+}
+
+// v3 → v4 (la très grande île) : la grande île devient le cœur, posée en map.OFFSET ; tout ce que le joueur y a posé
+// (annexes, créations, anciennes décorations) glisse d'autant. Les bâtiments n'ont rien à faire : leur place vient
+// de la carte. Décalage en deux temps : la clé (joueur, x, y) ne se heurte jamais à une case encore occupée
+async function toV4(userId, conn) {
+    const { x, y } = map.OFFSET;
+    for (const table of ['world_annexes', 'world_crafts', 'world_tiles']) {
+        await conn.query(`UPDATE ${table} SET x = x + 1000, y = y + 1000 WHERE user_id = $1 AND x IS NOT NULL`, [userId]);
+        await conn.query(`UPDATE ${table} SET x = x - 1000 + $2, y = y - 1000 + $3 WHERE user_id = $1 AND x IS NOT NULL`, [userId, x, y]);
+    }
+}
+
+// Quartiers des terres nouvelles déjà découverts (expédition revenue) : Set des identifiants. Les quartiers du cœur
+// sont toujours connus
+async function discoveredOf(userId, conn = db, now = Date.now()) {
+    const { rows } = await conn.query('SELECT zone FROM world_expeditions WHERE user_id = $1 AND ends_at <= $2', [userId, new Date(now)]);
+    return new Set(rows.map(r => r.zone));
+}
+const isKnown = (zone, discovered) => !zone.trip || discovered.has(zone.id);
+// Ce qu'emporte une expédition vers ce quartier : { food, wood }
+const expeditionCost = zone => Object.fromEntries(Object.entries(EXPEDITION_COST).map(([r, n]) => [r, n * zone.trip]));
+// Expédition en route (pas encore revenue), ou null : { zone, ends_at }
+async function expeditionOf(userId, conn = db, now = Date.now()) {
+    const { rows } = await conn.query('SELECT zone, ends_at FROM world_expeditions WHERE user_id = $1 AND ends_at > $2', [userId, new Date(now)]);
+    return rows[0] || null;
+}
+
+// Envoie une expédition vers un quartier inconnu des terres nouvelles, voisin d'un quartier à soi : une à la fois ; elle
+// emporte des vivres, du bois et une partie de Récolte, et revient après zone.trip heures (le quartier est alors
+// découvert : on peut l'acheter). { zone, endsAt } ou { status, message }
+async function startExpedition(userId, zoneId, now = Date.now()) {
+    const zone = map.ZONE_BY_ID[zoneId];
+    if (!zone || !zone.trip) return { status: 404, message: 'Quartier inconnu.' };
+    await migrate(userId);
+    return db.transaction(async conn => {
+        const stock = await stockOf(userId, conn, true);
+        if ((await discoveredOf(userId, conn, now)).has(zone.id)) return db.rollback({ status: 409, message: 'Ce quartier est déjà découvert.' });
+        const going = await expeditionOf(userId, conn, now);
+        if (going) return db.rollback({ status: 409, message: 'Une expédition est déjà en route : attends son retour.' });
+        const zones = await zonesOf(userId, conn);
+        if (!map.NEIGHBORS[zone.id].some(id => zones.has(id))) return db.rollback({ status: 403, message: 'Une expédition part d’un quartier à toi, vers un quartier voisin.' });
+        const cost = expeditionCost(zone);
+        if (Object.entries(cost).some(([r, n]) => stock[r] < n)) return db.rollback({ status: 400, message: `Il faut emporter ${cost.food} vivres et ${cost.wood} bûches : joue une Récolte.` });
+        const { levels } = await levelsOf(userId, conn);
+        const { bonuses, extra } = await bonusesFor(userId, conn);
+        const effects = effectsOf(levels, bonuses, extra);
+        const charges = chargesAt(stock, effects.maxCharges, now, effects.regenMs);
+        if (charges.count < 1) return db.rollback({ status: 409, message: 'Il faut une partie de Récolte en réserve : la prochaine revient bientôt.' });
+        await conn.query('UPDATE world_stock SET charges = $2, charges_at = $3, food = food - $4, wood = wood - $5 WHERE user_id = $1',
+            [userId, charges.count - 1, new Date(charges.since), cost.food, cost.wood]);
+        const endsAt = new Date(now + zone.trip * 3600 * 1000);
+        await conn.query('INSERT INTO world_expeditions (user_id, zone, ends_at) VALUES ($1, $2, $3)', [userId, zone.id, endsAt]);
+        return { zone: zone.id, endsAt: endsAt.toISOString() };
+    });
 }
 
 // Créations d'île (lot 8) : [{ id, craft, x, y }] (x, y vides : en réserve)
@@ -528,22 +589,30 @@ const placedOf = rows => rows.filter(r => r.x !== null);
 const madeOf = rows => rows.reduce((out, r) => ({ ...out, [r.craft]: (out[r.craft] || 0) + 1 }), {});
 // Contexte des règles de pose (crafts.spotBlock) : sol, case libre (sur l'île, hors chantier, quartier à soi, ni annexe
 // ni autre création), emprise d'un bâtiment bâti, créations posées (sauf skip : celle qu'on déplace)
+// (cells : les cases libres, calculées une fois pour toutes les créations)
 function craftCtx(levels, zones, annexRows, rows, skip = null) {
     const others = placedOf(rows).filter(r => r.id !== skip);
     const busy = new Set([...annexRows.map(keyOf), ...others.map(keyOf)]);
+    const open = new Uint8Array(SIZE * SIZE);
+    const cells = [];
+    for (let y = 0; y < SIZE; y++) {
+        for (let x = 0; x < SIZE; x++) {
+            if (!map.isLand(x, y) || !zones.has(map.zoneAt(x, y)) || busy.has(y * SIZE + x) || map.inFootprint(x, y, levels)) continue;
+            open[y * SIZE + x] = 1;
+            cells.push({ x, y });
+        }
+    }
     return {
         ground: map.groundAt,
-        free: (x, y) => Number.isInteger(x) && Number.isInteger(y) && map.isLand(x, y) && !map.inFootprint(x, y, levels)
-            && zones.has(map.zoneAt(x, y)) && !busy.has(y * SIZE + x),
+        free: (x, y) => Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < SIZE && y < SIZE && open[y * SIZE + x] === 1,
         site: id => (livesHere(id, levels, zones) ? map.footprintOf(id, levels[id]) : null),
-        placed: others
+        placed: others,
+        cells
     };
 }
-// Cases où cette création peut se poser maintenant
+// Cases où cette création peut se poser maintenant (parmi les cases libres)
 function craftSpots(c, ctx) {
-    const spots = [];
-    for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) if (!crafts.spotBlock(c, x, y, ctx)) spots.push({ x, y });
-    return spots;
+    return ctx.cells.filter(({ x, y }) => !crafts.spotBlock(c, x, y, ctx)).map(({ x, y }) => ({ x, y }));
 }
 // Créations posées sur une case qui n'est plus libre (chantier agrandi) : rangées dans la réserve
 async function stowCrafts(userId, rows, levels, zones, annexRows) {
@@ -724,20 +793,31 @@ async function view(userId, owned, book) {
     const claimed = await claimedOf(userId);
     const visiting = await visitorNow(userId);
     const epreuves = await epreuvesOf(userId);
+    const discovered = await discoveredOf(userId);
+    const going = await expeditionOf(userId);
+    const veil = map.veiled(new Set(map.ZONES.filter(z => !isKnown(z, discovered)).map(z => z.code)));
     return {
         size: SIZE,
         map: {
-            // Calques de la grande île (relief, sol, quartiers : voir islandData.js) ; grid : index des quartiers
+            // Calques de la très grande île (relief, sol, quartiers : voir islandData.js et islandOuter.js) ; grid : index
+            // des quartiers. Les quartiers encore inconnus n'y montrent que leur côte (worldMap.veiled)
             grid: map.GRID,
-            height: map.HEIGHT,
-            ground: map.GROUND,
+            height: veil.height,
+            ground: veil.ground,
             region: map.REGION,
-            zones: map.ZONES.map(z => ({
+            // Un quartier inconnu ne dit ni son nom, ni son climat, ni son prix : seulement s'il peut être exploré
+            // (voisin d'un quartier à soi), en combien d'heures, et ce qu'emporte l'expédition
+            zones: map.ZONES.map(z => (isKnown(z, discovered) ? {
                 id: z.id, name: named[`zone:${z.id}`] || z.name, baseName: z.name, renamed: Boolean(named[`zone:${z.id}`]),
-                price: z.price, chapter: z.chapter, code: z.code, anchor: map.ANCHORS[z.id],
+                price: z.price, chapter: z.chapter, code: z.code, anchor: map.ANCHORS[z.id], climate: z.climate, known: true,
                 owned: zones.has(z.id), open: !z.chapter || book.openChapters.has(z.chapter)
+            } : {
+                id: z.id, name: null, code: z.code, anchor: map.ANCHORS[z.id], known: false, owned: false, open: false,
+                trip: z.trip, cost: expeditionCost(z), explorable: !going && map.NEIGHBORS[z.id].some(id => zones.has(id))
             }))
         },
+        // Expédition en route : vers quel quartier, retour dans combien de temps (ms)
+        expedition: going ? { zone: going.zone, endsIn: Math.max(0, new Date(going.ends_at).getTime() - Date.now()) } : null,
         sites,
         stock: Object.fromEntries(RESOURCES.map(r => [r, stock[r]])),
         charges: { count: charges.count, max: effects.maxCharges, nextIn: charges.count < effects.maxCharges ? Math.max(0, charges.since + effects.regenMs - Date.now()) : null },
@@ -824,8 +904,10 @@ async function claimQuest(userId, questId, stars) {
 async function buyZone(userId, zoneId, openChapters) {
     const zone = map.ZONE_BY_ID[zoneId];
     if (!zone || zone.id === 'coeur') return { status: 404, message: 'Quartier inconnu.' };
-    if (zone.chapter && !openChapters.has(zone.chapter)) return { status: 403, message: `Ouvre d’abord le chapitre ${zone.chapter} du Livre.` };
     await migrate(userId);
+    // Inconnu : rien n'en est dit (pas même son chapitre)
+    if (!isKnown(zone, await discoveredOf(userId))) return { status: 403, message: 'Envoie d’abord une expédition découvrir ce quartier.' };
+    if (zone.chapter && !openChapters.has(zone.chapter)) return { status: 403, message: `Ouvre d’abord le chapitre ${zone.chapter} du Livre.` };
     return db.transaction(async conn => {
         const added = await conn.query('INSERT INTO world_zones (user_id, zone) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING zone', [userId, zone.id]);
         if (!added.rows.length) return db.rollback({ status: 409, message: 'Ce quartier est déjà à toi.' });
@@ -1510,5 +1592,5 @@ module.exports = {
     SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, isFree, pendingOf, chargesAt, effectsOf, productionOf,
     view, build, buyZone, buyItem, undoItem, chooseSkin, startRun, finishRun, collect, migrate, claimQuest, board, openChest, openAll,
     placeAnnex, moveAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename,
-    refundDecorations, startCraft, finishCraft, placeCraft, moveCraft, storeCraft
+    refundDecorations, startCraft, finishCraft, placeCraft, moveCraft, storeCraft, startExpedition
 };
