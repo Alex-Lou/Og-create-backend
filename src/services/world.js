@@ -15,11 +15,14 @@ const quests = require('./quests');
 const loot = require('./loot');
 const annexes = require('./annexes');
 const signs = require('./signs');
+const minigames = require('./minigames');
 
 const SIZE = map.SIZE;
 const CAP_HOURS = 8;
 const REGEN_MS = 30 * 60 * 1000; // une partie de Récolte revient toutes les 30 minutes
 const RUN_TTL_MS = 24 * 3600 * 1000; // une partie non rendue après 24 h est perdue
+const GAME_TTL_MS = 15 * 60 * 1000; // une partie de mini-jeu non rendue après 15 min est perdue
+const GAME_SLACK_MS = 3000; // tolérance d'horloge : un geste ne peut dater de plus tard que la partie elle-même
 const MOVES = 15;
 const RESOURCES = ['stone', 'wood', 'water', 'food'];
 // 1 : île 14 × 14 ; 2 : île 20 × 20 (worldMapV2.js) ; 3 : la grande île 48 × 48 (worldMap.js)
@@ -252,6 +255,13 @@ async function signsOf(userId, conn = db) {
     const worn = await conn.query('SELECT site, style FROM world_signs WHERE user_id = $1', [userId]);
     return { name, owned: new Set(bought.rows.map(r => r.style)), worn: Object.fromEntries(worn.rows.map(r => [r.site, r.style])) };
 }
+// Mini-jeux : réserve de parties de chaque jeu ({ jeu: { plays, plays_at } } ; absent : réserve pleine)
+async function gamesOf(userId, conn = db) {
+    const { rows } = await conn.query('SELECT game, plays, plays_at FROM world_games WHERE user_id = $1', [userId]);
+    return Object.fromEntries(rows.map(r => [r.game, r]));
+}
+// Parties d'un jeu à l'instant now (une de plus toutes les 2 h, 3 au plus) : { count, since }
+const playsOf = (row, now) => chargesAt({ charges: row ? row.plays : minigames.PLAYS, charges_at: row ? row.plays_at : now }, minigames.PLAYS, now, minigames.PLAY_REGEN_MS);
 // Annexes posées : [{ x, y, annex, built_at }]
 async function annexesOf(userId, conn = db) {
     const { rows } = await conn.query('SELECT x, y, annex, built_at FROM world_annexes WHERE user_id = $1 ORDER BY built_at, y, x', [userId]);
@@ -477,6 +487,7 @@ async function view(userId, owned, book) {
     const items = await itemsOf(userId);
     const skins = await skinsOf(userId);
     const signed = await signsOf(userId);
+    const played = await gamesOf(userId);
     const annexRows = await annexesOf(userId);
     const bonuses = shop.bonusesOf(items);
     const extra = annexes.bonusesOf(annexRows);
@@ -554,6 +565,16 @@ async function view(userId, owned, book) {
         pending: production.reduce((sum, p) => sum + p.coins, 0),
         pendingStock,
         tiles: tiles.map(t => ({ x: t.x, y: t.y, element: t.element, ...(known[t.element] || {}) })),
+        // Mini-jeux des bâtiments : ouverts au palier III, parties en réserve, multiplicateur d'écus du palier
+        games: Object.entries(minigames.GAMES).map(([id, game]) => {
+            const level = levels[game.site] || 0;
+            const plays = playsOf(played[id], Date.now());
+            return {
+                id, site: game.site, name: game.name, text: game.text, level: minigames.GAME_LEVEL, open: level >= minigames.GAME_LEVEL,
+                plays: plays.count, max: minigames.PLAYS, nextIn: plays.count < minigames.PLAYS ? Math.max(0, plays.since + minigames.PLAY_REGEN_MS - Date.now()) : null,
+                mult: minigames.multOf(level), cap: Math.round(minigames.CAP * minigames.multOf(level))
+            };
+        }),
         // Enseignes : le nom écrit dessus, le palier où elles viennent, les styles (offert, acheté ou à acheter)
         signs: {
             name: signed.name, level: signs.SIGN_LEVEL, nameMax: signs.NAME_MAX,
@@ -673,6 +694,47 @@ function finishRun(userId, runId, moves) {
         const chest = rarity ? await grant(userId, `recolte:${runId}`, rarity, conn) : null;
         // coins : le solde (écus de la partie et du coffre compris)
         return { gains: g, earned, coins: await balanceOf(userId, conn), chest };
+    });
+}
+
+// Nouvelle partie d'un mini-jeu (bâtiment au palier III ou plus) : une partie de sa réserve, une graine. { run } ou
+// { status, message }
+async function startGame(userId, gameId) {
+    const game = minigames.GAMES[gameId];
+    if (!game) return { status: 404, message: 'Mini-jeu inconnu.' };
+    await migrate(userId);
+    return db.transaction(async conn => {
+        await stockOf(userId, conn, true);
+        const level = (await levelsOf(userId, conn)).levels[game.site] || 0;
+        if (level < minigames.GAME_LEVEL) return db.rollback({ status: 403, message: `${game.name} : au palier III du bâtiment.` });
+        const now = Date.now();
+        const plays = playsOf((await gamesOf(userId, conn))[gameId], now);
+        if (plays.count < 1) return db.rollback({ status: 409, message: 'Plus de partie en réserve : la prochaine revient bientôt.' });
+        await conn.query(`INSERT INTO world_games (user_id, game, plays, plays_at) VALUES ($1, $2, $3, $4)
+            ON CONFLICT (user_id, game) DO UPDATE SET plays = EXCLUDED.plays, plays_at = EXCLUDED.plays_at`, [userId, gameId, plays.count - 1, new Date(plays.since)]);
+        const seed = crypto.randomInt(1, 2147483647);
+        const { rows } = await conn.query('INSERT INTO world_game_runs (user_id, game, seed, level) VALUES ($1, $2, $3, $4) RETURNING id', [userId, gameId, seed, level]);
+        return { run: { id: Number(rows[0].id), game: gameId, seed, level } };
+    });
+}
+
+// Fin d'une partie de mini-jeu : le serveur rejoue les gestes et verse les écus (une seule fois : la partie se rend
+// une fois, même refusée). { earned, raw, detail, coins } ou { status, message }
+function finishGame(userId, runId, input) {
+    return db.transaction(async conn => {
+        const { rows } = await conn.query(
+            'SELECT game, seed, level, created_at FROM world_game_runs WHERE id = $1 AND user_id = $2 AND finished_at IS NULL FOR UPDATE', [runId, userId]);
+        if (!rows.length) return db.rollback({ status: 404, message: 'Cette partie est déjà rendue.' });
+        await conn.query('UPDATE world_game_runs SET finished_at = NOW() WHERE id = $1', [runId]);
+        const { game, seed, level, created_at: createdAt } = rows[0];
+        const elapsed = Date.now() - new Date(createdAt).getTime();
+        if (elapsed > GAME_TTL_MS) return { status: 400, message: 'Partie refusée : partie expirée.' };
+        const played = minigames.replay(game, seed, input);
+        if (!played.ok) return { status: 400, message: `Partie refusée : ${played.error}.` };
+        if (played.last > elapsed + GAME_SLACK_MS) return { status: 400, message: 'Partie refusée : partie trop rapide.' };
+        const earned = minigames.earnedOf(played.raw, level);
+        if (earned > 0) await ledger.credit(userId, earned, `jeu:${game}`, runId, conn);
+        return { earned, raw: played.raw, detail: played.detail, coins: await balanceOf(userId, conn) };
     });
 }
 
@@ -966,5 +1028,5 @@ async function collect(userId) {
 module.exports = {
     SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, isFree, pendingOf, chargesAt, effectsOf, productionOf,
     view, build, buyZone, buyItem, undoItem, chooseSkin, startRun, finishRun, place, remove, collect, migrate, claimQuest, board, openChest, openAll,
-    placeAnnex, moveAnnex, annexSpotOk, nameSigns, chooseSign
+    placeAnnex, moveAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame
 };

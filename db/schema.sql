@@ -341,6 +341,25 @@ CREATE TABLE IF NOT EXISTS world_signs (
     style VARCHAR(20) NOT NULL,
     PRIMARY KEY (user_id, site)
 );
+-- Mini-jeux des bâtiments (services/minigames.js), dès le palier III : parties en réserve par jeu (comme la Récolte), et
+-- chaque partie lancée (graine, palier du bâtiment au lancement), rendue une seule fois
+CREATE TABLE IF NOT EXISTS world_games (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    game VARCHAR(20) NOT NULL,
+    plays SMALLINT NOT NULL CHECK (plays >= 0),
+    plays_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, game)
+);
+CREATE TABLE IF NOT EXISTS world_game_runs (
+    id BIGSERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    game VARCHAR(20) NOT NULL,
+    seed INTEGER NOT NULL,
+    level SMALLINT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    finished_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_world_game_runs_user ON world_game_runs (user_id, created_at);
 
 -- Le Livre : mélanges ratés sur une page à portée (l'encre de la page devient offerte après quelques essais différents)
 CREATE TABLE IF NOT EXISTS book_tries (
