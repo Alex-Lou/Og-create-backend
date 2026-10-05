@@ -17,11 +17,13 @@ const annexes = require('./annexes');
 const signs = require('./signs');
 const minigames = require('./minigames');
 const villagers = require('./villagers');
+const naming = require('./naming');
 
 const SIZE = map.SIZE;
 const CAP_HOURS = 8;
 const REGEN_MS = 30 * 60 * 1000; // une partie de Récolte revient toutes les 30 minutes
 const RUN_TTL_MS = 24 * 3600 * 1000; // une partie non rendue après 24 h est perdue
+const RENAME_LEVEL = 3; // un bâtiment se renomme dès son palier III (un quartier, dès qu'il est à soi)
 const GAME_TTL_MS = 15 * 60 * 1000; // une partie de mini-jeu non rendue après 15 min est perdue
 const GAME_SLACK_MS = 3000; // tolérance d'horloge : un geste ne peut dater de plus tard que la partie elle-même
 const MOVES = 15;
@@ -255,6 +257,11 @@ async function signsOf(userId, conn = db) {
     const bought = await conn.query('SELECT style FROM world_sign_styles WHERE user_id = $1', [userId]);
     const worn = await conn.query('SELECT site, style FROM world_signs WHERE user_id = $1', [userId]);
     return { name, owned: new Set(bought.rows.map(r => r.style)), worn: Object.fromEntries(worn.rows.map(r => [r.site, r.style])) };
+}
+// Noms choisis par le joueur : { 'site:<id>' | 'zone:<id>': nom }
+async function namesOf(userId, conn = db) {
+    const { rows } = await conn.query('SELECT target, name FROM world_names WHERE user_id = $1', [userId]);
+    return Object.fromEntries(rows.map(r => [r.target, r.name]));
 }
 // Amitié des habitants : { habitant: { points, talked, gifted } } (jours 'AAAA-MM-JJ', heure de Paris)
 async function friendsOf(userId, conn = db) {
@@ -497,6 +504,7 @@ async function view(userId, owned, book) {
     const signed = await signsOf(userId);
     const played = await gamesOf(userId);
     const friends = await friendsOf(userId);
+    const named = await namesOf(userId);
     const annexRows = await annexesOf(userId);
     const bonuses = shop.bonusesOf(items);
     const extra = annexes.bonusesOf(annexRows);
@@ -523,7 +531,10 @@ async function view(userId, owned, book) {
         });
         return {
             id, x: place.x, y: place.y, w: place.w, h: place.h, level, maxLevel: site.levels.length, zone, locked: !zones.has(zone),
-            name: level ? site.levels[level - 1].name : site.levels[0].name,
+            // Nom choisi par le joueur (dès le palier III), sinon celui du palier
+            name: named[`site:${id}`] || (level ? site.levels[level - 1].name : site.levels[0].name),
+            baseName: level ? site.levels[level - 1].name : site.levels[0].name,
+            renamed: Boolean(named[`site:${id}`]), renameLevel: RENAME_LEVEL,
             effect: level ? site.levels[level - 1].effect : null,
             emoji: level && site.levels[level - 1].plan ? known[site.levels[level - 1].plan]?.emoji || null : null,
             produce: site.produce || null,
@@ -560,7 +571,8 @@ async function view(userId, owned, book) {
             ground: map.GROUND,
             region: map.REGION,
             zones: map.ZONES.map(z => ({
-                id: z.id, name: z.name, price: z.price, chapter: z.chapter, code: z.code, anchor: map.ANCHORS[z.id],
+                id: z.id, name: named[`zone:${z.id}`] || z.name, baseName: z.name, renamed: Boolean(named[`zone:${z.id}`]),
+                price: z.price, chapter: z.chapter, code: z.code, anchor: map.ANCHORS[z.id],
                 owned: zones.has(z.id), open: !z.chapter || book.openChapters.has(z.chapter)
             }))
         },
@@ -1048,6 +1060,32 @@ async function chooseSkin(userId, siteId, skinId) {
     return {};
 }
 
+// Nom d'un bâtiment (dès son palier III) ou d'un quartier à soi ; un nom vide rend celui d'origine.
+// kind : 'site' | 'zone'. { status, message } si refus
+async function rename(userId, kind, id, raw) {
+    const known = kind === 'site' ? Boolean(SITES[id]) : kind === 'zone' && map.ZONES.some(z => z.id === id);
+    if (!known) return { status: 404, message: kind === 'zone' ? 'Quartier inconnu.' : 'Bâtiment inconnu.' };
+    const reset = !String(raw ?? '').trim();
+    const name = reset ? null : naming.cleanName(raw);
+    if (!reset && !name) return { status: 400, message: `Un nom de 2 à ${naming.NAME_MAX} lettres ou chiffres (espace, tiret ou apostrophe entre deux).` };
+    await migrate(userId);
+    return db.transaction(async conn => {
+        await stockOf(userId, conn, true);
+        if (kind === 'site') {
+            const site = SITES[id];
+            if (((await levelsOf(userId, conn)).levels[id] || 0) < RENAME_LEVEL) return db.rollback({ status: 403, message: 'Un bâtiment se renomme dès son palier III.' });
+            if (!(await zonesOf(userId, conn)).has(map.siteZone(id))) return db.rollback({ status: 403, message: `${site.levels[0].name} : achète d’abord son quartier.` });
+        } else if (!(await zonesOf(userId, conn)).has(id)) {
+            return db.rollback({ status: 403, message: 'Achète d’abord ce quartier pour le renommer.' });
+        }
+        const target = `${kind}:${id}`;
+        if (reset) await conn.query('DELETE FROM world_names WHERE user_id = $1 AND target = $2', [userId, target]);
+        else await conn.query(`INSERT INTO world_names (user_id, target, name) VALUES ($1, $2, $3)
+            ON CONFLICT (user_id, target) DO UPDATE SET name = EXCLUDED.name`, [userId, target, name]);
+        return {};
+    });
+}
+
 // Nom écrit sur les enseignes de l'île. { status, message } si le nom ne convient pas
 async function nameSigns(userId, raw) {
     const name = signs.cleanName(raw);
@@ -1110,5 +1148,5 @@ async function collect(userId) {
 module.exports = {
     SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, isFree, pendingOf, chargesAt, effectsOf, productionOf,
     view, build, buyZone, buyItem, undoItem, chooseSkin, startRun, finishRun, place, remove, collect, migrate, claimQuest, board, openChest, openAll,
-    placeAnnex, moveAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend
+    placeAnnex, moveAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend, rename
 };
