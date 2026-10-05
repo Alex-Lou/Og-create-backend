@@ -3,15 +3,16 @@
 // fois par jour) ; chaque cœur gagné donne une récompense, versée une seule fois (services/world.js). Leurs besoins
 // comblés (ou non) font leur humeur, qui change la production de leur bâtiment.
 // Le navigateur dessine les habitants et leurs paroles (src/world/village.js, src/world/friends.js : mêmes identifiants).
+// Prénoms, rôles et cadeaux : la troupe de la bible (HISTOIRE.md du dépôt front, § 8.1).
 
 const VILLAGERS = {
-    potager: { name: 'Rose', role: 'Jardinière', loves: 'water', likes: 'food' },
-    carriere: { name: 'Gaspard', role: 'Mineur', loves: 'food', likes: 'wood' },
-    bosquet: { name: 'Léonie', role: 'Bûcheronne', loves: 'food', likes: 'water' },
-    puits: { name: 'Anatole', role: 'Porteur d’eau', loves: 'wood', likes: 'stone' },
-    ponton: { name: 'Marine', role: 'Pêcheuse', loves: 'wood', likes: 'food' },
-    atelier: { name: 'Ferdinand', role: 'Forgeron', loves: 'stone', likes: 'wood' },
-    foyer: { name: 'Paulette', role: 'Cuisinière', loves: 'food', likes: 'water' }
+    potager: { name: 'Mélisse', role: 'Jardinière des lunes', loves: 'water', likes: 'food' },
+    carriere: { name: 'Galet', role: 'Tailleur de runes', loves: 'food', likes: 'stone' },
+    bosquet: { name: 'Sylve', role: 'Gardienne des bois', loves: 'water', likes: 'food' },
+    puits: { name: 'Ondin', role: 'Petit sourcier', loves: 'water', likes: 'food' },
+    ponton: { name: 'Aster', role: 'Navigatrice', loves: 'wood', likes: 'food' },
+    atelier: { name: 'Rivet', role: 'Horloger-artificier', loves: 'stone', likes: 'wood' },
+    foyer: { name: 'Cannelle', role: 'Cuisinière-guérisseuse', loves: 'food', likes: 'water' }
 };
 const RESOURCES = ['stone', 'wood', 'water', 'food'];
 const LABELS = { stone: 'pierre', wood: 'bois', water: 'eau', food: 'nourriture' };

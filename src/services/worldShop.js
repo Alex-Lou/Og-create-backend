@@ -144,7 +144,7 @@ function bonusesOf(ownedIds) {
 // Texte d'effet d'un article, pour la boutique
 function effectText(item) {
     const e = item.effect;
-    if (item.rare) return item.chapter ? `Pièce rare : offerte par le chapitre ${item.chapter} du Livre.` : 'Pièce rare : elle se trouve dans les coffres légendaires.';
+    if (item.rare) return item.chapter ? `Pièce rare : offerte par le chapitre ${item.chapter} du Grimoire.` : 'Pièce rare : elle se trouve dans les coffres légendaires.';
     if (item.tint) return 'Recolore le bâtiment, à tous ses paliers.';
     if (!e) return item.kind === 'skin' ? 'Change l’apparence du bâtiment.' : 'Vit sur ton île.';
     if (e.prod) return `+${Math.round(e.prod * 100)} % de production`;

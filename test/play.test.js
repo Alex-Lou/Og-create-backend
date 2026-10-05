@@ -650,7 +650,7 @@ test('le Monde : une teinte s’achète et se porte ; une pièce rare ne s’ach
   assert.equal(atelier.skin, 'etincelles');
   assert.deepEqual(atelier.shop.find(i => i.id === 'etincelles'), {
     id: 'etincelles', kind: 'skin', name: 'Gerbe d’étincelles', price: null, minLevel: 1, rare: true, chapter: 'II',
-    effect: 'Pièce rare : offerte par le chapitre II du Livre.', gain: null, owned: true
+    effect: 'Pièce rare : offerte par le chapitre II du Grimoire.', gain: null, owned: true
   });
   assert.equal(atelier.shop.find(i => i.id === 'engrenages').chapter, 'VI');
   assert.equal(atelier.shop.find(i => i.id === 'craie-atelier').rare, false);
@@ -1148,8 +1148,8 @@ test('habitants : on leur parle et on les gâte une fois par jour ; chaque cœur
   const talk = villager => api('POST', '/play/world/villager/talk', { villager }, player);
   const gift = (villager, resource) => api('POST', '/play/world/villager/gift', { villager, resource }, player);
   const view = (await api('GET', '/play/world', null, player)).data;
-  // Seule Paulette (Foyer) vit déjà sur l'île
-  assert.deepEqual(view.villagers.map(w => [w.id, w.name, w.hearts, w.talked, w.gifted]), [['foyer', 'Paulette', 0, false, false]]);
+  // Seule Cannelle (Foyer) vit déjà sur l'île
+  assert.deepEqual(view.villagers.map(w => [w.id, w.name, w.hearts, w.talked, w.gifted]), [['foyer', 'Cannelle', 0, false, false]]);
   assert.deepEqual(view.friendship.hearts, [30, 80, 150, 250, 400]);
   assert.equal((await talk('potager')).status, 403);
   // Bavarder : +8, une fois par jour
@@ -1158,7 +1158,7 @@ test('habitants : on leur parle et on les gâte une fois par jour ; chaque cœur
   assert.deepEqual([hello.data.gained, hello.data.hearts, hello.data.rewards], [8, 0, []]);
   assert.equal(hello.data.world.villagers[0].talked, true);
   assert.equal((await talk('foyer')).status, 409);
-  // Cadeau : 15 ressources ; Paulette adore la nourriture (+30) : premier cœur, 40 écus
+  // Cadeau : 15 ressources ; Cannelle adore la nourriture (+30) : premier cœur, 40 écus
   assert.equal((await gift('foyer', 'food')).status, 400);
   await sql('UPDATE world_stock SET food = 100, water = 100 WHERE user_id = $1', [player.userId]);
   const loved = await gift('foyer', 'food');
@@ -1206,7 +1206,7 @@ test('besoins des habitants : manger, travailler, se distraire ; l’humeur chan
     [player.userId, villager, need, hours]);
   const who = (world, id) => world.villagers.find(v => v.id === id);
   const deco = v => v.needs.find(n => n.id === 'deco');
-  // Paulette arrive comblée : manger tient 24 h ; sans décoration autour du Foyer, elle n'est que contente
+  // Cannelle arrive comblée : manger tient 24 h ; sans décoration autour du Foyer, elle n'est que contente
   const first = await view();
   const paulette = who(first, 'foyer');
   assert.deepEqual(paulette.needs.map(n => [n.id, n.met]), [['manger', true], ['deco', false]]);
@@ -1242,7 +1242,7 @@ test('besoins des habitants : manger, travailler, se distraire ; l’humeur chan
   assert.equal(deco(who(await view(), 'foyer')).met, true);
   const happy = who((await fill('foyer', 'manger')).data.world, 'foyer');
   assert.deepEqual([happy.mood, happy.moodEffect], ['heureux', 'Une partie de Récolte revient 3 min plus vite']);
-  // Rose (Potager, 10 h de production, plafonnées à 8) : contente, puis triste : −10 % de vivres et d'écus
+  // Mélisse (Potager, 10 h de production, plafonnées à 8) : contente, puis triste : −10 % de vivres et d'écus
   await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'jardins')`, [player.userId]);
   await sql(`INSERT INTO world_buildings (user_id, site, level, built_at) VALUES ($1, 'potager', 1, NOW() - INTERVAL '10 hours')`, [player.userId]);
   await sql(`UPDATE world_stock SET collected_at = NOW() - INTERVAL '10 hours' WHERE user_id = $1`, [player.userId]);
@@ -1256,14 +1256,14 @@ test('besoins des habitants : manger, travailler, se distraire ; l’humeur chan
   assert.deepEqual([potager(gloomy).moodBonus, potager(gloomy).pending, potager(gloomy).perHour], [-10, { coins: 14, food: 21 }, { amount: 2.7, coins: 1.8 }]);
   const collected = await api('POST', '/play/world/collect', {}, player);
   assert.deepEqual([collected.data.gained, collected.data.stock.food], [14, 21]);
-  // Tout combler : Rose et Paulette mangent (20 vivres), puis plus rien à faire
+  // Tout combler : Mélisse et Cannelle mangent (20 vivres), puis plus rien à faire
   await ago('foyer', 'manger', 20);
   const all = await fillAll();
   assert.equal(all.status, 200);
   assert.deepEqual(all.data.filled, [{ villager: 'potager', need: 'manger' }, { villager: 'foyer', need: 'manger' }]);
   assert.equal(all.data.world.stock.food, 81);
   assert.equal((await fillAll()).status, 409);
-  // Travailler : seulement avec l'Atelier (Ferdinand) ; triste, il ôte 2 coups à chaque Récolte
+  // Travailler : seulement avec l'Atelier (Rivet) ; triste, il ôte 2 coups à chaque Récolte
   assert.equal((await fill('foyer', 'outils')).status, 403);
   await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'est')`, [player.userId]);
   await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'atelier', 1)`, [player.userId]);
@@ -1664,7 +1664,7 @@ test('butins : chapitres ouverts, quêtes réclamées et bouteille donnent leur 
   const open = source => api('POST', '/play/world/chest', { source }, player);
   const view = (await api('GET', '/play/world', null, player)).data;
   // Chapitres I et II ouverts d'emblée : le II offre sa pièce rare
-  assert.deepEqual(view.chests.pending, [{ source: 'chapitre:II', rarity: 'legendaire', label: 'Chapitre II du Livre' }]);
+  assert.deepEqual(view.chests.pending, [{ source: 'chapitre:II', rarity: 'legendaire', label: 'Chapitre II du Grimoire' }]);
   const chapter = await open('chapitre:II');
   assert.equal(chapter.status, 200);
   assert.deepEqual(chapter.data.chest.prize, { kind: 'rare', item: 'etincelles', site: 'atelier', name: 'Gerbe d’étincelles' });

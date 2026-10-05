@@ -751,7 +751,7 @@ function chestsView({ day, slot, opened }, openChapters, claimed, found) {
     return {
         pending: [
             ...Object.entries(loot.CHAPTER_RARES).filter(([c]) => openChapters.has(c) && !opened.has(`chapitre:${c}`))
-                .map(([c]) => ({ source: `chapitre:${c}`, rarity: 'legendaire', label: `Chapitre ${c} du Livre` })),
+                .map(([c]) => ({ source: `chapitre:${c}`, rarity: 'legendaire', label: `Chapitre ${c} du Grimoire` })),
             ...QUEST_CHESTS.filter(q => claimed.has(q.id) && !opened.has(`quete:${q.id}`))
                 .map(q => ({ source: `quete:${q.id}`, rarity: q.chest, label: `Quête : ${q.label}` })),
             ...landmarks.LANDMARKS.filter(l => found.has(l.id) && !opened.has(`lieu:${l.id}`))
@@ -1004,7 +1004,7 @@ async function buyZone(userId, zoneId, openChapters) {
     await migrate(userId);
     // Inconnu : rien n'en est dit (pas même son chapitre)
     if (!isKnown(zone, await discoveredOf(userId))) return { status: 403, message: 'Envoie d’abord une expédition découvrir ce quartier.' };
-    if (zone.chapter && !openChapters.has(zone.chapter)) return { status: 403, message: `Ouvre d’abord le chapitre ${zone.chapter} du Livre.` };
+    if (zone.chapter && !openChapters.has(zone.chapter)) return { status: 403, message: `Ouvre d’abord le chapitre ${zone.chapter} du Grimoire.` };
     return db.transaction(async conn => {
         const added = await conn.query('INSERT INTO world_zones (user_id, zone) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING zone', [userId, zone.id]);
         if (!added.rows.length) return db.rollback({ status: 409, message: 'Ce quartier est déjà à toi.' });
@@ -1028,8 +1028,8 @@ async function build(userId, owned, siteId, openChapters = new Set()) {
         const level = levels[siteId] || 0;
         const next = site.levels[level];
         if (!next) return db.rollback({ status: 409, message: 'Ce chantier est déjà achevé.' });
-        if (!openChapters.has(next.chapter)) return db.rollback({ status: 403, message: `Ouvre d’abord le chapitre ${next.chapter} du Livre.` });
-        if (next.plan && !owned.includes(next.plan)) return db.rollback({ status: 403, message: `Il te faut le plan : découvre « ${next.plan} » dans le Livre.` });
+        if (!openChapters.has(next.chapter)) return db.rollback({ status: 403, message: `Ouvre d’abord le chapitre ${next.chapter} du Grimoire.` });
+        if (next.plan && !owned.includes(next.plan)) return db.rollback({ status: 403, message: `Il te faut le plan : découvre « ${next.plan} » dans le Grimoire.` });
         const missing = Object.entries(next.cost).filter(([r, n]) => stock[r] < n);
         if (missing.length) return db.rollback({ status: 400, message: 'Il te manque des ressources : joue une Récolte.' });
         const costs = RESOURCES.map(r => next.cost[r] || 0);
@@ -1438,7 +1438,7 @@ async function openChest(userId, source, openChapters, now = Date.now()) {
     const quest = kind === 'quete' ? QUEST_CHESTS.find(q => q.id === id) : null;
     const place = kind === 'lieu' && Object.hasOwn(landmarks.LANDMARK_BY_ID, id) ? landmarks.LANDMARK_BY_ID[id] : null;
     if (!['jour', 'bouteille'].includes(source) && !chapter && !quest && !place) return { status: 404, message: 'Coffre inconnu.' };
-    if (chapter && !openChapters.has(id)) return { status: 403, message: `Ouvre d’abord le chapitre ${id} du Livre.` };
+    if (chapter && !openChapters.has(id)) return { status: 403, message: `Ouvre d’abord le chapitre ${id} du Grimoire.` };
     await migrate(userId);
     return db.transaction(async conn => {
         await stockOf(userId, conn, true);

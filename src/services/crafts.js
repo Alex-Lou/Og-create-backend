@@ -172,11 +172,11 @@ function tiersOpen(finished, epreuves) {
 // Ce qui empêche de fabriquer une création (texte), ou null. made : { création: nombre fabriqué } ; owned : Set des
 // éléments du Livre ; stock : ressources ; open : paliers ouverts ; have : trouvailles de climat
 function blockOf(c, { made, owned, stock, open, have = {} }) {
-    if (!open.has(c.tier)) return c.tier === 'I' ? `Palier I : finis le chapitre I du Livre, ou réussis ${EPREUVES} questions de l’Épreuve.` : `Palier ${c.tier} : finis le chapitre ${c.tier} du Livre.`;
+    if (!open.has(c.tier)) return c.tier === 'I' ? `Palier I : finis le chapitre I du Grimoire, ou réussis ${EPREUVES} questions de l’Épreuve.` : `Palier ${c.tier} : finis le chapitre ${c.tier} du Grimoire.`;
     const before = c.after.filter(id => !made[id]);
     if (before.length) return `Fabrique d’abord : ${before.map(id => CRAFT_BY_ID[id].name).join(', ')}.`;
     const unknown = c.elements.filter(e => !owned.has(e));
-    if (unknown.length) return `Il faut savoir faire : ${unknown.join(', ')} (Livre).`;
+    if (unknown.length) return `Il faut savoir faire : ${unknown.join(', ')} (Grimoire).`;
     if (Object.entries(c.cost).some(([r, n]) => (stock[r] || 0) < n)) return 'Il te manque des ressources : joue une Récolte.';
     const short = Object.entries(c.finds).find(([f, n]) => (have[f] || 0) < n);
     if (short) {

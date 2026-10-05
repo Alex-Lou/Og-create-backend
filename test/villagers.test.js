@@ -13,14 +13,27 @@ test('un habitant par bâtiment (et la cuisinière du Foyer), chacun ses goûts'
   assert.equal(new Set(Object.values(v.VILLAGERS).map(w => w.name)).size, 7);
 });
 
+test('la troupe de la bible (HISTOIRE.md § 8.1) : prénom, rôle, cadeau adoré et apprécié', () => {
+  const troupe = Object.fromEntries(Object.entries(v.VILLAGERS).map(([id, w]) => [id, [w.name, w.role, w.loves, w.likes]]));
+  assert.deepEqual(troupe, {
+    potager: ['Mélisse', 'Jardinière des lunes', 'water', 'food'],
+    carriere: ['Galet', 'Tailleur de runes', 'food', 'stone'],
+    bosquet: ['Sylve', 'Gardienne des bois', 'water', 'food'],
+    puits: ['Ondin', 'Petit sourcier', 'water', 'food'],
+    ponton: ['Aster', 'Navigatrice', 'wood', 'food'],
+    atelier: ['Rivet', 'Horloger-artificier', 'stone', 'wood'],
+    foyer: ['Cannelle', 'Cuisinière-guérisseuse', 'food', 'water']
+  });
+});
+
 test('cinq cœurs, chacun récompensé ; un cadeau adoré compte plus', () => {
   assert.deepEqual([0, 29, 30, 79, 80, 150, 249, 250, 399, 400].map(v.heartsOf), [0, 0, 1, 1, 2, 3, 3, 4, 4, 5]);
   assert.equal(v.REWARDS.length, 5);
   assert.equal(v.MAX_POINTS, 400);
-  const rose = v.VILLAGERS.potager;
-  assert.equal(v.giftPoints(rose, 'water'), 30);
-  assert.equal(v.giftPoints(rose, 'food'), 15);
-  assert.equal(v.giftPoints(rose, 'stone'), 6);
+  const melisse = v.VILLAGERS.potager;
+  assert.equal(v.giftPoints(melisse, 'water'), 30);
+  assert.equal(v.giftPoints(melisse, 'food'), 15);
+  assert.equal(v.giftPoints(melisse, 'stone'), 6);
 });
 
 test('besoins : manger tient 24 h et se renouvelle à mi-chemin ; travailler vient avec l’Atelier ; humeur et effet', () => {
