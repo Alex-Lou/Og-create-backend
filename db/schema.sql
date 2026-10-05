@@ -301,7 +301,7 @@ CREATE TABLE IF NOT EXISTS world_quests (
 );
 
 -- Butins (services/loot.js) : un coffre par source, ouvert une seule fois. source : recolte:<partie>, jour:<date>,
--- bouteille:<date>-<tranche>, chapitre:<id>, quete:<id> ; prize : le lot tiré ; streak : série du coffre du jour
+-- bouteille:<date>-<tranche>, chapitre:<id>, quete:<id>, lieu:<id> ; prize : le lot tiré ; streak : série du coffre du jour
 CREATE TABLE IF NOT EXISTS world_chests (
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     source VARCHAR(40) NOT NULL,
@@ -420,6 +420,14 @@ CREATE TABLE IF NOT EXISTS world_expeditions (
     started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     ends_at TIMESTAMPTZ NOT NULL,
     PRIMARY KEY (user_id, zone)
+);
+-- Lieux remarquables découverts (lot 9c, services/landmarks.js) : un par lieu ; son effet dure, son coffre attend
+-- parmi les coffres (source lieu:<id>)
+CREATE TABLE IF NOT EXISTS world_landmarks (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    landmark VARCHAR(20) NOT NULL,
+    found_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, landmark)
 );
 -- Besoins des habitants (services/villagers.js) : dernière fois que chacun a été comblé ('manger', 'outils'). La ligne
 -- naît quand l'habitant arrive (il arrive comblé) ; se distraire se lit sur l'île (décorations), sans ligne.
