@@ -141,6 +141,22 @@ router.post('/world/harvest/finish', withAccount(async (req, res, owner, b) => {
     res.json({ gains: done.gains, earned: done.earned, coins: done.coins, chest: done.chest, world: await worldView(owner, b) });
 }));
 
+// Mini-jeux des bâtiments (dès le palier III) : une partie (graine), puis les gestes du joueur, rejoués par le serveur
+router.post('/world/game/start', withAccount(async (req, res, owner, b) => {
+    const game = String(req.body.game || '');
+    if (!/^[a-z]{1,20}$/.test(game)) return res.status(400).json({ message: 'Mini-jeu invalide' });
+    const started = await world.startGame(owner.id, game);
+    if (started.status) return res.status(started.status).json({ message: started.message });
+    res.json({ run: started.run, world: await worldView(owner, b) });
+}));
+router.post('/world/game/finish', withAccount(async (req, res, owner, b) => {
+    const run = Number(req.body.run);
+    if (!Number.isSafeInteger(run) || run <= 0 || !Array.isArray(req.body.input)) return res.status(400).json({ message: 'Partie invalide' });
+    const done = await world.finishGame(owner.id, run, req.body.input);
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json({ earned: done.earned, raw: done.raw, detail: done.detail, coins: done.coins, world: await worldView(owner, b) });
+}));
+
 // Coffre qui attend : du jour, bouteille à la mer, chapitre du Livre ouvert, quête de Brume réclamée
 router.post('/world/chest', withAccount(async (req, res, owner, b) => {
     const source = String(req.body.source || '');

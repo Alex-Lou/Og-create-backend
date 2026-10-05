@@ -3,6 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { startServer, api, sql, newPlayer, coinsOf, randomPassword } = require('./helpers');
 const loot = require('../src/services/loot');
+const minigames = require('../src/services/minigames');
 
 const BASE = ['Eau', 'Feu', 'Terre', 'Air'];
 
@@ -803,6 +804,57 @@ test('le Monde : les paliers III à VII demandent chapitre et écus, le palier I
   const fifth = await build();
   assert.equal(fifth.status, 403);
   assert.match(fifth.data.message, /chapitre V/);
+});
+
+test('mini-jeux : au palier III, trois parties en réserve, gestes rejoués par le serveur, écus versés une fois', async () => {
+  const player = await newPlayer();
+  const start = game => api('POST', '/play/world/game/start', { game }, player);
+  const finish = (run, input) => api('POST', '/play/world/game/finish', { run, input }, player);
+  const view = (await api('GET', '/play/world', null, player)).data;
+  assert.deepEqual(view.games.map(g => [g.id, g.site, g.open, g.plays, g.max]), [['peche', 'ponton', false, 3, 3], ['filon', 'carriere', false, 3, 3], ['cueillette', 'bosquet', false, 3, 3]]);
+  assert.equal((await start('peche')).status, 403);
+  await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'ponton', 3), ($1, 'carriere', 5)`, [player.userId]);
+  // Pêche : le premier poisson sous l'hameçon (la partie est datée d'une minute : les gestes ne viennent pas du futur)
+  const begun = await start('peche');
+  assert.equal(begun.status, 200);
+  assert.equal(begun.data.run.level, 3);
+  assert.equal(begun.data.world.games.find(g => g.id === 'peche').plays, 2);
+  const { id, seed } = begun.data.run;
+  const fish = minigames.fishingOf(seed).find(f => f.kind !== 'botte');
+  const at = Math.round(fish.t0 + (0.6 / fish.speed) * 1000);
+  await sql(`UPDATE world_game_runs SET created_at = NOW() - INTERVAL '1 minute' WHERE id = $1`, [id]);
+  const done = await finish(id, [[at, fish.lane]]);
+  assert.equal(done.status, 200);
+  assert.deepEqual(done.data.detail, [fish.kind]);
+  assert.equal(done.data.earned, minigames.FISH[fish.kind].value);
+  assert.equal(await coinsOf(player), done.data.earned);
+  assert.equal((await finish(id, [[at, fish.lane]])).status, 404);
+  // Gestes datés après la fin réelle de la partie : refusés (la partie est rendue quand même)
+  const quick = await start('peche');
+  const late = await finish(quick.data.run.id, [[40000, 0]]);
+  assert.equal(late.status, 400);
+  assert.match(late.data.message, /trop rapide/);
+  assert.equal((await finish(quick.data.run.id, [])).status, 404);
+  // Troisième partie, puis la réserve est vide
+  const third = await start('peche');
+  assert.equal((await finish(third.data.run.id, [['x']])).status, 400);
+  assert.equal((await start('peche')).status, 409);
+  // Filon au palier V : ×1,4 ; ouvrir la colonne du milieu jusqu'à trouver une pierre ou épuiser les coups
+  const vein = await start('filon');
+  assert.equal(vein.data.run.level, 5);
+  const wall = minigames.veinOf(vein.data.run.seed);
+  const taps = [];
+  for (const i of [2, 8, 14, 20, 26, 32, 38]) for (let k = 0; k < wall.hard[i] && taps.length < minigames.VEIN.strokes; k++) taps.push(i);
+  const dug = await finish(vein.data.run.id, taps);
+  assert.equal(dug.status, 200);
+  assert.equal(dug.data.earned, minigames.earnedOf(dug.data.raw, 5));
+  assert.equal((await api('GET', '/play/world', null, player)).data.games.find(g => g.id === 'filon').mult, 1.4);
+  // Jeu inconnu, entrées invalides ; compte requis
+  assert.equal((await start('rien')).status, 404);
+  assert.equal((await start('Pêche!')).status, 400);
+  assert.equal((await finish(0, [])).status, 400);
+  assert.equal((await api('POST', '/play/world/game/finish', { run: 1, input: 'x' }, player)).status, 400);
+  assert.equal((await api('POST', '/play/world/game/start', { game: 'peche' }, await guest())).status, 402);
 });
 
 test('enseignes : dès le palier V, au nom choisi, un style par bâtiment, acheté une seule fois', async () => {
