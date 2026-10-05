@@ -21,6 +21,7 @@ const PER_ZONE = 3;
 const REGROW_MS = 6 * 3600 * 1000; // un gisement ramassé repousse en 6 h
 const GATHER = { min: 2, max: 4 }; // trouvailles rendues par un ramassage
 const SPREAD = 4; // écart minimal (en cases, en tous sens) entre deux gisements, et avec un lieu remarquable
+const CRAFT_BONUS_MAX = 3; // trouvailles de plus par ramassage, au plus, grâce aux créations de climat du quartier
 
 // Ordre fixe et bien mêlé des cases (pour le choix des gisements)
 const scramble = (x, y) => (((x * 73856093) ^ (y * 19349663)) >>> 0) % 1000003;
@@ -56,4 +57,4 @@ const isDeposit = (x, y) => CELLS.has(y * map.SIZE + x);
 // Temps avant qu'un gisement ramassé à gatheredAt (date ou null) soit de nouveau prêt (ms, 0 : prêt)
 const readyIn = (gatheredAt, now = Date.now()) => (gatheredAt ? Math.max(0, new Date(gatheredAt).getTime() + REGROW_MS - now) : 0);
 
-module.exports = { FINDS, FIND_BY_ID, DEPOSITS, DEPOSIT_BY_ID, PER_ZONE, REGROW_MS, GATHER, SPREAD, isDeposit, readyIn };
+module.exports = { FINDS, FIND_BY_ID, DEPOSITS, DEPOSIT_BY_ID, PER_ZONE, REGROW_MS, GATHER, SPREAD, CRAFT_BONUS_MAX, isDeposit, readyIn };

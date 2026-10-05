@@ -3,23 +3,32 @@
 //   Livre (savoir-faire, non consommés). Elle s'ouvre quand son palier est ouvert et qu'on a déjà fabriqué celles qui
 //   la précèdent (after).
 // - Paliers : « start » ouvert d'emblée (pour apprendre) ; I : chapitre I du Livre entièrement trouvé, ou EPREUVES
-//   questions de l'Épreuve réussies ; II, III : chapitre II, III entièrement trouvé.
+//   questions de l'Épreuve réussies ; II, III : chapitre II, III entièrement trouvé. « climat » (lot 9d) : ouvert
+//   d'emblée, ses créations coûtent aussi des trouvailles de climat (finds) et ne se posent que dans leur climat ;
+//   chacune posée dans un quartier y fait rendre une trouvaille de plus à chaque ramassage (world.js).
 // - Fabrication : un puzzle d'assemblage. Le gabarit (cases de la silhouette) se découpe, d'après une graine, en
 //   pièces de 2 à 4 cases ; dès le palier II, les pièces arrivent tournées. Le joueur pose chaque pièce (rotation,
 //   case) ; le serveur vérifie que les pièces couvrent exactement le gabarit. Le front reçoit les pièces ; il ne
 //   recopie que le quart de tour (turn, src/world/crafts.js).
 // - Pose : sol permis (ground), au bord d'un chemin (path), près d'un bâtiment (nearSite) ou d'une autre création
-//   (nearCraft), à reach cases au plus (en tous sens).
+//   (nearCraft), à reach cases au plus (en tous sens), dans un quartier d'un climat (climate).
 // Fonctions pures, sans base de données.
+const map = require('./worldMap');
+const finds = require('./finds');
 
 const EPREUVES = 10;
-const TIERS = ['start', 'I', 'II', 'III'];
+const TIERS = ['start', 'I', 'II', 'III', 'climat'];
 // Plus grande pièce, et pièces tournées, selon le palier
-const PIECE_MAX = { start: 3, I: 3, II: 4, III: 4 };
-const TURNED = { start: false, I: false, II: true, III: true };
+const PIECE_MAX = { start: 3, I: 3, II: 4, III: 4, climat: 4 };
+const TURNED = { start: false, I: false, II: true, III: true, climat: true };
+// Sols des règles de pose, en clair
+const GROUND_TEXT = { gm: 'sur l’herbe', s: 'sur le sable', n: 'sur la neige', lg: 'sur la lande', x: 'dans le marais', jg: 'dans la jungle', ar: 'sur la cendre ou la roche' };
 
-// Gabarit en lignes ('x' : case de la silhouette)
-const craft = (id, name, tier, cost, elements, after, place, shape) => ({ id, name, tier, cost, elements, after, place, shape });
+// « de » + nom d'un climat, contracté (des Landes, du Marais, de la Jungle)
+const ofPlace = name => name.replace(/^Les /, 'des ').replace(/^Le /, 'du ').replace(/^La /, 'de la ');
+
+// Gabarit en lignes ('x' : case de la silhouette) ; spent : trouvailles de climat dépensées ({ trouvaille: nombre })
+const craft = (id, name, tier, cost, elements, after, place, shape, spent = {}) => ({ id, name, tier, cost, elements, after, place, shape, finds: spent });
 const CRAFTS = [
     craft('cloture', 'Clôture', 'start', { wood: 8 }, [], [], {}, ['x.x', 'xxx', 'x.x']),
     craft('massif', 'Massif de fleurs', 'start', { water: 6, food: 4 }, ['Terre'], [], { ground: 'gm' }, ['.x.', 'xxx', 'xxx']),
@@ -38,7 +47,20 @@ const CRAFTS = [
     craft('kiosque', 'Kiosque', 'III', { wood: 60, stone: 40 }, ['Bronze'], ['pergola', 'lanterne'], {}, ['..x..', '.xxx.', 'xxxxx', '.x.x.', '.x.x.']),
     craft('cadran', 'Cadran solaire', 'III', { stone: 50 }, ['Soleil'], ['statue'], {}, ['..x..', '.xxx.', 'xxxxx', '.xxx.', '..x..']),
     craft('bassin', 'Bassin', 'III', { stone: 40, water: 40 }, ['Source'], ['fontaine'], { nearCraft: { id: 'fontaine', reach: 3 } }, ['xxxxx', 'x...x', 'xxxxx']),
-    craft('longuevue', 'Longue-vue', 'III', { stone: 20, wood: 20 }, ['Étoile', 'Lentille'], ['girouette'], { ground: 's' }, ['...xx', '..xx.', '.xx..', 'xxx..', 'x.x..'])
+    craft('longuevue', 'Longue-vue', 'III', { stone: 20, wood: 20 }, ['Étoile', 'Lentille'], ['girouette'], { ground: 's' }, ['...xx', '..xx.', '.xx..', 'xxx..', 'x.x..']),
+    // Créations de climat (lot 9d) : deux par climat, la seconde après la première
+    craft('igloo', 'Igloo', 'climat', { wood: 10 }, ['Neige'], [], { climate: 'cimes', ground: 'n' }, ['.xxx.', 'xxxxx', 'xx.xx'], { glace: 8 }),
+    craft('sculpture', 'Sculpture de glace', 'climat', { stone: 10 }, ['Glace'], ['igloo'], { climate: 'cimes', ground: 'n' }, ['..x..', '.xxx.', '..x..', '.xxx.', 'xxxxx'], { glace: 12 }),
+    craft('parc', 'Enclos à moutons', 'climat', { wood: 24 }, ['Mouton'], [], { climate: 'landes', ground: 'lg' }, ['xxxx', 'x..x', 'x..x', 'xxxx'], { laine: 8 }),
+    craft('cairn', 'Cairn aux rubans', 'climat', { stone: 20 }, ['Vent'], ['parc'], { climate: 'landes', ground: 'lg' }, ['..x..', '.xxx.', '.xxx.', 'xxxxx'], { laine: 12 }),
+    craft('passerelle', 'Passerelle de roseaux', 'climat', { wood: 16 }, ['Marais'], [], { climate: 'marais', ground: 'x' }, ['xxxxx', 'xxxxx', '.x.x.'], { roseau: 8 }),
+    craft('heron', 'Héron de bois', 'climat', { wood: 14 }, ['Oiseau'], ['passerelle'], { climate: 'marais', ground: 'x' }, ['xx...', '.x...', '.xxxx', '..xx.', '..xx.'], { roseau: 12 }),
+    craft('tente', 'Tente nomade', 'climat', { wood: 12, food: 10 }, ['Tissu'], [], { climate: 'dunes', ground: 's' }, ['..x..', '.xxx.', 'xxxxx', 'xx.xx'], { sel: 8 }),
+    craft('cadransel', 'Cadran de sel', 'climat', { stone: 20 }, ['Sel'], ['tente'], { climate: 'dunes', ground: 's' }, ['.xxx.', 'xxxxx', 'xx.xx', 'xxxxx', '.xxx.'], { sel: 12 }),
+    craft('hamac', 'Hamac', 'climat', { wood: 14 }, ['Corde'], [], { climate: 'jungle', ground: 'jg' }, ['x...x', 'xx.xx', 'xxxxx'], { fruits: 8 }),
+    craft('totem', 'Totem', 'climat', { wood: 30 }, ['Jungle'], ['hamac'], { climate: 'jungle', ground: 'jg' }, ['xxx', '.x.', 'xxx', '.x.', 'xxx'], { fruits: 12 }),
+    craft('obelisque', 'Obélisque d’obsidienne', 'climat', { stone: 24 }, ['Obsidienne'], [], { climate: 'volcan', ground: 'ar' }, ['..x..', '.xxx.', '.xxx.', '.xxx.', 'xxxxx'], { obsidienne: 10 }),
+    craft('bassinchaud', 'Bassin chaud', 'climat', { stone: 20, water: 20 }, ['Vapeur'], ['obelisque'], { climate: 'volcan', ground: 'ar' }, ['.xxx.', 'xxxxx', 'xxxxx', '.xxx.'], { obsidienne: 12 })
 ];
 const CRAFT_BY_ID = Object.fromEntries(CRAFTS.map(c => [c.id, c]));
 
@@ -137,23 +159,30 @@ function check(shape, pieces, layout) {
     return filled.size === goal.size ? { ok: true } : { ok: false, error: 'le gabarit n’est pas rempli' };
 }
 
-// Paliers ouverts : finished = Set des chapitres du Livre entièrement trouvés ; epreuves = questions réussies
+// Paliers ouverts : finished = Set des chapitres du Livre entièrement trouvés ; epreuves = questions réussies (le palier
+// des climats est toujours ouvert : ses trouvailles le gardent)
 function tiersOpen(finished, epreuves) {
     const open = new Set(['start']);
     if (finished.has('I') || epreuves >= EPREUVES) open.add('I');
     for (const t of ['II', 'III']) if (finished.has(t)) open.add(t);
+    open.add('climat');
     return open;
 }
 
 // Ce qui empêche de fabriquer une création (texte), ou null. made : { création: nombre fabriqué } ; owned : Set des
-// éléments du Livre ; stock : ressources ; open : paliers ouverts
-function blockOf(c, { made, owned, stock, open }) {
+// éléments du Livre ; stock : ressources ; open : paliers ouverts ; have : trouvailles de climat
+function blockOf(c, { made, owned, stock, open, have = {} }) {
     if (!open.has(c.tier)) return c.tier === 'I' ? `Palier I : finis le chapitre I du Livre, ou réussis ${EPREUVES} questions de l’Épreuve.` : `Palier ${c.tier} : finis le chapitre ${c.tier} du Livre.`;
     const before = c.after.filter(id => !made[id]);
     if (before.length) return `Fabrique d’abord : ${before.map(id => CRAFT_BY_ID[id].name).join(', ')}.`;
     const unknown = c.elements.filter(e => !owned.has(e));
     if (unknown.length) return `Il faut savoir faire : ${unknown.join(', ')} (Livre).`;
     if (Object.entries(c.cost).some(([r, n]) => (stock[r] || 0) < n)) return 'Il te manque des ressources : joue une Récolte.';
+    const short = Object.entries(c.finds).find(([f, n]) => (have[f] || 0) < n);
+    if (short) {
+        const find = finds.FIND_BY_ID[short[0]];
+        return `Il te faut ${short[1]} ${find.name.toLowerCase()} : ramasses-en sur les gisements ${ofPlace(map.CLIMATES[find.climate])}.`;
+    }
     return null;
 }
 
@@ -161,8 +190,8 @@ function blockOf(c, { made, owned, stock, open }) {
 function placeText(c, siteName = id => id) {
     const p = c.place;
     const parts = [];
-    if (p.ground === 'gm') parts.push('sur l’herbe');
-    else if (p.ground === 's') parts.push('sur le sable');
+    if (p.climate) parts.push(`dans ${map.CLIMATES[p.climate]}`);
+    if (p.ground) parts.push(GROUND_TEXT[p.ground]);
     if (p.path) parts.push('au bord d’un chemin');
     if (p.nearSite) parts.push(`à ${p.nearSite.reach} cases au plus de « ${siteName(p.nearSite.id)} »`);
     if (p.nearCraft) parts.push(`à ${p.nearCraft.reach} cases au plus de « ${CRAFT_BY_ID[p.nearCraft.id].name} »`);
@@ -174,11 +203,12 @@ const gapTo = (x, y, r) => Math.max(r.x - x, 0, x - (r.x + r.w - 1), r.y - y, 0,
 
 // Ce qui empêche de poser cette création sur (x, y) (texte), ou null. ctx : { ground(x, y), free(x, y) (case libre :
 // constructible, hors chantier, quartier à soi, ni annexe ni création), site(id) (emprise si bâti, sinon null),
-// placed : [{ x, y, craft }] (les autres créations posées) }
+// placed : [{ x, y, craft }] (les autres créations posées), climate(x, y) (climat du quartier) }
 function spotBlock(c, x, y, ctx) {
     const p = c.place;
     if (!ctx.free(x, y)) return 'Case occupée ou hors de tes quartiers.';
-    if (!(p.ground || 'gsm').includes(ctx.ground(x, y))) return p.ground === 's' ? 'Se pose sur le sable.' : 'Se pose sur l’herbe.';
+    if (p.climate && ctx.climate(x, y) !== p.climate) return `Se pose dans ${map.CLIMATES[p.climate]}.`;
+    if (!(p.ground || 'gsm').includes(ctx.ground(x, y))) return `Se pose ${GROUND_TEXT[p.ground || 'gm']}.`;
     if (p.path && !DIRS.some(([dx, dy]) => 'pk'.includes(ctx.ground(x + dx, y + dy)))) return 'Se pose au bord d’un chemin.';
     if (p.nearSite) {
         const at = ctx.site(p.nearSite.id);

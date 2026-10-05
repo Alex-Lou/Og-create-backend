@@ -451,6 +451,12 @@ async function findsOf(userId, conn = db) {
     const have = Object.fromEntries(rows.map(r => [r.find, r.amount]));
     return Object.fromEntries(finds.FINDS.map(f => [f.id, have[f.id] || 0]));
 }
+// Dépense des trouvailles (déjà vérifiées, dans la transaction de l'appelant) : { trouvaille: nombre }
+async function spendFinds(userId, spent, conn) {
+    for (const [find, n] of Object.entries(spent)) {
+        if (n) await conn.query('UPDATE world_finds SET amount = amount - $3 WHERE user_id = $1 AND find = $2', [userId, find, n]);
+    }
+}
 // Gisements déjà ramassés : Map identifiant → date du dernier ramassage
 async function depositsOf(userId, conn = db) {
     const { rows } = await conn.query('SELECT deposit, gathered_at FROM world_deposits WHERE user_id = $1', [userId]);
@@ -623,8 +629,13 @@ async function findLandmark(userId, landmarkId, now = Date.now()) {
     });
 }
 
-// Ramasse un gisement d'un quartier à soi, s'il a repoussé : quelques trouvailles de son climat, versées une seule fois
-// (même en double clic : la ligne de stock est verrouillée). { find, amount } ou { status, message }
+// Trouvailles de plus à chaque ramassage d'un quartier : une par création de climat posée dans ce quartier, plafonnée
+const craftBonusOf = (placed, zoneId) => Math.min(finds.CRAFT_BONUS_MAX,
+    placed.filter(r => crafts.CRAFT_BY_ID[r.craft]?.place.climate && map.zoneAt(r.x, r.y) === zoneId).length);
+
+// Ramasse un gisement d'un quartier à soi, s'il a repoussé : quelques trouvailles de son climat (plus une par création
+// de climat posée dans le quartier), versées une seule fois (même en double clic : la ligne de stock est verrouillée).
+// { find, amount } ou { status, message }
 async function gatherDeposit(userId, depositId, now = Date.now()) {
     const deposit = Object.hasOwn(finds.DEPOSIT_BY_ID, depositId) ? finds.DEPOSIT_BY_ID[depositId] : null;
     if (!deposit) return { status: 404, message: 'Gisement inconnu.' };
@@ -634,7 +645,7 @@ async function gatherDeposit(userId, depositId, now = Date.now()) {
         if (!(await zonesOf(userId, conn)).has(deposit.zone)) return db.rollback({ status: 403, message: 'Achète d’abord ce quartier de l’île.' });
         const wait = finds.readyIn((await depositsOf(userId, conn)).get(deposit.id), now);
         if (wait > 0) return db.rollback({ status: 409, message: `Ce gisement repousse : reviens dans ${Math.ceil(wait / 60000)} min.` });
-        const amount = finds.GATHER.min + crypto.randomInt(0, finds.GATHER.max - finds.GATHER.min + 1);
+        const amount = finds.GATHER.min + crypto.randomInt(0, finds.GATHER.max - finds.GATHER.min + 1) + craftBonusOf(placedOf(await craftsOf(userId, conn)), deposit.zone);
         await conn.query(
             `INSERT INTO world_finds (user_id, find, amount) VALUES ($1, $2, $3)
              ON CONFLICT (user_id, find) DO UPDATE SET amount = world_finds.amount + EXCLUDED.amount`, [userId, deposit.find, amount]);
@@ -670,6 +681,7 @@ function craftCtx(levels, zones, annexRows, rows, skip = null) {
     }
     return {
         ground: map.groundAt,
+        climate: (x, y) => map.ZONE_BY_ID[map.zoneAt(x, y)]?.climate,
         free: (x, y) => Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < SIZE && y < SIZE && open[y * SIZE + x] === 1,
         site: id => (livesHere(id, levels, zones) ? map.footprintOf(id, levels[id]) : null),
         placed: others,
@@ -696,7 +708,7 @@ async function epreuvesOf(userId, conn = db) {
 }
 // Ce que la vue montre des créations d'île : paliers ouverts, catalogue (ce qui manque pour fabriquer, réserve, cases
 // où poser ou déplacer une création déjà fabriquée), créations posées
-function craftsView(rows, ctx, { owned, stock, open, epreuves }, siteName) {
+function craftsView(rows, ctx, { owned, stock, open, epreuves, have }, siteName) {
     const made = madeOf(rows);
     return {
         epreuves: { have: epreuves, need: crafts.EPREUVES },
@@ -704,9 +716,9 @@ function craftsView(rows, ctx, { owned, stock, open, epreuves }, siteName) {
         catalog: crafts.CRAFTS.map(c => {
             const reserve = rows.filter(r => r.craft === c.id && r.x === null).length;
             return {
-                id: c.id, name: c.name, tier: c.tier, cost: c.cost, elements: c.elements.map(name => ({ name, have: owned.has(name) })),
-                after: c.after, open: open.has(c.tier), made: made[c.id] || 0, reserve,
-                block: crafts.blockOf(c, { made, owned, stock, open }), place: crafts.placeText(c, siteName),
+                id: c.id, name: c.name, tier: c.tier, cost: c.cost, finds: c.finds, elements: c.elements.map(name => ({ name, have: owned.has(name) })),
+                after: c.after, open: open.has(c.tier), made: made[c.id] || 0, reserve, climate: c.place.climate || null,
+                block: crafts.blockOf(c, { made, owned, stock, open, have }), place: crafts.placeText(c, siteName),
                 spots: made[c.id] ? craftSpots(c, ctx) : []
             };
         }),
@@ -899,9 +911,10 @@ async function view(userId, owned, book) {
         } : { id: l.id, zone: l.zone, known: false })),
         // Trouvailles de climat (réserve à part) : nom, climat, nombre
         finds: finds.FINDS.map(f => ({ id: f.id, name: f.name, climate: f.climate, amount: stockFinds[f.id] })),
-        // Gisements des quartiers connus : case, trouvaille, temps avant de repousser (ms, 0 : prêt)
+        // Gisements des quartiers connus : case, trouvaille, temps avant de repousser (ms, 0 : prêt), trouvailles de plus
+        // grâce aux créations de climat de leur quartier
         deposits: finds.DEPOSITS.filter(d => isKnown(map.ZONE_BY_ID[d.zone], discovered))
-            .map(d => ({ id: d.id, zone: d.zone, find: d.find, x: d.x, y: d.y, readyIn: finds.readyIn(gathered.get(d.id)) })),
+            .map(d => ({ id: d.id, zone: d.zone, find: d.find, x: d.x, y: d.y, readyIn: finds.readyIn(gathered.get(d.id)), bonus: craftBonusOf(decor, d.zone) })),
         // Expédition en route : vers quel quartier, retour dans combien de temps (ms)
         expedition: going ? { zone: going.zone, endsIn: Math.max(0, new Date(going.ends_at).getTime() - Date.now()) } : null,
         sites,
@@ -914,7 +927,7 @@ async function view(userId, owned, book) {
         pendingStock,
         // Créations d'île : paliers, catalogue, réserve et cases où poser, créations posées
         crafts: craftsView(craftRows, craftCtx(levels, zones, annexRows, craftRows), {
-            owned: have, stock, open: crafts.tiersOpen(book.finished || new Set(), epreuves), epreuves
+            owned: have, stock, open: crafts.tiersOpen(book.finished || new Set(), epreuves), epreuves, have: stockFinds
         }, id => sites.find(site => site.id === id)?.name || id),
         // Habitants (bâtiment bâti dans un quartier à soi) : prénom, goûts, amitié, déjà vus ou gâtés aujourd'hui ; leurs
         // besoins, leur humeur et ce qu'elle fait
@@ -1314,7 +1327,7 @@ async function startCraft(userId, craftId, owned, finished) {
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
         const open = crafts.tiersOpen(finished, await epreuvesOf(userId, conn));
-        const block = crafts.blockOf(c, { made: madeOf(await craftsOf(userId, conn)), owned: new Set(owned), stock, open });
+        const block = crafts.blockOf(c, { made: madeOf(await craftsOf(userId, conn)), owned: new Set(owned), stock, open, have: await findsOf(userId, conn) });
         if (block) return db.rollback({ status: 403, message: block });
         const seed = crypto.randomInt(1, 2147483647);
         const { rows } = await conn.query('INSERT INTO world_craft_runs (user_id, craft, seed) VALUES ($1, $2, $3) RETURNING id', [userId, craftId, seed]);
@@ -1338,11 +1351,12 @@ function finishCraft(userId, runId, layout, owned, finished) {
         if (!done.ok) return { status: 400, message: `Assemblage refusé : ${done.error}.` };
         // Entre le début et la fin, le stock ou le Livre ont pu changer
         const open = crafts.tiersOpen(finished, await epreuvesOf(userId, conn));
-        const block = crafts.blockOf(c, { made: madeOf(await craftsOf(userId, conn)), owned: new Set(owned), stock, open });
+        const block = crafts.blockOf(c, { made: madeOf(await craftsOf(userId, conn)), owned: new Set(owned), stock, open, have: await findsOf(userId, conn) });
         if (block) return { status: 409, message: block };
         const n = r => c.cost[r] || 0;
         await conn.query('UPDATE world_stock SET stone = stone - $2, wood = wood - $3, water = water - $4, food = food - $5 WHERE user_id = $1',
             [userId, n('stone'), n('wood'), n('water'), n('food')]);
+        await spendFinds(userId, c.finds, conn);
         await conn.query('INSERT INTO world_crafts (user_id, craft) VALUES ($1, $2)', [userId, craftId]);
         return { made: c.name, craft: c.id };
     });
@@ -1501,11 +1515,15 @@ async function placeAnnex(userId, annexId, x, y) {
         const need = annexes.levelFor(a, copy);
         if (level < need) return db.rollback({ status: 403, message: `Il faut le palier ${CHAPTER_OF_LEVEL[need - 1]} de ce bâtiment.` });
         if (await cellTaken(userId, x, y, conn)) return db.rollback({ status: 409, message: 'Cette case est déjà occupée.' });
-        const { cost, coins: price } = annexes.priceOf(a, copy);
+        const { cost, coins: price, finds: spent } = annexes.priceOf(a, copy);
         if (Object.entries(cost).some(([r, n]) => stock[r] < n)) return db.rollback({ status: 400, message: 'Il te manque des ressources : joue une Récolte.' });
+        const have = await findsOf(userId, conn);
+        const short = Object.entries(spent).find(([f, n]) => have[f] < n);
+        if (short) return db.rollback({ status: 400, message: `Il te faut ${short[1]} ${finds.FIND_BY_ID[short[0]].name.toLowerCase()} : ramasses-en sur les gisements de son climat.` });
         await gather(userId, conn, stock);
         const coins = await ledger.debit(userId, price, `annexe:${a.id}:${copy + 1}`, conn);
         if (coins === null) return db.rollback({ status: 400, message: `Il te faut ${price} écus.` });
+        await spendFinds(userId, spent, conn);
         await conn.query('UPDATE world_stock SET stone = stone - $2, wood = wood - $3, water = water - $4, food = food - $5 WHERE user_id = $1',
             [userId, ...RESOURCES.map(r => cost[r] || 0)]);
         await conn.query('INSERT INTO world_annexes (user_id, x, y, annex) VALUES ($1, $2, $3, $4)', [userId, x, y, a.id]);

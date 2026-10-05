@@ -5,6 +5,7 @@
 // - une réserve au palier IV ;
 // - une grande annexe au palier VI.
 // Le Foyer a aussi ses maisons (lot 7d) : jusqu'à 4, ouvertes aux paliers II à V, chacune loge un visiteur qui reste.
+// Annexes de climat (lot 9d) : une par trouvaille de climat, au palier III, payée aussi en trouvailles (finds).
 // Effets : rate = ressources par heure en plus et earn = écus par heure en plus (production du bâtiment, comptée
 // depuis la pose, avec les bonus de production de la boutique) ; cap = heures de production gardées en plus ;
 // charges, regenCut, moves : réserve, retour d'une partie, coups de Récolte (comme la boutique) ; house : un logement.
@@ -13,8 +14,8 @@
 const REACH = 2;
 const SMALL_LEVELS = [2, 3, 5]; // palier du bâtiment qui ouvre chaque exemplaire d'une petite annexe
 const SMALL_COINS = [100, 250, 600];
-const KIND_LEVEL = { reserve: 4, grand: 6 };
-const KIND_COINS = { reserve: 400, grand: 1200 };
+const KIND_LEVEL = { reserve: 4, grand: 6, climate: 3 };
+const KIND_COINS = { reserve: 400, grand: 1200, climate: 500 };
 const HOUSE_LEVELS = [2, 3, 4, 5]; // palier du Foyer qui ouvre chaque maison
 const HOUSE_COINS = [80, 200, 400, 800];
 const REGEN_FLOOR_MS = 10 * 60 * 1000; // une partie ne revient jamais en moins de 10 minutes
@@ -23,8 +24,10 @@ const REGEN_FLOOR_MS = 10 * 60 * 1000; // une partie ne revient jamais en moins 
 const SMALL = { rate: 3, earn: 2 };
 const RESERVE = { cap: 4 };
 const GRAND = { rate: 8, earn: 6 };
+const CLIMATE = { rate: 5, earn: 4 };
+const CLIMATE_FINDS = 15;
 
-const annex = (id, site, kind, name, cost, effect) => ({ id, site, kind, name, cost, effect });
+const annex = (id, site, kind, name, cost, effect, spent = {}) => ({ id, site, kind, name, cost, effect, finds: spent });
 const ANNEXES = [
     annex('champ', 'potager', 'small', 'Champ', { wood: 20, water: 20 }, SMALL),
     annex('grenier', 'potager', 'reserve', 'Grenier', { wood: 90, stone: 60 }, RESERVE),
@@ -47,7 +50,14 @@ const ANNEXES = [
     annex('maison', 'foyer', 'house', 'Maison', { wood: 30, stone: 20 }, { house: 1 }),
     annex('charbon', 'atelier', 'small', 'Tas de charbon', { wood: 40, stone: 20 }, { moves: 1 }),
     annex('hangar', 'atelier', 'reserve', 'Hangar', { wood: 90, stone: 60 }, { moves: 1 }),
-    annex('fourneau', 'atelier', 'grand', 'Haut fourneau', { stone: 180, wood: 80, water: 40 }, { moves: 2 })
+    annex('fourneau', 'atelier', 'grand', 'Haut fourneau', { stone: 180, wood: 80, water: 40 }, { moves: 2 }),
+    // Annexes de climat
+    annex('glaciere', 'puits', 'climate', 'Glacière', { stone: 60, wood: 30 }, RESERVE, { glace: CLIMATE_FINDS }),
+    annex('metier', 'foyer', 'climate', 'Métier à tisser', { wood: 60, stone: 20 }, { charges: 1 }, { laine: CLIMATE_FINDS }),
+    annex('hutte', 'bosquet', 'climate', 'Hutte de roseaux', { wood: 50, water: 30 }, CLIMATE, { roseau: CLIMATE_FINDS }),
+    annex('saline', 'ponton', 'climate', 'Saline', { stone: 50, water: 40 }, CLIMATE, { sel: CLIMATE_FINDS }),
+    annex('serre', 'potager', 'climate', 'Serre tropicale', { wood: 40, stone: 40, water: 20 }, CLIMATE, { fruits: CLIMATE_FINDS }),
+    annex('fonderie', 'carriere', 'climate', 'Forge d’obsidienne', { stone: 60, wood: 40 }, CLIMATE, { obsidienne: CLIMATE_FINDS })
 ];
 const ANNEX_BY_ID = Object.fromEntries(ANNEXES.map(a => [a.id, a]));
 
@@ -55,11 +65,12 @@ const ANNEX_BY_ID = Object.fromEntries(ANNEXES.map(a => [a.id, a]));
 const maxOf = a => (a.kind === 'house' ? HOUSE_LEVELS.length : a.kind === 'small' && a.effect.rate ? SMALL_LEVELS.length : 1);
 // Palier du bâtiment qui ouvre l'exemplaire n° copy (0, 1, 2…)
 const levelFor = (a, copy) => (a.kind === 'house' ? HOUSE_LEVELS[copy] : a.kind === 'small' ? SMALL_LEVELS[copy] : KIND_LEVEL[a.kind]);
-// Prix de l'exemplaire n° copy : { cost, coins } ; le coût en ressources double à chaque exemplaire
+// Prix de l'exemplaire n° copy : { cost, coins, finds } ; le coût en ressources double à chaque exemplaire ; finds :
+// trouvailles de climat (annexes de climat)
 function priceOf(a, copy) {
-    const doubled = coins => ({ cost: Object.fromEntries(Object.entries(a.cost).map(([r, n]) => [r, n * 2 ** copy])), coins });
+    const doubled = coins => ({ cost: Object.fromEntries(Object.entries(a.cost).map(([r, n]) => [r, n * 2 ** copy])), coins, finds: { ...a.finds } });
     if (a.kind === 'house') return doubled(HOUSE_COINS[copy]);
-    if (a.kind !== 'small') return { cost: { ...a.cost }, coins: KIND_COINS[a.kind] };
+    if (a.kind !== 'small') return { cost: { ...a.cost }, coins: KIND_COINS[a.kind], finds: { ...a.finds } };
     return doubled(SMALL_COINS[copy]);
 }
 

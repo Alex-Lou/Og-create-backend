@@ -461,9 +461,9 @@ test('créations d’île : assembler (pièces vérifiées), payer à la réussi
   const first = await view();
   const cat = (world, id) => world.crafts.catalog.find(c => c.id === id);
   // Palier de départ ouvert ; palier I fermé (ni chapitre I fini, ni 10 questions de l'Épreuve)
-  assert.deepEqual(first.crafts.open, ['start']);
+  assert.deepEqual(first.crafts.open, ['start', 'climat']);
   assert.deepEqual(first.crafts.epreuves, { have: 0, need: 10 });
-  assert.equal(first.crafts.catalog.length, 18);
+  assert.equal(first.crafts.catalog.length, 30);
   assert.match(cat(first, 'muret').block, /Palier I/);
   assert.match(cat(first, 'cloture').block, /ressources/);
   assert.equal((await start('cloture')).status, 403);
@@ -503,7 +503,7 @@ test('créations d’île : assembler (pièces vérifiées), payer à la réussi
   // Palier I par l'Épreuve (10 questions) ; la Lanterne demande Feu et Lumière, et le bord d'un chemin
   await sql(`UPDATE progress SET timer_progress = jsonb_set(timer_progress, '{completedQuestions}', '{"Facile":{"A":[1,2,3,4,5,6,7,8,9,10]}}') WHERE user_id = $1`, [player.userId]);
   const opened = await view();
-  assert.deepEqual(opened.crafts.open, ['start', 'I']);
+  assert.deepEqual(opened.crafts.open, ['start', 'I', 'climat']);
   assert.match(cat(opened, 'lanterne').block, /Lumière/);
   await sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Lumière"]'::jsonb WHERE user_id = $1`, [player.userId]);
   assert.equal((await make('lanterne')).status, 200);
@@ -816,6 +816,61 @@ test('trouvailles de climat : gisements des quartiers connus, ramassés une fois
   const salt = known.deposits.find(d => d.id === 'dunes-1');
   await sql(`INSERT INTO world_crafts (user_id, craft) VALUES ($1, 'longuevue')`, [player.userId]);
   assert.match((await api('POST', '/play/world/craft/place', { craft: 'longuevue', x: salt.x, y: salt.y }, player)).data.message, /occupée/);
+});
+
+test('créations et annexes de climat : payées en trouvailles, posées dans leur climat ; elles enrichissent les gisements', async () => {
+  const player = await newPlayer({ coins: 2000 });
+  const view = async () => (await api('GET', '/play/world', null, player)).data;
+  const start = craft => api('POST', '/play/world/craft/start', { craft }, player);
+  const finish = (run, layout) => api('POST', '/play/world/craft/finish', { run, layout }, player);
+  const place = (craft, x, y) => api('POST', '/play/world/craft/place', { craft, x, y }, player);
+  const glace = async () => (await view()).finds.find(f => f.id === 'glace').amount;
+  await view();
+  await sql(`INSERT INTO world_expeditions (user_id, zone, ends_at) VALUES ($1, 'neiges', NOW() - INTERVAL '1 hour'), ($1, 'menhirs', NOW() - INTERVAL '1 hour')`, [player.userId]);
+  await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'neiges'), ($1, 'menhirs'), ($1, 'source')`, [player.userId]);
+  await sql('UPDATE world_stock SET wood = 200, stone = 200, water = 200, food = 200 WHERE user_id = $1', [player.userId]);
+  // L'igloo demande sa glace (et le savoir-faire « Neige » du Livre)
+  const before = (await view()).crafts.catalog.find(c => c.id === 'igloo');
+  assert.deepEqual([before.tier, before.finds, before.climate, before.place], ['climat', { glace: 8 }, 'cimes', 'Se pose dans Les Cimes, sur la neige.']);
+  assert.match(before.block, /Neige|glace/);
+  await sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Neige"]'::jsonb WHERE user_id = $1`, [player.userId]);
+  assert.match((await start('igloo')).data.message, /8 glace/);
+  await sql(`INSERT INTO world_finds (user_id, find, amount) VALUES ($1, 'glace', 20), ($1, 'laine', 20)`, [player.userId]);
+  const { run } = (await start('igloo')).data;
+  const made = await finish(run.id, solveCraft(run));
+  assert.equal(made.status, 200);
+  assert.equal(made.data.world.finds.find(f => f.id === 'glace').amount, 12);
+  // Seulement dans les Cimes, sur la neige ; puis ses gisements rendent une glace de plus
+  const deposit = made.data.world.deposits.find(d => d.id === 'neiges-1');
+  assert.equal(deposit.bonus, 0);
+  const worldMap = require('../src/services/worldMap');
+  const finds = require('../src/services/finds');
+  let lande = null;
+  for (let y = 0; y < 96 && !lande; y++) for (let x = 0; x < 96 && !lande; x++) if (worldMap.zoneAt(x, y) === 'menhirs' && worldMap.groundAt(x, y) === 'l' && !finds.isDeposit(x, y)) lande = { x, y };
+  assert.match((await place('igloo', lande.x, lande.y)).data.message, /Les Cimes/);
+  const spot = made.data.world.crafts.catalog.find(c => c.id === 'igloo').spots.find(s => Math.abs(s.x - deposit.x) + Math.abs(s.y - deposit.y) > 2);
+  assert.ok(spot, 'une case de neige libre dans les Cimes');
+  assert.equal((await place('igloo', spot.x, spot.y)).status, 200);
+  const after = await view();
+  const zone = worldMap.zoneAt(spot.x, spot.y);
+  assert.equal(after.deposits.find(d => d.zone === zone).bonus, 1);
+  const was = await glace();
+  const gathered = await api('POST', '/play/world/deposit', { id: after.deposits.find(d => d.zone === zone).id }, player);
+  assert.ok(gathered.data.amount >= 3 && gathered.data.amount <= 5);
+  assert.equal(await glace(), was + gathered.data.amount);
+  // La Glacière : annexe du Puits au palier III, 15 glaces en plus des ressources et des écus
+  await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'puits', 3)`, [player.userId]);
+  const puits = (await view()).sites.find(s => s.id === 'puits');
+  const glaciere = puits.annexes.find(a => a.id === 'glaciere');
+  assert.deepEqual([glaciere.kind, glaciere.next.level, glaciere.next.coins, glaciere.next.finds], ['climate', 3, 500, { glace: 15 }]);
+  const cell = puits.spots[0];
+  await sql(`UPDATE world_finds SET amount = 14 WHERE user_id = $1 AND find = 'glace'`, [player.userId]);
+  assert.match((await api('POST', '/play/world/annex', { annex: 'glaciere', x: cell.x, y: cell.y }, player)).data.message, /15 glace/);
+  await sql(`UPDATE world_finds SET amount = 15 WHERE user_id = $1 AND find = 'glace'`, [player.userId]);
+  const built = await api('POST', '/play/world/annex', { annex: 'glaciere', x: cell.x, y: cell.y }, player);
+  assert.equal(built.status, 200);
+  assert.equal(built.data.world.finds.find(f => f.id === 'glace').amount, 0);
+  assert.equal(built.data.world.sites.find(s => s.id === 'puits').capHours, 12);
 });
 
 test('le Monde : une île de la carte v3 devient le cœur de la très grande île ; tout ce qui est posé glisse', async () => {
