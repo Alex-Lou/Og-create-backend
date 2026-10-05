@@ -72,6 +72,26 @@ router.post('/world/skin', withAccount(async (req, res, owner, b) => {
     res.json(await worldView(owner, b));
 }));
 
+// Annexe d'un bâtiment : pose de l'exemplaire suivant sur une case libre autour de lui
+const cellOk = (...values) => values.every(v => Number.isInteger(v) && v >= 0 && v < world.SIZE);
+router.post('/world/annex', withAccount(async (req, res, owner, b) => {
+    const annex = String(req.body.annex || '');
+    const x = Number(req.body.x), y = Number(req.body.y);
+    if (!/^[a-z]{1,20}$/.test(annex) || !cellOk(x, y)) return res.status(400).json({ message: 'Annexe invalide' });
+    const done = await world.placeAnnex(owner.id, annex, x, y);
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json({ built: done.built, coins: done.coins, world: await worldView(owner, b) });
+}));
+
+// Annexe : déplacement gratuit vers une autre case libre autour de son bâtiment
+router.post('/world/annex/move', withAccount(async (req, res, owner, b) => {
+    const [x, y, toX, toY] = ['x', 'y', 'toX', 'toY'].map(k => Number(req.body[k]));
+    if (!cellOk(x, y, toX, toY)) return res.status(400).json({ message: 'Case invalide' });
+    const done = await world.moveAnnex(owner.id, x, y, toX, toY);
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json(await worldView(owner, b));
+}));
+
 // Quartier : écus et chapitre du Livre ouvert
 router.post('/world/zone', withAccount(async (req, res, owner, b) => {
     const zone = String(req.body.zone || '');

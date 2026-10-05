@@ -805,6 +805,81 @@ test('le Monde : les paliers III à VII demandent chapitre et écus, le palier I
   assert.match(fifth.data.message, /chapitre V/);
 });
 
+test('annexes : posées autour du bâtiment au palier voulu, payées une fois, déplacées gratuitement, elles produisent', async () => {
+  const player = await newPlayer({ coins: 0 });
+  const potagerOf = world => world.sites.find(s => s.id === 'potager');
+  const place = (annex, cell) => api('POST', '/play/world/annex', { annex, ...cell }, player);
+  await api('GET', '/play/world', null, player);
+  assert.equal((await place('Champ!', { x: 10, y: 10 })).status, 400);
+  assert.equal((await place('inconnue', { x: 10, y: 10 })).status, 404);
+  await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'jardins'), ($1, 'est')`, [player.userId]);
+  await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'potager', 1), ($1, 'atelier', 2)`, [player.userId]);
+  const first = (await api('GET', '/play/world', null, player)).data;
+  // Palier I : pas encore de cases ; le catalogue annonce le Champ au palier II, trois exemplaires (II, III, V)
+  assert.deepEqual(potagerOf(first).spots, []);
+  const champ = potagerOf(first).annexes.find(a => a.id === 'champ');
+  assert.deepEqual([champ.max, champ.built, champ.levels, champ.next.level, champ.next.coins], [3, 0, [2, 3, 5], 2, 100]);
+  assert.equal(champ.effect, '+3 vivres et +2 écus par heure');
+  assert.equal(potagerOf(first).annexes.find(a => a.id === 'grenier').effect, 'Garde 12 h de production au lieu de 8');
+  await sql(`UPDATE world_buildings SET level = 2 WHERE user_id = $1 AND site = 'potager'`, [player.userId]);
+  const spots = potagerOf((await api('GET', '/play/world', null, player)).data).spots;
+  assert.ok(spots.length >= 10);
+  const [a, b, c] = spots;
+  // Loin du bâtiment : refusé ; sans ressources puis sans écus : refusé, rien n'est pris
+  assert.equal((await place('champ', { x: 31, y: 35 })).status, 400);
+  assert.equal((await place('champ', a)).status, 400);
+  await sql('UPDATE world_stock SET stone = 500, wood = 500, water = 500, food = 500 WHERE user_id = $1', [player.userId]);
+  const poor = await place('champ', a);
+  assert.equal(poor.status, 400);
+  assert.match(poor.data.message, /100 écus/);
+  assert.equal((await api('GET', '/play/world', null, player)).data.stock.wood, 500);
+  await sql('UPDATE progress SET coins = 1000 WHERE user_id = $1', [player.userId]);
+  const done = await place('champ', a);
+  assert.equal(done.status, 200);
+  assert.equal(done.data.built, 'Champ');
+  assert.equal(done.data.coins, 900);
+  assert.deepEqual(done.data.world.annexes, [{ x: a.x, y: a.y, annex: 'champ', site: 'potager' }]);
+  assert.equal(done.data.world.stock.wood, 480);
+  assert.equal(potagerOf(done.data.world).annexes.find(x => x.id === 'champ').built, 1);
+  assert.ok(!potagerOf(done.data.world).spots.some(s => s.x === a.x && s.y === a.y));
+  // Deuxième exemplaire : palier III ; au palier III, deux poses en même temps : une seule passe (la 3e veut le palier V)
+  const early = await place('champ', b);
+  assert.equal(early.status, 403);
+  assert.match(early.data.message, /palier III/);
+  await sql(`UPDATE world_buildings SET level = 3 WHERE user_id = $1 AND site = 'potager'`, [player.userId]);
+  const [r1, r2] = await Promise.all([place('champ', b), place('champ', c)]);
+  assert.deepEqual([r1.status, r2.status].sort(), [200, 403]);
+  assert.equal(await coinsOf(player), 900 - 250);
+  // Case occupée : ni annexe ni décoration ne s'y pose
+  const taken = r1.status === 200 ? b : c;
+  const free = r1.status === 200 ? c : b;
+  assert.equal((await place('grenier', taken)).status, 403);
+  assert.equal((await api('POST', '/play/world/place', { element: 'Eau', ...a }, player)).status, 409);
+  // Déplacement gratuit vers une case autorisée ; pas hors de portée, pas sur une case prise
+  const move = (from, to) => api('POST', '/play/world/annex/move', { x: from.x, y: from.y, toX: to.x, toY: to.y }, player);
+  assert.equal((await move(a, { x: 31, y: 35 })).status, 400);
+  assert.equal((await move(a, taken)).status, 409);
+  assert.equal((await move({ x: 0, y: 0 }, free)).status, 404);
+  const moved = await move(a, free);
+  assert.equal(moved.status, 200);
+  assert.ok(moved.data.annexes.some(x => x.x === free.x && x.y === free.y && x.annex === 'champ'));
+  assert.equal(await coinsOf(player), 650);
+  // Production : Potager III depuis 4 h ; deux champs posés il y a 2 h → 36 + 12 vivres, 24 + 8 écus
+  await sql(`UPDATE world_buildings SET built_at = NOW() - INTERVAL '4 hours' WHERE user_id = $1 AND site = 'potager'`, [player.userId]);
+  await sql(`UPDATE world_annexes SET built_at = NOW() - INTERVAL '2 hours' WHERE user_id = $1`, [player.userId]);
+  await sql(`UPDATE world_stock SET collected_at = NOW() - INTERVAL '5 hours' WHERE user_id = $1`, [player.userId]);
+  const later = (await api('GET', '/play/world', null, player)).data;
+  assert.deepEqual(potagerOf(later).pending, { coins: 32, food: 48 });
+  assert.deepEqual(potagerOf(later).perHour, { amount: 15, coins: 10 });
+  // Atelier II : le Tas de charbon ajoute un coup à la Récolte (Atelier II : +5)
+  const atelier = later.sites.find(s => s.id === 'atelier');
+  assert.equal(later.harvest.maxMoves, 15 + 5);
+  const coal = await place('charbon', atelier.spots[0]);
+  assert.equal(coal.status, 200);
+  assert.equal(coal.data.world.harvest.maxMoves, 15 + 5 + 1);
+  assert.equal((await place('charbon', atelier.spots[1])).status, 409);
+});
+
 test('le pendu : lettre posée case par case, erreur douce, trois erreurs, rejouer contre des écus, élément inscrit', async () => {
   const player = await newPlayer();
   const { rules, owned } = await withStars(player);
