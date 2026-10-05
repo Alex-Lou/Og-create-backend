@@ -895,6 +895,98 @@ test('habitants : on leur parle et on les gâte une fois par jour ; chaque cœur
   assert.equal((await api('POST', '/play/world/villager/talk', { villager: 'foyer' }, await guest())).status, 402);
 });
 
+test('besoins des habitants : manger, travailler, se distraire ; l’humeur change la production', async () => {
+  const player = await newPlayer();
+  const view = async () => (await api('GET', '/play/world', null, player)).data;
+  const fill = (villager, need) => api('POST', '/play/world/villager/need', { villager, need }, player);
+  const fillAll = () => api('POST', '/play/world/villagers/needs', {}, player);
+  const ago = (villager, need, hours) => sql(
+    'UPDATE world_needs SET filled_at = NOW() - make_interval(hours => $4::int) WHERE user_id = $1 AND villager = $2 AND need = $3',
+    [player.userId, villager, need, hours]);
+  const who = (world, id) => world.villagers.find(v => v.id === id);
+  const deco = v => v.needs.find(n => n.id === 'deco');
+  // Paulette arrive comblée : manger tient 24 h ; sans décoration autour du Foyer, elle n'est que contente
+  const first = await view();
+  const paulette = who(first, 'foyer');
+  assert.deepEqual(paulette.needs.map(n => [n.id, n.met]), [['manger', true], ['deco', false]]);
+  assert.equal(paulette.needs[0].refill, false);
+  assert.ok(paulette.needs[0].left > 23.9 * 3600000);
+  assert.deepEqual([paulette.mood, paulette.moodEffect], ['content', null]);
+  assert.deepEqual(first.needs.kinds.manger, { label: 'Manger', hours: 24, cost: { food: 10 } });
+  assert.deepEqual(first.needs.kinds.deco, { label: 'Se distraire', decos: 3, reach: 3 });
+  assert.equal((await sql('SELECT COUNT(*)::int AS n FROM world_needs WHERE user_id = $1', [player.userId]))[0].n, 1);
+  // Pas encore faim ; à mi-chemin, on peut la nourrir : 10 vivres
+  assert.equal((await fill('foyer', 'manger')).status, 409);
+  await ago('foyer', 'manger', 13);
+  assert.equal(who(await view(), 'foyer').needs[0].refill, true);
+  const poor = await fill('foyer', 'manger');
+  assert.equal(poor.status, 400);
+  assert.match(poor.data.message, /10 vivres/);
+  await sql('UPDATE world_stock SET food = 100, stone = 100, wood = 100 WHERE user_id = $1', [player.userId]);
+  const fed = await fill('foyer', 'manger');
+  assert.equal(fed.status, 200);
+  assert.deepEqual(fed.data.filled, [{ villager: 'foyer', need: 'manger' }]);
+  assert.equal(fed.data.world.stock.food, 90);
+  assert.equal(who(fed.data.world, 'foyer').needs[0].refill, false);
+  // Affamée et sans décoration : triste (les parties de Récolte reviennent moins vite)
+  await ago('foyer', 'manger', 25);
+  const sad = who(await view(), 'foyer');
+  assert.deepEqual([sad.mood, sad.moodEffect], ['triste', 'Une partie de Récolte revient 3 min plus lentement']);
+  // Se distraire : trois décorations à 3 cases au plus du Foyer (celle du haut est trop loin)
+  await sql('UPDATE progress SET coins = 100 WHERE user_id = $1', [player.userId]);
+  for (const [element, x, y] of [['Eau', 31, 35], ['Feu', 32, 35], ['Air', 29, 27]]) {
+    assert.equal((await api('POST', '/play/world/place', { element, x, y }, player)).status, 200);
+  }
+  assert.deepEqual(deco(who(await view(), 'foyer')), { id: 'deco', met: false, have: 2, need: 3, reach: 3 });
+  const pretty = await api('POST', '/play/world/place', { element: 'Terre', x: 33, y: 35 }, player);
+  assert.equal(deco(who(pretty.data, 'foyer')).met, true);
+  const happy = who((await fill('foyer', 'manger')).data.world, 'foyer');
+  assert.deepEqual([happy.mood, happy.moodEffect], ['heureux', 'Une partie de Récolte revient 3 min plus vite']);
+  // Rose (Potager, 10 h de production, plafonnées à 8) : contente, puis triste : −10 % de vivres et d'écus
+  await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'jardins')`, [player.userId]);
+  await sql(`INSERT INTO world_buildings (user_id, site, level, built_at) VALUES ($1, 'potager', 1, NOW() - INTERVAL '10 hours')`, [player.userId]);
+  await sql(`UPDATE world_stock SET collected_at = NOW() - INTERVAL '10 hours' WHERE user_id = $1`, [player.userId]);
+  const garden = await view();
+  const potager = world => world.sites.find(s => s.id === 'potager');
+  assert.equal(who(garden, 'potager').mood, 'content');
+  assert.deepEqual([potager(garden).moodBonus, potager(garden).pending], [0, { coins: 16, food: 24 }]);
+  await ago('potager', 'manger', 30);
+  const gloomy = await view();
+  assert.equal(who(gloomy, 'potager').moodEffect, '−10 % de production');
+  assert.deepEqual([potager(gloomy).moodBonus, potager(gloomy).pending, potager(gloomy).perHour], [-10, { coins: 14, food: 21 }, { amount: 2.7, coins: 1.8 }]);
+  const collected = await api('POST', '/play/world/collect', {}, player);
+  assert.deepEqual([collected.data.gained, collected.data.stock.food], [14, 21]);
+  // Tout combler : Rose et Paulette mangent (20 vivres), puis plus rien à faire
+  await ago('foyer', 'manger', 20);
+  const all = await fillAll();
+  assert.equal(all.status, 200);
+  assert.deepEqual(all.data.filled, [{ villager: 'potager', need: 'manger' }, { villager: 'foyer', need: 'manger' }]);
+  assert.equal(all.data.world.stock.food, 81);
+  assert.equal((await fillAll()).status, 409);
+  // Travailler : seulement avec l'Atelier (Ferdinand) ; triste, il ôte 2 coups à chaque Récolte
+  assert.equal((await fill('foyer', 'outils')).status, 403);
+  await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'est')`, [player.userId]);
+  await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'atelier', 1)`, [player.userId]);
+  const forge = await view();
+  assert.deepEqual(who(forge, 'foyer').needs.map(n => n.id), ['manger', 'outils', 'deco']);
+  assert.equal(who(forge, 'atelier').mood, 'content');
+  await ago('atelier', 'outils', 50);
+  const worn = await view();
+  assert.equal(who(worn, 'atelier').moodEffect, '−2 coups par Récolte');
+  assert.equal(worn.harvest.maxMoves, forge.harvest.maxMoves - 2);
+  const run = await api('POST', '/play/world/harvest/start', {}, player);
+  assert.equal(run.data.maxMoves, worn.harvest.maxMoves);
+  const tooled = await fill('atelier', 'outils');
+  assert.deepEqual([tooled.data.world.stock.stone, tooled.data.world.stock.wood], [95, 95]);
+  // Entrées invalides ; habitant absent ; compte requis
+  assert.equal((await fill('personne', 'manger')).status, 404);
+  assert.equal((await fill('constructor', 'manger')).status, 404);
+  assert.equal((await fill('foyer', 'deco')).status, 400);
+  assert.equal((await fill('foyer', 'MANGER!')).status, 400);
+  assert.equal((await fill('carriere', 'manger')).status, 403);
+  assert.equal((await api('POST', '/play/world/villagers/needs', {}, await guest())).status, 402);
+});
+
 test('mini-jeux : au palier III, trois parties en réserve, gestes rejoués par le serveur, écus versés une fois', async () => {
   const player = await newPlayer();
   const start = game => api('POST', '/play/world/game/start', { game }, player);
