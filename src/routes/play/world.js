@@ -72,6 +72,16 @@ router.post('/world/skin', withAccount(async (req, res, owner, b) => {
     res.json(await worldView(owner, b));
 }));
 
+// Nom d'un bâtiment (dès son palier III) ou d'un quartier à soi ; un nom vide rend celui d'origine
+router.post('/world/name', withAccount(async (req, res, owner, b) => {
+    const kind = String(req.body.kind || '');
+    const id = String(req.body.id || '');
+    if (!['site', 'zone'].includes(kind) || !/^[a-z0-9-]{1,20}$/.test(id) || typeof (req.body.name ?? '') !== 'string') return res.status(400).json({ message: 'Nom invalide' });
+    const done = await world.rename(owner.id, kind, id, req.body.name);
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json(await worldView(owner, b));
+}));
+
 // Enseignes (dès le palier V) : le nom écrit dessus, puis le style de celle d'un bâtiment (acheté au passage)
 router.post('/world/sign/name', withAccount(async (req, res, owner, b) => {
     const done = await world.nameSigns(owner.id, req.body.name);

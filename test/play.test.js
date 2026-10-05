@@ -806,6 +806,42 @@ test('le Monde : les paliers III à VII demandent chapitre et écus, le palier I
   assert.match(fifth.data.message, /chapitre V/);
 });
 
+test('noms : un bâtiment se renomme dès son palier III, un quartier dès qu’il est à soi ; un nom vide rend l’original', async () => {
+  const player = await newPlayer();
+  const name = body => api('POST', '/play/world/name', body, player);
+  const start = (await api('GET', '/play/world', null, player)).data;
+  const coeur = start.map.zones.find(z => z.id === 'coeur');
+  assert.deepEqual([coeur.name, coeur.baseName, coeur.renamed], ['La Grève', 'La Grève', false]);
+  // Le quartier de départ, à soi d'office
+  const plage = await name({ kind: 'zone', id: 'coeur', name: '  Ma   Plage ' });
+  assert.equal(plage.status, 200);
+  assert.deepEqual(['name', 'baseName', 'renamed'].map(k => plage.data.map.zones.find(z => z.id === 'coeur')[k]), ['Ma Plage', 'La Grève', true]);
+  // Un quartier pas encore acheté : non
+  const other = start.map.zones.find(z => z.id !== 'coeur');
+  assert.equal((await name({ kind: 'zone', id: other.id, name: 'Ailleurs' })).status, 403);
+  // Bâtiment : au palier III seulement
+  assert.equal((await name({ kind: 'site', id: 'foyer', name: 'Chez Nous' })).status, 403);
+  await sql(`UPDATE world_buildings SET level = 3 WHERE user_id = $1 AND site = 'foyer'`, [player.userId]);
+  await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'foyer', 3) ON CONFLICT (user_id, site) DO UPDATE SET level = 3`, [player.userId]);
+  const home = await name({ kind: 'site', id: 'foyer', name: 'Chez Nous' });
+  assert.equal(home.status, 200);
+  const foyer = home.data.sites.find(s => s.id === 'foyer');
+  assert.deepEqual([foyer.name, foyer.renamed, foyer.renameLevel], ['Chez Nous', true, 3]);
+  assert.notEqual(foyer.baseName, 'Chez Nous');
+  // Nom invalide ; nom vide : retour à l'original
+  assert.equal((await name({ kind: 'site', id: 'foyer', name: '<script>' })).status, 400);
+  assert.equal((await name({ kind: 'site', id: 'foyer', name: 'x'.repeat(23) })).status, 400);
+  const back = await name({ kind: 'site', id: 'foyer', name: '' });
+  assert.equal(back.data.sites.find(s => s.id === 'foyer').name, foyer.baseName);
+  assert.equal(back.data.sites.find(s => s.id === 'foyer').renamed, false);
+  // Entrées invalides ; compte requis
+  assert.equal((await name({ kind: 'ile', id: 'coeur', name: 'X Y' })).status, 400);
+  assert.equal((await name({ kind: 'site', id: 'nulle', name: 'X Y' })).status, 404);
+  assert.equal((await name({ kind: 'zone', id: 'nulle', name: 'X Y' })).status, 404);
+  assert.equal((await name({ kind: 'site', id: 'foyer', name: ['a'] })).status, 400);
+  assert.equal((await api('POST', '/play/world/name', { kind: 'zone', id: 'coeur', name: 'Ma Plage' }, await guest())).status, 402);
+});
+
 test('habitants : on leur parle et on les gâte une fois par jour ; chaque cœur est récompensé une seule fois', async () => {
   const player = await newPlayer();
   const talk = villager => api('POST', '/play/world/villager/talk', { villager }, player);

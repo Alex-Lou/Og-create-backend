@@ -360,6 +360,13 @@ CREATE TABLE IF NOT EXISTS world_game_runs (
     finished_at TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS idx_world_game_runs_user ON world_game_runs (user_id, created_at);
+-- Noms choisis par le joueur (services/naming.js) : bâtiment dès son palier III ('site:<id>'), quartier à soi ('zone:<id>')
+CREATE TABLE IF NOT EXISTS world_names (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    target VARCHAR(30) NOT NULL,
+    name VARCHAR(22) NOT NULL,
+    PRIMARY KEY (user_id, target)
+);
 -- Amitié des habitants (services/villagers.js) : points, dernier jour où l'on a bavardé, dernier jour d'un cadeau
 -- (jours de Paris)
 CREATE TABLE IF NOT EXISTS world_friends (
