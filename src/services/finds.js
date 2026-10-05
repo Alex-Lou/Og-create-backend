@@ -55,6 +55,6 @@ const CELLS = new Set(DEPOSITS.map(d => d.y * map.SIZE + d.x));
 const isDeposit = (x, y) => CELLS.has(y * map.SIZE + x);
 
 // Temps avant qu'un gisement ramassé à gatheredAt (date ou null) soit de nouveau prêt (ms, 0 : prêt)
-const readyIn = (gatheredAt, now = Date.now()) => (gatheredAt ? Math.max(0, new Date(gatheredAt).getTime() + REGROW_MS - now) : 0);
+const readyIn = (gatheredAt, now = Date.now(), regrowMs = REGROW_MS) => (gatheredAt ? Math.max(0, new Date(gatheredAt).getTime() + regrowMs - now) : 0);
 
 module.exports = { FINDS, FIND_BY_ID, DEPOSITS, DEPOSIT_BY_ID, PER_ZONE, REGROW_MS, GATHER, SPREAD, CRAFT_BONUS_MAX, isDeposit, readyIn };
