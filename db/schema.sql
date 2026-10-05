@@ -429,6 +429,20 @@ CREATE TABLE IF NOT EXISTS world_landmarks (
     found_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (user_id, landmark)
 );
+-- Trouvailles de climat (lot 9d, services/finds.js) : réserve à part (glace, laine, roseau, sel, fruits, obsidienne)
+CREATE TABLE IF NOT EXISTS world_finds (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    find VARCHAR(12) NOT NULL,
+    amount INTEGER NOT NULL DEFAULT 0 CHECK (amount >= 0),
+    PRIMARY KEY (user_id, find)
+);
+-- Gisements ramassés (lot 9d) : dernier ramassage de chacun (il repousse ensuite ; sans ligne, il est prêt)
+CREATE TABLE IF NOT EXISTS world_deposits (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    deposit VARCHAR(20) NOT NULL,
+    gathered_at TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (user_id, deposit)
+);
 -- Besoins des habitants (services/villagers.js) : dernière fois que chacun a été comblé ('manger', 'outils'). La ligne
 -- naît quand l'habitant arrive (il arrive comblé) ; se distraire se lit sur l'île (décorations), sans ligne.
 CREATE TABLE IF NOT EXISTS world_needs (
