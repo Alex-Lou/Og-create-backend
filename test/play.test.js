@@ -1201,6 +1201,41 @@ test('habitants : on leur parle et on les gâte une fois par jour ; chaque cœur
   assert.equal((await api('POST', '/play/world/villager/talk', { villager: 'foyer' }, await guest())).status, 402);
 });
 
+test('Savoirs des maîtres : un indice par jour en bavardant, la famille puis l’ingrédient de l’Encre (bible, § 6.4)', async () => {
+  const player = await newPlayer({ coins: 500 });
+  const talk = (villager, body = {}) => api('POST', '/play/world/villager/talk', { villager, ...body }, player);
+  const reach = (await api('GET', '/play/book', null, player)).data.chapters[0].pages.filter(p => p.status === 'reach');
+  // Aster (moins de deux cœurs) : la famille d'un ingrédient, sur une page à énigme de son Art (chapitre I)
+  const first = await talk('ponton');
+  assert.equal(first.status, 200);
+  const hint = first.data.savoir;
+  assert.equal(hint.chapter, 'I');
+  assert.ok(reach.find(p => p.id === hint.page).riddle);
+  assert.equal(typeof hint.family, 'string');
+  assert.equal(hint.ingredient, undefined);
+  // Une fois par jour : le bavardage refusé ne souffle rien
+  assert.equal((await talk('ponton')).status, 409);
+  // Cannelle : son chapitre (V) est scellé, rien à souffler
+  assert.equal((await talk('foyer')).data.savoir, null);
+  // Deux cœurs : un ingrédient, celui que révèle l'Encre ; l'appareil qui l'a déjà en reçoit un autre
+  await sql(`UPDATE world_friends SET talked_on = NULL, points = 80 WHERE user_id = $1 AND villager = 'ponton'`, [player.userId]);
+  const strong = (await talk('ponton', { heard: [hint.page] })).data.savoir;
+  assert.equal(strong.family, undefined);
+  const ink = await api('POST', '/play/ink', { page: strong.page }, player);
+  assert.equal(ink.data.ingredient, strong.ingredient);
+  await sql(`UPDATE world_friends SET talked_on = NULL WHERE user_id = $1 AND villager = 'ponton'`, [player.userId]);
+  const other = (await talk('ponton', { known: [strong.page, 'pas une page !'] })).data.savoir;
+  assert.ok(!other || other.page !== strong.page);
+  // Les listes de l'appareil sont vérifiées : n'importe quoi est ignoré
+  await sql(`UPDATE world_friends SET talked_on = NULL WHERE user_id = $1 AND villager = 'ponton'`, [player.userId]);
+  assert.equal((await talk('ponton', { known: 'Vent', heard: [{}] })).status, 200);
+  // Un cadeau ne souffle rien
+  await sql('UPDATE world_stock SET wood = 100 WHERE user_id = $1', [player.userId]);
+  const gift = await api('POST', '/play/world/villager/gift', { villager: 'ponton', resource: 'wood' }, player);
+  assert.equal(gift.status, 200);
+  assert.equal(gift.data.savoir, undefined);
+});
+
 test('besoins des habitants : manger, travailler, se distraire ; l’humeur change la production', async () => {
   const player = await newPlayer();
   const view = async () => (await api('GET', '/play/world', null, player)).data;

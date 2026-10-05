@@ -30,6 +30,19 @@ const REWARDS = [
     { kind: 'chest', rarity: 'legendaire' }
 ];
 
+// Savoirs des maîtres (bible, § 4.2 et § 6.4) : les familles de l'Art de chacun (les pages de son chapitre ; Sylve et
+// Mélisse se partagent le Vivant). À partir de SAVOIR_HEARTS cœurs, le maître souffle un ingrédient, sinon sa famille
+const SAVOIRS = {
+    ponton: ['Elements Fondamentaux', 'Phénomènes Naturels'],
+    carriere: ['Matériaux', 'Chimie', 'Physique'],
+    puits: ['Cosmos', 'Formations Naturelles'],
+    bosquet: ['Vie et Créatures'],
+    potager: ['Flore', 'Biologie'],
+    foyer: ['Corps et Esprit', 'Créations Humaines'],
+    atelier: ['Histoire', 'Technologie']
+};
+const SAVOIR_HEARTS = 2;
+
 // Cœurs pour tant de points (0 à 5)
 const heartsOf = points => HEARTS.filter(n => points >= n).length;
 // Points gagnés par un cadeau de cette ressource
@@ -81,6 +94,6 @@ function moodEffect(siteId, produces, mood) {
 }
 
 module.exports = {
-    VILLAGERS, RESOURCES, LABELS, TALK, GIFT, HEARTS, MAX_POINTS, REWARDS, heartsOf, giftPoints,
+    VILLAGERS, RESOURCES, LABELS, TALK, GIFT, HEARTS, MAX_POINTS, REWARDS, SAVOIRS, SAVOIR_HEARTS, heartsOf, giftPoints,
     NEEDS, FILLABLE, MOODS, MOOD_STEP, moodOf, moodSign, needsOf, moodEffect
 };

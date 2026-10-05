@@ -424,3 +424,31 @@ test('lieux remarquables : un par case, dans son quartier des terres nouvelles, 
   assert.ok(Object.values(all.prod).every(p => Math.abs(p - 0.1) < 1e-9));
   assert.deepEqual(landmarks.bonusesOf(['nulle']), landmarks.bonusesOf([]));
 });
+
+test('les Savoirs des maîtres : une famille, puis un ingrédient, sur une page de leur Art à portée', () => {
+  const { savoir, reachableById, telling, pageId } = require('../src/services/bookPages');
+  const { SAVOIRS } = require('../src/services/villagers');
+  const meta = new Map(BASE.map(name => [name, { emoji: '·', family: 'Elements Fondamentaux' }]));
+  meta.set('Vent', { emoji: '·', family: 'Phénomènes Naturels', riddle: 'Je souffle.' });
+  meta.set('Pluie', { emoji: '·', family: 'Phénomènes Naturels' });
+  meta.set('Brasier', { emoji: '·', family: 'Phénomènes Naturels', riddle: 'Je crépite.' });
+  meta.set('Boue', { emoji: '·', family: 'Matériaux', riddle: 'Je colle.' });
+  const entries = [[['Air', 'Air'], 'Vent'], [['Eau', 'Air'], 'Pluie'], [['Feu', 'Feu'], 'Brasier'], [['Eau', 'Terre'], 'Boue']];
+  const b = { meta, entries };
+  const aster = (opts = {}) => savoir(b, BASE, SAVOIRS.ponton, opts);
+  // Moins de deux cœurs : la famille d'un ingrédient, sur une page à énigme pas encore essayée
+  assert.deepEqual(aster(), { page: pageId('Vent'), chapter: 'I', family: 'Elements Fondamentaux' });
+  assert.equal(aster({ heard: [pageId('Vent')] }).page, pageId('Brasier'));
+  // Une page essayée montre déjà ses familles ; une page sans énigme les écrit : rien à souffler
+  assert.equal(aster({ heard: [pageId('Vent')], misses: { [pageId('Brasier')]: 1 } }), null);
+  // Deux cœurs : l'ingrédient que l'Encre révélerait, sur une page dont l'appareil n'a pas encore l'ingrédient
+  assert.deepEqual(aster({ strong: true }), { page: pageId('Vent'), chapter: 'I', ingredient: 'Air' });
+  const next = aster({ strong: true, known: [pageId('Vent')], heard: [pageId('Pluie')] });
+  assert.deepEqual(next, { page: pageId('Pluie'), chapter: 'I', ingredient: telling(reachableById(b, BASE, pageId('Pluie')).parts) });
+  // La page marquée d'abord, même dans un chapitre encore scellé
+  assert.equal(aster({ strong: true, ariane: { target: 'Brasier', next: 'Brasier', remaining: 1 } }).page, pageId('Brasier'));
+  assert.equal(savoir(b, BASE, SAVOIRS.carriere), null);
+  assert.deepEqual(savoir(b, BASE, SAVOIRS.carriere, { ariane: { target: 'Boue', next: 'Boue', remaining: 1 } }), { page: pageId('Boue'), chapter: 'II', family: 'Elements Fondamentaux' });
+  // Hors de son Art, le maître n'a rien à souffler
+  assert.equal(savoir(b, BASE, SAVOIRS.foyer, { strong: true }), null);
+});

@@ -256,6 +256,22 @@ function aim(b, owned, id, tried) {
     return target && { name: target.name, right: overlap(tried, target.parts), of: target.parts.length };
 }
 
+// Savoir d'un maître (bible, § 6.4) : un indice sur une page à portée de son Art (families), ouverte ou marquée, la
+// marquée d'abord. strong (assez de cœurs) : l'ingrédient que l'Encre révélerait ; sinon la famille de cet ingrédient,
+// sur une page à énigme pas encore essayée (ailleurs, les familles sont déjà écrites sur la page). known : pages dont
+// l'appareil a déjà un ingrédient ; heard : pages dont il a déjà une famille. Rien n'est gardé ici.
+// { page, chapter, ingredient } ou { page, chapter, family }, ou null (aucune page de son Art à portée)
+function savoir(b, owned, families, { strong = false, known = [], heard = [], misses = {}, veteran = false, ariane = null } = {}) {
+    const skip = new Set(strong ? known : [...known, ...heard]);
+    const pages = view(b, owned, misses, {}, veteran, ariane).chapters
+        .flatMap(chapter => chapter.pages.map(page => ({ ...page, chapter: chapter.id })))
+        .filter(page => page.status === 'reach' && families.includes(page.family) && !skip.has(page.id) && (strong || (page.riddle && !page.misses)));
+    const page = pages.find(p => p.marked) || pages[0];
+    if (!page) return null;
+    const ingredient = telling(reachableById(b, owned, page.id).parts);
+    return strong ? { page: page.id, chapter: page.chapter, ingredient } : { page: page.id, chapter: page.chapter, family: b.meta.get(ingredient)?.family || null };
+}
+
 // Chapitres ouverts pour ces éléments possédés (découvertes hors éléments de base ≥ « need »)
 // Découvertes inscrites au Livre (les éléments de base n'en sont pas)
 const starsOf = (b, owned) => owned.filter(name => !BASE_ELEMENTS.includes(name) && b.meta.has(name)).length;
@@ -278,4 +294,4 @@ function finishedChapters(b, owned) {
     }).map(c => c.id));
 }
 
-module.exports = { DIFFICULTY, view, arianeOf, reachableById, pageId, aim, telling, difficultyOf, chapterOf, openChapters, finishedChapters, starsOf };
+module.exports = { DIFFICULTY, view, arianeOf, reachableById, pageId, aim, telling, savoir, difficultyOf, chapterOf, openChapters, finishedChapters, starsOf };
