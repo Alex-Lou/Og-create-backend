@@ -87,3 +87,19 @@ test('jour de Paris : changement d’heure, minuit et veille', () => {
   assert.equal(loot.dayBefore('2026-03-01'), '2026-02-28');
   assert.equal(loot.dayBefore('2027-01-01'), '2026-12-31');
 });
+
+test('les mots d’Héliane : un par acte, dans la première bouteille ouverte pendant l’acte (bible, § 6.13)', () => {
+  const { actStartsOf } = require('../src/services/quests');
+  // Rien de réclamé : le prologue n'a pas de mot
+  assert.deepEqual(actStartsOf([]), {});
+  assert.deepEqual(loot.helianeOf({}, [5]), { found: [], next: null });
+  // Le prologue fini à 100 : l'acte I commence ; l'acte I fini à 200 : l'acte II commence
+  const starts = actStartsOf([{ quest: 'puits-ondin', at: 100 }, { quest: 'lanterne', at: 200 }]);
+  assert.deepEqual(starts, { I: 100, II: 200 });
+  // Une quête de l'acte en cours ne déplace pas son début ; une ancienne quête inconnue non plus
+  assert.deepEqual(actStartsOf([{ quest: 'puits-ondin', at: 100 }, { quest: 'lisiere', at: 150 }, { quest: 'vieille-quete', at: 999 }]), { I: 100 });
+  // Bouteilles : avant l'acte I (rien), pendant l'acte I (son mot), puis rien encore pendant l'acte II
+  assert.deepEqual(loot.helianeOf(starts, [50, 120, 130]), { found: ['I'], next: 'II' });
+  assert.deepEqual(loot.helianeOf(starts, [250]), { found: ['II'], next: null });
+  assert.deepEqual(loot.helianeOf(starts, []), { found: [], next: 'II' });
+});

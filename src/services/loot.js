@@ -105,7 +105,21 @@ function dayBefore(day) {
     return date.toISOString().slice(0, 10);
 }
 
+// Les mots d'Héliane (bible, § 6.13) : un mot d'histoire par acte, dans la première bouteille ouverte pendant l'acte (les
+// autres gardent leurs mots drôles ; le front a les textes). starts : début de chaque acte commencé ({ acte: ms }, dans
+// l'ordre : quests.actStartsOf) ; bottles : heures d'ouverture des bouteilles (ms). Rien n'est gardé : { found : actes
+// dont le mot a été lu, next : l'acte en cours si son mot attend encore la prochaine bouteille, sinon null }
+function helianeOf(starts, bottles) {
+    const acts = Object.keys(starts);
+    const found = acts.filter((act, i) => {
+        const end = i + 1 < acts.length ? starts[acts[i + 1]] : Infinity;
+        return bottles.some(at => at >= starts[act] && at < end);
+    });
+    const current = acts[acts.length - 1];
+    return { found, next: current && !found.includes(current) ? current : null };
+}
+
 module.exports = {
     RARITIES, HARVEST, BOTTLE, CHAPTER_RARES, LEGEND_COINS,
-    rarityOf, harvestChest, dailyRarity, rareFor, tintFor, prizeOf, parisOf, dayBefore
+    rarityOf, harvestChest, dailyRarity, rareFor, tintFor, prizeOf, parisOf, dayBefore, helianeOf
 };
