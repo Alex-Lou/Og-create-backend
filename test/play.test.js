@@ -806,6 +806,59 @@ test('le Monde : les paliers III à VII demandent chapitre et écus, le palier I
   assert.match(fifth.data.message, /chapitre V/);
 });
 
+test('habitants : on leur parle et on les gâte une fois par jour ; chaque cœur est récompensé une seule fois', async () => {
+  const player = await newPlayer();
+  const talk = villager => api('POST', '/play/world/villager/talk', { villager }, player);
+  const gift = (villager, resource) => api('POST', '/play/world/villager/gift', { villager, resource }, player);
+  const view = (await api('GET', '/play/world', null, player)).data;
+  // Seule Paulette (Foyer) vit déjà sur l'île
+  assert.deepEqual(view.villagers.map(w => [w.id, w.name, w.hearts, w.talked, w.gifted]), [['foyer', 'Paulette', 0, false, false]]);
+  assert.deepEqual(view.friendship.hearts, [30, 80, 150, 250, 400]);
+  assert.equal((await talk('potager')).status, 403);
+  // Bavarder : +8, une fois par jour
+  const hello = await talk('foyer');
+  assert.equal(hello.status, 200);
+  assert.deepEqual([hello.data.gained, hello.data.hearts, hello.data.rewards], [8, 0, []]);
+  assert.equal(hello.data.world.villagers[0].talked, true);
+  assert.equal((await talk('foyer')).status, 409);
+  // Cadeau : 15 ressources ; Paulette adore la nourriture (+30) : premier cœur, 40 écus
+  assert.equal((await gift('foyer', 'food')).status, 400);
+  await sql('UPDATE world_stock SET food = 100, water = 100 WHERE user_id = $1', [player.userId]);
+  const loved = await gift('foyer', 'food');
+  assert.equal(loved.status, 200);
+  assert.deepEqual([loved.data.gained, loved.data.points, loved.data.hearts], [30, 38, 1]);
+  assert.deepEqual(loved.data.rewards, [{ level: 1, kind: 'coins', amount: 40 }]);
+  assert.equal(loved.data.world.stock.food, 85);
+  assert.equal(await coinsOf(player), 40);
+  assert.equal((await gift('foyer', 'water')).status, 409);
+  // Les jours suivants (dates effacées) : chaque cœur gagné donne sa récompense, une fois
+  const nextDay = points => sql('UPDATE world_friends SET talked_on = NULL, gifted_on = NULL, points = $2 WHERE user_id = $1', [player.userId, points]);
+  await nextDay(79);
+  const second = await talk('foyer');
+  assert.deepEqual([second.data.points, second.data.hearts], [87, 2]);
+  assert.deepEqual(second.data.rewards.map(r => [r.level, r.kind, r.chest && r.chest.rarity]), [[2, 'chest', 'rare']]);
+  await nextDay(149);
+  const third = await gift('foyer', 'water');
+  assert.deepEqual([third.data.gained, third.data.hearts, third.data.rewards], [15, 3, [{ level: 3, kind: 'coins', amount: 120 }]]);
+  await nextDay(249);
+  assert.deepEqual((await talk('foyer')).data.rewards.map(r => [r.level, r.chest && r.chest.rarity]), [[4, 'epique']]);
+  await nextDay(390);
+  const fifth = await gift('foyer', 'food');
+  assert.deepEqual([fifth.data.gained, fifth.data.points, fifth.data.hearts], [10, 400, 5]);
+  assert.deepEqual(fifth.data.rewards.map(r => [r.level, r.chest && r.chest.rarity]), [[5, 'legendaire']]);
+  assert.equal((await sql(`SELECT COUNT(*)::int AS n FROM world_chests WHERE user_id = $1 AND source LIKE 'ami:foyer:%'`, [player.userId]))[0].n, 3);
+  // Au plus haut, bavarder ne rapporte plus de points ; une récompense déjà versée ne revient jamais
+  const top = await talk('foyer');
+  assert.deepEqual([top.data.gained, top.data.hearts, top.data.rewards], [0, 5, []]);
+  await nextDay(395);
+  assert.deepEqual((await gift('foyer', 'food')).data.rewards, []);
+  // Entrées invalides ; compte requis
+  assert.equal((await talk('personne')).status, 404);
+  assert.equal((await gift('foyer', 'or')).status, 400);
+  assert.equal((await gift('foyer', 'OR!')).status, 400);
+  assert.equal((await api('POST', '/play/world/villager/talk', { villager: 'foyer' }, await guest())).status, 402);
+});
+
 test('mini-jeux : au palier III, trois parties en réserve, gestes rejoués par le serveur, écus versés une fois', async () => {
   const player = await newPlayer();
   const start = game => api('POST', '/play/world/game/start', { game }, player);

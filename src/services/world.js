@@ -16,6 +16,7 @@ const loot = require('./loot');
 const annexes = require('./annexes');
 const signs = require('./signs');
 const minigames = require('./minigames');
+const villagers = require('./villagers');
 
 const SIZE = map.SIZE;
 const CAP_HOURS = 8;
@@ -255,6 +256,13 @@ async function signsOf(userId, conn = db) {
     const worn = await conn.query('SELECT site, style FROM world_signs WHERE user_id = $1', [userId]);
     return { name, owned: new Set(bought.rows.map(r => r.style)), worn: Object.fromEntries(worn.rows.map(r => [r.site, r.style])) };
 }
+// Amitié des habitants : { habitant: { points, talked, gifted } } (jours 'AAAA-MM-JJ', heure de Paris)
+async function friendsOf(userId, conn = db) {
+    const { rows } = await conn.query(
+        `SELECT villager, points, to_char(talked_on, 'YYYY-MM-DD') AS talked, to_char(gifted_on, 'YYYY-MM-DD') AS gifted
+         FROM world_friends WHERE user_id = $1`, [userId]);
+    return Object.fromEntries(rows.map(r => [r.villager, r]));
+}
 // Mini-jeux : réserve de parties de chaque jeu ({ jeu: { plays, plays_at } } ; absent : réserve pleine)
 async function gamesOf(userId, conn = db) {
     const { rows } = await conn.query('SELECT game, plays, plays_at FROM world_games WHERE user_id = $1', [userId]);
@@ -488,6 +496,7 @@ async function view(userId, owned, book) {
     const skins = await skinsOf(userId);
     const signed = await signsOf(userId);
     const played = await gamesOf(userId);
+    const friends = await friendsOf(userId);
     const annexRows = await annexesOf(userId);
     const bonuses = shop.bonusesOf(items);
     const extra = annexes.bonusesOf(annexRows);
@@ -565,6 +574,19 @@ async function view(userId, owned, book) {
         pending: production.reduce((sum, p) => sum + p.coins, 0),
         pendingStock,
         tiles: tiles.map(t => ({ x: t.x, y: t.y, element: t.element, ...(known[t.element] || {}) })),
+        // Habitants (bâtiment bâti dans un quartier à soi) : prénom, goûts, amitié, déjà vus ou gâtés aujourd'hui
+        villagers: (() => {
+            const { day } = loot.parisOf(Date.now());
+            return Object.entries(villagers.VILLAGERS).filter(([id]) => (levels[id] || 0) >= 1 && zones.has(map.siteZone(id))).map(([id, v]) => {
+                const friend = friends[id] || { points: 0 };
+                const hearts = villagers.heartsOf(friend.points);
+                return {
+                    id, name: v.name, role: v.role, loves: v.loves, likes: v.likes, points: friend.points, hearts,
+                    next: villagers.HEARTS[hearts] ?? null, talked: friend.talked === day, gifted: friend.gifted === day
+                };
+            });
+        })(),
+        friendship: { talk: villagers.TALK, gift: villagers.GIFT, hearts: villagers.HEARTS, rewards: villagers.REWARDS },
         // Mini-jeux des bâtiments : ouverts au palier III, parties en réserve, multiplicateur d'écus du palier
         games: Object.entries(minigames.GAMES).map(([id, game]) => {
             const level = levels[game.site] || 0;
@@ -735,6 +757,66 @@ function finishGame(userId, runId, input) {
         const earned = minigames.earnedOf(played.raw, level);
         if (earned > 0) await ledger.credit(userId, earned, `jeu:${game}`, runId, conn);
         return { earned, raw: played.raw, detail: played.detail, coins: await balanceOf(userId, conn) };
+    });
+}
+
+// Récompenses des cœurs gagnés de from (exclu) à to (inclus), versées une seule fois chacune (ami:<habitant>:<cœur>),
+// dans la transaction de l'appelant : [{ level, kind: 'coins', amount } | { level, kind: 'chest', chest }]
+async function friendRewards(userId, villagerId, from, to, conn) {
+    const out = [];
+    for (let level = from + 1; level <= to; level++) {
+        const reward = villagers.REWARDS[level - 1];
+        const ref = `ami:${villagerId}:${level}`;
+        if (reward.kind === 'coins') {
+            const done = await ledger.credit(userId, reward.amount, 'ami', ref, conn);
+            if (done.credited) out.push({ level, kind: 'coins', amount: reward.amount });
+        } else {
+            const chest = await grant(userId, ref, reward.rarity, conn);
+            if (chest) out.push({ level, kind: 'chest', chest });
+        }
+    }
+    return out;
+}
+
+// Amitié d'un habitant (son bâtiment bâti, dans un quartier à soi) : lui parler (resource null) ou lui offrir des
+// ressources, chacun une fois par jour (heure de Paris). Points d'amitié, puis les récompenses des cœurs gagnés.
+// { gained, points, hearts, rewards, coins } ou { status, message }
+async function befriend(userId, villagerId, resource = null, now = Date.now()) {
+    const villager = villagers.VILLAGERS[villagerId];
+    if (!villager) return { status: 404, message: 'Habitant inconnu.' };
+    if (resource !== null && !villagers.RESOURCES.includes(resource)) return { status: 400, message: 'Cadeau invalide.' };
+    await migrate(userId);
+    return db.transaction(async conn => {
+        const stock = await stockOf(userId, conn, true);
+        const { levels } = await levelsOf(userId, conn);
+        if (!(levels[villagerId] >= 1) || !(await zonesOf(userId, conn)).has(map.siteZone(villagerId))) {
+            return db.rollback({ status: 403, message: `${villager.name} n’habite pas encore ton île.` });
+        }
+        const { day } = loot.parisOf(now);
+        const { rows } = await conn.query(
+            `SELECT points, to_char(talked_on, 'YYYY-MM-DD') AS talked, to_char(gifted_on, 'YYYY-MM-DD') AS gifted
+             FROM world_friends WHERE user_id = $1 AND villager = $2`, [userId, villagerId]);
+        const friend = rows[0] || { points: 0 };
+        let gained;
+        if (resource === null) {
+            if (friend.talked === day) return db.rollback({ status: 409, message: `Vous avez déjà bavardé aujourd’hui : ${villager.name} t’attend demain.` });
+            gained = villagers.TALK;
+        } else {
+            if (friend.gifted === day) return db.rollback({ status: 409, message: `${villager.name} a déjà reçu un cadeau aujourd’hui.` });
+            if (stock[resource] < villagers.GIFT.cost) return db.rollback({ status: 400, message: `Il te faut ${villagers.GIFT.cost} ${villagers.LABELS[resource]} pour ce cadeau.` });
+            // resource est l'une des quatre colonnes du stock (liste fermée ci-dessus)
+            await conn.query(`UPDATE world_stock SET ${resource} = ${resource} - $2 WHERE user_id = $1`, [userId, villagers.GIFT.cost]);
+            gained = villagers.giftPoints(villager, resource);
+        }
+        const points = Math.min(villagers.MAX_POINTS, friend.points + gained);
+        await conn.query(
+            `INSERT INTO world_friends (user_id, villager, points, talked_on, gifted_on) VALUES ($1, $2, $3, $4::date, $5::date)
+             ON CONFLICT (user_id, villager) DO UPDATE SET points = EXCLUDED.points,
+                 talked_on = COALESCE(EXCLUDED.talked_on, world_friends.talked_on), gifted_on = COALESCE(EXCLUDED.gifted_on, world_friends.gifted_on)`,
+            [userId, villagerId, points, resource === null ? day : null, resource === null ? null : day]);
+        const hearts = villagers.heartsOf(points);
+        const rewards = await friendRewards(userId, villagerId, villagers.heartsOf(friend.points), hearts, conn);
+        return { gained: points - friend.points, points, hearts, rewards, coins: await balanceOf(userId, conn) };
     });
 }
 
@@ -1028,5 +1110,5 @@ async function collect(userId) {
 module.exports = {
     SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, isFree, pendingOf, chargesAt, effectsOf, productionOf,
     view, build, buyZone, buyItem, undoItem, chooseSkin, startRun, finishRun, place, remove, collect, migrate, claimQuest, board, openChest, openAll,
-    placeAnnex, moveAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame
+    placeAnnex, moveAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend
 };
