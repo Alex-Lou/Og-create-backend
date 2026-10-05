@@ -651,15 +651,15 @@ async function view(userId, owned, book) {
                 return {
                     id, name: v.name, role: v.role, loves: v.loves, likes: v.likes, points: friend.points, hearts,
                     next: villagers.HEARTS[hearts] ?? null, talked: friend.talked === day, gifted: friend.gifted === day,
-                    needs, mood, moodEffect: villagers.moodEffect(id, Boolean(SITES[id].produce), mood)
+                    needs, mood, moodEffect: villagers.moodEffect(id, Boolean(SITES[id].produce), mood),
+                    happyEffect: villagers.moodEffect(id, Boolean(SITES[id].produce), 'heureux')
                 };
             });
         })(),
         friendship: { talk: villagers.TALK, gift: villagers.GIFT, hearts: villagers.HEARTS, rewards: villagers.REWARDS },
-        // Besoins : nom, durée, prix de chacun ; effet d'une bonne humeur
+        // Besoins : nom, durée et prix de chacun (se distraire : décorations, à tant de cases)
         needs: {
-            kinds: Object.fromEntries(Object.entries(villagers.NEEDS).map(([id, n]) => [id, { label: n.label, ...(n.hours ? { hours: n.hours, cost: n.cost } : { decos: n.decos, reach: n.reach }) }])),
-            step: { prod: Math.round(villagers.MOOD_STEP.prod * 100), moves: villagers.MOOD_STEP.moves, regenMin: villagers.MOOD_STEP.regenMs / 60000 }
+            kinds: Object.fromEntries(Object.entries(villagers.NEEDS).map(([id, n]) => [id, { label: n.label, ...(n.hours ? { hours: n.hours, cost: n.cost } : { decos: n.decos, reach: n.reach }) }]))
         },
         // Mini-jeux des bâtiments : ouverts au palier III, parties en réserve, multiplicateur d'écus du palier
         games: Object.entries(minigames.GAMES).map(([id, game]) => {

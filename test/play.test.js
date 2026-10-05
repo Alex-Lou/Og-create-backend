@@ -911,7 +911,7 @@ test('besoins des habitants : manger, travailler, se distraire ; l’humeur chan
   assert.deepEqual(paulette.needs.map(n => [n.id, n.met]), [['manger', true], ['deco', false]]);
   assert.equal(paulette.needs[0].refill, false);
   assert.ok(paulette.needs[0].left > 23.9 * 3600000);
-  assert.deepEqual([paulette.mood, paulette.moodEffect], ['content', null]);
+  assert.deepEqual([paulette.mood, paulette.moodEffect, paulette.happyEffect], ['content', null, 'Une partie de Récolte revient 3 min plus vite']);
   assert.deepEqual(first.needs.kinds.manger, { label: 'Manger', hours: 24, cost: { food: 10 } });
   assert.deepEqual(first.needs.kinds.deco, { label: 'Se distraire', decos: 3, reach: 3 });
   assert.equal((await sql('SELECT COUNT(*)::int AS n FROM world_needs WHERE user_id = $1', [player.userId]))[0].n, 1);
