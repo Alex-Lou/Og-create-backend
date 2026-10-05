@@ -1849,7 +1849,7 @@ test('chaque objectif de la chaîne se lit dans l’état (création, annexe, ex
     assert.equal((await after(before)).done, true, id);
   };
   await check('lumiere', 'lanterne', () => sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'lanterne', $2, $3)`, [player.userId, X(28), Y(31)]));
-  await check('bois', 'annexe', () => sql(`INSERT INTO world_annexes (user_id, x, y, annex) VALUES ($1, 1, 1, 'champ')`, [player.userId]));
+  await check('cabane', 'annexe', () => sql(`INSERT INTO world_annexes (user_id, x, y, annex) VALUES ($1, 1, 1, 'champ')`, [player.userId]));
   await check('etoile', 'expedition', () => sql(`INSERT INTO world_expeditions (user_id, zone, ends_at) VALUES ($1, 'roselieres', NOW() - INTERVAL '1 hour')`, [player.userId]));
   await check('expedition', 'ruine', () => sql(`INSERT INTO world_landmarks (user_id, landmark) VALUES ($1, 'saule')`, [player.userId]));
   await check('ponton-aster', 'bete', () => sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Grenouille"]'::jsonb WHERE user_id = $1`, [player.userId]));

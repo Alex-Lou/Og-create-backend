@@ -65,11 +65,12 @@ const QUESTS = [
         '« Hm. » Il dit qu’il est prêt à tailler. Ouvre la Fissure : la pierre de l’Abri viendra de là.'),
     q('bois', 'II', { kind: 'element', element: 'Bois' }, 40, 'Écris le Bois',
         'Pour l’Abri, il faut du bois… sans faire pleurer Sylve. L’Arbre et le Métal, peut-être ?'),
-    q('annexe', 'II', { kind: 'annex', need: 1 }, 50, 'Pose une annexe',
-        'Un bâtiment grandit par ce qu’on pose autour de lui. Dans sa fiche, l’onglet Annexes : choisis, puis pose.'),
     q('cabane', 'II', { kind: 'level', site: 'foyer', need: 2 }, 70, 'Dresse l’Abri avant l’orage',
         'Le ciel gronde déjà. Dresse l’Abri près du feu de camp : il faut tenir, tous ensemble.', 'rare'),
     // Acte III : se nourrir, explorer (Mélisse, la forge de Rivet)
+    // L'annexe vient après l'Abri : il faut un bâtiment au palier II (bible, mises à jour du lot H1)
+    q('annexe', 'III', { kind: 'annex', need: 1 }, 50, 'Pose une annexe',
+        'L’Abri tient ! Un bâtiment grandit aussi par ce qu’on pose autour de lui : dans sa fiche, l’onglet Annexes.'),
     q('jardins', 'III', { kind: 'zone', zone: 'jardins' }, 110, 'Achète Les Jardins',
         'Sept bouches, et la Récolte ne suffit plus. Au nord, une terre noire… et une barque de graines. Achète Les Jardins.'),
     q('eveil-melisse', 'III', { kind: 'wake', villager: 'potager' }, 10, 'Réveille Mélisse',
