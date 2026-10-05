@@ -4,7 +4,9 @@ const book = require('../../services/recipeBook');
 const players = require('../../services/players');
 const world = require('../../services/world');
 const bookPages = require('../../services/bookPages');
-const { playLimiter, withAccount } = require('./shared');
+const bookTries = require('../../services/bookTries');
+const villagers = require('../../services/villagers');
+const { PAGE, playLimiter, withAccount } = require('./shared');
 
 const router = express.Router();
 router.use('/world', playLimiter);
@@ -242,14 +244,28 @@ router.post('/world/game/finish', withAccount(async (req, res, owner, b) => {
 }));
 
 // Habitants : leur parler, leur offrir des ressources (chacun une fois par jour) ; les cœurs gagnés sont récompensés
-const befriended = async (res, owner, b, done) => {
+const befriended = async (res, owner, b, done, extra = {}) => {
     if (done.status) return res.status(done.status).json({ message: done.message });
-    res.json({ gained: done.gained, points: done.points, hearts: done.hearts, rewards: done.rewards, coins: done.coins, world: await worldView(owner, b) });
+    res.json({ gained: done.gained, points: done.points, hearts: done.hearts, rewards: done.rewards, coins: done.coins, ...extra, world: await worldView(owner, b) });
 };
+// Pages dont l'appareil a déjà un indice (envoyées avec le bavardage) : identifiants valides, liste bornée
+const pagesOf = list => (Array.isArray(list) ? list.slice(-400).map(String).filter(id => PAGE.test(id)) : []);
+// Ce qu'il faut pour le Savoir d'un maître : éléments écrits, essais ratés par page, fil d'Ariane
+async function savoirInputs(owner, b) {
+    const owned = await players.elements(owner);
+    return { owned, misses: await bookTries.missesByPage(owner.id), veteran: await players.isVeteran(owner), ariane: bookPages.arianeOf(b, owned, await world.arianeTargets(owner.id)) };
+}
+// Bavarder avec un maître (bible, § 6.4) : son Savoir n'est soufflé que si le bavardage compte (une fois par jour)
 router.post('/world/villager/talk', withAccount(async (req, res, owner, b) => {
     const villager = String(req.body.villager || '');
     if (!/^[a-z0-9]{1,20}$/.test(villager)) return res.status(400).json({ message: 'Habitant invalide' });
-    await befriended(res, owner, b, await world.befriend(owner.id, villager));
+    const families = villagers.SAVOIRS[villager];
+    const inputs = families ? await savoirInputs(owner, b) : null;
+    const done = await world.befriend(owner.id, villager);
+    const savoir = inputs && !done.status
+        ? bookPages.savoir(b, inputs.owned, families, { ...inputs, strong: done.hearts >= villagers.SAVOIR_HEARTS, known: pagesOf(req.body.known), heard: pagesOf(req.body.heard) })
+        : null;
+    await befriended(res, owner, b, done, { savoir });
 }));
 router.post('/world/villager/gift', withAccount(async (req, res, owner, b) => {
     const villager = String(req.body.villager || '');
