@@ -14,7 +14,7 @@ const router = express.Router();
 // Une page à portée ne révèle jamais le nom de l'élément inconnu
 router.get('/book', playLimiter, withPlayer(async (req, res, owner, b) => {
     const misses = owner.kind === 'user' ? await bookTries.missesByPage(owner.id) : {};
-    res.json(bookPages.view(b, await players.elements(owner), misses, await bookLetters.byPage(owner)));
+    res.json(bookPages.view(b, await players.elements(owner), misses, await bookLetters.byPage(owner), await players.isVeteran(owner)));
 }));
 
 // Encre : révèle un ingrédient (déjà possédé) d'une page à portée ; offerte à un compte

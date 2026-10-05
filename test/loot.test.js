@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const loot = require('../src/services/loot');
 const shop = require('../src/services/worldShop');
-const { QUESTS } = require('../src/services/quests');
+const { QUESTS, QUEST_CHESTS } = require('../src/services/quests');
 
 // Hasard rejoué : une suite de valeurs, puis 0
 const seq = (...values) => () => (values.length ? values.shift() : 0);
@@ -39,8 +39,8 @@ test('chaque chapitre du II au VII offre sa pièce rare ; les quêtes de fin d�
   assert.deepEqual(Object.keys(loot.CHAPTER_RARES), ['II', 'III', 'IV', 'V', 'VI', 'VII']);
   for (const id of Object.values(loot.CHAPTER_RARES)) assert.ok(shop.ITEM_BY_ID[id].rare, id);
   const acts = QUESTS.filter(q => q.chest).map(q => q.act);
-  assert.deepEqual(acts, ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII']);
-  for (const q of QUESTS.filter(q => q.chest)) assert.ok(loot.RARITIES.includes(q.chest), q.id);
+  assert.deepEqual(acts, ['T', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII']);
+  for (const q of QUEST_CHESTS) assert.ok(loot.RARITIES.includes(q.chest), q.id);
 });
 
 test('légendaire : une pièce rare qui manque, d’abord celle promise, sinon des écus', () => {

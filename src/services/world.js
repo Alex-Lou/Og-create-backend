@@ -22,6 +22,7 @@ const crafts = require('./crafts');
 const naming = require('./naming');
 const landmarks = require('./landmarks');
 const finds = require('./finds');
+const players = require('./players');
 
 const SIZE = map.SIZE;
 const CAP_HOURS = 8;
@@ -297,24 +298,46 @@ async function settlersOf(userId, conn = db) {
 // Identifiant d'un visiteur installé, parmi les habitants : 'v<numéro de sa visite>'
 const SETTLER_ID = /^v\d{1,9}$/;
 const knownResident = id => Object.hasOwn(villagers.VILLAGERS, id) || SETTLER_ID.test(id);
-// Habitants de l'île : un par bâtiment bâti (dans un quartier à soi), puis les visiteurs installés, qui travaillent
-// au bâtiment de leur métier : [{ id, name, role, loves, likes, site, seed? }]
-function residentsOf(levels, zones, settlers) {
-    const base = Object.entries(villagers.VILLAGERS).filter(([id]) => livesHere(id, levels, zones))
-        .map(([id, v]) => ({ id, name: v.name, role: v.role, loves: v.loves, likes: v.likes, site: id }));
+// La troupe est là dès sa rencontre (bible, § 6.6) : Aster dès le compte, Cannelle après la Récolte du prologue, Rivet
+// après la soupe, les quatre dormeurs (SLEEPERS) dès que leur quartier est à soi ; un joueur d'avant la bible garde
+// aussi chaque habitant dont le bâtiment est bâti. presence : { veteran, done (quêtes faites, quests.doneOf) }
+const SLEEPERS = ['puits', 'bosquet', 'carriere', 'potager'];
+function metOf(id, levels, zones, presence) {
+    if (presence.veteran && livesHere(id, levels, zones)) return true;
+    if (id === 'ponton') return true;
+    if (id === 'foyer') return presence.done.has('recolte');
+    if (id === 'atelier') return presence.done.has('soupe');
+    return zones.has(map.siteZone(id));
+}
+// Ce qu'il faut pour savoir qui est là : compte d'avant la bible, quêtes faites
+async function presenceOf(userId, conn = db) {
+    return { veteran: await players.veteranOf(userId, conn), done: quests.doneOf(await claimedOf(userId, conn)) };
+}
+// Habitants de l'île : la troupe rencontrée (built : son bâtiment est bâti, dans un quartier à soi), puis les
+// visiteurs installés, qui travaillent au bâtiment de leur métier : [{ id, name, role, loves, likes, site, built, seed? }]
+function residentsOf(levels, zones, settlers, presence) {
+    const base = Object.entries(villagers.VILLAGERS).filter(([id]) => metOf(id, levels, zones, presence))
+        .map(([id, v]) => ({ id, name: v.name, role: v.role, loves: v.loves, likes: v.likes, site: id, built: livesHere(id, levels, zones) }));
     const settled = settlers.map(row => ({
-        id: `v${row.id}`, name: visitors.nameOf(row.seed), role: visitors.ROLES[row.site].role, ...visitors.tastesOf(row.site), site: row.site, seed: row.seed
+        id: `v${row.id}`, name: visitors.nameOf(row.seed), role: visitors.ROLES[row.site].role, ...visitors.tastesOf(row.site), site: row.site, built: true, seed: row.seed
     }));
     return [...base, ...settled];
 }
-// Besoins et humeur de chaque habitant à l'instant now : { habitant: { needs, mood, site } } (se distraire : les
-// créations d'île posées autour du bâtiment où il travaille)
-function moodsOf(residents, levels, zones, decor, filled, now = Date.now()) {
+// Cannelle a faim en arrivant, pendant le prologue (la quête « soupe » : bible, § 9, étape 3) ; pour les autres, et
+// pour un joueur d'avant la bible, on arrive comblé
+const hungryOf = (id, presence) => id === 'foyer' && !presence.veteran && !presence.done.has('soupe');
+const HUNGRY_AGO = (villagers.NEEDS.manger.hours * 60 + 1) * 60 * 1000;
+// Besoins et humeur de chaque habitant à l'instant now : { habitant: { needs, mood, site, built } } (se distraire :
+// les créations d'île posées autour du bâtiment où il travaille, une fois ce bâtiment bâti et le prologue fini)
+function moodsOf(residents, levels, zones, decor, filled, presence, now = Date.now()) {
     const atelier = livesHere('atelier', levels, zones);
+    const prologue = !presence.veteran && !presence.done.has('puits-ondin');
     const out = {};
-    for (const { id, site } of residents) {
-        const needs = villagers.needsOf(filled[id] || {}, decosNear(decor, site, levels[site], villagers.NEEDS.deco.reach), atelier, now);
-        out[id] = { needs, mood: villagers.moodOf(needs), site };
+    for (const { id, site, built } of residents) {
+        const rows = hungryOf(id, presence) && !filled[id]?.manger ? { ...filled[id], manger: new Date(now - HUNGRY_AGO) } : filled[id] || {};
+        const deco = built && !prologue;
+        const needs = villagers.needsOf(rows, deco ? decosNear(decor, site, levels[site], villagers.NEEDS.deco.reach) : 0, atelier, now, { deco });
+        out[id] = { needs, mood: villagers.moodOf(needs), site, built };
     }
     return out;
 }
@@ -324,7 +347,9 @@ function withMoods(bonuses, extra, moods) {
     const prod = { ...bonuses.prod };
     let moves = bonuses.moves;
     let regenCut = extra.regenCut;
-    for (const { mood, site } of Object.values(moods)) {
+    for (const { mood, site, built } of Object.values(moods)) {
+        // L'humeur ne joue qu'une fois le bâtiment là (bible, § 6.6)
+        if (!built) continue;
         const sign = villagers.moodSign(mood);
         if (SITES[site].produce) prod[site] = (prod[site] || 0) + sign * villagers.MOOD_STEP.prod;
         else if (site === 'atelier') moves += sign * villagers.MOOD_STEP.moves;
@@ -344,12 +369,13 @@ function withLandmarks({ bonuses, extra }, lm) {
         extra: { ...extra, cap, charges: extra.charges + lm.charges, moves: extra.moves + lm.moves, regenCut: extra.regenCut + lm.regenCut }
     };
 }
-// Un habitant arrive comblé : la première vue de l'île après son arrivée inscrit l'heure de ses besoins (ou de celui
-// qui apparaît, travailler avec l'Atelier), une seule fois
-async function welcome(userId, moods, filled) {
+// Un habitant arrive comblé (Cannelle, pendant le prologue, affamée : hungryOf) : la première vue de l'île après son
+// arrivée inscrit l'heure de ses besoins (ou de celui qui apparaît, travailler avec l'Atelier), une seule fois
+async function welcome(userId, moods, filled, presence, now = Date.now()) {
     const fresh = Object.entries(moods).flatMap(([id, m]) => m.needs.filter(n => n.cost && !filled[id]?.[n.id]).map(n => [id, n.id]));
     for (const [villager, need] of fresh) {
-        await db.query('INSERT INTO world_needs (user_id, villager, need) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING', [userId, villager, need]);
+        const at = need === 'manger' && hungryOf(villager, presence) ? new Date(now - HUNGRY_AGO) : new Date(now);
+        await db.query('INSERT INTO world_needs (user_id, villager, need, filled_at) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING', [userId, villager, need, at]);
     }
 }
 // Récoltes terminées depuis une date (demande d'un visiteur)
@@ -408,8 +434,9 @@ async function annexesOf(userId, conn = db) {
 async function bonusesFor(userId, conn = db) {
     const { levels } = await levelsOf(userId, conn);
     const zones = await zonesOf(userId, conn);
-    const residents = residentsOf(levels, zones, await settlersOf(userId, conn));
-    const moods = moodsOf(residents, levels, zones, placedOf(await craftsOf(userId, conn)), await needRowsOf(userId, conn));
+    const presence = await presenceOf(userId, conn);
+    const residents = residentsOf(levels, zones, await settlersOf(userId, conn), presence);
+    const moods = moodsOf(residents, levels, zones, placedOf(await craftsOf(userId, conn)), await needRowsOf(userId, conn), presence);
     const mooded = withMoods(shop.bonusesOf(await itemsOf(userId, conn)), annexes.bonusesOf(await annexesOf(userId, conn)), moods);
     return withLandmarks(mooded, landmarks.bonusesOf((await foundOf(userId, conn)).keys()));
 }
@@ -477,17 +504,56 @@ async function runsOf(userId, conn = db) {
     const { rows } = await conn.query('SELECT COUNT(*)::int AS n FROM world_runs WHERE user_id = $1 AND finished_at IS NOT NULL', [userId]);
     return rows[0].n;
 }
-// Ce que lisent les objectifs des quêtes (stars : découvertes du Livre)
-async function factsOf(userId, stars, conn = db) {
+// Un nombre lu en base (COUNT)
+async function countOf(conn, sql, params) {
+    const { rows } = await conn.query(sql, params);
+    return rows[0].n;
+}
+// Ce que lisent les objectifs des quêtes (quests.HAVE) : owned = éléments du Grimoire ; stars = ses découvertes.
+// moods : besoins des habitants déjà calculés (la vue de l'île), sinon calculés ici
+async function factsOf(userId, owned, stars, conn = db, moods = null) {
+    const { levels } = await levelsOf(userId, conn);
+    const zones = await zonesOf(userId, conn);
+    const placed = placedOf(await craftsOf(userId, conn));
+    if (!moods) {
+        const presence = await presenceOf(userId, conn);
+        const residents = residentsOf(levels, zones, await settlersOf(userId, conn), presence);
+        moods = moodsOf(residents, levels, zones, placed, await needRowsOf(userId, conn), presence);
+    }
+    const friends = await friendsOf(userId, conn);
+    const best = Math.max(0, ...Object.values(friends).map(f => f.points));
     return {
-        crafts: placedOf(await craftsOf(userId, conn)).length, runs: await runsOf(userId, conn), stars,
-        zones: await zonesOf(userId, conn), levels: (await levelsOf(userId, conn)).levels
+        crafts: placed.length, placed: new Set(placed.map(t => t.craft)), runs: await runsOf(userId, conn), stars,
+        elements: new Set(owned), zones, levels,
+        annexes: await countOf(conn, 'SELECT COUNT(*)::int AS n FROM world_annexes WHERE user_id = $1', [userId]),
+        houses: await countOf(conn, 'SELECT COUNT(*)::int AS n FROM world_annexes WHERE user_id = $1 AND annex = $2', [userId, 'maison']),
+        met: new Set(Object.entries(moods).flatMap(([id, m]) => m.needs.filter(n => n.met).map(n => `${id}:${n.id}`))),
+        awake: new Set(Object.entries(friends).filter(([, f]) => f.points > 0).map(([id]) => id)),
+        hearts: villagers.heartsOf(best),
+        expeditions: await countOf(conn, 'SELECT COUNT(*)::int AS n FROM world_expeditions WHERE user_id = $1 AND ends_at <= NOW()', [userId]),
+        landmarks: new Set((await foundOf(userId, conn)).keys()),
+        gathered: await countOf(conn, 'SELECT COUNT(*)::int AS n FROM world_deposits WHERE user_id = $1', [userId]),
+        visitors: await countOf(conn, 'SELECT COUNT(*)::int AS n FROM world_visitors WHERE user_id = $1 AND satisfied_at IS NOT NULL', [userId]),
+        settled: await countOf(conn, 'SELECT COUNT(*)::int AS n FROM world_visitors WHERE user_id = $1 AND settled_at IS NOT NULL', [userId]),
+        named: Boolean((await namesOf(userId, conn)).peuple)
     };
 }
 
-// Brume seule (quête active), sans le reste de l'île : le Livre la consulte après une découverte
-async function board(userId, stars) {
-    return quests.boardOf(await claimedOf(userId), await factsOf(userId, stars));
+// Le tableau de Brume, avec le chapitre encore fermé qu'attend la quête active (un quartier ou un palier d'un
+// chapitre pas encore ouvert : le joueur doit d'abord écrire des découvertes). openChapters : Set des chapitres ouverts
+function boardWith(claimed, facts, openChapters) {
+    const out = quests.boardOf(claimed, facts);
+    const quest = out.quest;
+    if (!quest || quest.done) return out;
+    const { goal } = quests.QUESTS[quest.step - 1];
+    const next = goal.kind === 'level' && (facts.levels[goal.site] || 0) === goal.need - 1 ? SITES[goal.site].levels[goal.need - 1] : null;
+    const chapter = goal.kind === 'zone' ? map.ZONE_BY_ID[goal.zone].chapter : next?.chapter;
+    if (chapter && !openChapters.has(chapter)) quest.chapter = chapter;
+    return out;
+}
+// Brume seule (quête active), sans le reste de l'île : le Grimoire la consulte après une découverte
+async function board(userId, owned, stars, openChapters) {
+    return boardWith(await claimedOf(userId), await factsOf(userId, owned, stars), openChapters);
 }
 
 // Passage aux cartes suivantes, une fois par joueur, au premier passage, verrouillé (deux requêtes ne migrent pas
@@ -708,10 +774,12 @@ async function epreuvesOf(userId, conn = db) {
 }
 // Ce que la vue montre des créations d'île : paliers ouverts, catalogue (ce qui manque pour fabriquer, réserve, cases
 // où poser ou déplacer une création déjà fabriquée), créations posées
-function craftsView(rows, ctx, { owned, stock, open, epreuves, have }, siteName) {
+function craftsView(rows, ctx, { owned, stock, open, epreuves, stars = 0, have }, siteName) {
     const made = madeOf(rows);
     return {
         epreuves: { have: epreuves, need: crafts.EPREUVES },
+        // Découvertes du Grimoire qui ouvrent le palier I (l'autre clé : les questions de l'Épreuve)
+        stars: { have: stars, need: crafts.STARS },
         open: crafts.TIERS.filter(t => open.has(t)),
         catalog: crafts.CRAFTS.map(c => {
             const reserve = rows.filter(r => r.craft === c.id && r.x === null).length;
@@ -727,7 +795,7 @@ function craftsView(rows, ctx, { owned, stock, open, epreuves, have }, siteName)
 }
 
 // Coffres déjà ouverts parmi les sources à surveiller : chapitres, quêtes, lieux, jour (et veille), bouteille. Map source → ligne
-const QUEST_CHESTS = quests.QUESTS.filter(q => q.chest);
+const { QUEST_CHESTS } = quests;
 async function openedOf(userId, now, conn = db) {
     const { day, slot } = loot.parisOf(now);
     const keys = [
@@ -797,7 +865,7 @@ function annexesView(siteId, rows) {
     });
 }
 
-// Vue de l'île pour le navigateur. book = { describe(noms), openChapters: Set des chapitres ouverts }
+// Vue de l'île pour le navigateur. book = { describe(noms), openChapters: Set des chapitres ouverts, stars, finished }
 async function view(userId, owned, book) {
     await migrate(userId);
     const { levels, builtAt } = await levelsOf(userId);
@@ -816,9 +884,10 @@ async function view(userId, owned, book) {
     const decor = placedOf(craftRows);
     const filled = await needRowsOf(userId);
     const settlers = await settlersOf(userId);
-    const residents = residentsOf(levels, zones, settlers);
-    const moods = moodsOf(residents, levels, zones, decor, filled);
-    await welcome(userId, moods, filled);
+    const presence = await presenceOf(userId);
+    const residents = residentsOf(levels, zones, settlers, presence);
+    const moods = moodsOf(residents, levels, zones, decor, filled, presence);
+    await welcome(userId, moods, filled, presence);
     const found = await foundOf(userId);
     const lmBonuses = landmarks.bonusesOf(found.keys());
     const { bonuses, extra } = withLandmarks(withMoods(shopBonuses, annexes.bonusesOf(annexRows), moods), lmBonuses);
@@ -861,7 +930,7 @@ async function view(userId, owned, book) {
             // Part de production en plus apportée par les lieux remarquables découverts
             landmarkBonus: Math.round((lmBonuses.prod[id] || 0) * 100),
             // Part de production en plus (ou en moins) selon l'humeur de son habitant
-            moodBonus: site.produce ? Object.values(moods).filter(m => m.site === id).reduce((sum, m) => sum + villagers.moodSign(m.mood), 0) * Math.round(villagers.MOOD_STEP.prod * 100) : 0,
+            moodBonus: site.produce ? Object.values(moods).filter(m => m.site === id && m.built).reduce((sum, m) => sum + villagers.moodSign(m.mood), 0) * Math.round(villagers.MOOD_STEP.prod * 100) : 0,
             // Tous les paliers, pour la fiche du bâtiment (atteints, suivant, à venir)
             levels: site.levels.map(step),
             pending: made ? { coins: made.coins, [made.resource]: made.amount } : null,
@@ -927,10 +996,11 @@ async function view(userId, owned, book) {
         pendingStock,
         // Créations d'île : paliers, catalogue, réserve et cases où poser, créations posées
         crafts: craftsView(craftRows, craftCtx(levels, zones, annexRows, craftRows), {
-            owned: have, stock, open: crafts.tiersOpen(book.finished || new Set(), epreuves), epreuves, have: stockFinds
+            owned: have, stock, open: crafts.tiersOpen(book.finished || new Set(), epreuves, book.stars ?? 0), epreuves, stars: book.stars ?? 0, have: stockFinds
         }, id => sites.find(site => site.id === id)?.name || id),
-        // Habitants (bâtiment bâti dans un quartier à soi) : prénom, goûts, amitié, déjà vus ou gâtés aujourd'hui ; leurs
-        // besoins, leur humeur et ce qu'elle fait
+        // Habitants (la troupe rencontrée, les visiteurs installés) : prénom, goûts, amitié, déjà vus ou gâtés
+        // aujourd'hui ; leurs besoins, leur humeur et ce qu'elle fait ; built : son bâtiment est bâti (sinon il vit au
+        // camp, ou dort dans son quartier) ; asleep : un dormeur qu'on n'a pas encore réveillé (bible, § 6.7)
         villagers: (() => {
             const { day } = loot.parisOf(Date.now());
             // Maisons dans l'ordre où elles sont posées : le premier visiteur installé loge dans la première
@@ -944,6 +1014,7 @@ async function view(userId, owned, book) {
                 const home = settled ? houses[settlers.findIndex(row => `v${row.id}` === v.id)] : null;
                 return {
                     id: v.id, name: v.name, role: v.role, loves: v.loves, likes: v.likes, site: v.site, points: friend.points, hearts,
+                    built: v.built, asleep: SLEEPERS.includes(v.id) && !v.built && !friend.points,
                     next: villagers.HEARTS[hearts] ?? null, talked: friend.talked === day, gifted: friend.gifted === day,
                     needs, mood, moodEffect: villagers.moodEffect(v.site, produces, mood), happyEffect: villagers.moodEffect(v.site, produces, 'heureux'),
                     ...(settled ? { seed: v.seed, home: home ? { x: home.x, y: home.y } : null } : {})
@@ -975,19 +1046,21 @@ async function view(userId, owned, book) {
             styles: signs.STYLES.map(st => ({ id: st.id, name: st.name, price: st.price, text: st.text, owned: !st.price || signed.owned.has(st.id) }))
         },
         annexes: annexRows.filter(r => annexes.ANNEX_BY_ID[r.annex]).map(r => ({ x: r.x, y: r.y, annex: r.annex, site: annexes.ANNEX_BY_ID[r.annex].site })),
-        // Brume, l'esprit de la brume : la quête active (ou son dernier mot)
-        brume: quests.boardOf(claimed, { crafts: decor.length, runs: await runsOf(userId), stars: book.stars ?? 0, zones, levels }),
+        // Le nom du peuple (bible, § 6.11), une fois choisi
+        people: named.peuple || null,
+        // Brume, le feu follet : la quête active (ou son dernier mot)
+        brume: boardWith(claimed, await factsOf(userId, owned, book.stars ?? 0, db, moods), book.openChapters),
         // Coffres : en attente, du jour, bouteille à la mer
         chests: chestsView(await openedOf(userId, Date.now()), book.openChapters, claimed, found)
     };
 }
 
 // Réclame la récompense de la quête active de Brume : c'est bien elle, son objectif est atteint, versée une seule
-// fois (même en double clic). stars : découvertes du Livre. { status, message } si refus
-async function claimQuest(userId, questId, stars) {
+// fois (même en double clic). owned : éléments du Grimoire ; stars : ses découvertes. { status, message } si refus
+async function claimQuest(userId, questId, owned, stars) {
     await migrate(userId);
     return db.transaction(async conn => {
-        const quest = quests.active(await claimedOf(userId, conn), await factsOf(userId, stars, conn));
+        const quest = quests.active(await claimedOf(userId, conn), await factsOf(userId, owned, stars, conn));
         if (!quest || quest.id !== questId) return db.rollback({ status: 409, message: 'Ce n’est pas la quête en cours.' });
         if (!quest.done) return db.rollback({ status: 403, message: `Pas encore : ${quest.label.toLowerCase()} (${quest.have}/${quest.need}).` });
         const added = await conn.query('INSERT INTO world_quests (user_id, quest) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING quest', [userId, questId]);
@@ -1162,7 +1235,7 @@ async function befriend(userId, villagerId, resource = null, now = Date.now()) {
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
         const { levels } = await levelsOf(userId, conn);
-        const villager = residentsOf(levels, await zonesOf(userId, conn), await settlersOf(userId, conn)).find(r => r.id === villagerId);
+        const villager = residentsOf(levels, await zonesOf(userId, conn), await settlersOf(userId, conn), await presenceOf(userId, conn)).find(r => r.id === villagerId);
         if (!villager) {
             const base = villagers.VILLAGERS[villagerId];
             return db.rollback(base ? { status: 403, message: `${base.name} n’habite pas encore ton île.` } : { status: 404, message: 'Habitant inconnu.' });
@@ -1208,8 +1281,9 @@ async function fillNeeds(userId, targets = null, now = Date.now()) {
         const stock = await stockOf(userId, conn, true);
         const { levels } = await levelsOf(userId, conn);
         const zones = await zonesOf(userId, conn);
-        const residents = residentsOf(levels, zones, await settlersOf(userId, conn));
-        const moods = moodsOf(residents, levels, zones, placedOf(await craftsOf(userId, conn)), await needRowsOf(userId, conn), now);
+        const presence = await presenceOf(userId, conn);
+        const residents = residentsOf(levels, zones, await settlersOf(userId, conn), presence);
+        const moods = moodsOf(residents, levels, zones, placedOf(await craftsOf(userId, conn)), await needRowsOf(userId, conn), presence, now);
         const wanted = targets || Object.entries(moods).flatMap(([villager, m]) => m.needs.filter(n => n.cost).map(n => ({ villager, need: n.id })));
         const spent = Object.fromEntries(RESOURCES.map(r => [r, 0]));
         const filled = [];
@@ -1320,13 +1394,13 @@ async function refundDecorations(userId, priceOf) {
 // Assemblage d'une création : palier ouvert, celles d'avant déjà fabriquées, savoir-faire du Livre, ressources. Une
 // graine, les pièces à poser (rien n'est payé avant la réussite). owned : éléments du Livre ; finished : chapitres
 // finis. { run: { id, craft, shape, pieces, turned } } ou { status, message }
-async function startCraft(userId, craftId, owned, finished) {
+async function startCraft(userId, craftId, owned, finished, stars = 0) {
     if (!Object.hasOwn(crafts.CRAFT_BY_ID, craftId)) return { status: 404, message: 'Création inconnue.' };
     const c = crafts.CRAFT_BY_ID[craftId];
     await migrate(userId);
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
-        const open = crafts.tiersOpen(finished, await epreuvesOf(userId, conn));
+        const open = crafts.tiersOpen(finished, await epreuvesOf(userId, conn), stars);
         const block = crafts.blockOf(c, { made: madeOf(await craftsOf(userId, conn)), owned: new Set(owned), stock, open, have: await findsOf(userId, conn) });
         if (block) return db.rollback({ status: 403, message: block });
         const seed = crypto.randomInt(1, 2147483647);
@@ -1337,7 +1411,7 @@ async function startCraft(userId, craftId, owned, finished) {
 
 // Fin d'un assemblage : le serveur vérifie que les pièces couvrent le gabarit, puis prend les ressources et met la
 // création en réserve. L'assemblage ne se rend qu'une fois, même refusé. { made, craft } ou { status, message }
-function finishCraft(userId, runId, layout, owned, finished) {
+function finishCraft(userId, runId, layout, owned, finished, stars = 0) {
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
         const { rows } = await conn.query(
@@ -1350,7 +1424,7 @@ function finishCraft(userId, runId, layout, owned, finished) {
         const done = crafts.check(c.shape, crafts.piecesOf(c.shape, seed, c.tier), layout);
         if (!done.ok) return { status: 400, message: `Assemblage refusé : ${done.error}.` };
         // Entre le début et la fin, le stock ou le Livre ont pu changer
-        const open = crafts.tiersOpen(finished, await epreuvesOf(userId, conn));
+        const open = crafts.tiersOpen(finished, await epreuvesOf(userId, conn), stars);
         const block = crafts.blockOf(c, { made: madeOf(await craftsOf(userId, conn)), owned: new Set(owned), stock, open, have: await findsOf(userId, conn) });
         if (block) return { status: 409, message: block };
         const n = r => c.cost[r] || 0;
@@ -1608,6 +1682,17 @@ async function chooseSkin(userId, siteId, skinId) {
     return {};
 }
 
+// Le nom du peuple (bible, § 6.11 ; la quête « peuple » de l'acte V) : même règle que les autres noms, rangé dans
+// world_names sous la cible 'peuple' ; il peut changer, jamais s'effacer. { name } ou { status, message }
+async function namePeople(userId, raw) {
+    const name = naming.cleanName(raw);
+    if (!name) return { status: 400, message: `Un nom de 2 à ${naming.NAME_MAX} lettres ou chiffres (espace, tiret ou apostrophe entre deux).` };
+    await migrate(userId);
+    await db.query(`INSERT INTO world_names (user_id, target, name) VALUES ($1, 'peuple', $2)
+        ON CONFLICT (user_id, target) DO UPDATE SET name = EXCLUDED.name`, [userId, name]);
+    return { name };
+}
+
 // Nom d'un bâtiment (dès son palier III) ou d'un quartier à soi ; un nom vide rend celui d'origine.
 // kind : 'site' | 'zone'. { status, message } si refus
 async function rename(userId, kind, id, raw) {
@@ -1696,6 +1781,6 @@ async function collect(userId) {
 module.exports = {
     SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, pendingOf, chargesAt, effectsOf, productionOf,
     view, build, buyZone, buyItem, undoItem, chooseSkin, startRun, finishRun, collect, migrate, claimQuest, board, openChest, openAll,
-    placeAnnex, moveAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename,
+    placeAnnex, moveAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople,
     refundDecorations, startCraft, finishCraft, placeCraft, moveCraft, storeCraft, startExpedition, findLandmark, gatherDeposit
 };

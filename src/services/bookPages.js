@@ -6,10 +6,11 @@ const { BASE_ELEMENTS } = require('./recipeBook');
 const hangman = require('./hangman');
 
 // Les 15 familles regroupées en 7 chapitres ; « need » = découvertes requises (hors 4 éléments de base),
-// « verse » = la phrase de la page de garde du chapitre
+// « verse » = la phrase de la page de garde du chapitre. Le chapitre II s'ouvre à 3 découvertes (bible, D4), sauf pour
+// un joueur d'avant la bible : il l'avait ouvert d'emblée et le garde (needOf)
 const CHAPTERS = [
     { id: 'I', name: 'Les Premiers Souffles', families: ['Elements Fondamentaux', 'Phénomènes Naturels'], need: 0, verse: 'Au commencement, quatre souffles et une étincelle de curiosité.' },
-    { id: 'II', name: 'La Matière', families: ['Matériaux', 'Chimie', 'Physique'], need: 0, verse: 'Ce qui se pétrit, se fond, se forge : le monde a des mains.' },
+    { id: 'II', name: 'La Matière', families: ['Matériaux', 'Chimie', 'Physique'], need: 3, verse: 'Ce qui se pétrit, se fond, se forge : le monde a des mains.' },
     { id: 'III', name: 'Ciel et Terre', families: ['Cosmos', 'Formations Naturelles'], need: 5, verse: 'Lève les yeux vers les astres, puis baisse-les vers les montagnes.' },
     { id: 'IV', name: 'Le Vivant', families: ['Flore', 'Biologie', 'Vie et Créatures'], need: 12, verse: 'Une graine, un souffle, un battement : tout ce qui pousse et respire.' },
     { id: 'V', name: 'Le Foyer', families: ['Corps et Esprit', 'Créations Humaines'], need: 25, verse: 'Autour du feu, l’humain invente, rêve et bâtit sa maison.' },
@@ -29,6 +30,8 @@ const DIFFICULTY = {
     VII: { decoys: 12, open: 3, letter: false, freeInkAfter: 5, size: 4 }
 };
 const chapterOf = family => CHAPTERS.find(c => c.families.includes(family)) || CHAPTERS[0];
+// Découvertes qui ouvrent ce chapitre pour ce joueur (veteran : compte d'avant la bible, players.isVeteran)
+const needOf = (chapter, veteran) => (veteran && chapter.id === 'II' ? 0 : chapter.need);
 const difficultyOf = family => DIFFICULTY[chapterOf(family).id];
 
 const hmac = text => crypto.createHmac('sha256', process.env.JWT_SECRET || 'og-create-book').update(text);
@@ -99,8 +102,9 @@ function pageRecipe(recipes, size, slots) {
         .reduce((best, parts) => (!best || Math.abs(parts.length - want) < Math.abs(best.length - want) ? parts : best), null);
 }
 
-// misses : essais ratés par page (compte seulement), pour l'encre offerte ; letters : parties de pendu par page
-function view(b, owned, misses = {}, letters = {}) {
+// misses : essais ratés par page (compte seulement), pour l'encre offerte ; letters : parties de pendu par page ;
+// veteran : compte d'avant la bible (le chapitre II lui reste ouvert d'emblée)
+function view(b, owned, misses = {}, letters = {}, veteran = false) {
     const have = new Set(owned);
     const within = recipesWithin(b, have);
     const slots = slotsFor(b, owned);
@@ -114,7 +118,8 @@ function view(b, owned, misses = {}, letters = {}) {
     }
     const chapters = CHAPTERS.map(chapter => {
         const names = chapter.families.flatMap(family => byFamily.get(family) || []);
-        const open = stars >= chapter.need;
+        const need = needOf(chapter, veteran);
+        const open = stars >= need;
         const rules = DIFFICULTY[chapter.id];
         const recipeOf = new Map(names
             .filter(name => !have.has(name) && within.has(name))
@@ -158,7 +163,7 @@ function view(b, owned, misses = {}, letters = {}) {
             }
         }
         const sealed = reachable.length - opened.size;
-        return { id: chapter.id, name: chapter.name, verse: chapter.verse, families: chapter.families, need: chapter.need, open, total: names.length, found, far, sealed, pages: open ? pages : [] };
+        return { id: chapter.id, name: chapter.name, verse: chapter.verse, families: chapter.families, need, open, total: names.length, found, far, sealed, pages: open ? pages : [] };
     });
     return { stars, chapters };
 }
@@ -203,9 +208,9 @@ function aim(b, owned, id, tried) {
 // Découvertes inscrites au Livre (les éléments de base n'en sont pas)
 const starsOf = (b, owned) => owned.filter(name => !BASE_ELEMENTS.includes(name) && b.meta.has(name)).length;
 
-function openChapters(b, owned) {
+function openChapters(b, owned, veteran = false) {
     const stars = starsOf(b, owned);
-    return new Set(CHAPTERS.filter(c => stars >= c.need).map(c => c.id));
+    return new Set(CHAPTERS.filter(c => stars >= needOf(c, veteran)).map(c => c.id));
 }
 // Chapitres dont toutes les pages sont trouvées (créations d'île, lot 8)
 function finishedChapters(b, owned) {

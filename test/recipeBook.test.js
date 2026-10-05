@@ -44,9 +44,13 @@ test('le Livre : pages trouvées, pages à portée sans nom, chapitres scellés'
     ['Pluie', { emoji: '🌧️', family: 'Phénomènes Naturels' }], ['Lave', { emoji: '🌋', family: 'Matériaux' }]
   ]);
   const b = { ...BOOK, meta };
-  const start = view(b, BASE);
+  // Nouveau joueur : le chapitre II s'ouvre à 3 découvertes (bible, D4) ; un joueur d'avant la bible l'a d'emblée
+  const fresh = view(b, BASE).chapters[1];
+  assert.deepEqual([fresh.need, fresh.open, fresh.pages], [3, false, []]);
+  const start = view(b, BASE, {}, {}, true);
   assert.equal(start.stars, 0);
   const [one, two, three] = start.chapters;
+  assert.deepEqual([two.need, two.open], [0, true]);
   assert.equal(one.pages.filter(p => p.status === 'found').length, 4);
   assert.equal(one.far, 2);
   const reach = two.pages.filter(p => p.status === 'reach');
@@ -67,7 +71,7 @@ test('le Livre : pages trouvées, pages à portée sans nom, chapitres scellés'
   assert.equal(reachableById(b, BASE, pageId('Vapeur')).name, 'Vapeur');
   assert.equal(reachableById(b, BASE, pageId('Pluie')), null);
   // Une page trouvée montre sa recette
-  const after = view(b, [...BASE, 'Vapeur']);
+  const after = view(b, [...BASE, 'Vapeur'], {}, {}, true);
   const vapeur = after.chapters[1].pages.find(p => p.name === 'Vapeur');
   assert.deepEqual(vapeur.recipe, ['Eau', 'Feu']);
   assert.equal(vapeur.riddle, 'Je m’élève en soupirant.');
