@@ -19,6 +19,7 @@ async function worldView(owner, b) {
     const refund = await world.refundDecorations(owner.id, element => decoPrice(b, element));
     const view = await world.view(owner.id, owned, {
         describe: names => book.describe(b, names), openChapters: await chaptersOf(owner, b, owned), stars: bookPages.starsOf(b, owned),
+        ariane: bookPages.arianeOf(b, owned, await world.arianeTargets(owner.id)),
         finished: bookPages.finishedChapters(b, owned)
     });
     return refund.count ? { ...view, refund } : view;

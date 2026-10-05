@@ -1895,3 +1895,51 @@ test('un joueur d’avant la bible ne recule jamais : quêtes rangées, coffres 
   // Chapitre II ouvert sans aucune découverte : La Colline s'achète (zone d'un chapitre II)
   assert.equal(world.map.zones.find(z => z.id === 'colline').open, true);
 });
+
+// Lot H2 : le fil d'Ariane (bible, § 6.1)
+test('le fil d’Ariane marque la bonne étape suivante : Puits, Arbre, Bateau, Livre, Feu follet', async () => {
+  const { pageId } = require('../src/services/bookPages');
+  const player = await newPlayer({ veteran: false });
+  await api('GET', '/play/world', null, player);
+  const T = ['Vent', 'Pluie', 'Brasier'];
+  const afterT = [...T, 'Boue', 'Brique', 'Puits'];
+  const actI = [...afterT, 'Vie', 'Plante', 'Arbre', 'Vapeur', 'Nuage', 'Énergie', 'Éclair', 'Lumière', 'Lave', 'Pierre', 'Métal', 'Bois'];
+  // La quête juste avant l'active, et les éléments écrits
+  const at = async (before, names) => {
+    await sql('DELETE FROM world_quests WHERE user_id = $1', [player.userId]);
+    await sql('INSERT INTO world_quests (user_id, quest) VALUES ($1, $2)', [player.userId, before]);
+    await sql(`UPDATE progress SET infinite_elements = $2::jsonb WHERE user_id = $1`, [player.userId, JSON.stringify([...BASE, ...names])]);
+    return (await api('GET', '/play/book', null, player)).data;
+  };
+  const marked = book => book.chapters.flatMap(c => c.pages.map(p => ({ ...p, chapter: c.id, open: c.open }))).filter(p => p.marked);
+  // Le Puits (souvenir d'Ondin) : d'abord la Boue, au chapitre II ; la page ne dit pas son nom
+  const puits = await at('eveil-ondin', T);
+  assert.deepEqual(puits.ariane, { target: 'Puits', remaining: 3, page: pageId('Boue'), chapter: 'II' });
+  const [boue] = marked(puits);
+  assert.deepEqual([boue.id, boue.status, boue.chapter, boue.name, boue.emoji], [pageId('Boue'), 'reach', 'II', undefined, undefined]);
+  // Plus qu'une page : le Puits lui-même, dans un chapitre encore scellé (Créations humaines, chapitre V)
+  const last = await at('eveil-ondin', [...T, 'Boue', 'Brique']);
+  assert.deepEqual(last.ariane, { target: 'Puits', remaining: 1, page: pageId('Puits'), chapter: 'V' });
+  const v = last.chapters.find(c => c.id === 'V');
+  assert.deepEqual([v.open, v.pages.map(p => p.id)], [false, [pageId('Puits')]]);
+  // L'Arbre (souvenir de Sylve) passe par la Vie ; le Bateau (Aster), une page ; le Feu follet, par le Marais
+  assert.deepEqual((await at('eveil-sylve', afterT)).ariane, { target: 'Vie', remaining: 1, page: pageId('Vie'), chapter: 'IV' });
+  assert.deepEqual((await at('vie', afterT)).ariane, { target: 'Arbre', remaining: 3, page: pageId('Vie'), chapter: 'IV' });
+  assert.deepEqual((await at('crique', actI)).ariane, { target: 'Bateau', remaining: 1, page: pageId('Bateau'), chapter: 'V' });
+  assert.deepEqual((await at('ile-legendes', actI)).ariane, { target: 'Feu follet', remaining: 2, page: pageId('Marais'), chapter: 'III' });
+  // Le Livre, plan de la Tour d'étude (une invention) : la quête demande le palier, le fil vise son plan
+  await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'foyer', 4) ON CONFLICT (user_id, site) DO UPDATE SET level = 4`, [player.userId]);
+  const livre = await at('cle', actI);
+  assert.equal(livre.ariane.target, 'Livre');
+  assert.ok(livre.ariane.remaining >= 2);
+  assert.equal(marked(livre).length, 1);
+  // La Lanterne (une création) : son savoir-faire, la Lumière ; la quête de l'île dit où mène le fil
+  const lanterne = await at('lumiere', afterT.filter(n => n !== 'Lumière'));
+  assert.equal(lanterne.ariane.target, 'Lumière');
+  const island = (await api('GET', '/play/world', null, player)).data.brume.quest;
+  assert.deepEqual([island.id, island.ariane], ['lanterne', { target: 'Lumière', remaining: lanterne.ariane.remaining }]);
+  // Rien à viser (une Récolte), déjà écrit, ou un invité : pas de fil
+  assert.equal((await at('pages', T)).ariane, null);
+  assert.equal((await at('eveil-ondin', afterT)).ariane, null);
+  assert.equal((await api('GET', '/play/book', null, { cookies: {} })).status, 401);
+});

@@ -179,6 +179,12 @@ function doneOf(claimed) {
     return new Set(QUESTS.filter((quest, i) => i <= reach || claimed.has(quest.id)).map(quest => quest.id));
 }
 
+// La quête active (la première pas encore faite), telle que la chaîne la définit, ou null
+function currentOf(claimed) {
+    const done = doneOf(claimed);
+    return QUESTS.find(quest => !done.has(quest.id)) || null;
+}
+
 // Ce que l'état fournit (services/world.js) : { crafts, runs, stars, zones: Set, levels: { site: palier },
 // elements: Set, placed: Set (créations posées), annexes, houses, met: Set ('habitant:besoin' comblés), awake: Set,
 // hearts (cœurs du meilleur ami), expeditions, landmarks: Set, gathered, visitors, settled, named }
@@ -235,4 +241,4 @@ function boardOf(claimed, facts) {
 // Quand tout est fait
 const RESTED = 'La brume s’est levée sur toute l’île. Merci, alchimiste : elle est de nouveau vivante.';
 
-module.exports = { QUESTS, LEGACY, QUEST_CHESTS, BEASTS, reachOf, doneOf, progressOf, active, boardOf };
+module.exports = { QUESTS, LEGACY, QUEST_CHESTS, BEASTS, reachOf, doneOf, currentOf, progressOf, active, boardOf };
