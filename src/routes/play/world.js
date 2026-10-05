@@ -157,6 +157,23 @@ router.post('/world/game/finish', withAccount(async (req, res, owner, b) => {
     res.json({ earned: done.earned, raw: done.raw, detail: done.detail, coins: done.coins, world: await worldView(owner, b) });
 }));
 
+// Habitants : leur parler, leur offrir des ressources (chacun une fois par jour) ; les cœurs gagnés sont récompensés
+const befriended = async (res, owner, b, done) => {
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json({ gained: done.gained, points: done.points, hearts: done.hearts, rewards: done.rewards, coins: done.coins, world: await worldView(owner, b) });
+};
+router.post('/world/villager/talk', withAccount(async (req, res, owner, b) => {
+    const villager = String(req.body.villager || '');
+    if (!/^[a-z]{1,20}$/.test(villager)) return res.status(400).json({ message: 'Habitant invalide' });
+    await befriended(res, owner, b, await world.befriend(owner.id, villager));
+}));
+router.post('/world/villager/gift', withAccount(async (req, res, owner, b) => {
+    const villager = String(req.body.villager || '');
+    const resource = String(req.body.resource || '');
+    if (!/^[a-z]{1,20}$/.test(villager) || !/^[a-z]{1,10}$/.test(resource)) return res.status(400).json({ message: 'Cadeau invalide' });
+    await befriended(res, owner, b, await world.befriend(owner.id, villager, resource));
+}));
+
 // Coffre qui attend : du jour, bouteille à la mer, chapitre du Livre ouvert, quête de Brume réclamée
 router.post('/world/chest', withAccount(async (req, res, owner, b) => {
     const source = String(req.body.source || '');

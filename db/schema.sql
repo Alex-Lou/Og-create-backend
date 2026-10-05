@@ -360,6 +360,16 @@ CREATE TABLE IF NOT EXISTS world_game_runs (
     finished_at TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS idx_world_game_runs_user ON world_game_runs (user_id, created_at);
+-- Amitié des habitants (services/villagers.js) : points, dernier jour où l'on a bavardé, dernier jour d'un cadeau
+-- (jours de Paris)
+CREATE TABLE IF NOT EXISTS world_friends (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    villager VARCHAR(20) NOT NULL,
+    points SMALLINT NOT NULL DEFAULT 0 CHECK (points >= 0),
+    talked_on DATE,
+    gifted_on DATE,
+    PRIMARY KEY (user_id, villager)
+);
 
 -- Le Livre : mélanges ratés sur une page à portée (l'encre de la page devient offerte après quelques essais différents)
 CREATE TABLE IF NOT EXISTS book_tries (
