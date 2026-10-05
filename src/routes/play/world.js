@@ -121,6 +121,14 @@ router.post('/world/people', withAccount(async (req, res, owner, b) => {
     res.json(await worldView(owner, b));
 }));
 
+// Le nom du joueur, écrit dans le Grimoire au tutoriel (bible, § 9, étape 2)
+router.post('/world/player', withAccount(async (req, res, owner, b) => {
+    if (typeof (req.body.name ?? '') !== 'string') return res.status(400).json({ message: 'Nom invalide' });
+    const done = await world.namePlayer(owner.id, req.body.name);
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json(await worldView(owner, b));
+}));
+
 // Enseignes (dès le palier V) : le nom écrit dessus, puis le style de celle d'un bâtiment (acheté au passage)
 router.post('/world/sign/name', withAccount(async (req, res, owner, b) => {
     const done = await world.nameSigns(owner.id, req.body.name);

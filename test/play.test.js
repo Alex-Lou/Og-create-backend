@@ -964,7 +964,10 @@ test('le Monde : la Récolte se joue contre une partie de la réserve, rejouée 
   const runs = [];
   for (let i = 0; i < 3; i++) runs.push((await api('POST', '/play/world/harvest/start', {}, player)).data);
   assert.equal((await api('POST', '/play/world/harvest/start', {}, player)).status, 409);
-  assert.ok(Number.isInteger(runs[0].seed) && runs[0].kinds.length === 4);
+  assert.ok(Number.isInteger(runs[0].seed));
+  // La toute première Récolte est généreuse (bible, § 9) : pas d'eau, 4 coups de plus ; les suivantes sont normales
+  assert.deepEqual([runs[0].kinds, runs[0].maxMoves], [['stone', 'wood', 'food'], 19]);
+  assert.deepEqual([runs[1].kinds.length, runs[1].maxMoves], [4, 15]);
 
   // Partie jouée : le gain est celui que le serveur recalcule ; la rendre deux fois ne paie qu'une fois
   const { moves, expected } = playRun(runs[0], 6);
@@ -1277,6 +1280,8 @@ test('besoins des habitants : manger, travailler, se distraire ; l’humeur chan
   const worn = await view();
   assert.equal(who(worn, 'atelier').moodEffect, '−2 coups par Récolte');
   assert.equal(worn.harvest.maxMoves, forge.harvest.maxMoves - 2);
+  // Une Récolte déjà jouée : celle-ci n'est pas la première (généreuse)
+  await sql(`INSERT INTO world_runs (user_id, seed, config, finished_at) VALUES ($1, 1, '{}', NOW())`, [player.userId]);
   const run = await api('POST', '/play/world/harvest/start', {}, player);
   assert.equal(run.data.maxMoves, worn.harvest.maxMoves);
   const tooled = await fill('atelier', 'outils');
@@ -1868,6 +1873,11 @@ test('chaque objectif de la chaîne se lit dans l’état (création, annexe, ex
   });
   assert.equal((await api('POST', '/play/world/people', { name: 'Les Marées' }, player)).data.people, 'Les Marées');
   assert.equal((await api('POST', '/play/world/people', { name: 'Les Marées' }, { cookies: {} })).status, 401);
+  // Le nom du joueur, écrit dans le Grimoire au tutoriel : même règle, rangé à part du nom du peuple
+  assert.equal((await api('POST', '/play/world/player', { name: '?' }, player)).status, 400);
+  assert.equal((await api('POST', '/play/world/player', { name: 'Ana' }, { cookies: {} })).status, 401);
+  const me = (await api('POST', '/play/world/player', { name: '  Ana  Lys ' }, player)).data;
+  assert.deepEqual([me.player, me.people], ['Ana Lys', 'Les Marées']);
   // Un quartier dont le chapitre est encore fermé : Brume dit lequel ouvrir
   const hameau = await after('installe');
   assert.deepEqual([hameau.id, hameau.chapter], ['hameau', 'V']);
