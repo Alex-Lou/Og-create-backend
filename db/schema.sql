@@ -313,6 +313,16 @@ CREATE TABLE IF NOT EXISTS world_chests (
 );
 -- Article acheté ('boutique') ou gagné dans un coffre ('butin') : seul un achat s'annule
 ALTER TABLE world_items ADD COLUMN IF NOT EXISTS source VARCHAR(10) NOT NULL DEFAULT 'boutique';
+-- Annexes (services/annexes.js) : constructions posées par le joueur autour de ses bâtiments (champ, filon, vivier…).
+-- Une case ne porte qu'une annexe ; une décoration ne s'y pose pas (services/world.js). built_at : début de sa production
+CREATE TABLE IF NOT EXISTS world_annexes (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    x SMALLINT NOT NULL CHECK (x >= 0),
+    y SMALLINT NOT NULL CHECK (y >= 0),
+    annex VARCHAR(20) NOT NULL,
+    built_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, x, y)
+);
 
 -- Le Livre : mélanges ratés sur une page à portée (l'encre de la page devient offerte après quelques essais différents)
 CREATE TABLE IF NOT EXISTS book_tries (

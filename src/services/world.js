@@ -1,7 +1,8 @@
 // Le Monde : l'île du joueur, sur une carte commune (worldMap.js) : la Grève ouverte d'office, onze quartiers à acheter
 // (écus + chapitre du Livre). Les chantiers se construisent puis évoluent avec un plan découvert dans le Livre et des
-// ressources tirées de la Récolte. Les bâtiments de production rapportent ressources et écus ; les décorations
-// s'achètent et embellissent, sans rien produire.
+// ressources tirées de la Récolte. Les bâtiments de production rapportent ressources et écus, avec leurs annexes
+// (annexes.js : champs, filons, viviers… posés autour d'eux) ; les décorations s'achètent et embellissent, sans rien
+// produire.
 // Tout ce qui compte (stock, quartiers, parties, gains, écus, coffres) est décidé ici, dans des transactions verrouillées.
 const crypto = require('crypto');
 const db = require('../config/db');
@@ -12,6 +13,7 @@ const legacy = require('./worldMapV2');
 const shop = require('./worldShop');
 const quests = require('./quests');
 const loot = require('./loot');
+const annexes = require('./annexes');
 
 const SIZE = map.SIZE;
 const CAP_HOURS = 8;
@@ -145,8 +147,10 @@ for (const [id, site] of Object.entries(SITES)) {
 }
 
 // Case où l'on peut poser une décoration : sol constructible (herbe, sable, prairie), hors emprise d'un chantier
-// (selon son niveau), dans un quartier possédé
-const isFree = (x, y, zones, levels) => Number.isInteger(x) && Number.isInteger(y) && map.buildable(x, y) && !map.inFootprint(x, y, levels) && zones.has(map.zoneAt(x, y));
+// (selon son niveau) et des annexes (blocked : clés y * SIZE + x), dans un quartier possédé
+const isFree = (x, y, zones, levels, blocked = null) => Number.isInteger(x) && Number.isInteger(y) && map.buildable(x, y)
+    && !map.inFootprint(x, y, levels) && zones.has(map.zoneAt(x, y)) && !blocked?.has(y * SIZE + x);
+const keyOf = cell => cell.y * SIZE + cell.x;
 
 // Écus dus selon l'ancienne règle (décorations) : chaque source compte depuis sa pose ou la dernière récolte, plafonnée
 function pendingOf(sources, collectedAt, now = Date.now()) {
@@ -167,46 +171,66 @@ function chargesAt(stock, max, now = Date.now(), regen = REGEN_MS) {
     return { count: stock.charges + ticks, since: since + ticks * regen };
 }
 
-// Effets des bâtiments construits : réserve, coups, tuiles, multiplicateurs de Récolte (BOOST_BY_LEVEL)
+// Effets des bâtiments construits : réserve, coups, tuiles, multiplicateurs de Récolte (BOOST_BY_LEVEL), avec les
+// bonus de la boutique (bonuses) et des annexes (extra)
 const NO_BONUS = shop.bonusesOf([]);
-function effectsOf(levels, bonuses = NO_BONUS) {
+const NO_ANNEX = annexes.bonusesOf([]);
+function effectsOf(levels, bonuses = NO_BONUS, extra = NO_ANNEX) {
     const boosts = {};
     for (const [site, resource] of Object.entries(BOOSTED)) if (levels[site]) boosts[resource] = BOOST_BY_LEVEL[levels[site]];
     const foyer = levels.foyer || 1;
     const atelier = levels.atelier || 0;
     const ponton = levels.ponton || 0;
     return {
-        maxCharges: 2 + foyer + bonuses.charges,
-        maxMoves: MOVES + ATELIER_MOVES[atelier] + (ponton >= 2 ? 2 : 0) + bonuses.moves,
+        maxCharges: 2 + foyer + bonuses.charges + extra.charges,
+        maxMoves: MOVES + ATELIER_MOVES[atelier] + (ponton >= 2 ? 2 : 0) + bonuses.moves + extra.moves,
         kinds: [...harvest.BASE_KINDS, ...(ponton ? ['fish'] : [])],
         boosts,
-        regenMs: bonuses.regenMs || REGEN_MS
+        regenMs: annexes.regenWith(bonuses.regenMs || REGEN_MS, extra.regenCut)
     };
 }
 
-// Production d'un bâtiment depuis sa construction ou la dernière récolte (plafonnée à CAP_HOURS) : { coins, amount }
-// bonus = { prod: part en plus, coins: écus par heure en plus } (boutique de l'atelier)
-function productionOf(siteId, level, builtAt, collectedAt, now = Date.now(), bonus = { prod: 0, coins: 0 }) {
+// Production d'un bâtiment et de ses annexes depuis leur pose ou la dernière récolte (plafonnée à CAP_HOURS, plus les
+// heures des réserves) : { resource, amount, coins }.
+// bonus = { prod: part en plus, coins: écus par heure en plus (boutique de l'atelier), cap: heures en plus (réserve) } ;
+// annexList = [{ rate, earn, at }] (annexes.bonusesOf) : ressources et écus par heure en plus, comptés depuis at,
+// avec la même part de production en plus que le bâtiment
+function productionOf(siteId, level, builtAt, collectedAt, now = Date.now(), bonus = { prod: 0, coins: 0 }, annexList = []) {
     const site = SITES[siteId];
     if (!site.produce || !level) return null;
-    const since = Math.max(collectedAt ? new Date(collectedAt).getTime() : 0, new Date(builtAt).getTime());
-    const hours = Math.min(CAP_HOURS, Math.max(0, (now - since) / 3600000));
+    const cap = CAP_HOURS + (bonus.cap || 0);
+    const collected = collectedAt ? new Date(collectedAt).getTime() : 0;
+    const hoursSince = at => Math.min(cap, Math.max(0, (now - Math.max(collected, new Date(at).getTime())) / 3600000));
+    const hours = hoursSince(builtAt);
+    let amount = hours * PRODUCE_PER_LEVEL * level;
+    let coins = hours * COINS_PER_LEVEL * level;
+    for (const a of annexList) {
+        const h = hoursSince(a.at);
+        amount += h * a.rate;
+        coins += h * a.earn;
+    }
     const boost = 1 + (bonus.prod || 0);
     return {
         resource: site.produce,
-        amount: Math.floor(hours * PRODUCE_PER_LEVEL * level * boost + 1e-9),
-        coins: Math.floor(hours * (COINS_PER_LEVEL * level * boost + (bonus.coins || 0)) + 1e-9)
+        amount: Math.floor(amount * boost + 1e-9),
+        coins: Math.floor(coins * boost + hours * (bonus.coins || 0) + 1e-9)
     };
 }
-// Rendement par heure d'un bâtiment producteur : { amount, coins }, arrondis au dixième
-function perHourOf(level, prod = 0, coins = 0) {
+// Rendement par heure d'un bâtiment producteur et de ses annexes : { amount, coins }, arrondis au dixième
+function perHourOf(level, prod = 0, coins = 0, annexList = []) {
     const boost = 1 + prod;
     const round = n => Math.round(n * 10) / 10;
-    return { amount: round(PRODUCE_PER_LEVEL * level * boost), coins: round(COINS_PER_LEVEL * level * boost + coins) };
+    const rate = annexList.reduce((sum, a) => sum + a.rate, 0);
+    const earn = annexList.reduce((sum, a) => sum + a.earn, 0);
+    return { amount: round((PRODUCE_PER_LEVEL * level + rate) * boost), coins: round((COINS_PER_LEVEL * level + earn) * boost + coins) };
 }
-function productionAll(levels, builtAt, collectedAt, now = Date.now(), bonuses = NO_BONUS) {
+function productionAll(levels, builtAt, collectedAt, now = Date.now(), bonuses = NO_BONUS, extra = NO_ANNEX) {
     return Object.keys(SITES)
-        .map(id => ({ site: id, ...productionOf(id, levels[id] || 0, builtAt[id], collectedAt, now, { prod: bonuses.prod[id] || 0, coins: bonuses.coins[id] || 0 }) }))
+        .map(id => ({
+            site: id,
+            ...productionOf(id, levels[id] || 0, builtAt[id], collectedAt, now,
+                { prod: bonuses.prod[id] || 0, coins: bonuses.coins[id] || 0, cap: extra.cap[id] || 0 }, extra.site[id] || [])
+        }))
         .filter(p => p.resource);
 }
 
@@ -217,6 +241,15 @@ async function itemsOf(userId, conn = db) {
 async function skinsOf(userId, conn = db) {
     const { rows } = await conn.query('SELECT site, skin FROM world_skins WHERE user_id = $1', [userId]);
     return Object.fromEntries(rows.map(r => [r.site, r.skin]));
+}
+// Annexes posées : [{ x, y, annex, built_at }]
+async function annexesOf(userId, conn = db) {
+    const { rows } = await conn.query('SELECT x, y, annex, built_at FROM world_annexes WHERE user_id = $1 ORDER BY built_at, y, x', [userId]);
+    return rows;
+}
+// Bonus de la boutique et des annexes : { bonuses, extra } (ce que lisent effectsOf et productionAll)
+async function bonusesFor(userId, conn = db) {
+    return { bonuses: shop.bonusesOf(await itemsOf(userId, conn)), extra: annexes.bonusesOf(await annexesOf(userId, conn)) };
 }
 
 async function levelsOf(userId, conn = db) {
@@ -337,11 +370,12 @@ async function toV3(userId, conn) {
     // replacée par settle() à la vue suivante, jamais supprimée
 }
 
-// Décorations hors d'une case libre (mer, chantier agrandi, quartier non possédé) : déplacées vers la case libre la plus proche
-async function settle(userId, tiles, zones, levels) {
-    const taken = new Set(tiles.map(t => t.y * SIZE + t.x));
+// Décorations hors d'une case libre (mer, chantier agrandi, quartier non possédé) : déplacées vers la case libre la plus
+// proche (ni décoration ni annexe ; annexCells : clés des cases des annexes)
+async function settle(userId, tiles, zones, levels, annexCells = new Set()) {
+    const taken = new Set([...tiles.map(keyOf), ...annexCells]);
     let moved = false;
-    for (const tile of tiles.filter(t => !isFree(t.x, t.y, zones, levels))) {
+    for (const tile of tiles.filter(t => !isFree(t.x, t.y, zones, levels, annexCells))) {
         let best = null;
         for (let y = 0; y < SIZE; y++) {
             for (let x = 0; x < SIZE; x++) {
@@ -394,22 +428,58 @@ function chestsView({ day, slot, opened }, openChapters, claimed) {
     };
 }
 
+// Case où une annexe de ce bâtiment peut se poser (sans compter ce qui l'occupe) : sol constructible du quartier du
+// bâtiment, hors des grandes emprises des chantiers, à annexes.REACH cases au plus de la sienne
+function annexSpotOk(siteId, x, y) {
+    const at = map.SITE_BIG[siteId];
+    return Boolean(at) && Number.isInteger(x) && Number.isInteger(y) && map.buildable(x, y) && !map.inSite(x, y)
+        && map.zoneAt(x, y) === map.siteZone(siteId) && annexes.reachOf(x, y, at) <= annexes.REACH;
+}
+// Cases libres où poser une annexe de ce bâtiment (taken : clés des cases occupées), des plus proches aux plus lointaines
+function annexSpots(siteId, taken) {
+    const at = map.SITE_BIG[siteId];
+    const spots = [];
+    for (let y = at.y - annexes.REACH; y <= at.y + 2 + annexes.REACH; y++) {
+        for (let x = at.x - annexes.REACH; x <= at.x + 2 + annexes.REACH; x++) {
+            if (annexSpotOk(siteId, x, y) && !taken.has(y * SIZE + x)) spots.push({ x, y, d: annexes.reachOf(x, y, at) });
+        }
+    }
+    return spots.sort((a, b) => a.d - b.d || a.y - b.y || a.x - b.x).map(({ x, y }) => ({ x, y }));
+}
+// Ce que la fiche d'un bâtiment montre de ses annexes : posées, prochain exemplaire (palier, prix), effet
+function annexesView(siteId, rows) {
+    const words = WORDS[SITES[siteId].produce] || [];
+    return annexes.ANNEXES.filter(a => a.site === siteId).map(a => {
+        const built = rows.filter(r => r.annex === a.id).length;
+        const max = annexes.maxOf(a);
+        return {
+            id: a.id, name: a.name, kind: a.kind, max, built, effect: annexes.effectText(a, words, CAP_HOURS), gain: a.effect,
+            levels: Array.from({ length: max }, (_, k) => annexes.levelFor(a, k)),
+            next: built < max ? { level: annexes.levelFor(a, built), ...annexes.priceOf(a, built) } : null
+        };
+    });
+}
+
 // Vue de l'île pour le navigateur. book = { describe(noms), openChapters: Set des chapitres ouverts }
 async function view(userId, owned, book) {
     await migrate(userId);
     const { levels, builtAt } = await levelsOf(userId);
     const items = await itemsOf(userId);
     const skins = await skinsOf(userId);
+    const annexRows = await annexesOf(userId);
     const bonuses = shop.bonusesOf(items);
-    const effects = effectsOf(levels, bonuses);
+    const extra = annexes.bonusesOf(annexRows);
+    const effects = effectsOf(levels, bonuses, extra);
     const stock = await stockOf(userId);
     const charges = chargesAt(stock, effects.maxCharges, Date.now(), effects.regenMs);
     const zones = await zonesOf(userId);
-    const tiles = await settle(userId, await tilesOf(userId), zones, levels);
+    const annexCells = new Set(annexRows.map(keyOf));
+    const tiles = await settle(userId, await tilesOf(userId), zones, levels, annexCells);
+    const taken = new Set([...annexCells, ...tiles.map(keyOf)]);
     const have = new Set(owned);
     const plans = Object.values(SITES).flatMap(s => s.levels.map(l => l.plan)).filter(Boolean);
     const known = book.describe([...tiles.map(t => t.element), ...plans]);
-    const production = productionAll(levels, builtAt, stock.collected_at, Date.now(), bonuses);
+    const production = productionAll(levels, builtAt, stock.collected_at, Date.now(), bonuses, extra);
     const sites = Object.entries(SITES).map(([id, site]) => {
         const level = levels[id] || 0;
         const next = site.levels[level];
@@ -437,8 +507,12 @@ async function view(userId, owned, book) {
             // Tous les paliers, pour la fiche du bâtiment (atteints, suivant, à venir)
             levels: site.levels.map(step),
             pending: made ? { coins: made.coins, [made.resource]: made.amount } : null,
-            // Rendement horaire avec les bonus de la boutique (pour la fiche)
-            perHour: site.produce && level ? perHourOf(level, bonuses.prod[id] || 0, bonuses.coins[id] || 0) : null,
+            // Rendement horaire avec les bonus de la boutique et les annexes (pour la fiche), heures de production gardées
+            perHour: site.produce && level ? perHourOf(level, bonuses.prod[id] || 0, bonuses.coins[id] || 0, extra.site[id] || []) : null,
+            capHours: CAP_HOURS + (extra.cap[id] || 0),
+            // Annexes : catalogue du bâtiment et cases libres où en poser une (dès le palier II)
+            annexes: annexesView(id, annexRows),
+            spots: level >= 2 && zones.has(zone) ? annexSpots(id, taken) : [],
             next: next ? step(next) : null
         };
     });
@@ -467,6 +541,7 @@ async function view(userId, owned, book) {
         pending: production.reduce((sum, p) => sum + p.coins, 0),
         pendingStock,
         tiles: tiles.map(t => ({ x: t.x, y: t.y, element: t.element, ...(known[t.element] || {}) })),
+        annexes: annexRows.filter(r => annexes.ANNEX_BY_ID[r.annex]).map(r => ({ x: r.x, y: r.y, annex: r.annex, site: annexes.ANNEX_BY_ID[r.annex].site })),
         // Brume, l'esprit de la brume : la quête active (ou son dernier mot)
         brume: quests.boardOf(claimed, { tiles: tiles.length, runs: await runsOf(userId), stars: book.stars ?? 0, zones, levels }),
         // Coffres : en attente, du jour, bouteille à la mer
@@ -543,7 +618,8 @@ function startRun(userId) {
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
         const { levels } = await levelsOf(userId, conn);
-        const effects = effectsOf(levels, shop.bonusesOf(await itemsOf(userId, conn)));
+        const { bonuses, extra } = await bonusesFor(userId, conn);
+        const effects = effectsOf(levels, bonuses, extra);
         const charges = chargesAt(stock, effects.maxCharges, Date.now(), effects.regenMs);
         if (charges.count < 1) return db.rollback({ status: 409, message: 'Plus de partie en réserve : la prochaine revient bientôt.' });
         await conn.query('UPDATE world_stock SET charges = $2, charges_at = $3 WHERE user_id = $1', [userId, charges.count - 1, new Date(charges.since)]);
@@ -650,6 +726,7 @@ async function place(userId, owned, element, x, y, price) {
         if (!(await zonesOf(userId, conn)).has(map.zoneAt(x, y))) return db.rollback({ status: 403, message: 'Achète d’abord ce quartier de l’île.' });
         const occupied = await conn.query('SELECT element FROM world_tiles WHERE user_id = $1 AND x = $2 AND y = $3 FOR UPDATE', [userId, x, y]);
         if (occupied.rows.length && occupied.rows[0].element !== element) return db.rollback({ status: 409, message: 'Cette case est déjà occupée.' });
+        if (await annexAt(userId, x, y, conn)) return db.rollback({ status: 409, message: 'Une annexe occupe déjà cette case.' });
         // Déjà posé ailleurs : on le déplace gratuitement ; sinon on l'achète et on le pose
         const moved = await conn.query('UPDATE world_tiles SET x = $3, y = $4 WHERE user_id = $1 AND element = $2 RETURNING element', [userId, element, x, y]);
         if (moved.rows.length) return {};
@@ -663,6 +740,64 @@ async function place(userId, owned, element, x, y, price) {
 async function remove(userId, x, y) {
     await migrate(userId);
     await db.query('DELETE FROM world_tiles WHERE user_id = $1 AND x = $2 AND y = $3', [userId, x, y]);
+}
+
+// Annexe posée sur cette case (ligne verrouillée), ou null
+async function annexAt(userId, x, y, conn) {
+    const { rows } = await conn.query('SELECT annex FROM world_annexes WHERE user_id = $1 AND x = $2 AND y = $3 FOR UPDATE', [userId, x, y]);
+    return rows[0] || null;
+}
+// Case déjà prise par une décoration ou une annexe
+async function cellTaken(userId, x, y, conn) {
+    const { rows } = await conn.query('SELECT 1 FROM world_tiles WHERE user_id = $1 AND x = $2 AND y = $3', [userId, x, y]);
+    return rows.length > 0 || Boolean(await annexAt(userId, x, y, conn));
+}
+const SPOT_MESSAGE = 'Une annexe se pose sur une case libre du quartier, à deux cases au plus de son bâtiment.';
+
+// Pose l'exemplaire suivant d'une annexe : bâtiment construit au palier voulu dans un quartier possédé, case libre
+// autorisée, ressources et écus débités une seule fois (ligne de stock verrouillée : deux poses ne se croisent pas).
+// La production en cours est encaissée d'abord (l'annexe produit à partir de sa pose). { status, message } si refus
+async function placeAnnex(userId, annexId, x, y) {
+    const a = annexes.ANNEX_BY_ID[annexId];
+    if (!a) return { status: 404, message: 'Annexe inconnue.' };
+    if (!annexSpotOk(a.site, x, y)) return { status: 400, message: SPOT_MESSAGE };
+    await migrate(userId);
+    return db.transaction(async conn => {
+        const stock = await stockOf(userId, conn, true);
+        const { levels } = await levelsOf(userId, conn);
+        const level = levels[a.site] || 0;
+        if (!level || !(await zonesOf(userId, conn)).has(map.siteZone(a.site))) return db.rollback({ status: 403, message: 'Bâtis d’abord ce bâtiment.' });
+        const copy = (await annexesOf(userId, conn)).filter(r => r.annex === a.id).length;
+        if (copy >= annexes.maxOf(a)) return db.rollback({ status: 409, message: annexes.maxOf(a) > 1 ? 'Tous les exemplaires de cette annexe sont posés.' : 'Cette annexe est déjà posée.' });
+        const need = annexes.levelFor(a, copy);
+        if (level < need) return db.rollback({ status: 403, message: `Il faut le palier ${CHAPTER_OF_LEVEL[need - 1]} de ce bâtiment.` });
+        if (await cellTaken(userId, x, y, conn)) return db.rollback({ status: 409, message: 'Cette case est déjà occupée.' });
+        const { cost, coins: price } = annexes.priceOf(a, copy);
+        if (Object.entries(cost).some(([r, n]) => stock[r] < n)) return db.rollback({ status: 400, message: 'Il te manque des ressources : joue une Récolte.' });
+        await gather(userId, conn, stock);
+        const coins = await ledger.debit(userId, price, `annexe:${a.id}:${copy + 1}`, conn);
+        if (coins === null) return db.rollback({ status: 400, message: `Il te faut ${price} écus.` });
+        await conn.query('UPDATE world_stock SET stone = stone - $2, wood = wood - $3, water = water - $4, food = food - $5 WHERE user_id = $1',
+            [userId, ...RESOURCES.map(r => cost[r] || 0)]);
+        await conn.query('INSERT INTO world_annexes (user_id, x, y, annex) VALUES ($1, $2, $3, $4)', [userId, x, y, a.id]);
+        return { built: a.name, coins };
+    });
+}
+
+// Déplace gratuitement une annexe vers une autre case libre autorisée pour son bâtiment (sa production continue)
+async function moveAnnex(userId, x, y, toX, toY) {
+    await migrate(userId);
+    return db.transaction(async conn => {
+        await stockOf(userId, conn, true);
+        const found = await annexAt(userId, x, y, conn);
+        if (!found) return db.rollback({ status: 404, message: 'Aucune annexe sur cette case.' });
+        const a = annexes.ANNEX_BY_ID[found.annex];
+        if (!a || !annexSpotOk(a.site, toX, toY)) return db.rollback({ status: 400, message: SPOT_MESSAGE });
+        if (x === toX && y === toY) return {};
+        if (await cellTaken(userId, toX, toY, conn)) return db.rollback({ status: 409, message: 'Cette case est déjà occupée.' });
+        await conn.query('UPDATE world_annexes SET x = $4, y = $5 WHERE user_id = $1 AND x = $2 AND y = $3', [userId, x, y, toX, toY]);
+        return {};
+    });
 }
 
 // Achat d'un article de la boutique d'un atelier : bâtiment construit (au niveau demandé) dans un quartier possédé,
@@ -730,7 +865,8 @@ async function chooseSkin(userId, siteId, skinId) {
 async function gather(userId, conn, stock) {
     const { levels, builtAt } = await levelsOf(userId, conn);
     const now = new Date();
-    const made = productionAll(levels, builtAt, stock.collected_at, now.getTime(), shop.bonusesOf(await itemsOf(userId, conn)));
+    const { bonuses, extra } = await bonusesFor(userId, conn);
+    const made = productionAll(levels, builtAt, stock.collected_at, now.getTime(), bonuses, extra);
     const coins = made.reduce((sum, p) => sum + p.coins, 0);
     const got = Object.fromEntries(RESOURCES.map(r => [r, made.filter(p => p.resource === r).reduce((sum, p) => sum + p.amount, 0)]));
     if (!coins && RESOURCES.every(r => !got[r])) return { gained: 0, stock: got, balance: null };
@@ -753,5 +889,6 @@ async function collect(userId) {
 
 module.exports = {
     SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, isFree, pendingOf, chargesAt, effectsOf, productionOf,
-    view, build, buyZone, buyItem, undoItem, chooseSkin, startRun, finishRun, place, remove, collect, migrate, claimQuest, board, openChest
+    view, build, buyZone, buyItem, undoItem, chooseSkin, startRun, finishRun, place, remove, collect, migrate, claimQuest, board, openChest,
+    placeAnnex, moveAnnex, annexSpotOk
 };
