@@ -1021,6 +1021,34 @@ test('butins : chapitres ouverts, quêtes réclamées et bouteille donnent leur 
   assert.equal((await api('POST', '/play/world/chest', { source: 'jour' }, await guest())).status, 402);
 });
 
+test('butins : « Tout ouvrir » ouvre d’un coup le coffre du jour, les chapitres, les quêtes et la bouteille, une seule fois', async () => {
+  const player = await newPlayer();
+  await api('GET', '/play/world', null, player);
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'deco'), ($1, 'source')`, [player.userId]);
+  const all = () => api('POST', '/play/world/chests/all', {}, player);
+  // Deux appels simultanés : l'un ouvre tout, l'autre ne trouve plus rien
+  const [a, b] = await Promise.all([all(), all()]);
+  assert.deepEqual([a.status, b.status].sort(), [200, 409]);
+  const ok = a.status === 200 ? a : b;
+  const { day, slot } = loot.parisOf(Date.now());
+  assert.deepEqual(ok.data.chests.map(c => c.source), [`jour:${day}`, 'chapitre:II', 'quete:source', `bouteille:${day}-${slot}`]);
+  assert.deepEqual(ok.data.chests.map(c => c.rarity).slice(0, 3), ['commun', 'legendaire', 'rare']);
+  assert.deepEqual(ok.data.chests[1].prize, { kind: 'rare', item: 'etincelles', site: 'atelier', name: 'Gerbe d’étincelles' });
+  // Le solde et la vue suivent : plus rien n'attend, la série du jour compte
+  const coins = ok.data.chests.reduce((sum, c) => sum + (c.prize.kind === 'coins' ? c.prize.amount : 0), 0);
+  assert.equal(ok.data.coins, coins);
+  assert.equal(await coinsOf(player), coins);
+  assert.deepEqual(ok.data.world.chests.pending, []);
+  assert.equal(ok.data.world.chests.daily.available, false);
+  assert.equal(ok.data.world.chests.daily.streak, 1);
+  assert.equal(ok.data.world.chests.bottle.available, false);
+  assert.equal((await sql('SELECT COUNT(*)::int AS n FROM world_chests WHERE user_id = $1', [player.userId]))[0].n, 4);
+  assert.equal((await all()).status, 409);
+  assert.equal((await api('POST', '/play/world/chest', { source: 'jour' }, player)).status, 409);
+  // Compte requis
+  assert.equal((await api('POST', '/play/world/chests/all', {}, await guest())).status, 402);
+});
+
 test('butins : une teinte gagnée ne s’annule pas comme un achat', async () => {
   const player = await newPlayer({ coins: 500 });
   await api('GET', '/play/world', null, player);
