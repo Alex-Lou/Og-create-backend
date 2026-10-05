@@ -30,7 +30,7 @@ router.post('/send', contactLimiter, async (req, res) => {
             from: process.env.EMAIL_USER,
             to: process.env.EMAIL_USER,
             replyTo: email,
-            subject: 'Origins — nouveau message de contact',
+            subject: 'Brumelune — nouveau message de contact',
             text: `De : ${email}\n\n${message}`,
             html: `<h3>Nouveau message de contact</h3>
 <p><strong>De :</strong> ${escapeHtml(email)}</p>

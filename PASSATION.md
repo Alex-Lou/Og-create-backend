@@ -1,4 +1,4 @@
-# Passation — serveur d'Origins Création
+# Passation — serveur de Brumelune
 
 Le document complet est dans le dépôt du front : **`Alex-Lou/og-create`, fichier `PASSATION.md`**. Il couvre le jeu,
 les règles de travail avec l'auteur, l'architecture, l'historique, la feuille de route et les pièges connus.

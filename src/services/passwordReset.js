@@ -26,7 +26,7 @@ async function request(email) {
     await transporter.sendMail({
         from: process.env.EMAIL_USER,
         to: user.email,
-        subject: 'Origins — nouveau mot de passe',
+        subject: 'Brumelune — nouveau mot de passe',
         text: `Bonjour,\n\nPour choisir un nouveau mot de passe, ouvre ce lien (valable ${TOKEN_MINUTES} minutes, une seule fois) :\n${APP_URL}/?reset=${token}\n\nSi tu n'as rien demandé, ignore ce message : ton mot de passe ne change pas.`
     });
     log('info', 'Lien de réinitialisation envoyé', { userId: user.id });
