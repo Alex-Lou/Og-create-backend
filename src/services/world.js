@@ -1120,7 +1120,8 @@ async function settleVisitor(userId, visitorId, now = Date.now()) {
 }
 
 // Décorations de l'ancienne règle (éléments du Livre posés n'importe où) : remboursées au prix payé, une seule fois,
-// puis retirées de l'île (lot 8). priceOf(élément) : prix selon son chapitre. { count, coins } (count 0 : rien à faire)
+// puis retirées de l'île (lot 8). priceOf(élément) : prix selon son chapitre. { count, coins, balance } (count 0 : rien
+// à faire ; balance : solde après remboursement)
 async function refundDecorations(userId, priceOf) {
     const seen = await db.query('SELECT 1 FROM world_tiles WHERE user_id = $1 LIMIT 1', [userId]);
     if (!seen.rows.length) return { count: 0, coins: 0 };
@@ -1133,7 +1134,7 @@ async function refundDecorations(userId, priceOf) {
         const coins = rows.reduce((sum, r) => sum + (priceOf(r.element) || 0), 0);
         if (coins > 0) await ledger.credit(userId, coins, 'remboursement', 'decorations', conn);
         await conn.query('DELETE FROM world_tiles WHERE user_id = $1', [userId]);
-        return { count: rows.length, coins };
+        return { count: rows.length, coins, balance: await balanceOf(userId, conn) };
     });
 }
 

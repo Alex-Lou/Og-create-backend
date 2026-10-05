@@ -401,7 +401,7 @@ test('le Monde : compte requis ; les décorations de l’ancienne règle sont re
   // Deux décorations posées avec l'ancienne règle : Eau (chapitre I, 10 écus) et Boue (chapitre II, 15 écus)
   await sql(`INSERT INTO world_tiles (user_id, x, y, element) VALUES ($1, 31, 35, 'Eau'), ($1, 32, 35, 'Boue')`, [player.userId]);
   const both = await Promise.all([1, 2].map(() => api('GET', '/play/world', null, player)));
-  assert.deepEqual(both.map(r => r.data.refund).filter(Boolean), [{ count: 2, coins: 25 }]);
+  assert.deepEqual(both.map(r => r.data.refund).filter(Boolean), [{ count: 2, coins: 25, balance: 25 }]);
   both.forEach(r => assert.deepEqual(r.data.tiles, []));
   assert.equal(await coinsOf(player), 25);
   assert.equal((await sql('SELECT COUNT(*)::int AS n FROM world_tiles WHERE user_id = $1', [player.userId]))[0].n, 0);
