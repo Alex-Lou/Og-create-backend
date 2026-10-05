@@ -487,6 +487,9 @@ test('créations d’île : assembler (pièces vérifiées), payer à la réussi
   assert.equal(placed.status, 200);
   assert.deepEqual(placed.data.world.crafts.placed, [{ x: 31, y: 35, craft: 'cloture' }]);
   assert.equal((await place('cloture', 32, 35)).status, 409);
+  // Posée, elle garde ses cases (pour la déplacer), sans la sienne
+  const fenceSpots = cat(placed.data.world, 'cloture').spots;
+  assert.ok(fenceSpots.some(sp => sp.x === 32 && sp.y === 35) && !fenceSpots.some(sp => sp.x === 31 && sp.y === 35));
   // Déplacée gratuitement, puis rangée dans la réserve
   const moved = await api('POST', '/play/world/craft/move', { x: 31, y: 35, toX: 32, toY: 35 }, player);
   assert.deepEqual(moved.data.world.crafts.placed, [{ x: 32, y: 35, craft: 'cloture' }]);

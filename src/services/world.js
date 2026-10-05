@@ -560,7 +560,7 @@ async function epreuvesOf(userId, conn = db) {
     return Object.values(done).flatMap(cats => Object.values(cats || {})).reduce((n, ids) => n + (Array.isArray(ids) ? ids.length : 0), 0);
 }
 // Ce que la vue montre des créations d'île : paliers ouverts, catalogue (ce qui manque pour fabriquer, réserve, cases
-// où poser), créations posées
+// où poser ou déplacer une création déjà fabriquée), créations posées
 function craftsView(rows, ctx, { owned, stock, open, epreuves }, siteName) {
     const made = madeOf(rows);
     return {
@@ -572,7 +572,7 @@ function craftsView(rows, ctx, { owned, stock, open, epreuves }, siteName) {
                 id: c.id, name: c.name, tier: c.tier, cost: c.cost, elements: c.elements.map(name => ({ name, have: owned.has(name) })),
                 after: c.after, open: open.has(c.tier), made: made[c.id] || 0, reserve,
                 block: crafts.blockOf(c, { made, owned, stock, open }), place: crafts.placeText(c, siteName),
-                spots: reserve ? craftSpots(c, ctx) : []
+                spots: made[c.id] ? craftSpots(c, ctx) : []
             };
         }),
         placed: placedOf(rows).map(r => ({ x: r.x, y: r.y, craft: r.craft }))

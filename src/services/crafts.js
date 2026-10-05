@@ -6,8 +6,8 @@
 //   questions de l'Épreuve réussies ; II, III : chapitre II, III entièrement trouvé.
 // - Fabrication : un puzzle d'assemblage. Le gabarit (cases de la silhouette) se découpe, d'après une graine, en
 //   pièces de 2 à 4 cases ; dès le palier II, les pièces arrivent tournées. Le joueur pose chaque pièce (rotation,
-//   case) ; le serveur vérifie que les pièces couvrent exactement le gabarit. Copie conforme du découpage :
-//   src/world/crafts.js (mêmes vecteurs de test).
+//   case) ; le serveur vérifie que les pièces couvrent exactement le gabarit. Le front reçoit les pièces ; il ne
+//   recopie que le quart de tour (turn, src/world/crafts.js).
 // - Pose : sol permis (ground), au bord d'un chemin (path), près d'un bâtiment (nearSite) ou d'une autre création
 //   (nearCraft), à reach cases au plus (en tous sens).
 // Fonctions pures, sans base de données.
