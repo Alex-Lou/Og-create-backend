@@ -174,13 +174,13 @@ const befriended = async (res, owner, b, done) => {
 };
 router.post('/world/villager/talk', withAccount(async (req, res, owner, b) => {
     const villager = String(req.body.villager || '');
-    if (!/^[a-z]{1,20}$/.test(villager)) return res.status(400).json({ message: 'Habitant invalide' });
+    if (!/^[a-z0-9]{1,20}$/.test(villager)) return res.status(400).json({ message: 'Habitant invalide' });
     await befriended(res, owner, b, await world.befriend(owner.id, villager));
 }));
 router.post('/world/villager/gift', withAccount(async (req, res, owner, b) => {
     const villager = String(req.body.villager || '');
     const resource = String(req.body.resource || '');
-    if (!/^[a-z]{1,20}$/.test(villager) || !/^[a-z]{1,10}$/.test(resource)) return res.status(400).json({ message: 'Cadeau invalide' });
+    if (!/^[a-z0-9]{1,20}$/.test(villager) || !/^[a-z]{1,10}$/.test(resource)) return res.status(400).json({ message: 'Cadeau invalide' });
     await befriended(res, owner, b, await world.befriend(owner.id, villager, resource));
 }));
 // Besoins des habitants : en combler un (manger, travailler), ou tout ce qui peut l'être d'un coup
@@ -191,7 +191,7 @@ const fed = async (res, owner, b, done) => {
 router.post('/world/villager/need', withAccount(async (req, res, owner, b) => {
     const villager = String(req.body.villager || '');
     const need = String(req.body.need || '');
-    if (!/^[a-z]{1,20}$/.test(villager) || !/^[a-z]{1,10}$/.test(need)) return res.status(400).json({ message: 'Besoin invalide' });
+    if (!/^[a-z0-9]{1,20}$/.test(villager) || !/^[a-z]{1,10}$/.test(need)) return res.status(400).json({ message: 'Besoin invalide' });
     await fed(res, owner, b, await world.fillNeeds(owner.id, [{ villager, need }]));
 }));
 router.post('/world/villagers/needs', withAccount(async (req, res, owner, b) => {
@@ -204,6 +204,14 @@ router.post('/world/visitor', withAccount(async (req, res, owner, b) => {
     const done = await world.satisfyVisitor(owner.id, id);
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ reward: done.reward, coins: done.coins, world: await worldView(owner, b) });
+}));
+// Visiteur comblé : il reste, dans une maison libre → { settled, world }
+router.post('/world/visitor/settle', withAccount(async (req, res, owner, b) => {
+    const id = Number(req.body.id);
+    if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ message: 'Visiteur invalide' });
+    const done = await world.settleVisitor(owner.id, id);
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json({ settled: done.settled, world: await worldView(owner, b) });
 }));
 
 // Coffre qui attend : du jour, bouteille à la mer, chapitre du Livre ouvert, quête de Brume réclamée

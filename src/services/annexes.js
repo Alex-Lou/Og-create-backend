@@ -4,9 +4,10 @@
 //   II, III et V ; le coût double à chaque exemplaire) ;
 // - une réserve au palier IV ;
 // - une grande annexe au palier VI.
+// Le Foyer a aussi ses maisons (lot 7d) : jusqu'à 4, ouvertes aux paliers II à V, chacune loge un visiteur qui reste.
 // Effets : rate = ressources par heure en plus et earn = écus par heure en plus (production du bâtiment, comptée
 // depuis la pose, avec les bonus de production de la boutique) ; cap = heures de production gardées en plus ;
-// charges, regenCut, moves : réserve, retour d'une partie, coups de Récolte (comme la boutique).
+// charges, regenCut, moves : réserve, retour d'une partie, coups de Récolte (comme la boutique) ; house : un logement.
 // Fonctions pures, sans base de données.
 
 const REACH = 2;
@@ -14,6 +15,8 @@ const SMALL_LEVELS = [2, 3, 5]; // palier du bâtiment qui ouvre chaque exemplai
 const SMALL_COINS = [100, 250, 600];
 const KIND_LEVEL = { reserve: 4, grand: 6 };
 const KIND_COINS = { reserve: 400, grand: 1200 };
+const HOUSE_LEVELS = [2, 3, 4, 5]; // palier du Foyer qui ouvre chaque maison
+const HOUSE_COINS = [80, 200, 400, 800];
 const REGEN_FLOOR_MS = 10 * 60 * 1000; // une partie ne revient jamais en moins de 10 minutes
 
 // Effets types des bâtiments qui produisent
@@ -41,21 +44,23 @@ const ANNEXES = [
     annex('jardin', 'foyer', 'small', 'Jardin d’herbes', { water: 30, food: 30 }, { charges: 1 }),
     annex('four', 'foyer', 'reserve', 'Four à pain', { stone: 90, wood: 60 }, { regenCut: 5 * 60 * 1000 }),
     annex('belvedere', 'foyer', 'grand', 'Belvédère', { stone: 150, wood: 150 }, { charges: 1 }),
+    annex('maison', 'foyer', 'house', 'Maison', { wood: 30, stone: 20 }, { house: 1 }),
     annex('charbon', 'atelier', 'small', 'Tas de charbon', { wood: 40, stone: 20 }, { moves: 1 }),
     annex('hangar', 'atelier', 'reserve', 'Hangar', { wood: 90, stone: 60 }, { moves: 1 }),
     annex('fourneau', 'atelier', 'grand', 'Haut fourneau', { stone: 180, wood: 80, water: 40 }, { moves: 2 })
 ];
 const ANNEX_BY_ID = Object.fromEntries(ANNEXES.map(a => [a.id, a]));
 
-// Exemplaires possibles : 3 pour la petite annexe d'un bâtiment qui produit (rate), sinon 1
-const maxOf = a => (a.kind === 'small' && a.effect.rate ? SMALL_LEVELS.length : 1);
-// Palier du bâtiment qui ouvre l'exemplaire n° copy (0, 1, 2)
-const levelFor = (a, copy) => (a.kind === 'small' ? SMALL_LEVELS[copy] : KIND_LEVEL[a.kind]);
+// Exemplaires possibles : 4 maisons, 3 pour la petite annexe d'un bâtiment qui produit (rate), sinon 1
+const maxOf = a => (a.kind === 'house' ? HOUSE_LEVELS.length : a.kind === 'small' && a.effect.rate ? SMALL_LEVELS.length : 1);
+// Palier du bâtiment qui ouvre l'exemplaire n° copy (0, 1, 2…)
+const levelFor = (a, copy) => (a.kind === 'house' ? HOUSE_LEVELS[copy] : a.kind === 'small' ? SMALL_LEVELS[copy] : KIND_LEVEL[a.kind]);
 // Prix de l'exemplaire n° copy : { cost, coins } ; le coût en ressources double à chaque exemplaire
 function priceOf(a, copy) {
+    const doubled = coins => ({ cost: Object.fromEntries(Object.entries(a.cost).map(([r, n]) => [r, n * 2 ** copy])), coins });
+    if (a.kind === 'house') return doubled(HOUSE_COINS[copy]);
     if (a.kind !== 'small') return { cost: { ...a.cost }, coins: KIND_COINS[a.kind] };
-    const factor = 2 ** copy;
-    return { cost: Object.fromEntries(Object.entries(a.cost).map(([r, n]) => [r, n * factor])), coins: SMALL_COINS[copy] };
+    return doubled(SMALL_COINS[copy]);
 }
 
 // Ce que rapportent les annexes posées ([{ annex, built_at }]) :
@@ -86,6 +91,7 @@ function effectText(a, words, capHours) {
     if (e.charges) return `+${e.charges} partie de Récolte en réserve`;
     if (e.regenCut) return `Une partie revient ${Math.round(e.regenCut / 60000)} min plus vite`;
     if (e.moves) return `+${e.moves} coup${e.moves > 1 ? 's' : ''} par Récolte`;
+    if (e.house) return 'Loge un visiteur qui veut rester sur l’île';
     return '';
 }
 

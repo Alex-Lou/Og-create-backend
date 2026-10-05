@@ -389,6 +389,8 @@ CREATE TABLE IF NOT EXISTS world_visitors (
     satisfied_at TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS idx_world_visitors_user ON world_visitors (user_id, arrived_at);
+-- Lot 7d-2 : visiteur comblé resté sur l'île, dans une maison du Foyer (il devient habitant)
+ALTER TABLE world_visitors ADD COLUMN IF NOT EXISTS settled_at TIMESTAMPTZ;
 -- Besoins des habitants (services/villagers.js) : dernière fois que chacun a été comblé ('manger', 'outils'). La ligne
 -- naît quand l'habitant arrive (il arrive comblé) ; se distraire se lit sur l'île (décorations), sans ligne.
 CREATE TABLE IF NOT EXISTS world_needs (
