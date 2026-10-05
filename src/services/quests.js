@@ -1,14 +1,14 @@
-// Les quêtes de Brume, l'esprit de la brume, mémoire de l'île : une seule chaîne en sept actes (les chapitres du
-// Livre), une quête active à la fois. L'avancée se lit dans l'état de l'île et du Livre (rien de plus à suivre) ;
-// seule la réclamation s'écrit (world_quests). Fonctions pures, sans base de données.
+// Les quêtes de Brume, le feu follet qui garde le Grimoire : une seule chaîne en sept actes (les chapitres du
+// Grimoire), une quête active à la fois. L'avancée se lit dans l'état de l'île et du Grimoire (rien de plus à
+// suivre) ; seule la réclamation s'écrit (world_quests). Fonctions pures, sans base de données.
 //
-// Objectifs (goal) : crafts (créations d'île posées), runs (récoltes terminées), stars (découvertes du Livre),
+// Objectifs (goal) : crafts (créations d'île posées), runs (récoltes terminées), stars (découvertes du Grimoire),
 // zone (quartier acheté), level (palier d'un bâtiment). Chaque objectif est atteignable quand sa quête devient
 // active : le bâtiment demandé est dans un quartier déjà acheté, le chapitre demandé déjà ouvert.
 // chest : la dernière quête de chaque acte donne aussi un coffre de cette rareté (loot.js), à ouvrir une fois réclamée.
 const QUESTS = [
     { id: 'deco', act: 'I', goal: { kind: 'crafts', need: 1 }, coins: 20, label: 'Pose ta première création sur l’île',
-        say: 'Je suis Brume, la mémoire de cette île. La brume l’a recouverte quand le dernier alchimiste est parti. À l’établi du Foyer, assemble une Clôture, puis pose-la sur l’île : la vie revient où l’on crée.' },
+        say: 'Les Anciens ont cessé d’écrire, et la brume a tout couvert. À l’établi du Foyer, assemble une Clôture et pose-la : la vie revient.' },
     { id: 'recolte', act: 'I', goal: { kind: 'runs', need: 1 }, coins: 25, label: 'Termine une Récolte',
         say: 'Une île se bâtit de pierre, de bois et d’eau. Lance une Récolte et rapporte ce que tu trouves.' },
     { id: 'source', act: 'I', goal: { kind: 'zone', zone: 'source' }, coins: 40, chest: 'rare', label: 'Achète La Source',
@@ -19,13 +19,13 @@ const QUESTS = [
         say: 'Plus à l’ouest, des arbres attendent sous la brume. Achète La Lisière.' },
     { id: 'cabane', act: 'II', goal: { kind: 'level', site: 'foyer', need: 2 }, coins: 60, chest: 'rare', label: 'Dresse l’Abri',
         say: 'Un feu, c’est bien ; un toit, c’est mieux. Dresse un Abri près de ton feu de camp.' },
-    { id: 'livre5', act: 'III', goal: { kind: 'stars', need: 5 }, coins: 60, label: 'Inscris 5 découvertes au Livre',
-        say: 'Ton Livre est la clé de l’île : chaque découverte repousse la brume. Inscris-en cinq, le chapitre III s’ouvrira.' },
+    { id: 'livre5', act: 'III', goal: { kind: 'stars', need: 5 }, coins: 60, label: 'Inscris 5 découvertes au Grimoire',
+        say: 'Le Grimoire est la clé de l’île : chaque découverte repousse la brume. Inscris-en cinq, le chapitre III s’ouvrira.' },
     { id: 'colline', act: 'III', goal: { kind: 'zone', zone: 'colline' }, coins: 80, label: 'Achète La Colline',
         say: 'Au nord-est, une falaise cache une fissure. Achète La Colline : la roche a des choses à te dire.' },
     { id: 'mine', act: 'III', goal: { kind: 'level', site: 'carriere', need: 2 }, coins: 90, chest: 'epique', label: 'Ouvre la Carrière',
         say: 'La fissure de la falaise cache de la belle pierre. Élargis-la : ouvre la Carrière.' },
-    { id: 'livre12', act: 'IV', goal: { kind: 'stars', need: 12 }, coins: 100, label: 'Inscris 12 découvertes au Livre',
+    { id: 'livre12', act: 'IV', goal: { kind: 'stars', need: 12 }, coins: 100, label: 'Inscris 12 découvertes au Grimoire',
         say: 'Je sens le vivant qui s’éveille. À douze découvertes, le chapitre IV s’ouvrira.' },
     { id: 'jardins', act: 'IV', goal: { kind: 'zone', zone: 'jardins' }, coins: 110, label: 'Achète Les Jardins',
         say: 'La terre noire du nord n’attend que des graines. Achète Les Jardins.' },
@@ -37,7 +37,7 @@ const QUESTS = [
         say: 'Au nord-est, une crique abritée. On dit que des dauphins y viennent quand la brume s’en va.' },
     { id: 'ponton', act: 'V', goal: { kind: 'level', site: 'ponton', need: 1 }, coins: 170, chest: 'epique', label: 'Construis le Ponton',
         say: 'Un ponton, et la mer devient un chemin. Construis-le dans la crique.' },
-    { id: 'livre45', act: 'VI', goal: { kind: 'stars', need: 45 }, coins: 200, label: 'Inscris 45 découvertes au Livre',
+    { id: 'livre45', act: 'VI', goal: { kind: 'stars', need: 45 }, coins: 200, label: 'Inscris 45 découvertes au Grimoire',
         say: 'Le temps reprend son cours. À quarante-cinq découvertes, le chapitre des Âges s’ouvrira.' },
     { id: 'hameau', act: 'VI', goal: { kind: 'zone', zone: 'hameau' }, coins: 220, label: 'Achète Le Hameau',
         say: 'Des toits dorment sous la brume, à l’est. Achète Le Hameau : une baleine passe parfois au large.' },
@@ -45,7 +45,7 @@ const QUESTS = [
         say: 'Une île vit de ce qu’on y crée. Dix créations, et elle aura ton visage.' },
     { id: 'phare', act: 'VII', goal: { kind: 'zone', zone: 'phare' }, coins: 300, label: 'Achète L’Îlot aux Mouettes',
         say: 'Un rocher battu des vents, où nichent les mouettes. Achète L’Îlot aux Mouettes : les méduses danseront la nuit.' },
-    { id: 'livre70', act: 'VII', goal: { kind: 'stars', need: 70 }, coins: 350, label: 'Inscris 70 découvertes au Livre',
+    { id: 'livre70', act: 'VII', goal: { kind: 'stars', need: 70 }, coins: 350, label: 'Inscris 70 découvertes au Grimoire',
         say: 'Il ne reste qu’un voile : celui des légendes. À soixante-dix découvertes, le dernier chapitre s’ouvrira.' },
     { id: 'legendes', act: 'VII', goal: { kind: 'zone', zone: 'legendes' }, coins: 500, chest: 'legendaire', label: 'Achète L’Île des Légendes',
         say: 'Voici la dernière brume, et la plus ancienne. Achète L’Île des Légendes, et je pourrai enfin me reposer.' }
