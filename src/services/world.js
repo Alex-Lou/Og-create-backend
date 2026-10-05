@@ -504,6 +504,13 @@ async function claimedOf(userId, conn = db) {
     const { rows } = await conn.query('SELECT quest FROM world_quests WHERE user_id = $1', [userId]);
     return new Set(rows.map(r => r.quest));
 }
+// Les mots d'Héliane (loot.helianeOf) : déduits des quêtes réclamées et des bouteilles ouvertes, avec leurs heures
+async function helianeOfUser(userId, conn = db) {
+    const claimed = await conn.query('SELECT quest, claimed_at FROM world_quests WHERE user_id = $1', [userId]);
+    const bottles = await conn.query(`SELECT opened_at FROM world_chests WHERE user_id = $1 AND source LIKE 'bouteille:%'`, [userId]);
+    const starts = quests.actStartsOf(claimed.rows.map(r => ({ quest: r.quest, at: r.claimed_at.getTime() })));
+    return loot.helianeOf(starts, bottles.rows.map(r => r.opened_at.getTime()));
+}
 async function runsOf(userId, conn = db) {
     const { rows } = await conn.query('SELECT COUNT(*)::int AS n FROM world_runs WHERE user_id = $1 AND finished_at IS NOT NULL', [userId]);
     return rows[0].n;
@@ -1079,7 +1086,9 @@ async function view(userId, owned, book) {
             return out;
         })(),
         // Coffres : en attente, du jour, bouteille à la mer
-        chests: chestsView(await openedOf(userId, Date.now()), book.openChapters, claimed, found)
+        chests: chestsView(await openedOf(userId, Date.now()), book.openChapters, claimed, found),
+        // Les mots d'Héliane déjà lus (la Chronique) et l'acte dont le mot attend la prochaine bouteille
+        heliane: await helianeOfUser(userId)
     };
 }
 
@@ -1563,11 +1572,18 @@ function grantSource(userId, source, { day, slot, opened }, conn) {
         const streak = streakOf(opened, day);
         return grant(userId, `jour:${day}`, loot.dailyRarity(streak), conn, { streak });
     }
-    if (source === 'bouteille') return grant(userId, `bouteille:${day}-${slot}`, loot.rarityOf(loot.BOTTLE.odds, random), conn);
+    if (source === 'bouteille') return bottleOf(userId, `bouteille:${day}-${slot}`, conn);
     const [kind, id] = source.split(':');
     if (kind === 'lieu') return grant(userId, source, landmarks.LANDMARK_BY_ID[id].chest, conn);
     const chapter = kind === 'chapitre' ? loot.CHAPTER_RARES[id] : null;
     return grant(userId, source, chapter ? 'legendaire' : QUEST_CHESTS.find(q => q.id === id).chest, conn, { wanted: chapter });
+}
+
+// Une bouteille à la mer : la première ouverte pendant un acte porte son mot d'histoire (story : l'acte)
+async function bottleOf(userId, source, conn) {
+    const { next } = await helianeOfUser(userId, conn);
+    const chest = await grant(userId, source, loot.rarityOf(loot.BOTTLE.odds, random), conn);
+    return chest && next ? { ...chest, story: next } : chest;
 }
 
 // « Tout ouvrir » : tout ce qui attend (coffre du jour, chapitres ouverts, quêtes réclamées, lieux découverts, bouteille), dans une seule

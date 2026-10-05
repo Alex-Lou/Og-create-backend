@@ -1741,6 +1741,28 @@ test('butins : chapitres ouverts, quêtes réclamées et bouteille donnent leur 
   assert.equal((await api('POST', '/play/world/chest', { source: 'jour' }, await guest())).status, 402);
 });
 
+test('les mots d’Héliane : la première bouteille ouverte pendant un acte porte son mot (bible, § 6.13)', async () => {
+  const player = await newPlayer();
+  const open = () => api('POST', '/play/world/chest', { source: 'bouteille' }, player);
+  const heliane = async () => (await api('GET', '/play/world', null, player)).data.heliane;
+  // Le prologue n'a pas de mot
+  assert.deepEqual(await heliane(), { found: [], next: null });
+  // Le prologue fini (le Puits d'Ondin réclamé il y a une heure) : le mot de l'acte I attend
+  await sql(`INSERT INTO world_quests (user_id, quest, claimed_at) VALUES ($1, 'puits-ondin', NOW() - INTERVAL '1 hour')`, [player.userId]);
+  assert.deepEqual(await heliane(), { found: [], next: 'I' });
+  const first = await open();
+  assert.equal(first.data.chest.story, 'I');
+  assert.deepEqual(first.data.world.heliane, { found: ['I'], next: null });
+  // L'acte I fini ensuite : le mot de l'acte II attend la bouteille suivante (celle d'avant ne compte pas)
+  await sql(`UPDATE world_chests SET source = 'bouteille:hier-0', opened_at = NOW() - INTERVAL '10 minutes' WHERE user_id = $1 AND source LIKE 'bouteille:%'`, [player.userId]);
+  await sql(`INSERT INTO world_quests (user_id, quest, claimed_at) VALUES ($1, 'lanterne', NOW() - INTERVAL '5 minutes')`, [player.userId]);
+  assert.deepEqual(await heliane(), { found: ['I'], next: 'II' });
+  assert.equal((await open()).data.chest.story, 'II');
+  // Une bouteille de plus pendant le même acte garde ses mots drôles
+  await sql(`UPDATE world_chests SET source = 'bouteille:hier-1' WHERE user_id = $1 AND source NOT LIKE 'bouteille:hier%' AND source LIKE 'bouteille:%'`, [player.userId]);
+  assert.equal((await open()).data.chest.story, undefined);
+});
+
 test('butins : « Tout ouvrir » ouvre d’un coup le coffre du jour, les chapitres, les quêtes et la bouteille, une seule fois', async () => {
   const player = await newPlayer();
   await api('GET', '/play/world', null, player);

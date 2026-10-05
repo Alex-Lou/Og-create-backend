@@ -245,7 +245,22 @@ function boardOf(claimed, facts) {
     const done = doneOf(claimed);
     return { quest: active(claimed, facts), done: QUESTS.filter(quest => done.has(quest.id)).length, total: QUESTS.length, acts: actsDoneOf(done), rested: RESTED };
 }
+// Début de chaque acte commencé (les mots d'Héliane, bible § 6.13) : l'heure où la dernière quête des actes d'avant a été
+// réclamée (0 si rien n'a été réclamé avant lui). rows : [{ quest, at (ms) }]. { acte: ms } pour les actes I à VII
+// commencés, dans l'ordre
+function actStartsOf(rows) {
+    const done = actsDoneOf(doneOf(new Set(rows.map(r => r.quest))));
+    const actOf = new Map(QUESTS.map(quest => [quest.id, quest.act]));
+    const out = {};
+    ACTS.forEach((act, i) => {
+        const before = ACTS.slice(0, i);
+        if (act === 'T' || !before.every(a => done.includes(a))) return;
+        out[act] = Math.max(0, ...rows.filter(r => before.includes(actOf.get(r.quest))).map(r => r.at));
+    });
+    return out;
+}
+
 // Quand tout est fait
 const RESTED = 'La brume s’est levée sur toute l’île. Merci, alchimiste : elle est de nouveau vivante.';
 
-module.exports = { QUESTS, LEGACY, QUEST_CHESTS, BEASTS, reachOf, doneOf, currentOf, progressOf, active, boardOf, actsDoneOf };
+module.exports = { QUESTS, LEGACY, QUEST_CHESTS, BEASTS, reachOf, doneOf, currentOf, progressOf, active, boardOf, actsDoneOf, actStartsOf };
