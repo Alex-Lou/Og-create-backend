@@ -219,14 +219,17 @@ test('le Monde : écus dus (ancienne règle), parties qui reviennent, effets et 
 
   // Cases libres : terre, hors chantier, dans un quartier possédé
   const core = new Set(['coeur']);
-  // Grande île : herbe de la Grève libre ; chantier du Foyer, mer, chemin et arbre refusés ; la Source à acheter
-  assert.equal(isFree(30, 32, core), false);
-  assert.equal(isFree(31, 35, core), true);
+  // Le cœur (la grande île, décalée) : herbe de la Grève libre ; chantier du Foyer, mer, chemin et arbre refusés ; la
+  // Source à acheter
+  const { OFFSET } = require('../src/services/worldMap');
+  const free = (x, y, zones = core) => isFree(x + OFFSET.x, y + OFFSET.y, zones);
+  assert.equal(free(30, 32), false);
+  assert.equal(free(31, 35), true);
   assert.equal(isFree(0, 0, core), false);
-  assert.equal(isFree(27, 31, core), false);
-  assert.equal(isFree(30, 35, core), false);
-  assert.equal(isFree(24, 33, core), false);
-  assert.equal(isFree(24, 33, new Set(['coeur', 'source'])), true);
+  assert.equal(free(27, 31), false);
+  assert.equal(free(30, 35), false);
+  assert.equal(free(24, 33), false);
+  assert.equal(free(24, 33, new Set(['coeur', 'source'])), true);
 });
 
 test('la boutique des ateliers : bonus additionnés et plafonnés, effets sur la Récolte et la production', () => {
@@ -299,20 +302,30 @@ test('les teintes et les pièces rares : douze teintes par bâtiment de I à VII
   assert.deepEqual(shop.bonusesOf(shop.ITEMS.filter(i => i.tint || i.rare).map(i => i.id)), { prod: {}, coins: {}, moves: 0, charges: 0, regenMs: null });
 });
 
-test('la grande île : calques cohérents, chantiers à plat dans leur quartier, anciens quartiers logés', () => {
+test('la très grande île : calques cohérents, le cœur intact, chantiers à plat, anciens quartiers logés, voisinages', () => {
   const map = require('../src/services/worldMap');
   const legacy = require('../src/services/worldMapV2');
+  const heart = require('../src/services/islandData');
   for (const layer of [map.GRID, map.HEIGHT, map.GROUND, map.REGION]) {
     assert.equal(layer.length, map.SIZE);
     assert.ok(layer.every(row => row.length === map.SIZE));
   }
-  // Mer partout où il n'y a ni relief ni quartier (le pont de l'îlot excepté) ; relief de 0 à 3
+  // Mer partout où il n'y a ni relief ni quartier (les ponts sur la mer exceptés) ; relief de 0 à 6
   for (let y = 0; y < map.SIZE; y++) {
     for (let x = 0; x < map.SIZE; x++) {
       const g = map.groundAt(x, y);
-      assert.ok('~sdgmftrwpkb'.includes(g), `${x},${y} ${g}`);
+      assert.ok('~sdgmftrwpkbnvlxjao'.includes(g), `${x},${y} ${g}`);
       if (g === '~') assert.ok(map.heightAt(x, y) === -1 && map.zoneAt(x, y) === null, `${x},${y}`);
-      else if (g !== 'b') assert.ok(map.heightAt(x, y) >= 0 && map.heightAt(x, y) <= 3 && map.zoneAt(x, y), `${x},${y}`);
+      else if (g === 'b') assert.ok(map.heightAt(x, y) === 0 && map.zoneAt(x, y) === null, `${x},${y}`);
+      else assert.ok(map.heightAt(x, y) >= 0 && map.heightAt(x, y) <= 6 && map.zoneAt(x, y), `${x},${y}`);
+    }
+  }
+  // Le cœur : chaque case de terre de la grande île, telle quelle, en OFFSET
+  for (let y = 0; y < 48; y++) {
+    for (let x = 0; x < 48; x++) {
+      if (heart.GROUND[y][x] === '~') continue;
+      const X = x + map.OFFSET.x, Y = y + map.OFFSET.y;
+      assert.deepEqual([map.GROUND[Y][X], map.HEIGHT[Y][X], map.REGION[Y][X]], [heart.GROUND[y][x], heart.HEIGHT[y][x], heart.REGION[y][x]], `${x},${y}`);
     }
   }
   // Chaque chantier : grande emprise 3 × 3 plate, constructible, dans un seul quartier ; la petite y est incluse
@@ -329,9 +342,28 @@ test('la grande île : calques cohérents, chantiers à plat dans leur quartier,
   // La Mine s'adosse à la falaise de la Colline : du relief plus haut juste derrière elle
   const mine = map.SITE_BIG.carriere;
   assert.ok([0, 1, 2].some(d => map.heightAt(mine.x + d, mine.y - 1) > map.heightAt(mine.x, mine.y)));
-  // Douze quartiers, chacun avec son panneau ; les sept anciens gardent leur identifiant
-  assert.equal(map.ZONES.length, 12);
+  // Vingt-quatre quartiers, chacun avec son panneau ; ceux des terres nouvelles ont un climat et une durée d'expédition
+  assert.equal(map.ZONES.length, 24);
   map.ZONES.forEach(z => assert.ok(map.ANCHORS[z.id], z.id));
+  const fresh = map.ZONES.filter(z => z.trip);
+  assert.equal(fresh.length, 12);
+  assert.deepEqual([...new Set(fresh.map(z => z.climate))].sort(), ['cimes', 'dunes', 'jungle', 'landes', 'marais', 'volcan']);
+  assert.ok(map.ZONES.filter(z => !z.trip).every(z => z.climate === 'tempere'));
+  // Voisinages : on entre dans les terres nouvelles par le cœur (Roselières, Contreforts), puis de proche en proche
+  // jusqu'au Cratère (le pont de la Cascade mène aux Coulées noires)
+  assert.ok(map.NEIGHBORS.roselieres.includes('lisiere') && map.NEIGHBORS.contreforts.includes('hauteurs'));
+  assert.ok(map.NEIGHBORS.coulees.includes('cascade'));
+  const reached = new Set(map.ZONES.filter(z => !z.trip).map(z => z.id));
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const z of fresh) if (!reached.has(z.id) && map.NEIGHBORS[z.id].some(id => reached.has(id))) { reached.add(z.id); grew = true; }
+  }
+  assert.equal(reached.size, 24);
+  // Un quartier inconnu ne montre que sa côte : relief plat, sol inconnu
+  const veil = map.veiled(new Set(['x']));
+  const crater = [map.ANCHORS.cratere.x, map.ANCHORS.cratere.y];
+  assert.deepEqual([veil.ground[crater[1]][crater[0]], veil.height[crater[1]][crater[0]]], ['u', '1']);
+  assert.equal(veil.ground[map.SITE_BIG.foyer.y][map.SITE_BIG.foyer.x], map.GROUND[map.SITE_BIG.foyer.y][map.SITE_BIG.foyer.x]);
   // Chaque ancien quartier tient dans le nouveau, même avec tous les chantiers au plus grand
   const all = Object.fromEntries(Object.keys(map.SITE_BIG).map(id => [id, 7]));
   const old = {};

@@ -261,8 +261,8 @@ CREATE TABLE IF NOT EXISTS world_buildings (
     PRIMARY KEY (user_id, site)
 );
 -- Le Monde v3 : carte commune de 20 × 20 (services/worldMap.js) et quartiers achetés par le joueur.
--- map_version : 1 = ancienne île 14 × 14 ; 2 = île 20 × 20 ; 3 = grande île 48 × 48. Le passage se fait une fois par
--- joueur, à sa première visite (services/world.js, migrate).
+-- map_version : 1 = ancienne île 14 × 14 ; 2 = île 20 × 20 ; 3 = grande île 48 × 48 ; 4 = très grande île 96 × 96 (la
+-- précédente en est le cœur). Le passage se fait une fois par joueur, à sa première visite (services/world.js, migrate).
 ALTER TABLE world_stock ADD COLUMN IF NOT EXISTS map_version SMALLINT NOT NULL DEFAULT 1;
 CREATE TABLE IF NOT EXISTS world_zones (
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -412,6 +412,15 @@ CREATE TABLE IF NOT EXISTS world_craft_runs (
     finished_at TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS idx_world_craft_runs_user ON world_craft_runs (user_id, created_at);
+-- Expéditions vers les quartiers des terres nouvelles (lot 9) : une par quartier ; revenue (ends_at passé), elle l'a
+-- découvert. Une seule en route à la fois (services/world.js, startExpedition)
+CREATE TABLE IF NOT EXISTS world_expeditions (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    zone VARCHAR(20) NOT NULL,
+    started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    ends_at TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (user_id, zone)
+);
 -- Besoins des habitants (services/villagers.js) : dernière fois que chacun a été comblé ('manger', 'outils'). La ligne
 -- naît quand l'habitant arrive (il arrive comblé) ; se distraire se lit sur l'île (décorations), sans ligne.
 CREATE TABLE IF NOT EXISTS world_needs (

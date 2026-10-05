@@ -153,6 +153,15 @@ router.post('/world/zone', withAccount(async (req, res, owner, b) => {
     res.json({ bought: done.bought, coins: done.coins, world: await worldView(owner, b) });
 }));
 
+// Expédition vers un quartier inconnu des terres nouvelles (lot 9) : { expedition: { zone, endsAt }, world }
+router.post('/world/expedition', withAccount(async (req, res, owner, b) => {
+    const zone = String(req.body.zone || '');
+    if (!/^[a-z]{1,20}$/.test(zone)) return res.status(400).json({ message: 'Quartier invalide' });
+    const done = await world.startExpedition(owner.id, zone);
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json({ expedition: done, world: await worldView(owner, b) });
+}));
+
 // Chantier : niveau suivant, avec son plan (élément du Livre) et ses ressources
 router.post('/world/build', withAccount(async (req, res, owner, b) => {
     const site = String(req.body.site || '');
