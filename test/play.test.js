@@ -385,46 +385,138 @@ test('le Livre : un mélange visé dit combien d’ingrédients sont justes, pui
   assert.equal(elsewhere.data.aim, undefined);
 });
 
-test('le Monde : compte requis, décorations achetées dans un quartier possédé, déplacées gratuitement', async () => {
+test('le Monde : compte requis ; les décorations de l’ancienne règle sont remboursées une fois, puis retirées', async () => {
   const visitor = await guest();
   assert.equal((await api('GET', '/play/world', null, visitor)).status, 402);
 
-  const player = await newPlayer();
+  const player = await newPlayer({ coins: 0 });
   const start = await api('GET', '/play/world', null, player);
   assert.equal(start.status, 200);
   assert.equal(start.data.size, 48);
   assert.deepEqual(start.data.tiles, []);
+  assert.equal(start.data.refund, undefined);
   assert.equal(start.data.map.grid.length, 48);
   assert.deepEqual([start.data.map.height.length, start.data.map.ground.length, start.data.map.region.length], [48, 48, 48]);
   assert.deepEqual(start.data.map.zones.filter(z => z.owned).map(z => z.id), ['coeur']);
-  assert.equal(start.data.decoPrices.I, 10);
+  // Deux décorations posées avec l'ancienne règle : Eau (chapitre I, 10 écus) et Boue (chapitre II, 15 écus)
+  await sql(`INSERT INTO world_tiles (user_id, x, y, element) VALUES ($1, 31, 35, 'Eau'), ($1, 32, 35, 'Boue')`, [player.userId]);
+  const both = await Promise.all([1, 2].map(() => api('GET', '/play/world', null, player)));
+  assert.deepEqual(both.map(r => r.data.refund).filter(Boolean), [{ count: 2, coins: 25, balance: 25 }]);
+  both.forEach(r => assert.deepEqual(r.data.tiles, []));
+  assert.equal(await coinsOf(player), 25);
+  assert.equal((await sql('SELECT COUNT(*)::int AS n FROM world_tiles WHERE user_id = $1', [player.userId]))[0].n, 0);
+  assert.equal((await api('GET', '/play/world', null, player)).data.refund, undefined);
+  assert.equal(await coinsOf(player), 25);
+  // L'ancienne pose n'existe plus
+  assert.notEqual((await api('POST', '/play/world/place', { element: 'Eau', x: 31, y: 35 }, player)).status, 200);
+});
 
-  assert.equal((await api('POST', '/play/world/place', { element: 'Dragon', x: 31, y: 35 }, player)).status, 403);
-  // Mer, place d'un chantier (le Foyer, sur la Grève), chemin, arbre, quartier non acheté
-  assert.equal((await api('POST', '/play/world/place', { element: 'Eau', x: 0, y: 0 }, player)).status, 400);
-  assert.equal((await api('POST', '/play/world/place', { element: 'Eau', x: 30, y: 32 }, player)).status, 400);
-  assert.equal((await api('POST', '/play/world/place', { element: 'Eau', x: 27, y: 31 }, player)).status, 400);
-  assert.equal((await api('POST', '/play/world/place', { element: 'Eau', x: 30, y: 35 }, player)).status, 400);
-  assert.equal((await api('POST', '/play/world/place', { element: 'Eau', x: 24, y: 33 }, player)).status, 403);
-  // Une décoration s'achète : sans écus, refusée ; avec, payée une fois
-  assert.equal((await api('POST', '/play/world/place', { element: 'Eau', x: 31, y: 35 }, player)).status, 400);
-  await sql('UPDATE progress SET coins = 25 WHERE user_id = $1', [player.userId]);
-  const placed = await api('POST', '/play/world/place', { element: 'Eau', x: 31, y: 35 }, player);
+// Résout un assemblage comme un joueur (recherche exhaustive) : [{ piece, rot, x, y }]
+function solveCraft(run) {
+  const crafts = require('../src/services/crafts');
+  const goal = crafts.cellsOf(run.shape).map(([x, y]) => `${x},${y}`);
+  const inside = new Set(goal);
+  const filled = new Set();
+  const used = run.pieces.map(() => false);
+  const layout = [];
+  const fill = () => {
+    const next = goal.find(k => !filled.has(k));
+    if (!next) return true;
+    const [fx, fy] = next.split(',').map(Number);
+    for (let i = 0; i < run.pieces.length; i++) {
+      if (used[i]) continue;
+      for (let rot = 0; rot < 4; rot++) {
+        const cells = crafts.turn(run.pieces[i], rot);
+        const x = fx - cells[0][0];
+        const y = fy - cells[0][1];
+        const keys = cells.map(([cx, cy]) => `${cx + x},${cy + y}`);
+        if (!keys.every(k => inside.has(k) && !filled.has(k))) continue;
+        keys.forEach(k => filled.add(k));
+        used[i] = true;
+        layout.push({ piece: i, rot, x, y });
+        if (fill()) return true;
+        layout.pop();
+        used[i] = false;
+        keys.forEach(k => filled.delete(k));
+      }
+    }
+    return false;
+  };
+  return fill() ? layout : null;
+}
+
+test('créations d’île : assembler (pièces vérifiées), payer à la réussite, poser selon la règle, déplacer, ranger', async () => {
+  const player = await newPlayer();
+  const view = async () => (await api('GET', '/play/world', null, player)).data;
+  const start = craft => api('POST', '/play/world/craft/start', { craft }, player);
+  const finish = (run, layout) => api('POST', '/play/world/craft/finish', { run, layout }, player);
+  const place = (craft, x, y) => api('POST', '/play/world/craft/place', { craft, x, y }, player);
+  const make = async craft => {
+    const { run } = (await start(craft)).data;
+    return finish(run.id, solveCraft(run));
+  };
+  const first = await view();
+  const cat = (world, id) => world.crafts.catalog.find(c => c.id === id);
+  // Palier de départ ouvert ; palier I fermé (ni chapitre I fini, ni 10 questions de l'Épreuve)
+  assert.deepEqual(first.crafts.open, ['start']);
+  assert.deepEqual(first.crafts.epreuves, { have: 0, need: 10 });
+  assert.equal(first.crafts.catalog.length, 18);
+  assert.match(cat(first, 'muret').block, /Palier I/);
+  assert.match(cat(first, 'cloture').block, /ressources/);
+  assert.equal((await start('cloture')).status, 403);
+  await sql('UPDATE world_stock SET wood = 60, stone = 60, water = 60, food = 60 WHERE user_id = $1', [player.userId]);
+  // Un assemblage : le gabarit et ses pièces ; une disposition fausse est refusée (rien payé), l'assemblage est rendu
+  const { run } = (await start('cloture')).data;
+  assert.deepEqual(run.shape, ['x.x', 'xxx', 'x.x']);
+  assert.ok(run.pieces.length >= 2 && run.pieces.every(p => p.length >= 2));
+  assert.equal((await finish(run.id, [{ piece: 0, rot: 0, x: 9, y: 9 }])).status, 400);
+  assert.equal((await finish(run.id, solveCraft(run))).status, 404);
+  assert.equal((await view()).stock.wood, 60);
+  // Résolu : 8 bûches payées, la Clôture attend en réserve, avec les cases où la poser
+  const made = await make('cloture');
+  assert.equal(made.status, 200);
+  assert.deepEqual([made.data.made, made.data.craft, made.data.world.stock.wood], ['Clôture', 'cloture', 52]);
+  const fence = cat(made.data.world, 'cloture');
+  assert.deepEqual([fence.made, fence.reserve], [1, 1]);
+  assert.ok(fence.spots.some(sp => sp.x === 31 && sp.y === 35));
+  // Pose : chantier, chemin, quartier pas à soi refusés ; puis posée ; la réserve est vide
+  assert.equal((await place('cloture', 30, 32)).status, 400);
+  assert.equal((await place('cloture', 27, 31)).status, 400);
+  assert.equal((await place('cloture', 24, 33)).status, 400);
+  const placed = await place('cloture', 31, 35);
   assert.equal(placed.status, 200);
-  assert.deepEqual(placed.data.tiles.map(t => [t.element, t.x, t.y]), [['Eau', 31, 35]]);
-  assert.ok(placed.data.tiles[0].emoji);
-  assert.equal(placed.data.coins, 15);
-  assert.equal(await coinsOf(player), 15);
-  // Case occupée par un autre élément : refusé ; même élément ailleurs : déplacé, sans payer
-  assert.equal((await api('POST', '/play/world/place', { element: 'Feu', x: 31, y: 35 }, player)).status, 409);
-  const moved = await api('POST', '/play/world/place', { element: 'Eau', x: 32, y: 35 }, player);
-  assert.deepEqual(moved.data.tiles.map(t => [t.element, t.x, t.y]), [['Eau', 32, 35]]);
-  assert.equal(await coinsOf(player), 15);
-  // Les décorations ne produisent rien
-  await sql(`UPDATE world_tiles SET placed_at = NOW() - INTERVAL '3 hours' WHERE user_id = $1`, [player.userId]);
-  assert.equal((await api('GET', '/play/world', null, player)).data.pending, 0);
-  const removed = await api('POST', '/play/world/remove', { x: 32, y: 35 }, player);
-  assert.deepEqual(removed.data.tiles, []);
+  assert.deepEqual(placed.data.world.crafts.placed, [{ x: 31, y: 35, craft: 'cloture' }]);
+  assert.equal((await place('cloture', 32, 35)).status, 409);
+  // Posée, elle garde ses cases (pour la déplacer), sans la sienne
+  const fenceSpots = cat(placed.data.world, 'cloture').spots;
+  assert.ok(fenceSpots.some(sp => sp.x === 32 && sp.y === 35) && !fenceSpots.some(sp => sp.x === 31 && sp.y === 35));
+  // Déplacée gratuitement, puis rangée dans la réserve
+  const moved = await api('POST', '/play/world/craft/move', { x: 31, y: 35, toX: 32, toY: 35 }, player);
+  assert.deepEqual(moved.data.world.crafts.placed, [{ x: 32, y: 35, craft: 'cloture' }]);
+  const stored = await api('POST', '/play/world/craft/store', { x: 32, y: 35 }, player);
+  assert.deepEqual(stored.data.world.crafts.placed, []);
+  assert.equal(cat(stored.data.world, 'cloture').reserve, 1);
+  assert.equal((await api('POST', '/play/world/craft/store', { x: 32, y: 35 }, player)).status, 404);
+  // Palier I par l'Épreuve (10 questions) ; la Lanterne demande Feu et Lumière, et le bord d'un chemin
+  await sql(`UPDATE progress SET timer_progress = jsonb_set(timer_progress, '{completedQuestions}', '{"Facile":{"A":[1,2,3,4,5,6,7,8,9,10]}}') WHERE user_id = $1`, [player.userId]);
+  const opened = await view();
+  assert.deepEqual(opened.crafts.open, ['start', 'I']);
+  assert.match(cat(opened, 'lanterne').block, /Lumière/);
+  await sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Lumière"]'::jsonb WHERE user_id = $1`, [player.userId]);
+  assert.equal((await make('lanterne')).status, 200);
+  assert.equal((await place('lanterne', 30, 30)).status, 400);
+  assert.equal((await place('lanterne', 28, 31)).status, 200);
+  // Le Banc (après la Clôture) se pose près de la Lanterne, pas loin d'elle
+  assert.equal((await make('banc')).status, 200);
+  assert.equal((await place('banc', 32, 35)).status, 400);
+  assert.equal((await place('banc', 29, 31)).status, 200);
+  // Les créations comptent pour les quêtes de Brume ; entrées invalides ; compte requis
+  assert.equal((await view()).brume.quest.done, true);
+  assert.equal((await start('inconnue')).status, 404);
+  assert.equal((await start('DROP')).status, 400);
+  assert.equal((await finish('x', [])).status, 400);
+  assert.equal((await place('cloture', -1, 3)).status, 400);
+  assert.equal((await api('POST', '/play/world/craft/start', { craft: 'cloture' }, await guest())).status, 402);
 });
 
 test('le Monde : un quartier s’achète avec des écus et un chapitre ouvert, une seule fois', async () => {
@@ -571,18 +663,18 @@ test('le Monde : une île de l’ancienne carte passe à la nouvelle sans rien p
   await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'potager', 1)`, [player.userId]);
   const [a, b] = await Promise.all([api('GET', '/play/world', null, player), api('GET', '/play/world', null, player)]);
   const view = a.data;
-  // v1 → v2 (décalée de 3 cases : la Lisière) → v3 (dans la Lisière de la grande île, au plus près de son panneau),
-  // quartiers offerts, écus dus par la décoration versés une seule fois
-  assert.deepEqual(view.tiles.map(t => [t.element, t.x, t.y]), [['Eau', 13, 34]]);
-  assert.deepEqual(b.data.tiles.map(t => [t.x, t.y]), [[13, 34]]);
+  // v1 → v2 → v3 : quartiers offerts, écus dus par la décoration versés une seule fois (3) ; puis la décoration est
+  // remboursée (lot 8 : Eau, chapitre I, 10 écus) et retirée
+  assert.deepEqual(view.tiles, []);
+  assert.deepEqual(b.data.tiles, []);
   const owned = view.map.zones.filter(z => z.owned).map(z => z.id).sort();
   assert.deepEqual(owned, ['coeur', 'jardins', 'lisiere']);
-  assert.equal(await coinsOf(player), 3);
+  assert.equal(await coinsOf(player), 13);
   await api('GET', '/play/world', null, player);
-  assert.equal(await coinsOf(player), 3);
+  assert.equal(await coinsOf(player), 13);
 });
 
-test('le Monde : une île de la carte v2 passe à la grande île, chaque décoration dans son quartier', async () => {
+test('le Monde : une île de la carte v2 passe à la grande île ; ses décorations sont remboursées', async () => {
   const player = await newPlayer({ coins: 0 });
   await api('GET', '/play/world', null, player);
   // Île v2 simulée : décorations dans le Cœur, la Lisière, les Jardins et la Crique ; quartiers et bâtiment achetés
@@ -592,20 +684,15 @@ test('le Monde : une île de la carte v2 passe à la grande île, chaque décora
   await sql(`INSERT INTO world_tiles (user_id, x, y, element) VALUES ($1, 8, 8, 'Eau'), ($1, 12, 12, 'Feu'), ($1, 4, 5, 'Terre'), ($1, 4, 12, 'Air'), ($1, 14, 14, 'Boue')`, [player.userId]);
   const before = await coinsOf(player);
   const [a, b] = await Promise.all([api('GET', '/play/world', null, player), api('GET', '/play/world', null, player)]);
-  const map = require('../src/services/worldMap');
   for (const view of [a.data, b.data]) {
     assert.equal(view.size, 48);
-    // Rien de perdu : cinq décorations, chacune sur une case libre de son ancien quartier
-    const zones = view.tiles.map(t => [t.element, map.zoneAt(t.x, t.y)]).sort((p, q) => (p[0] + p[1]).localeCompare(q[0] + q[1]));
-    assert.deepEqual(zones, [['Air', 'jardins'], ['Boue', 'crique'], ['Eau', 'coeur'], ['Feu', 'coeur'], ['Terre', 'lisiere']]);
-    view.tiles.forEach(t => assert.ok(map.buildable(t.x, t.y) && !map.inFootprint(t.x, t.y, { ponton: 2 }), `${t.x},${t.y}`));
+    assert.deepEqual(view.tiles, []);
     assert.deepEqual(view.map.zones.filter(z => z.owned).map(z => z.id).sort(), ['coeur', 'crique', 'jardins', 'lisiere']);
     assert.equal(view.sites.find(s => s.id === 'ponton').level, 2);
   }
-  // Une seule migration (rien ne bouge à la vue suivante), aucun écu versé ni pris
-  const again = (await api('GET', '/play/world', null, player)).data;
-  assert.deepEqual(again.tiles.map(t => [t.x, t.y]), a.data.tiles.map(t => [t.x, t.y]));
-  assert.equal(await coinsOf(player), before);
+  // Une seule migration ; les cinq décorations remboursées une fois (Eau, Feu, Terre, Air : 10 ; Boue : 15)
+  await api('GET', '/play/world', null, player);
+  assert.equal(await coinsOf(player), before + 55);
   assert.equal((await sql('SELECT map_version FROM world_stock WHERE user_id = $1', [player.userId]))[0].map_version, 3);
 });
 
@@ -755,7 +842,7 @@ test('le Monde : un chantier demande son quartier, son plan du Livre et ses ress
   assert.equal((await api('POST', '/play/world/build', { site: 'foyer' }, player)).status, 403);
 });
 
-test('le Monde : les paliers III à VII demandent chapitre et écus, le palier IV agrandit l’emprise et déplace les décorations', async () => {
+test('le Monde : les paliers III à VII demandent chapitre et écus, le palier IV agrandit l’emprise et range les créations', async () => {
   const player = await newPlayer({ coins: 0 });
   const siteOf = (world, id) => world.sites.find(s => s.id === id);
   const build = () => api('POST', '/play/world/build', { site: 'carriere' }, player);
@@ -788,18 +875,17 @@ test('le Monde : les paliers III à VII demandent chapitre et écus, le palier I
   const galerie = siteOf(third.data.world, 'carriere');
   assert.deepEqual([galerie.x, galerie.y, galerie.w, galerie.h], [25, 21, 2, 2]);
 
-  // Une décoration posée là où la Mine va s'étendre est déplacée quand l'emprise s'agrandit
-  const placed = await api('POST', '/play/world/place', { element: 'Bronze', x: 24, y: 20 }, player);
-  assert.equal(placed.status, 200);
+  // Une création posée là où la Mine va s'étendre est rangée dans la réserve quand l'emprise s'agrandit
+  await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'cloture', 24, 20)`, [player.userId]);
   const fourth = await build();
   assert.equal(fourth.status, 200);
   assert.equal(fourth.data.built, 'Galerie');
-  assert.equal(fourth.data.coins, 850 - 15 - 300);
+  assert.equal(fourth.data.coins, 850 - 300);
   const big = siteOf(fourth.data.world, 'carriere');
   assert.deepEqual([big.x, big.y, big.w, big.h], [24, 20, 3, 3]);
-  const bronze = fourth.data.world.tiles.find(t => t.element === 'Bronze');
-  assert.ok(bronze && !(bronze.x >= 24 && bronze.x < 27 && bronze.y >= 20 && bronze.y < 23), 'décoration sortie de l’emprise');
-  assert.equal((await api('POST', '/play/world/place', { element: 'Bronze', x: 24, y: 21 }, player)).status, 400);
+  assert.deepEqual(fourth.data.world.crafts.placed, []);
+  assert.equal(fourth.data.world.crafts.catalog.find(c => c.id === 'cloture').reserve, 1);
+  assert.equal((await api('POST', '/play/world/craft/place', { craft: 'cloture', x: 24, y: 21 }, player)).status, 400);
   // Palier V : chapitre V encore fermé
   const fifth = await build();
   assert.equal(fifth.status, 403);
@@ -932,14 +1018,13 @@ test('besoins des habitants : manger, travailler, se distraire ; l’humeur chan
   await ago('foyer', 'manger', 25);
   const sad = who(await view(), 'foyer');
   assert.deepEqual([sad.mood, sad.moodEffect], ['triste', 'Une partie de Récolte revient 3 min plus lentement']);
-  // Se distraire : trois décorations à 3 cases au plus du Foyer (celle du haut est trop loin)
-  await sql('UPDATE progress SET coins = 100 WHERE user_id = $1', [player.userId]);
-  for (const [element, x, y] of [['Eau', 31, 35], ['Feu', 32, 35], ['Air', 29, 27]]) {
-    assert.equal((await api('POST', '/play/world/place', { element, x, y }, player)).status, 200);
-  }
+  // Se distraire : trois créations d'île à 3 cases au plus du Foyer (celle du haut est trop loin)
+  const decorate = cells => sql(`INSERT INTO world_crafts (user_id, craft, x, y) SELECT $1, 'cloture', c[1], c[2] FROM jsonb_to_recordset($2::jsonb) AS t(c int[])`,
+    [player.userId, JSON.stringify(cells.map(c => ({ c })))]);
+  await decorate([[31, 35], [32, 35], [29, 27]]);
   assert.deepEqual(deco(who(await view(), 'foyer')), { id: 'deco', met: false, have: 2, need: 3, reach: 3 });
-  const pretty = await api('POST', '/play/world/place', { element: 'Terre', x: 33, y: 35 }, player);
-  assert.equal(deco(who(pretty.data, 'foyer')).met, true);
+  await decorate([[33, 35]]);
+  assert.equal(deco(who(await view(), 'foyer')).met, true);
   const happy = who((await fill('foyer', 'manger')).data.world, 'foyer');
   assert.deepEqual([happy.mood, happy.moodEffect], ['heureux', 'Une partie de Récolte revient 3 min plus vite']);
   // Rose (Potager, 10 h de production, plafonnées à 8) : contente, puis triste : −10 % de vivres et d'écus
@@ -1230,7 +1315,8 @@ test('annexes : posées autour du bâtiment au palier voulu, payées une fois, d
   const taken = r1.status === 200 ? b : c;
   const free = r1.status === 200 ? c : b;
   assert.equal((await place('grenier', taken)).status, 403);
-  assert.equal((await api('POST', '/play/world/place', { element: 'Eau', ...a }, player)).status, 409);
+  await sql(`INSERT INTO world_crafts (user_id, craft) VALUES ($1, 'cloture')`, [player.userId]);
+  assert.equal((await api('POST', '/play/world/craft/place', { craft: 'cloture', ...a }, player)).status, 400);
   // Déplacement gratuit vers une case autorisée ; pas hors de portée, pas sur une case prise
   const move = (from, to) => api('POST', '/play/world/annex/move', { x: from.x, y: from.y, toX: to.x, toY: to.y }, player);
   assert.equal((await move(a, { x: 31, y: 35 })).status, 400);
@@ -1450,8 +1536,8 @@ test('quêtes de Brume : la quête active se réclame une fois, son objectif att
   assert.equal((await api('POST', '/play/world/quest', { id: 'deco' }, player)).status, 403);
   assert.equal((await api('POST', '/play/world/quest', { id: 'source' }, player)).status, 409);
   assert.equal((await api('POST', '/play/world/quest', { id: 'DROP TABLE' }, player)).status, 400);
-  // Une décoration posée : deux réclamations simultanées, une seule récompense
-  await sql(`INSERT INTO world_tiles (user_id, x, y, element) VALUES ($1, 31, 35, 'Eau')`, [player.userId]);
+  // Une création posée : deux réclamations simultanées, une seule récompense
+  await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'cloture', 31, 35)`, [player.userId]);
   const [a, b] = await Promise.all([1, 2].map(() => api('POST', '/play/world/quest', { id: 'deco' }, player)));
   assert.deepEqual([a.status, b.status].sort(), [200, 409]);
   const ok = a.status === 200 ? a : b;

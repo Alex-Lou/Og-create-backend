@@ -8,7 +8,7 @@ const { SITES } = require('../src/services/world');
 // Découvertes nécessaires à chaque chapitre (bookPages.CHAPTERS)
 const NEED = { I: 0, II: 0, III: 5, IV: 12, V: 25, VI: 45, VII: 70 };
 const CHAPTERS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
-const facts = (extra = {}) => ({ tiles: 0, runs: 0, stars: 0, zones: new Set(['coeur']), levels: { foyer: 1 }, ...extra });
+const facts = (extra = {}) => ({ crafts: 0, runs: 0, stars: 0, zones: new Set(['coeur']), levels: { foyer: 1 }, ...extra });
 
 test('chaque quête désigne un vrai quartier ou un vrai palier, avec un texte et une récompense', () => {
   assert.equal(new Set(QUESTS.map(q => q.id)).size, QUESTS.length);
@@ -51,7 +51,7 @@ test('chaque objectif est atteignable quand sa quête devient active (quartier a
 });
 
 test('avancée d’un objectif, plafonnée', () => {
-  assert.deepEqual(progressOf({ kind: 'tiles', need: 10 }, facts({ tiles: 3 })), { have: 3, need: 10 });
+  assert.deepEqual(progressOf({ kind: 'crafts', need: 10 }, facts({ crafts: 3 })), { have: 3, need: 10 });
   assert.deepEqual(progressOf({ kind: 'stars', need: 5 }, facts({ stars: 9 })), { have: 5, need: 5 });
   assert.deepEqual(progressOf({ kind: 'zone', zone: 'source' }, facts()), { have: 0, need: 1 });
   assert.deepEqual(progressOf({ kind: 'zone', zone: 'source' }, facts({ zones: new Set(['coeur', 'source']) })), { have: 1, need: 1 });
@@ -66,7 +66,7 @@ test('la quête active est la première non réclamée ; à la fin, Brume se rep
   assert.equal(first.step, 1);
   assert.equal(first.total, QUESTS.length);
   assert.equal(first.done, false);
-  assert.equal(active(new Set(), facts({ tiles: 1 })).done, true);
+  assert.equal(active(new Set(), facts({ crafts: 1 })).done, true);
   const second = active(new Set([QUESTS[0].id]), facts());
   assert.equal(second.id, QUESTS[1].id);
   assert.equal(second.kind, 'runs');

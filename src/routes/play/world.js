@@ -4,39 +4,66 @@ const book = require('../../services/recipeBook');
 const players = require('../../services/players');
 const world = require('../../services/world');
 const bookPages = require('../../services/bookPages');
-const { NAME, playLimiter, withAccount } = require('./shared');
+const { playLimiter, withAccount } = require('./shared');
 
 const router = express.Router();
 router.use('/world', playLimiter);
 
+// Vue de l'île. Les décorations de l'ancienne règle sont remboursées au premier passage (lot 8) : refund { count,
+// coins } accompagne alors la vue, une fois
 async function worldView(owner, b) {
     const owned = await players.elements(owner);
-    return world.view(owner.id, owned, {
-        describe: names => book.describe(b, names), openChapters: bookPages.openChapters(b, owned), stars: bookPages.starsOf(b, owned)
+    const refund = await world.refundDecorations(owner.id, element => decoPrice(b, element));
+    const view = await world.view(owner.id, owned, {
+        describe: names => book.describe(b, names), openChapters: bookPages.openChapters(b, owned), stars: bookPages.starsOf(b, owned),
+        finished: bookPages.finishedChapters(b, owned)
     });
+    return refund.count ? { ...view, refund } : view;
 }
 
-// Prix d'une décoration : selon le chapitre de la famille de l'élément
-const decoPrice = (b, element) => world.DECO_PRICES[bookPages.chapterOf(b.meta.get(element)?.family).id];
+// Prix qu'avait coûté une décoration (ancienne règle) : selon le chapitre de la famille de l'élément
+const decoPrice = (b, element) => world.DECO_PRICES[bookPages.chapterOf(b.meta.get(element)?.family)?.id] || 0;
 
 router.get('/world', withAccount(async (req, res, owner, b) => {
     res.json(await worldView(owner, b));
 }));
 
-router.post('/world/place', withAccount(async (req, res, owner, b) => {
-    const { element } = req.body;
-    if (typeof element !== 'string' || !NAME.test(element)) return res.status(400).json({ message: 'Élément invalide' });
-    const placed = await world.place(owner.id, await players.elements(owner), element, Number(req.body.x), Number(req.body.y), decoPrice(b, element));
-    if (placed.status) return res.status(placed.status).json({ message: placed.message });
-    // Solde après achat (absent pour un simple déplacement)
-    res.json({ ...(await worldView(owner, b)), ...(placed.coins !== undefined ? { coins: placed.coins } : {}) });
+// Créations d'île (lot 8) : assembler (début : les pièces ; fin : la disposition, vérifiée), poser, déplacer, ranger
+const craftId = body => String(body.craft || '');
+const craftDone = async (res, owner, b, done, extra = {}) => {
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json({ ...extra, world: await worldView(owner, b) });
+};
+router.post('/world/craft/start', withAccount(async (req, res, owner, b) => {
+    const craft = craftId(req.body);
+    if (!/^[a-z]{1,20}$/.test(craft)) return res.status(400).json({ message: 'Création invalide' });
+    const owned = await players.elements(owner);
+    const done = await world.startCraft(owner.id, craft, owned, bookPages.finishedChapters(b, owned));
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json({ run: done.run });
 }));
-
-router.post('/world/remove', withAccount(async (req, res, owner, b) => {
+router.post('/world/craft/finish', withAccount(async (req, res, owner, b) => {
+    const run = Number(req.body.run);
+    if (!Number.isSafeInteger(run) || run <= 0 || !Array.isArray(req.body.layout) || req.body.layout.length > 40) return res.status(400).json({ message: 'Assemblage invalide' });
+    const owned = await players.elements(owner);
+    const done = await world.finishCraft(owner.id, run, req.body.layout, owned, bookPages.finishedChapters(b, owned));
+    await craftDone(res, owner, b, done, { made: done.made, craft: done.craft });
+}));
+router.post('/world/craft/place', withAccount(async (req, res, owner, b) => {
+    const craft = craftId(req.body);
     const x = Number(req.body.x), y = Number(req.body.y);
-    if (![x, y].every(v => Number.isInteger(v) && v >= 0 && v < world.SIZE)) return res.status(400).json({ message: 'Case invalide' });
-    await world.remove(owner.id, x, y);
-    res.json(await worldView(owner, b));
+    if (!/^[a-z]{1,20}$/.test(craft) || !cellOk(x, y)) return res.status(400).json({ message: 'Pose invalide' });
+    await craftDone(res, owner, b, await world.placeCraft(owner.id, craft, x, y));
+}));
+router.post('/world/craft/move', withAccount(async (req, res, owner, b) => {
+    const [x, y, toX, toY] = ['x', 'y', 'toX', 'toY'].map(k => Number(req.body[k]));
+    if (!cellOk(x, y, toX, toY)) return res.status(400).json({ message: 'Case invalide' });
+    await craftDone(res, owner, b, await world.moveCraft(owner.id, x, y, toX, toY));
+}));
+router.post('/world/craft/store', withAccount(async (req, res, owner, b) => {
+    const x = Number(req.body.x), y = Number(req.body.y);
+    if (!cellOk(x, y)) return res.status(400).json({ message: 'Case invalide' });
+    await craftDone(res, owner, b, await world.storeCraft(owner.id, x, y));
 }));
 
 router.post('/world/collect', withAccount(async (req, res, owner, b) => {
