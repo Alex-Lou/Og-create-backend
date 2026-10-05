@@ -698,17 +698,42 @@ async function openChest(userId, source, openChapters, now = Date.now()) {
         await stockOf(userId, conn, true);
         const { day, slot, opened } = await openedOf(userId, now, conn);
         if (quest && !(await claimedOf(userId, conn)).has(quest.id)) return db.rollback({ status: 403, message: 'Réclame d’abord cette quête de Brume.' });
-        let chest;
-        if (source === 'jour') {
-            const streak = streakOf(opened, day);
-            chest = await grant(userId, `jour:${day}`, loot.dailyRarity(streak), conn, { streak });
-        } else if (source === 'bouteille') {
-            chest = await grant(userId, `bouteille:${day}-${slot}`, loot.rarityOf(loot.BOTTLE.odds, random), conn);
-        } else {
-            chest = await grant(userId, source, chapter ? 'legendaire' : quest.chest, conn, { wanted: chapter });
-        }
+        const chest = await grantSource(userId, source, { day, slot, opened }, conn);
         if (!chest) return db.rollback({ status: 409, message: source === 'bouteille' ? 'La prochaine bouteille n’est pas encore arrivée.' : 'Ce coffre est déjà ouvert.' });
         return { chest, coins: await balanceOf(userId, conn) };
+    });
+}
+
+// Tire et donne le coffre d'une source déjà validée ('jour', 'bouteille', 'chapitre:<id>', 'quete:<id>'), dans la
+// transaction : sa clé et sa rareté selon le jour, la tranche et la série. null s'il est déjà ouvert
+function grantSource(userId, source, { day, slot, opened }, conn) {
+    if (source === 'jour') {
+        const streak = streakOf(opened, day);
+        return grant(userId, `jour:${day}`, loot.dailyRarity(streak), conn, { streak });
+    }
+    if (source === 'bouteille') return grant(userId, `bouteille:${day}-${slot}`, loot.rarityOf(loot.BOTTLE.odds, random), conn);
+    const [kind, id] = source.split(':');
+    const chapter = kind === 'chapitre' ? loot.CHAPTER_RARES[id] : null;
+    return grant(userId, source, chapter ? 'legendaire' : QUEST_CHESTS.find(q => q.id === id).chest, conn, { wanted: chapter });
+}
+
+// « Tout ouvrir » : tout ce qui attend (coffre du jour, chapitres ouverts, quêtes réclamées, bouteille), dans une seule
+// transaction. La liste est celle que montre la vue, établie ici sous verrou, jamais reçue du client.
+// { chests, coins } ou { status, message } s'il n'y a rien à ouvrir
+async function openAll(userId, openChapters, now = Date.now()) {
+    await migrate(userId);
+    return db.transaction(async conn => {
+        await stockOf(userId, conn, true);
+        const state = await openedOf(userId, now, conn);
+        const { daily, pending, bottle } = chestsView(state, openChapters, await claimedOf(userId, conn));
+        const sources = [...(daily.available ? ['jour'] : []), ...pending.map(c => c.source), ...(bottle.available ? ['bouteille'] : [])];
+        const chests = [];
+        for (const source of sources) {
+            const chest = await grantSource(userId, source, state, conn);
+            if (chest) chests.push(chest);
+        }
+        if (!chests.length) return db.rollback({ status: 409, message: 'Aucun coffre à ouvrir.' });
+        return { chests, coins: await balanceOf(userId, conn) };
     });
 }
 
@@ -889,6 +914,6 @@ async function collect(userId) {
 
 module.exports = {
     SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, isFree, pendingOf, chargesAt, effectsOf, productionOf,
-    view, build, buyZone, buyItem, undoItem, chooseSkin, startRun, finishRun, place, remove, collect, migrate, claimQuest, board, openChest,
+    view, build, buyZone, buyItem, undoItem, chooseSkin, startRun, finishRun, place, remove, collect, migrate, claimQuest, board, openChest, openAll,
     placeAnnex, moveAnnex, annexSpotOk
 };

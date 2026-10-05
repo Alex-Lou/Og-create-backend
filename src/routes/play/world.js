@@ -135,6 +135,13 @@ router.post('/world/chest', withAccount(async (req, res, owner, b) => {
     res.json({ chest: done.chest, coins: done.coins, world: await worldView(owner, b) });
 }));
 
+// « Tout ouvrir » : tous les coffres qui attendent, d'un coup (le serveur dresse la liste)
+router.post('/world/chests/all', withAccount(async (req, res, owner, b) => {
+    const done = await world.openAll(owner.id, bookPages.openChapters(b, await players.elements(owner)));
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json({ chests: done.chests, coins: done.coins, world: await worldView(owner, b) });
+}));
+
 // Brume seule (la quête active), pour le Livre : une quête accomplie y est annoncée
 router.get('/world/brume', withAccount(async (req, res, owner, b) => {
     res.json(await world.board(owner.id, bookPages.starsOf(b, await players.elements(owner))));
