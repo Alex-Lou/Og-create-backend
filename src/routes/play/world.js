@@ -9,13 +9,16 @@ const { playLimiter, withAccount } = require('./shared');
 const router = express.Router();
 router.use('/world', playLimiter);
 
+// Chapitres ouverts du joueur (un joueur d'avant la bible garde le chapitre II ouvert d'emblée)
+const chaptersOf = async (owner, b, owned) => bookPages.openChapters(b, owned, await players.isVeteran(owner));
+
 // Vue de l'île. Les décorations de l'ancienne règle sont remboursées au premier passage (lot 8) : refund { count,
 // coins } accompagne alors la vue, une fois
 async function worldView(owner, b) {
     const owned = await players.elements(owner);
     const refund = await world.refundDecorations(owner.id, element => decoPrice(b, element));
     const view = await world.view(owner.id, owned, {
-        describe: names => book.describe(b, names), openChapters: bookPages.openChapters(b, owned), stars: bookPages.starsOf(b, owned),
+        describe: names => book.describe(b, names), openChapters: await chaptersOf(owner, b, owned), stars: bookPages.starsOf(b, owned),
         finished: bookPages.finishedChapters(b, owned)
     });
     return refund.count ? { ...view, refund } : view;
@@ -38,7 +41,7 @@ router.post('/world/craft/start', withAccount(async (req, res, owner, b) => {
     const craft = craftId(req.body);
     if (!/^[a-z]{1,20}$/.test(craft)) return res.status(400).json({ message: 'Création invalide' });
     const owned = await players.elements(owner);
-    const done = await world.startCraft(owner.id, craft, owned, bookPages.finishedChapters(b, owned));
+    const done = await world.startCraft(owner.id, craft, owned, bookPages.finishedChapters(b, owned), bookPages.starsOf(b, owned));
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ run: done.run });
 }));
@@ -46,7 +49,7 @@ router.post('/world/craft/finish', withAccount(async (req, res, owner, b) => {
     const run = Number(req.body.run);
     if (!Number.isSafeInteger(run) || run <= 0 || !Array.isArray(req.body.layout) || req.body.layout.length > 40) return res.status(400).json({ message: 'Assemblage invalide' });
     const owned = await players.elements(owner);
-    const done = await world.finishCraft(owner.id, run, req.body.layout, owned, bookPages.finishedChapters(b, owned));
+    const done = await world.finishCraft(owner.id, run, req.body.layout, owned, bookPages.finishedChapters(b, owned), bookPages.starsOf(b, owned));
     await craftDone(res, owner, b, done, { made: done.made, craft: done.craft });
 }));
 router.post('/world/craft/place', withAccount(async (req, res, owner, b) => {
@@ -109,6 +112,14 @@ router.post('/world/name', withAccount(async (req, res, owner, b) => {
     res.json(await worldView(owner, b));
 }));
 
+// Le nom du peuple (bible, § 6.11)
+router.post('/world/people', withAccount(async (req, res, owner, b) => {
+    if (typeof (req.body.name ?? '') !== 'string') return res.status(400).json({ message: 'Nom invalide' });
+    const done = await world.namePeople(owner.id, req.body.name);
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json(await worldView(owner, b));
+}));
+
 // Enseignes (dès le palier V) : le nom écrit dessus, puis le style de celle d'un bâtiment (acheté au passage)
 router.post('/world/sign/name', withAccount(async (req, res, owner, b) => {
     const done = await world.nameSigns(owner.id, req.body.name);
@@ -148,7 +159,7 @@ router.post('/world/annex/move', withAccount(async (req, res, owner, b) => {
 router.post('/world/zone', withAccount(async (req, res, owner, b) => {
     const zone = String(req.body.zone || '');
     if (!/^[a-z]{1,20}$/.test(zone)) return res.status(400).json({ message: 'Quartier invalide' });
-    const done = await world.buyZone(owner.id, zone, bookPages.openChapters(b, await players.elements(owner)));
+    const done = await world.buyZone(owner.id, zone, await chaptersOf(owner, b, await players.elements(owner)));
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ bought: done.bought, coins: done.coins, world: await worldView(owner, b) });
 }));
@@ -185,7 +196,7 @@ router.post('/world/build', withAccount(async (req, res, owner, b) => {
     const site = String(req.body.site || '');
     if (!/^[a-z]{1,20}$/.test(site)) return res.status(400).json({ message: 'Chantier invalide' });
     const owned = await players.elements(owner);
-    const done = await world.build(owner.id, owned, site, bookPages.openChapters(b, owned));
+    const done = await world.build(owner.id, owned, site, await chaptersOf(owner, b, owned));
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ built: done.built, ...(done.coins !== undefined ? { coins: done.coins } : {}), world: await worldView(owner, b) });
 }));
@@ -271,29 +282,31 @@ router.post('/world/visitor/settle', withAccount(async (req, res, owner, b) => {
 // Coffre qui attend : du jour, bouteille à la mer, chapitre du Livre ouvert, quête de Brume réclamée, lieu découvert
 router.post('/world/chest', withAccount(async (req, res, owner, b) => {
     const source = String(req.body.source || '');
-    if (!/^(jour|bouteille|chapitre:[IVX]{1,4}|quete:[a-z0-9]{1,30}|lieu:[a-z]{1,20})$/.test(source)) return res.status(400).json({ message: 'Coffre invalide' });
-    const done = await world.openChest(owner.id, source, bookPages.openChapters(b, await players.elements(owner)));
+    if (!/^(jour|bouteille|chapitre:[IVX]{1,4}|quete:[a-z0-9-]{1,30}|lieu:[a-z]{1,20})$/.test(source)) return res.status(400).json({ message: 'Coffre invalide' });
+    const done = await world.openChest(owner.id, source, await chaptersOf(owner, b, await players.elements(owner)));
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ chest: done.chest, coins: done.coins, world: await worldView(owner, b) });
 }));
 
 // « Tout ouvrir » : tous les coffres qui attendent, d'un coup (le serveur dresse la liste)
 router.post('/world/chests/all', withAccount(async (req, res, owner, b) => {
-    const done = await world.openAll(owner.id, bookPages.openChapters(b, await players.elements(owner)));
+    const done = await world.openAll(owner.id, await chaptersOf(owner, b, await players.elements(owner)));
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ chests: done.chests, coins: done.coins, world: await worldView(owner, b) });
 }));
 
-// Brume seule (la quête active), pour le Livre : une quête accomplie y est annoncée
+// Brume seule (la quête active), pour le Grimoire : une quête accomplie y est annoncée
 router.get('/world/brume', withAccount(async (req, res, owner, b) => {
-    res.json(await world.board(owner.id, bookPages.starsOf(b, await players.elements(owner))));
+    const owned = await players.elements(owner);
+    res.json(await world.board(owner.id, owned, bookPages.starsOf(b, owned), await chaptersOf(owner, b, owned)));
 }));
 
 // Quête de Brume : réclamer la récompense de la quête active
 router.post('/world/quest', withAccount(async (req, res, owner, b) => {
     const id = String(req.body.id || '');
-    if (!/^[a-z0-9]{1,30}$/.test(id)) return res.status(400).json({ message: 'Quête invalide' });
-    const done = await world.claimQuest(owner.id, id, bookPages.starsOf(b, await players.elements(owner)));
+    if (!/^[a-z0-9-]{1,30}$/.test(id)) return res.status(400).json({ message: 'Quête invalide' });
+    const owned = await players.elements(owner);
+    const done = await world.claimQuest(owner.id, id, owned, bookPages.starsOf(b, owned));
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ gained: done.gained, coins: done.coins, world: await worldView(owner, b) });
 }));

@@ -54,15 +54,17 @@ const moodSign = mood => (mood === 'heureux' ? 1 : mood === 'triste' ? -1 : 0);
 const MOOD_STEP = { prod: 0.1, moves: 2, regenMs: 3 * 60 * 1000 };
 
 // Besoins d'un habitant à l'instant now. filled : { besoin: date où il a été comblé } (absent : il arrive, comblé
-// maintenant) ; decos : décorations autour de son bâtiment ; atelier : l'Atelier est bâti.
+// maintenant) ; decos : décorations autour de son bâtiment ; atelier : l'Atelier est bâti ; deco : se distraire compte
+// (son bâtiment est bâti et le prologue est fini : bible, § 6.6).
 // [{ id, met, left (ms), refill, cost } | { id: 'deco', met, have, need, reach }]
-function needsOf(filled, decos, atelier, now) {
+function needsOf(filled, decos, atelier, now, { deco = true } = {}) {
     const out = FILLABLE.filter(id => id !== 'outils' || atelier).map(id => {
         const need = NEEDS[id];
         const at = filled[id] ? new Date(filled[id]).getTime() : now;
         const left = Math.max(0, at + need.hours * HOUR_MS - now);
         return { id, met: left > 0, left, refill: left <= need.hours * HOUR_MS / 2, cost: need.cost };
     });
+    if (!deco) return out;
     const { decos: need, reach } = NEEDS.deco;
     out.push({ id: 'deco', met: decos >= need, have: Math.min(decos, need), need, reach });
     return out;

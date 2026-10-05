@@ -49,6 +49,17 @@ async function createGuest(res) {
 
 const asList = value => (Array.isArray(value) ? value.filter(v => typeof v === 'string') : []);
 
+// Joueurs d'avant la bible (lot H1, HISTOIRE.md du dépôt front) : comptes créés avant le déploiement du lot. Rien ne
+// recule pour eux : le chapitre II leur reste ouvert d'emblée, chaque habitant dont le bâtiment est bâti reste là,
+// Cannelle arrive comblée. Un invité n'en est jamais un : le prologue est fait pour lui. Date à régler sur l'heure du
+// déploiement du lot H1 (un compte créé entre le déploiement et cette date garde simplement les anciennes règles).
+const VETERAN_BEFORE = new Date('2026-10-06T06:00:00Z');
+async function veteranOf(userId, conn = db) {
+    const { rows } = await conn.query('SELECT created_at < $2 AS veteran FROM users WHERE id = $1', [userId, VETERAN_BEFORE]);
+    return Boolean(rows[0]?.veteran);
+}
+const isVeteran = async owner => owner.kind === 'user' && veteranOf(owner.id);
+
 // Carnet de l'Infini
 async function elements(owner) {
     if (owner.kind === 'user') {
@@ -111,4 +122,4 @@ async function adoptGuest(req, res, userId) {
     );
 }
 
-module.exports = { resolve, createGuest, elements, addElement, getRun, addToRun, takeFreeJoker, adoptGuest };
+module.exports = { VETERAN_BEFORE, veteranOf, isVeteran, resolve, createGuest, elements, addElement, getRun, addToRun, takeFreeJoker, adoptGuest };

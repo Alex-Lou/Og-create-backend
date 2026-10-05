@@ -2,7 +2,7 @@
 // - Catalogue : chaque création coûte des ressources (prises au stock) et demande des éléments déjà découverts dans le
 //   Livre (savoir-faire, non consommés). Elle s'ouvre quand son palier est ouvert et qu'on a déjà fabriqué celles qui
 //   la précèdent (after).
-// - Paliers : « start » ouvert d'emblée (pour apprendre) ; I : chapitre I du Livre entièrement trouvé, ou EPREUVES
+// - Paliers : « start » ouvert d'emblée (pour apprendre) ; I : STARS découvertes au Grimoire (bible, D7), ou EPREUVES
 //   questions de l'Épreuve réussies ; II, III : chapitre II, III entièrement trouvé. « climat » (lot 9d) : ouvert
 //   d'emblée, ses créations coûtent aussi des trouvailles de climat (finds) et ne se posent que dans leur climat ;
 //   chacune posée dans un quartier y fait rendre une trouvaille de plus à chaque ramassage (world.js).
@@ -17,6 +17,7 @@ const map = require('./worldMap');
 const finds = require('./finds');
 
 const EPREUVES = 10;
+const STARS = 10;
 const TIERS = ['start', 'I', 'II', 'III', 'climat'];
 // Plus grande pièce, et pièces tournées, selon le palier
 const PIECE_MAX = { start: 3, I: 3, II: 4, III: 4, climat: 4 };
@@ -159,11 +160,11 @@ function check(shape, pieces, layout) {
     return filled.size === goal.size ? { ok: true } : { ok: false, error: 'le gabarit n’est pas rempli' };
 }
 
-// Paliers ouverts : finished = Set des chapitres du Livre entièrement trouvés ; epreuves = questions réussies (le palier
-// des climats est toujours ouvert : ses trouvailles le gardent)
-function tiersOpen(finished, epreuves) {
+// Paliers ouverts : finished = Set des chapitres du Grimoire entièrement trouvés ; epreuves = questions réussies ;
+// stars = découvertes du Grimoire (le palier des climats est toujours ouvert : ses trouvailles le gardent)
+function tiersOpen(finished, epreuves, stars = 0) {
     const open = new Set(['start']);
-    if (finished.has('I') || epreuves >= EPREUVES) open.add('I');
+    if (stars >= STARS || finished.has('I') || epreuves >= EPREUVES) open.add('I');
     for (const t of ['II', 'III']) if (finished.has(t)) open.add(t);
     open.add('climat');
     return open;
@@ -172,7 +173,7 @@ function tiersOpen(finished, epreuves) {
 // Ce qui empêche de fabriquer une création (texte), ou null. made : { création: nombre fabriqué } ; owned : Set des
 // éléments du Livre ; stock : ressources ; open : paliers ouverts ; have : trouvailles de climat
 function blockOf(c, { made, owned, stock, open, have = {} }) {
-    if (!open.has(c.tier)) return c.tier === 'I' ? `Palier I : finis le chapitre I du Grimoire, ou réussis ${EPREUVES} questions de l’Épreuve.` : `Palier ${c.tier} : finis le chapitre ${c.tier} du Grimoire.`;
+    if (!open.has(c.tier)) return c.tier === 'I' ? `Palier I : inscris ${STARS} découvertes au Grimoire, ou réussis ${EPREUVES} questions de l’Épreuve.` : `Palier ${c.tier} : finis le chapitre ${c.tier} du Grimoire.`;
     const before = c.after.filter(id => !made[id]);
     if (before.length) return `Fabrique d’abord : ${before.map(id => CRAFT_BY_ID[id].name).join(', ')}.`;
     const unknown = c.elements.filter(e => !owned.has(e));
@@ -221,5 +222,5 @@ function spotBlock(c, x, y, ctx) {
 }
 
 module.exports = {
-    EPREUVES, TIERS, PIECE_MAX, TURNED, CRAFTS, CRAFT_BY_ID, cellsOf, mulberry32, normal, turn, piecesOf, check, tiersOpen, blockOf, placeText, gapTo, spotBlock
+    EPREUVES, STARS, TIERS, PIECE_MAX, TURNED, CRAFTS, CRAFT_BY_ID, cellsOf, mulberry32, normal, turn, piecesOf, check, tiersOpen, blockOf, placeText, gapTo, spotBlock
 };

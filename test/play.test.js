@@ -513,8 +513,9 @@ test('créations d’île : assembler (pièces vérifiées), payer à la réussi
   assert.equal((await make('banc')).status, 200);
   assert.equal((await place('banc', X(32), Y(35))).status, 400);
   assert.equal((await place('banc', X(29), Y(31))).status, 200);
-  // Les créations comptent pour les quêtes de Brume ; entrées invalides ; compte requis
-  assert.equal((await view()).brume.quest.done, true);
+  // Les créations comptent pour les quêtes de Brume (la quête « deco » du prologue) ; entrées invalides ; compte requis
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'soupe')`, [player.userId]);
+  assert.deepEqual([(await view()).brume.quest.id, (await view()).brume.quest.done], ['deco', true]);
   assert.equal((await start('inconnue')).status, 404);
   assert.equal((await start('DROP')).status, 400);
   assert.equal((await finish('x', [])).status, 400);
@@ -1148,15 +1149,16 @@ test('habitants : on leur parle et on les gâte une fois par jour ; chaque cœur
   const talk = villager => api('POST', '/play/world/villager/talk', { villager }, player);
   const gift = (villager, resource) => api('POST', '/play/world/villager/gift', { villager, resource }, player);
   const view = (await api('GET', '/play/world', null, player)).data;
-  // Seule Cannelle (Foyer) vit déjà sur l'île
-  assert.deepEqual(view.villagers.map(w => [w.id, w.name, w.hearts, w.talked, w.gifted]), [['foyer', 'Cannelle', 0, false, false]]);
+  // Cannelle (Foyer) vit déjà sur l'île ; Aster aussi, dès le compte (bible, § 6.6), au camp tant que le Ponton n'est pas là
+  assert.deepEqual(view.villagers.map(w => [w.id, w.name, w.hearts, w.talked, w.gifted, w.built]),
+    [['ponton', 'Aster', 0, false, false, false], ['foyer', 'Cannelle', 0, false, false, true]]);
   assert.deepEqual(view.friendship.hearts, [30, 80, 150, 250, 400]);
   assert.equal((await talk('potager')).status, 403);
   // Bavarder : +8, une fois par jour
   const hello = await talk('foyer');
   assert.equal(hello.status, 200);
   assert.deepEqual([hello.data.gained, hello.data.hearts, hello.data.rewards], [8, 0, []]);
-  assert.equal(hello.data.world.villagers[0].talked, true);
+  assert.equal(hello.data.world.villagers.find(v => v.id === 'foyer').talked, true);
   assert.equal((await talk('foyer')).status, 409);
   // Cadeau : 15 ressources ; Cannelle adore la nourriture (+30) : premier cœur, 40 écus
   assert.equal((await gift('foyer', 'food')).status, 400);
@@ -1215,7 +1217,8 @@ test('besoins des habitants : manger, travailler, se distraire ; l’humeur chan
   assert.deepEqual([paulette.mood, paulette.moodEffect, paulette.happyEffect], ['content', null, 'Une partie de Récolte revient 3 min plus vite']);
   assert.deepEqual(first.needs.kinds.manger, { label: 'Manger', hours: 24, cost: { food: 10 } });
   assert.deepEqual(first.needs.kinds.deco, { label: 'Se distraire', decos: 3, reach: 3 });
-  assert.equal((await sql('SELECT COUNT(*)::int AS n FROM world_needs WHERE user_id = $1', [player.userId]))[0].n, 1);
+  // Cannelle et Aster (là dès le compte) arrivent comblées
+  assert.equal((await sql('SELECT COUNT(*)::int AS n FROM world_needs WHERE user_id = $1', [player.userId]))[0].n, 2);
   // Pas encore faim ; à mi-chemin, on peut la nourrir : 10 vivres
   assert.equal((await fill('foyer', 'manger')).status, 409);
   await ago('foyer', 'manger', 13);
@@ -1744,24 +1747,24 @@ test('quêtes de Brume : la quête active se réclame une fois, son objectif att
   const player = await newPlayer();
   const start = await api('GET', '/play/world', null, player);
   assert.equal(start.status, 200);
-  assert.equal(start.data.brume.quest.id, 'deco');
-  assert.equal(start.data.brume.quest.done, false);
+  assert.deepEqual([start.data.brume.quest.id, start.data.brume.quest.kind, start.data.brume.quest.done], ['pages', 'stars', false]);
   assert.equal(start.data.brume.done, 0);
+  assert.equal(start.data.brume.total, 55);
   // Objectif pas encore atteint ; quête qui n'est pas l'active ; identifiant invalide
-  assert.equal((await api('POST', '/play/world/quest', { id: 'deco' }, player)).status, 403);
-  assert.equal((await api('POST', '/play/world/quest', { id: 'source' }, player)).status, 409);
+  assert.equal((await api('POST', '/play/world/quest', { id: 'pages' }, player)).status, 403);
+  assert.equal((await api('POST', '/play/world/quest', { id: 'achat-source' }, player)).status, 409);
   assert.equal((await api('POST', '/play/world/quest', { id: 'DROP TABLE' }, player)).status, 400);
-  // Une création posée : deux réclamations simultanées, une seule récompense
-  await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'cloture', 31, 35)`, [player.userId]);
-  const [a, b] = await Promise.all([1, 2].map(() => api('POST', '/play/world/quest', { id: 'deco' }, player)));
+  // Trois pages écrites : deux réclamations simultanées, une seule récompense
+  await sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Vapeur", "Boue", "Lave"]'::jsonb WHERE user_id = $1`, [player.userId]);
+  const [a, b] = await Promise.all([1, 2].map(() => api('POST', '/play/world/quest', { id: 'pages' }, player)));
   assert.deepEqual([a.status, b.status].sort(), [200, 409]);
   const ok = a.status === 200 ? a : b;
-  assert.equal(ok.data.gained, 20);
-  assert.equal(ok.data.coins, 20);
-  assert.equal(await coinsOf(player), 20);
+  assert.equal(ok.data.gained, 25);
+  assert.equal(ok.data.coins, 25);
+  assert.equal(await coinsOf(player), 25);
   assert.equal(ok.data.world.brume.quest.id, 'recolte');
   assert.equal(ok.data.world.brume.done, 1);
-  assert.equal((await api('POST', '/play/world/quest', { id: 'deco' }, player)).status, 409);
+  assert.equal((await api('POST', '/play/world/quest', { id: 'pages' }, player)).status, 409);
   // Brume seule, pour le Livre : la même quête active, sans le reste de l'île
   const brume = await api('GET', '/play/world/brume', null, player);
   assert.equal(brume.status, 200);
@@ -1772,3 +1775,123 @@ test('quêtes de Brume : la quête active se réclame une fois, son objectif att
   assert.equal((await api('GET', '/play/world/brume', null, { cookies: {} })).status, 401);
 });
 
+
+// Lot H1 (la colonne vertébrale de la bible) : un nouveau compte suit le prologue, chaque objectif se lit dans l'état
+test('le prologue d’un nouveau compte : la troupe arrive à sa rencontre, Ondin dort, le chapitre II s’ouvre à 3 pages', async () => {
+  const player = await newPlayer({ veteran: false });
+  const view = async () => (await api('GET', '/play/world', null, player)).data;
+  const claim = id => api('POST', '/play/world/quest', { id }, player);
+  const talk = villager => api('POST', '/play/world/villager/talk', { villager }, player);
+  const write = names => sql('UPDATE progress SET infinite_elements = infinite_elements || $2::jsonb WHERE user_id = $1', [player.userId, JSON.stringify(names)]);
+  const who = (world, id) => world.villagers.find(v => v.id === id);
+  // Le chapitre II est scellé jusqu'à la 3e découverte (un joueur d'avant la bible l'a d'emblée)
+  assert.deepEqual((await api('GET', '/play/book', null, player)).data.chapters.slice(0, 2).map(c => [c.need, c.open]), [[0, true], [3, false]]);
+  const veteran = await newPlayer();
+  assert.deepEqual((await api('GET', '/play/book', null, veteran)).data.chapters[1].open, true);
+  // Au compte : Aster seule, au camp ; Cannelle n'est pas encore rencontrée
+  const first = await view();
+  assert.deepEqual(first.villagers.map(v => [v.id, v.built, v.asleep]), [['ponton', false, false]]);
+  assert.equal((await talk('foyer')).status, 403);
+  assert.equal(first.brume.quest.id, 'pages');
+  await write(['Vent', 'Pluie', 'Brasier']);
+  assert.equal((await api('GET', '/play/book', null, player)).data.chapters[1].open, true);
+  assert.equal((await claim('pages')).status, 200);
+  // Une Récolte : Cannelle arrive, affamée (la soupe du prologue), sans besoin de se distraire
+  await sql(`INSERT INTO world_runs (user_id, seed, config, finished_at) VALUES ($1, 1, '{}', NOW())`, [player.userId]);
+  assert.equal((await claim('recolte')).status, 200);
+  const hungry = await view();
+  assert.deepEqual(who(hungry, 'foyer').needs.map(n => [n.id, n.met, n.refill]), [['manger', false, true]]);
+  assert.deepEqual([hungry.brume.quest.id, hungry.brume.quest.done, hungry.brume.quest.target], ['soupe', false, { villager: 'foyer' }]);
+  assert.equal(who(hungry, 'atelier'), undefined);
+  await sql('UPDATE world_stock SET food = 10, stone = 10 WHERE user_id = $1', [player.userId]);
+  const fed = await api('POST', '/play/world/villager/need', { villager: 'foyer', need: 'manger' }, player);
+  assert.equal(fed.data.world.brume.quest.done, true);
+  assert.equal((await claim('soupe')).status, 200);
+  // Rivet arrive après la soupe ; la Clôture posée, 100 écus : La Source
+  assert.deepEqual(who(await view(), 'atelier').built, false);
+  await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'cloture', $2, $3)`, [player.userId, X(31), Y(35)]);
+  assert.equal((await claim('deco')).status, 200);
+  assert.equal(await coinsOf(player), 100);
+  assert.equal((await api('POST', '/play/world/zone', { zone: 'source' }, player)).status, 200);
+  assert.equal((await claim('achat-source')).status, 200);
+  // Ondin dort à La Source : on le réveille en lui parlant
+  const sleeping = await view();
+  assert.deepEqual([who(sleeping, 'puits').asleep, who(sleeping, 'puits').built], [true, false]);
+  assert.deepEqual([sleeping.brume.quest.id, sleeping.brume.quest.done], ['eveil-ondin', false]);
+  assert.equal((await talk('puits')).data.world.villagers.find(v => v.id === 'puits').asleep, false);
+  assert.equal((await claim('eveil-ondin')).status, 200);
+  // Son don : le Puits écrit au Grimoire, puis bâti ; le prologue fini, se distraire compte
+  const memory = await view();
+  assert.deepEqual([memory.brume.quest.kind, memory.brume.quest.element, memory.brume.quest.done], ['element', 'Puits', false]);
+  await write(['Boue', 'Brique', 'Puits']);
+  assert.equal((await claim('souvenir-ondin')).status, 200);
+  assert.equal((await api('POST', '/play/world/build', { site: 'puits' }, player)).status, 200);
+  const built = await claim('puits-ondin');
+  assert.equal(built.status, 200);
+  // Six découvertes : les chapitres II et III ont leur coffre ; la fin du prologue, le sien
+  assert.deepEqual(built.data.world.chests.pending.map(c => c.source), ['chapitre:II', 'chapitre:III', 'quete:puits-ondin']);
+  assert.deepEqual(who(built.data.world, 'foyer').needs.map(n => n.id), ['manger', 'deco']);
+  assert.deepEqual([who(built.data.world, 'puits').built, built.data.world.brume.quest.id], [true, 'lisiere']);
+  assert.equal(await coinsOf(player), 30 + 10 + 20 + 40);
+});
+
+test('chaque objectif de la chaîne se lit dans l’état (création, annexe, expédition, lieu, bête, voyageur, cœur, trouvaille, maison, nom)', async () => {
+  const player = await newPlayer({ veteran: false });
+  // La quête active juste après celle-ci (les quêtes d'avant comptent comme faites)
+  const after = async id => {
+    await sql('DELETE FROM world_quests WHERE user_id = $1', [player.userId]);
+    await sql('INSERT INTO world_quests (user_id, quest) VALUES ($1, $2)', [player.userId, id]);
+    return (await api('GET', '/play/world', null, player)).data.brume.quest;
+  };
+  const check = async (before, id, act) => {
+    assert.deepEqual([(await after(before)).id, (await after(before)).done], [id, false], id);
+    await act();
+    assert.equal((await after(before)).done, true, id);
+  };
+  await check('lumiere', 'lanterne', () => sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'lanterne', $2, $3)`, [player.userId, X(28), Y(31)]));
+  await check('bois', 'annexe', () => sql(`INSERT INTO world_annexes (user_id, x, y, annex) VALUES ($1, 1, 1, 'champ')`, [player.userId]));
+  await check('etoile', 'expedition', () => sql(`INSERT INTO world_expeditions (user_id, zone, ends_at) VALUES ($1, 'roselieres', NOW() - INTERVAL '1 hour')`, [player.userId]));
+  await check('expedition', 'ruine', () => sql(`INSERT INTO world_landmarks (user_id, landmark) VALUES ($1, 'saule')`, [player.userId]));
+  await check('ponton-aster', 'bete', () => sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Grenouille"]'::jsonb WHERE user_id = $1`, [player.userId]));
+  await check('bete', 'voyageur', () => sql(`INSERT INTO world_visitors (user_id, seed, site, request, leaves_at, satisfied_at) VALUES ($1, 7, 'foyer', '{}', NOW(), NOW())`, [player.userId]));
+  await check('voyageur', 'coeur', () => sql(`INSERT INTO world_friends (user_id, villager, points) VALUES ($1, 'ponton', 30)`, [player.userId]));
+  await check('coeur', 'trouvaille', () => sql(`INSERT INTO world_deposits (user_id, deposit, gathered_at) VALUES ($1, 'd1', NOW())`, [player.userId]));
+  await check('maison', 'une-maison', () => sql(`INSERT INTO world_annexes (user_id, x, y, annex) VALUES ($1, 2, 2, 'maison')`, [player.userId]));
+  await check('une-maison', 'installe', () => sql(`UPDATE world_visitors SET settled_at = NOW() WHERE user_id = $1`, [player.userId]));
+  await check('ecriture', 'cle', () => sql(`INSERT INTO world_landmarks (user_id, landmark) VALUES ($1, 'menhirs')`, [player.userId]));
+  // Le nom du peuple : même règle que les autres noms ; il se change, la quête le lit
+  await check('alchimiste', 'peuple', async () => {
+    assert.equal((await api('POST', '/play/world/people', { name: '!' }, player)).status, 400);
+    assert.equal((await api('POST', '/play/world/people', { name: ['a'] }, player)).status, 400);
+    const named = await api('POST', '/play/world/people', { name: '  Les   Lucioles ' }, player);
+    assert.equal(named.data.people, 'Les Lucioles');
+  });
+  assert.equal((await api('POST', '/play/world/people', { name: 'Les Marées' }, player)).data.people, 'Les Marées');
+  assert.equal((await api('POST', '/play/world/people', { name: 'Les Marées' }, { cookies: {} })).status, 401);
+  // Un quartier dont le chapitre est encore fermé : Brume dit lequel ouvrir
+  const hameau = await after('installe');
+  assert.deepEqual([hameau.id, hameau.chapter], ['hameau', 'V']);
+  // Chaque élément demandé est un vrai élément du Grimoire
+  const { QUESTS, BEASTS } = require('../src/services/quests');
+  const results = new Set((await sql(`SELECT r.value FROM game_data g, jsonb_each_text(g.rules->'rules') r WHERE g.active`)).map(r => r.value));
+  for (const name of QUESTS.flatMap(q => (q.goal.kind === 'element' ? q.goal.any || [q.goal.element] : []))) assert.ok(results.has(name), name);
+  assert.ok(BEASTS.every(name => results.has(name)));
+});
+
+test('un joueur d’avant la bible ne recule jamais : quêtes rangées, coffres dus, habitants et chapitre II gardés', async () => {
+  const player = await newPlayer();
+  await api('GET', '/play/world', null, player);
+  await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'source')`, [player.userId]);
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'deco'), ($1, 'recolte'), ($1, 'source')`, [player.userId]);
+  const world = (await api('GET', '/play/world', null, player)).data;
+  // Plus loin que l'ancienne « Achète La Source » : réveiller Ondin ; le coffre de l'ancienne quête attend toujours
+  assert.deepEqual([world.brume.quest.id, world.brume.done], ['eveil-ondin', 5]);
+  assert.ok(world.chests.pending.some(c => c.source === 'quete:source' && c.rarity === 'rare'));
+  // Cannelle est là d'emblée, comblée, et se distrait comme avant ; Aster, Rivet (la soupe compte comme faite) et
+  // Ondin (La Source à soi) sont arrivés
+  const cannelle = world.villagers.find(v => v.id === 'foyer');
+  assert.deepEqual(cannelle.needs.map(n => [n.id, n.met]), [['manger', true], ['deco', false]]);
+  assert.deepEqual(world.villagers.map(v => v.id), ['puits', 'ponton', 'atelier', 'foyer']);
+  // Chapitre II ouvert sans aucune découverte : La Colline s'achète (zone d'un chapitre II)
+  assert.equal(world.map.zones.find(z => z.id === 'colline').open, true);
+});

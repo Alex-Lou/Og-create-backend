@@ -77,11 +77,14 @@ async function sql(query, params) {
 }
 
 let counter = 0;
-async function newPlayer({ coins = 0 } = {}) {
+// Compte de test. veteran : créé avant la bible (players.VETERAN_BEFORE : les anciennes règles lui restent dues) ;
+// sinon créé après. La date est fixée ici, pour que les tests ne dépendent pas de l'horloge.
+async function newPlayer({ coins = 0, veteran = true } = {}) {
   const email = `test-${process.pid}-${Date.now()}-${counter++}@exemple.fr`;
   const player = { email, password: randomPassword(), cookies: {} };
   const { data } = await api('POST', '/auth/register', { email, password: player.password }, player);
   player.userId = data.userId;
+  await sql('UPDATE users SET created_at = $2 WHERE id = $1', [player.userId, veteran ? '2026-01-01T00:00:00Z' : '2030-01-01T00:00:00Z']);
   await api('POST', '/progress/save', { discoveredElements: ['Eau', 'Feu', 'Terre', 'Air'], discoveredCategories: [] }, player);
   if (coins) await sql('UPDATE progress SET coins = $1 WHERE user_id = $2', [coins, player.userId]);
   return player;
