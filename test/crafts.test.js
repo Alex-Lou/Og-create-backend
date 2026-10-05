@@ -4,10 +4,10 @@ const assert = require('node:assert/strict');
 const crafts = require('../src/services/crafts');
 const bookPages = require('../src/services/bookPages');
 
-test('18 créations sur quatre paliers, chacune après des créations existantes, gabarit d’un seul tenant', () => {
-  assert.equal(crafts.CRAFTS.length, 18);
-  assert.equal(new Set(crafts.CRAFTS.map(c => c.id)).size, 18);
-  assert.deepEqual(crafts.TIERS.map(t => crafts.CRAFTS.filter(c => c.tier === t).length), [2, 6, 6, 4]);
+test('30 créations sur cinq paliers (dont 12 de climat), chacune après des créations existantes, gabarit d’un seul tenant', () => {
+  assert.equal(crafts.CRAFTS.length, 30);
+  assert.equal(new Set(crafts.CRAFTS.map(c => c.id)).size, 30);
+  assert.deepEqual(crafts.TIERS.map(t => crafts.CRAFTS.filter(c => c.tier === t).length), [2, 6, 6, 4, 12]);
   const rank = t => crafts.TIERS.indexOf(t);
   for (const c of crafts.CRAFTS) {
     for (const id of c.after) assert.ok(crafts.CRAFT_BY_ID[id] && rank(crafts.CRAFT_BY_ID[id].tier) <= rank(c.tier), `${c.id} après ${id}`);
@@ -51,9 +51,9 @@ test('un assemblage se vérifie : pièces toutes posées, dans le gabarit, sans 
 });
 
 test('paliers : I par le chapitre I fini ou 10 questions de l’Épreuve ; II et III par leur chapitre fini', () => {
-  assert.deepEqual([...crafts.tiersOpen(new Set(), 9)], ['start']);
-  assert.deepEqual([...crafts.tiersOpen(new Set(), 10)], ['start', 'I']);
-  assert.deepEqual([...crafts.tiersOpen(new Set(['I', 'II']), 0)], ['start', 'I', 'II']);
+  assert.deepEqual([...crafts.tiersOpen(new Set(), 9)], ['start', 'climat']);
+  assert.deepEqual([...crafts.tiersOpen(new Set(), 10)], ['start', 'I', 'climat']);
+  assert.deepEqual([...crafts.tiersOpen(new Set(['I', 'II']), 0)], ['start', 'I', 'II', 'climat']);
   const ctx = (over = {}) => ({ made: {}, owned: new Set(['Feu']), stock: { wood: 50, stone: 50 }, open: new Set(['start', 'I']), ...over });
   const lanterne = crafts.CRAFT_BY_ID.lanterne;
   assert.match(crafts.blockOf(lanterne, ctx()), /Lumière/);
@@ -80,6 +80,29 @@ test('règles de pose : sol, bord de chemin, près d’un bâtiment, près d’u
   assert.equal(crafts.spotBlock(by('banc'), 3, 3, ctx([{ x: 4, y: 4, craft: 'lanterne' }])), null);
   assert.match(crafts.placeText(by('epouvantail'), () => 'Serre'), /3 cases au plus de « Serre »/);
   assert.equal(crafts.placeText(by('cloture')), 'Se pose sur n’importe quelle case libre.');
+});
+
+test('créations de climat : deux par climat, payées aussi en trouvailles, posées seulement dans leur climat et sur leur sol', () => {
+  const map = require('../src/services/worldMap');
+  const finds = require('../src/services/finds');
+  const climate = crafts.CRAFTS.filter(c => c.tier === 'climat');
+  for (const f of finds.FINDS) {
+    const mine = climate.filter(c => c.place.climate === f.climate);
+    assert.equal(mine.length, 2, f.climate);
+    assert.ok(mine.every(c => c.finds[f.id] > 0), f.id);
+    assert.deepEqual(mine[1].after, [mine[0].id]);
+  }
+  assert.ok(crafts.CRAFTS.filter(c => c.tier !== 'climat').every(c => !Object.keys(c.finds).length && !c.place.climate));
+  const igloo = crafts.CRAFT_BY_ID.igloo;
+  const ctx = (over = {}) => ({ made: {}, owned: new Set(['Neige']), stock: { wood: 50 }, open: new Set(['climat']), have: { glace: 8 }, ...over });
+  assert.equal(crafts.blockOf(igloo, ctx()), null);
+  assert.match(crafts.blockOf(igloo, ctx({ have: { glace: 7 } })), /8 glace.*Cimes/);
+  assert.equal(crafts.placeText(igloo), 'Se pose dans Les Cimes, sur la neige.');
+  const spot = { ground: () => 'n', free: () => true, site: () => null, placed: [], climate: () => 'cimes' };
+  assert.equal(crafts.spotBlock(igloo, 1, 1, spot), null);
+  assert.match(crafts.spotBlock(igloo, 1, 1, { ...spot, climate: () => 'landes' }), /Les Cimes/);
+  assert.match(crafts.spotBlock(igloo, 1, 1, { ...spot, ground: () => 'r' }), /neige/);
+  assert.equal(map.CLIMATES.cimes, 'Les Cimes');
 });
 
 test('un chapitre est fini quand toutes ses pages sont trouvées', () => {

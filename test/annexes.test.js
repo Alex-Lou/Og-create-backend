@@ -8,22 +8,36 @@ const map = require('../src/services/worldMap');
 const hoursAgo = (h, now) => new Date(now - h * 3600000);
 
 test('trois annexes par bâtiment : petite (palier II), réserve (IV), grande (VI) ; le Foyer a aussi ses maisons', () => {
-  assert.equal(annexes.ANNEXES.length, 22);
+  assert.equal(annexes.ANNEXES.length, 28);
   for (const site of Object.keys(world.SITES)) {
-    const own = annexes.ANNEXES.filter(a => a.site === site && a.kind !== 'house');
+    const own = annexes.ANNEXES.filter(a => a.site === site && a.kind !== 'house' && a.kind !== 'climate');
     assert.deepEqual(own.map(a => a.kind), ['small', 'reserve', 'grand'], site);
     assert.deepEqual(own.map(a => annexes.levelFor(a, 0)), [2, 4, 6], site);
   }
   assert.deepEqual(annexes.ANNEXES.filter(a => a.kind === 'house').map(a => [a.id, a.site]), [['maison', 'foyer']]);
-  assert.equal(new Set(annexes.ANNEXES.map(a => a.id)).size, 22);
+  assert.equal(new Set(annexes.ANNEXES.map(a => a.id)).size, 28);
+});
+
+test('annexes de climat : une par trouvaille, au palier III, payées aussi en trouvailles', () => {
+  const finds = require('../src/services/finds');
+  const climate = annexes.ANNEXES.filter(a => a.kind === 'climate');
+  assert.deepEqual(climate.map(a => Object.keys(a.finds)[0]).sort(), finds.FINDS.map(f => f.id).sort());
+  for (const a of climate) {
+    assert.equal(annexes.maxOf(a), 1);
+    assert.equal(annexes.levelFor(a, 0), 3);
+    assert.deepEqual(annexes.priceOf(a, 0), { cost: a.cost, coins: 500, finds: { [Object.keys(a.finds)[0]]: 15 } });
+  }
+  assert.equal(annexes.effectText(annexes.ANNEX_BY_ID.glaciere, ['seaux d’eau'], 8), 'Garde 12 h de production au lieu de 8');
+  assert.equal(annexes.effectText(annexes.ANNEX_BY_ID.serre, ['vivres'], 8), '+5 vivres et +4 écus par heure');
+  assert.equal(annexes.effectText(annexes.ANNEX_BY_ID.metier, [], 8), '+1 partie de Récolte en réserve');
 });
 
 test('quatre maisons au Foyer (paliers II à V), leur coût double ; chacune loge un visiteur', () => {
   const maison = annexes.ANNEX_BY_ID.maison;
   assert.equal(annexes.maxOf(maison), 4);
   assert.deepEqual([0, 1, 2, 3].map(k => annexes.levelFor(maison, k)), [2, 3, 4, 5]);
-  assert.deepEqual(annexes.priceOf(maison, 0), { cost: { wood: 30, stone: 20 }, coins: 80 });
-  assert.deepEqual(annexes.priceOf(maison, 3), { cost: { wood: 240, stone: 160 }, coins: 800 });
+  assert.deepEqual(annexes.priceOf(maison, 0), { cost: { wood: 30, stone: 20 }, coins: 80, finds: {} });
+  assert.deepEqual(annexes.priceOf(maison, 3), { cost: { wood: 240, stone: 160 }, coins: 800, finds: {} });
   assert.equal(annexes.effectText(maison, [], 8), 'Loge un visiteur qui veut rester sur l’île');
   // Une maison ne change ni la production ni la Récolte
   const extra = annexes.bonusesOf([{ annex: 'maison', built_at: new Date() }]);
@@ -34,8 +48,8 @@ test('la petite annexe d’un bâtiment qui produit se pose 3 fois (paliers II, 
   const champ = annexes.ANNEX_BY_ID.champ;
   assert.equal(annexes.maxOf(champ), 3);
   assert.deepEqual([0, 1, 2].map(k => annexes.levelFor(champ, k)), [2, 3, 5]);
-  assert.deepEqual(annexes.priceOf(champ, 0), { cost: { wood: 20, water: 20 }, coins: 100 });
-  assert.deepEqual(annexes.priceOf(champ, 2), { cost: { wood: 80, water: 80 }, coins: 600 });
+  assert.deepEqual(annexes.priceOf(champ, 0), { cost: { wood: 20, water: 20 }, coins: 100, finds: {} });
+  assert.deepEqual(annexes.priceOf(champ, 2), { cost: { wood: 80, water: 80 }, coins: 600, finds: {} });
   // Foyer et Atelier : un seul exemplaire
   assert.equal(annexes.maxOf(annexes.ANNEX_BY_ID.jardin), 1);
   assert.equal(annexes.maxOf(annexes.ANNEX_BY_ID.charbon), 1);
