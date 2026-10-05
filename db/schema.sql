@@ -377,6 +377,18 @@ CREATE TABLE IF NOT EXISTS world_friends (
     gifted_on DATE,
     PRIMARY KEY (user_id, villager)
 );
+-- Visiteurs (services/visitors.js) : graine (allure, prénom), métier (bâtiment), demande, séjour, comblé ou non
+CREATE TABLE IF NOT EXISTS world_visitors (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    seed INTEGER NOT NULL,
+    site VARCHAR(20) NOT NULL,
+    request JSONB NOT NULL,
+    arrived_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    leaves_at TIMESTAMPTZ NOT NULL,
+    satisfied_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_world_visitors_user ON world_visitors (user_id, arrived_at);
 -- Besoins des habitants (services/villagers.js) : dernière fois que chacun a été comblé ('manger', 'outils'). La ligne
 -- naît quand l'habitant arrive (il arrive comblé) ; se distraire se lit sur l'île (décorations), sans ligne.
 CREATE TABLE IF NOT EXISTS world_needs (
