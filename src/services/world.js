@@ -33,6 +33,10 @@ const GAME_TTL_MS = 15 * 60 * 1000; // une partie de mini-jeu non rendue après 
 const GAME_SLACK_MS = 3000; // tolérance d'horloge : un geste ne peut dater de plus tard que la partie elle-même
 const CRAFT_TTL_MS = 30 * 60 * 1000; // un assemblage non rendu après 30 min est perdu (rien n'est encore payé)
 const MOVES = 15;
+// Première Récolte du joueur (le tutoriel de la bible, § 9, étape 2) : un plateau généreux, sans l'eau (le Puits n'est
+// pas encore là) et avec des coups en plus ; la configuration est figée dans la partie, le rejeu la suit
+const FIRST_RUN_MOVES = 4;
+const FIRST_RUN_KINDS = harvest.BASE_KINDS.filter(kind => kind !== 'water');
 const RESOURCES = ['stone', 'wood', 'water', 'food'];
 // 1 : île 14 × 14 ; 2 : île 20 × 20 (worldMapV2.js) ; 3 : la grande île 48 × 48 ; 4 : la très grande île 96 × 96, dont
 // la précédente est le cœur (worldMap.js)
@@ -1062,8 +1066,9 @@ async function view(userId, owned, book) {
             styles: signs.STYLES.map(st => ({ id: st.id, name: st.name, price: st.price, text: st.text, owned: !st.price || signed.owned.has(st.id) }))
         },
         annexes: annexRows.filter(r => annexes.ANNEX_BY_ID[r.annex]).map(r => ({ x: r.x, y: r.y, annex: r.annex, site: annexes.ANNEX_BY_ID[r.annex].site })),
-        // Le nom du peuple (bible, § 6.11), une fois choisi
+        // Le nom du peuple (bible, § 6.11), une fois choisi ; le nom du joueur (§ 9, étape 2)
         people: named.peuple || null,
+        player: named.joueur || null,
         // Brume, le feu follet : la quête active (ou son dernier mot)
         brume: (() => {
             const out = boardWith(claimed, facts, book.openChapters);
@@ -1153,7 +1158,10 @@ function startRun(userId) {
         if (charges.count < 1) return db.rollback({ status: 409, message: 'Plus de partie en réserve : la prochaine revient bientôt.' });
         await conn.query('UPDATE world_stock SET charges = $2, charges_at = $3 WHERE user_id = $1', [userId, charges.count - 1, new Date(charges.since)]);
         const seed = crypto.randomInt(1, 2147483647);
-        const { kinds, maxMoves, boosts } = effects;
+        const first = !(await conn.query('SELECT 1 FROM world_runs WHERE user_id = $1 LIMIT 1', [userId])).rows.length;
+        const { boosts } = effects;
+        const kinds = first ? FIRST_RUN_KINDS : effects.kinds;
+        const maxMoves = effects.maxMoves + (first ? FIRST_RUN_MOVES : 0);
         const { rows } = await conn.query(
             'INSERT INTO world_runs (user_id, seed, config) VALUES ($1, $2, $3) RETURNING id',
             [userId, seed, JSON.stringify({ kinds, maxMoves, boosts })]);
@@ -1714,6 +1722,17 @@ async function namePeople(userId, raw) {
     return { name };
 }
 
+// Le nom du joueur (bible, § 9, étape 2 : « écris-le dans le Grimoire ») : même règle que les autres noms, rangé dans
+// world_names sous la cible 'joueur' ; il peut changer, jamais s'effacer. { name } ou { status, message }
+async function namePlayer(userId, raw) {
+    const name = naming.cleanName(raw);
+    if (!name) return { status: 400, message: `Un nom de 2 à ${naming.NAME_MAX} lettres ou chiffres (espace, tiret ou apostrophe entre deux).` };
+    await migrate(userId);
+    await db.query(`INSERT INTO world_names (user_id, target, name) VALUES ($1, 'joueur', $2)
+        ON CONFLICT (user_id, target) DO UPDATE SET name = EXCLUDED.name`, [userId, name]);
+    return { name };
+}
+
 // Nom d'un bâtiment (dès son palier III) ou d'un quartier à soi ; un nom vide rend celui d'origine.
 // kind : 'site' | 'zone'. { status, message } si refus
 async function rename(userId, kind, id, raw) {
@@ -1802,6 +1821,6 @@ async function collect(userId) {
 module.exports = {
     SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, pendingOf, chargesAt, effectsOf, productionOf,
     view, build, buyZone, buyItem, undoItem, chooseSkin, startRun, finishRun, collect, migrate, claimQuest, board, openChest, openAll,
-    placeAnnex, moveAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople, arianeTargets,
+    placeAnnex, moveAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople, namePlayer, arianeTargets,
     refundDecorations, startCraft, finishCraft, placeCraft, moveCraft, storeCraft, startExpedition, findLandmark, gatherDeposit
 };
