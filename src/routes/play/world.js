@@ -72,6 +72,21 @@ router.post('/world/skin', withAccount(async (req, res, owner, b) => {
     res.json(await worldView(owner, b));
 }));
 
+// Enseignes (dès le palier V) : le nom écrit dessus, puis le style de celle d'un bâtiment (acheté au passage)
+router.post('/world/sign/name', withAccount(async (req, res, owner, b) => {
+    const done = await world.nameSigns(owner.id, req.body.name);
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json(await worldView(owner, b));
+}));
+router.post('/world/sign', withAccount(async (req, res, owner, b) => {
+    const site = String(req.body.site || '');
+    const style = String(req.body.style || '');
+    if (!/^[a-z]{1,20}$/.test(site) || !/^[a-z]{1,20}$/.test(style)) return res.status(400).json({ message: 'Enseigne invalide' });
+    const done = await world.chooseSign(owner.id, site, style);
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json({ coins: done.coins, world: await worldView(owner, b) });
+}));
+
 // Annexe d'un bâtiment : pose de l'exemplaire suivant sur une case libre autour de lui
 const cellOk = (...values) => values.every(v => Number.isInteger(v) && v >= 0 && v < world.SIZE);
 router.post('/world/annex', withAccount(async (req, res, owner, b) => {

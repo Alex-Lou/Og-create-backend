@@ -14,6 +14,7 @@ const shop = require('./worldShop');
 const quests = require('./quests');
 const loot = require('./loot');
 const annexes = require('./annexes');
+const signs = require('./signs');
 
 const SIZE = map.SIZE;
 const CAP_HOURS = 8;
@@ -242,6 +243,15 @@ async function skinsOf(userId, conn = db) {
     const { rows } = await conn.query('SELECT site, skin FROM world_skins WHERE user_id = $1', [userId]);
     return Object.fromEntries(rows.map(r => [r.site, r.skin]));
 }
+// Enseignes : nom écrit dessus (choisi, ou tiré de l'identifiant), styles achetés, style porté par bâtiment
+async function signsOf(userId, conn = db) {
+    const named = await conn.query('SELECT name FROM world_sign_names WHERE user_id = $1', [userId]);
+    const name = named.rows.length ? named.rows[0].name
+        : signs.defaultName((await conn.query('SELECT username FROM users WHERE id = $1', [userId])).rows[0]?.username);
+    const bought = await conn.query('SELECT style FROM world_sign_styles WHERE user_id = $1', [userId]);
+    const worn = await conn.query('SELECT site, style FROM world_signs WHERE user_id = $1', [userId]);
+    return { name, owned: new Set(bought.rows.map(r => r.style)), worn: Object.fromEntries(worn.rows.map(r => [r.site, r.style])) };
+}
 // Annexes posées : [{ x, y, annex, built_at }]
 async function annexesOf(userId, conn = db) {
     const { rows } = await conn.query('SELECT x, y, annex, built_at FROM world_annexes WHERE user_id = $1 ORDER BY built_at, y, x', [userId]);
@@ -466,6 +476,7 @@ async function view(userId, owned, book) {
     const { levels, builtAt } = await levelsOf(userId);
     const items = await itemsOf(userId);
     const skins = await skinsOf(userId);
+    const signed = await signsOf(userId);
     const annexRows = await annexesOf(userId);
     const bonuses = shop.bonusesOf(items);
     const extra = annexes.bonusesOf(annexRows);
@@ -503,6 +514,8 @@ async function view(userId, owned, book) {
                 effect: shop.effectText(item), gain: item.effect || null, owned: items.has(item.id)
             })),
             skin: skins[id] || null,
+            // Style de son enseigne (dès le palier V ; la planche de bois tant qu'aucun autre n'est choisi)
+            sign: level >= signs.SIGN_LEVEL ? signed.worn[id] || 'bois' : null,
             bonus: Math.round((bonuses.prod[id] || 0) * 100),
             // Tous les paliers, pour la fiche du bâtiment (atteints, suivant, à venir)
             levels: site.levels.map(step),
@@ -541,6 +554,11 @@ async function view(userId, owned, book) {
         pending: production.reduce((sum, p) => sum + p.coins, 0),
         pendingStock,
         tiles: tiles.map(t => ({ x: t.x, y: t.y, element: t.element, ...(known[t.element] || {}) })),
+        // Enseignes : le nom écrit dessus, le palier où elles viennent, les styles (offert, acheté ou à acheter)
+        signs: {
+            name: signed.name, level: signs.SIGN_LEVEL, nameMax: signs.NAME_MAX,
+            styles: signs.STYLES.map(st => ({ id: st.id, name: st.name, price: st.price, text: st.text, owned: !st.price || signed.owned.has(st.id) }))
+        },
         annexes: annexRows.filter(r => annexes.ANNEX_BY_ID[r.annex]).map(r => ({ x: r.x, y: r.y, annex: r.annex, site: annexes.ANNEX_BY_ID[r.annex].site })),
         // Brume, l'esprit de la brume : la quête active (ou son dernier mot)
         brume: quests.boardOf(claimed, { tiles: tiles.length, runs: await runsOf(userId), stars: book.stars ?? 0, zones, levels }),
@@ -886,6 +904,39 @@ async function chooseSkin(userId, siteId, skinId) {
     return {};
 }
 
+// Nom écrit sur les enseignes de l'île. { status, message } si le nom ne convient pas
+async function nameSigns(userId, raw) {
+    const name = signs.cleanName(raw);
+    if (!name) return { status: 400, message: `Un nom de 2 à ${signs.NAME_MAX} lettres ou chiffres (espace, tiret ou apostrophe entre deux).` };
+    await db.query(`INSERT INTO world_sign_names (user_id, name) VALUES ($1, $2)
+        ON CONFLICT (user_id) DO UPDATE SET name = EXCLUDED.name`, [userId, name]);
+    return {};
+}
+
+// Style de l'enseigne d'un bâtiment au palier V ou plus : acheté au passage s'il ne l'est pas encore (payé une seule
+// fois, même en double clic), puis porté. { coins } après un achat, {} sinon, ou { status, message } si refus
+async function chooseSign(userId, siteId, styleId) {
+    if (!SITES[siteId]) return { status: 404, message: 'Bâtiment inconnu.' };
+    const style = signs.STYLE_BY_ID[styleId];
+    if (!style) return { status: 404, message: 'Style d’enseigne inconnu.' };
+    await migrate(userId);
+    return db.transaction(async conn => {
+        await stockOf(userId, conn, true);
+        if (((await levelsOf(userId, conn)).levels[siteId] || 0) < signs.SIGN_LEVEL) return db.rollback({ status: 403, message: 'L’enseigne vient au palier V du bâtiment.' });
+        let coins;
+        if (style.price) {
+            const bought = await conn.query('INSERT INTO world_sign_styles (user_id, style) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING style', [userId, style.id]);
+            if (bought.rows.length) {
+                coins = await ledger.debit(userId, style.price, 'enseigne', conn);
+                if (coins === null) return db.rollback({ status: 400, message: `Ce style coûte ${style.price} écus.` });
+            }
+        }
+        await conn.query(`INSERT INTO world_signs (user_id, site, style) VALUES ($1, $2, $3)
+            ON CONFLICT (user_id, site) DO UPDATE SET style = EXCLUDED.style`, [userId, siteId, style.id]);
+        return coins === undefined ? {} : { coins };
+    });
+}
+
 // Encaisse la production des bâtiments (écus au grand livre, ressources au stock) dans la transaction de l'appelant
 async function gather(userId, conn, stock) {
     const { levels, builtAt } = await levelsOf(userId, conn);
@@ -915,5 +966,5 @@ async function collect(userId) {
 module.exports = {
     SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, isFree, pendingOf, chargesAt, effectsOf, productionOf,
     view, build, buyZone, buyItem, undoItem, chooseSkin, startRun, finishRun, place, remove, collect, migrate, claimQuest, board, openChest, openAll,
-    placeAnnex, moveAnnex, annexSpotOk
+    placeAnnex, moveAnnex, annexSpotOk, nameSigns, chooseSign
 };
