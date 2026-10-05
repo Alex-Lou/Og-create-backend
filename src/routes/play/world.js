@@ -183,6 +183,20 @@ router.post('/world/villager/gift', withAccount(async (req, res, owner, b) => {
     if (!/^[a-z]{1,20}$/.test(villager) || !/^[a-z]{1,10}$/.test(resource)) return res.status(400).json({ message: 'Cadeau invalide' });
     await befriended(res, owner, b, await world.befriend(owner.id, villager, resource));
 }));
+// Besoins des habitants : en combler un (manger, travailler), ou tout ce qui peut l'être d'un coup
+const fed = async (res, owner, b, done) => {
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json({ filled: done.filled, world: await worldView(owner, b) });
+};
+router.post('/world/villager/need', withAccount(async (req, res, owner, b) => {
+    const villager = String(req.body.villager || '');
+    const need = String(req.body.need || '');
+    if (!/^[a-z]{1,20}$/.test(villager) || !/^[a-z]{1,10}$/.test(need)) return res.status(400).json({ message: 'Besoin invalide' });
+    await fed(res, owner, b, await world.fillNeeds(owner.id, [{ villager, need }]));
+}));
+router.post('/world/villagers/needs', withAccount(async (req, res, owner, b) => {
+    await fed(res, owner, b, await world.fillNeeds(owner.id));
+}));
 
 // Coffre qui attend : du jour, bouteille à la mer, chapitre du Livre ouvert, quête de Brume réclamée
 router.post('/world/chest', withAccount(async (req, res, owner, b) => {

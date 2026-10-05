@@ -377,6 +377,15 @@ CREATE TABLE IF NOT EXISTS world_friends (
     gifted_on DATE,
     PRIMARY KEY (user_id, villager)
 );
+-- Besoins des habitants (services/villagers.js) : dernière fois que chacun a été comblé ('manger', 'outils'). La ligne
+-- naît quand l'habitant arrive (il arrive comblé) ; se distraire se lit sur l'île (décorations), sans ligne.
+CREATE TABLE IF NOT EXISTS world_needs (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    villager VARCHAR(20) NOT NULL,
+    need VARCHAR(10) NOT NULL,
+    filled_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, villager, need)
+);
 
 -- Le Livre : mélanges ratés sur une page à portée (l'encre de la page devient offerte après quelques essais différents)
 CREATE TABLE IF NOT EXISTS book_tries (
