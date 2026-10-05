@@ -2,13 +2,13 @@
 // Livre), une quête active à la fois. L'avancée se lit dans l'état de l'île et du Livre (rien de plus à suivre) ;
 // seule la réclamation s'écrit (world_quests). Fonctions pures, sans base de données.
 //
-// Objectifs (goal) : tiles (décorations posées), runs (récoltes terminées), stars (découvertes du Livre),
+// Objectifs (goal) : crafts (créations d'île posées), runs (récoltes terminées), stars (découvertes du Livre),
 // zone (quartier acheté), level (palier d'un bâtiment). Chaque objectif est atteignable quand sa quête devient
 // active : le bâtiment demandé est dans un quartier déjà acheté, le chapitre demandé déjà ouvert.
 // chest : la dernière quête de chaque acte donne aussi un coffre de cette rareté (loot.js), à ouvrir une fois réclamée.
 const QUESTS = [
-    { id: 'deco', act: 'I', goal: { kind: 'tiles', need: 1 }, coins: 20, label: 'Pose une décoration sur l’île',
-        say: 'Je suis Brume, la mémoire de cette île. La brume l’a recouverte quand le dernier alchimiste est parti. Pose un élément de ton Livre sur une case d’herbe : la vie revient où l’on crée.' },
+    { id: 'deco', act: 'I', goal: { kind: 'crafts', need: 1 }, coins: 20, label: 'Pose ta première création sur l’île',
+        say: 'Je suis Brume, la mémoire de cette île. La brume l’a recouverte quand le dernier alchimiste est parti. À l’établi du Foyer, assemble une Clôture, puis pose-la sur l’île : la vie revient où l’on crée.' },
     { id: 'recolte', act: 'I', goal: { kind: 'runs', need: 1 }, coins: 25, label: 'Termine une Récolte',
         say: 'Une île se bâtit de pierre, de bois et d’eau. Lance une Récolte et rapporte ce que tu trouves.' },
     { id: 'source', act: 'I', goal: { kind: 'zone', zone: 'source' }, coins: 40, chest: 'rare', label: 'Achète La Source',
@@ -41,8 +41,8 @@ const QUESTS = [
         say: 'Le temps reprend son cours. À quarante-cinq découvertes, le chapitre des Âges s’ouvrira.' },
     { id: 'hameau', act: 'VI', goal: { kind: 'zone', zone: 'hameau' }, coins: 220, label: 'Achète Le Hameau',
         say: 'Des toits dorment sous la brume, à l’est. Achète Le Hameau : une baleine passe parfois au large.' },
-    { id: 'deco10', act: 'VI', goal: { kind: 'tiles', need: 10 }, coins: 240, chest: 'legendaire', label: 'Pose 10 décorations',
-        say: 'Une île vit de ce qu’on y pose. Dix décorations, et elle aura ton visage.' },
+    { id: 'deco10', act: 'VI', goal: { kind: 'crafts', need: 10 }, coins: 240, chest: 'legendaire', label: 'Pose 10 créations sur l’île',
+        say: 'Une île vit de ce qu’on y crée. Dix créations, et elle aura ton visage.' },
     { id: 'phare', act: 'VII', goal: { kind: 'zone', zone: 'phare' }, coins: 300, label: 'Achète L’Îlot aux Mouettes',
         say: 'Un rocher battu des vents, où nichent les mouettes. Achète L’Îlot aux Mouettes : les méduses danseront la nuit.' },
     { id: 'livre70', act: 'VII', goal: { kind: 'stars', need: 70 }, coins: 350, label: 'Inscris 70 découvertes au Livre',
@@ -53,9 +53,9 @@ const QUESTS = [
 // Quand tout est fait
 const RESTED = 'La brume s’est levée sur toute l’île. Merci, alchimiste : elle est de nouveau vivante.';
 
-// Ce que l'état fournit : { tiles, runs, stars, zones: Set, levels: { site: palier } }
+// Ce que l'état fournit : { crafts, runs, stars, zones: Set, levels: { site: palier } }
 const HAVE = {
-    tiles: (goal, facts) => facts.tiles,
+    crafts: (goal, facts) => facts.crafts,
     runs: (goal, facts) => facts.runs,
     stars: (goal, facts) => facts.stars,
     zone: (goal, facts) => (facts.zones.has(goal.zone) ? 1 : 0),

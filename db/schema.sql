@@ -391,6 +391,27 @@ CREATE TABLE IF NOT EXISTS world_visitors (
 CREATE INDEX IF NOT EXISTS idx_world_visitors_user ON world_visitors (user_id, arrived_at);
 -- Lot 7d-2 : visiteur comblé resté sur l'île, dans une maison du Foyer (il devient habitant)
 ALTER TABLE world_visitors ADD COLUMN IF NOT EXISTS settled_at TIMESTAMPTZ;
+-- Créations d'île (services/crafts.js, lot 8) : fabriquées, en réserve (x, y vides) ou posées sur une case
+CREATE TABLE IF NOT EXISTS world_crafts (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    craft VARCHAR(20) NOT NULL,
+    x SMALLINT CHECK (x >= 0),
+    y SMALLINT CHECK (y >= 0),
+    made_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_world_crafts_user ON world_crafts (user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_world_crafts_cell ON world_crafts (user_id, x, y) WHERE x IS NOT NULL;
+-- Assemblages en cours (puzzle d'une création) : graine des pièces, rendus une seule fois
+CREATE TABLE IF NOT EXISTS world_craft_runs (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    craft VARCHAR(20) NOT NULL,
+    seed INTEGER NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    finished_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_world_craft_runs_user ON world_craft_runs (user_id, created_at);
 -- Besoins des habitants (services/villagers.js) : dernière fois que chacun a été comblé ('manger', 'outils'). La ligne
 -- naît quand l'habitant arrive (il arrive comblé) ; se distraire se lit sur l'île (décorations), sans ligne.
 CREATE TABLE IF NOT EXISTS world_needs (

@@ -207,5 +207,18 @@ function openChapters(b, owned) {
     const stars = starsOf(b, owned);
     return new Set(CHAPTERS.filter(c => stars >= c.need).map(c => c.id));
 }
+// Chapitres dont toutes les pages sont trouvées (créations d'île, lot 8)
+function finishedChapters(b, owned) {
+    const have = new Set(owned);
+    const byFamily = new Map();
+    for (const [name, info] of b.meta) {
+        if (!byFamily.has(info.family)) byFamily.set(info.family, []);
+        byFamily.get(info.family).push(name);
+    }
+    return new Set(CHAPTERS.filter(c => {
+        const names = c.families.flatMap(family => byFamily.get(family) || []);
+        return names.length > 0 && names.every(name => have.has(name));
+    }).map(c => c.id));
+}
 
-module.exports = { DIFFICULTY, view, reachableById, pageId, aim, telling, difficultyOf, chapterOf, openChapters, starsOf };
+module.exports = { DIFFICULTY, view, reachableById, pageId, aim, telling, difficultyOf, chapterOf, openChapters, finishedChapters, starsOf };

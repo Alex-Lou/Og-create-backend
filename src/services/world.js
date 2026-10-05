@@ -18,6 +18,7 @@ const signs = require('./signs');
 const minigames = require('./minigames');
 const villagers = require('./villagers');
 const visitors = require('./visitors');
+const crafts = require('./crafts');
 const naming = require('./naming');
 
 const SIZE = map.SIZE;
@@ -27,6 +28,7 @@ const RUN_TTL_MS = 24 * 3600 * 1000; // une partie non rendue après 24 h est pe
 const RENAME_LEVEL = 3; // un bâtiment se renomme dès son palier III (un quartier, dès qu'il est à soi)
 const GAME_TTL_MS = 15 * 60 * 1000; // une partie de mini-jeu non rendue après 15 min est perdue
 const GAME_SLACK_MS = 3000; // tolérance d'horloge : un geste ne peut dater de plus tard que la partie elle-même
+const CRAFT_TTL_MS = 30 * 60 * 1000; // un assemblage non rendu après 30 min est perdu (rien n'est encore payé)
 const MOVES = 15;
 const RESOURCES = ['stone', 'wood', 'water', 'food'];
 // 1 : île 14 × 14 ; 2 : île 20 × 20 (worldMapV2.js) ; 3 : la grande île 48 × 48 (worldMap.js)
@@ -304,13 +306,13 @@ function residentsOf(levels, zones, settlers) {
     }));
     return [...base, ...settled];
 }
-// Besoins et humeur de chaque habitant à l'instant now : { habitant: { needs, mood, site } } (se distraire : autour
-// du bâtiment où il travaille)
-function moodsOf(residents, levels, zones, tiles, filled, now = Date.now()) {
+// Besoins et humeur de chaque habitant à l'instant now : { habitant: { needs, mood, site } } (se distraire : les
+// créations d'île posées autour du bâtiment où il travaille)
+function moodsOf(residents, levels, zones, decor, filled, now = Date.now()) {
     const atelier = livesHere('atelier', levels, zones);
     const out = {};
     for (const { id, site } of residents) {
-        const needs = villagers.needsOf(filled[id] || {}, decosNear(tiles, site, levels[site], villagers.NEEDS.deco.reach), atelier, now);
+        const needs = villagers.needsOf(filled[id] || {}, decosNear(decor, site, levels[site], villagers.NEEDS.deco.reach), atelier, now);
         out[id] = { needs, mood: villagers.moodOf(needs), site };
     }
     return out;
@@ -394,7 +396,7 @@ async function bonusesFor(userId, conn = db) {
     const { levels } = await levelsOf(userId, conn);
     const zones = await zonesOf(userId, conn);
     const residents = residentsOf(levels, zones, await settlersOf(userId, conn));
-    const moods = moodsOf(residents, levels, zones, await tilesOf(userId, conn), await needRowsOf(userId, conn));
+    const moods = moodsOf(residents, levels, zones, placedOf(await craftsOf(userId, conn)), await needRowsOf(userId, conn));
     return withMoods(shop.bonusesOf(await itemsOf(userId, conn)), annexes.bonusesOf(await annexesOf(userId, conn)), moods);
 }
 
@@ -442,7 +444,7 @@ async function runsOf(userId, conn = db) {
 // Ce que lisent les objectifs des quêtes (stars : découvertes du Livre)
 async function factsOf(userId, stars, conn = db) {
     return {
-        tiles: (await tilesOf(userId, conn)).length, runs: await runsOf(userId, conn), stars,
+        crafts: placedOf(await craftsOf(userId, conn)).length, runs: await runsOf(userId, conn), stars,
         zones: await zonesOf(userId, conn), levels: (await levelsOf(userId, conn)).levels
     };
 }
@@ -512,30 +514,69 @@ async function toV3(userId, conn) {
             await conn.query('UPDATE world_tiles SET x = $4, y = $5 WHERE user_id = $1 AND x = $2 AND y = $3', [userId, tile.x + 1000, tile.y + 1000, spot.x, spot.y]);
         }
     }
-    // Chaque ancien quartier tient dans le nouveau (test/play.test.js) ; une décoration restée sans place serait
-    // replacée par settle() à la vue suivante, jamais supprimée
+    // Chaque ancien quartier tient dans le nouveau (test/play.test.js) ; les décorations sont ensuite remboursées
+    // (refundDecorations, lot 8)
 }
 
-// Décorations hors d'une case libre (mer, chantier agrandi, quartier non possédé) : déplacées vers la case libre la plus
-// proche (ni décoration ni annexe ; annexCells : clés des cases des annexes)
-async function settle(userId, tiles, zones, levels, annexCells = new Set()) {
-    const taken = new Set([...tiles.map(keyOf), ...annexCells]);
-    let moved = false;
-    for (const tile of tiles.filter(t => !isFree(t.x, t.y, zones, levels, annexCells))) {
-        let best = null;
-        for (let y = 0; y < SIZE; y++) {
-            for (let x = 0; x < SIZE; x++) {
-                if (!isFree(x, y, zones, levels) || taken.has(y * SIZE + x)) continue;
-                const d = Math.abs(x - tile.x) + Math.abs(y - tile.y);
-                if (!best || d < best.d) best = { x, y, d };
-            }
-        }
-        if (!best) continue;
-        await db.query('UPDATE world_tiles SET x = $4, y = $5 WHERE user_id = $1 AND x = $2 AND y = $3', [userId, tile.x, tile.y, best.x, best.y]).catch(() => {});
-        taken.add(best.y * SIZE + best.x);
-        moved = true;
-    }
-    return moved ? tilesOf(userId) : tiles;
+// Créations d'île (lot 8) : [{ id, craft, x, y }] (x, y vides : en réserve)
+async function craftsOf(userId, conn = db) {
+    const { rows } = await conn.query('SELECT id, craft, x, y FROM world_crafts WHERE user_id = $1 ORDER BY id', [userId]);
+    return rows;
+}
+const placedOf = rows => rows.filter(r => r.x !== null);
+// Créations déjà fabriquées, par sorte (posées ou en réserve) : { création: nombre }
+const madeOf = rows => rows.reduce((out, r) => ({ ...out, [r.craft]: (out[r.craft] || 0) + 1 }), {});
+// Contexte des règles de pose (crafts.spotBlock) : sol, case libre (sur l'île, hors chantier, quartier à soi, ni annexe
+// ni autre création), emprise d'un bâtiment bâti, créations posées (sauf skip : celle qu'on déplace)
+function craftCtx(levels, zones, annexRows, rows, skip = null) {
+    const others = placedOf(rows).filter(r => r.id !== skip);
+    const busy = new Set([...annexRows.map(keyOf), ...others.map(keyOf)]);
+    return {
+        ground: map.groundAt,
+        free: (x, y) => Number.isInteger(x) && Number.isInteger(y) && map.isLand(x, y) && !map.inFootprint(x, y, levels)
+            && zones.has(map.zoneAt(x, y)) && !busy.has(y * SIZE + x),
+        site: id => (livesHere(id, levels, zones) ? map.footprintOf(id, levels[id]) : null),
+        placed: others
+    };
+}
+// Cases où cette création peut se poser maintenant
+function craftSpots(c, ctx) {
+    const spots = [];
+    for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) if (!crafts.spotBlock(c, x, y, ctx)) spots.push({ x, y });
+    return spots;
+}
+// Créations posées sur une case qui n'est plus libre (chantier agrandi) : rangées dans la réserve
+async function stowCrafts(userId, rows, levels, zones, annexRows) {
+    const ctx = craftCtx(levels, zones, annexRows, []);
+    const out = placedOf(rows).filter(r => !ctx.free(r.x, r.y));
+    if (!out.length) return rows;
+    await db.query('UPDATE world_crafts SET x = NULL, y = NULL WHERE user_id = $1 AND id = ANY($2::int[])', [userId, out.map(r => r.id)]);
+    return craftsOf(userId);
+}
+// Questions de l'Épreuve réussies (progress.timer_progress : niveau → catégorie → identifiants)
+async function epreuvesOf(userId, conn = db) {
+    const { rows } = await conn.query('SELECT timer_progress FROM progress WHERE user_id = $1', [userId]);
+    const done = rows[0]?.timer_progress?.completedQuestions || {};
+    return Object.values(done).flatMap(cats => Object.values(cats || {})).reduce((n, ids) => n + (Array.isArray(ids) ? ids.length : 0), 0);
+}
+// Ce que la vue montre des créations d'île : paliers ouverts, catalogue (ce qui manque pour fabriquer, réserve, cases
+// où poser), créations posées
+function craftsView(rows, ctx, { owned, stock, open, epreuves }, siteName) {
+    const made = madeOf(rows);
+    return {
+        epreuves: { have: epreuves, need: crafts.EPREUVES },
+        open: crafts.TIERS.filter(t => open.has(t)),
+        catalog: crafts.CRAFTS.map(c => {
+            const reserve = rows.filter(r => r.craft === c.id && r.x === null).length;
+            return {
+                id: c.id, name: c.name, tier: c.tier, cost: c.cost, elements: c.elements.map(name => ({ name, have: owned.has(name) })),
+                after: c.after, open: open.has(c.tier), made: made[c.id] || 0, reserve,
+                block: crafts.blockOf(c, { made, owned, stock, open }), place: crafts.placeText(c, siteName),
+                spots: reserve ? craftSpots(c, ctx) : []
+            };
+        }),
+        placed: placedOf(rows).map(r => ({ x: r.x, y: r.y, craft: r.craft }))
+    };
 }
 
 // Coffres déjà ouverts parmi les sources à surveiller : chapitres, quêtes, jour (et veille), bouteille. Map source → ligne
@@ -621,19 +662,20 @@ async function view(userId, owned, book) {
     const stock = await stockOf(userId);
     const zones = await zonesOf(userId);
     const annexCells = new Set(annexRows.map(keyOf));
-    const tiles = await settle(userId, await tilesOf(userId), zones, levels, annexCells);
+    const craftRows = await stowCrafts(userId, await craftsOf(userId), levels, zones, annexRows);
+    const decor = placedOf(craftRows);
     const filled = await needRowsOf(userId);
     const settlers = await settlersOf(userId);
     const residents = residentsOf(levels, zones, settlers);
-    const moods = moodsOf(residents, levels, zones, tiles, filled);
+    const moods = moodsOf(residents, levels, zones, decor, filled);
     await welcome(userId, moods, filled);
     const { bonuses, extra } = withMoods(shopBonuses, annexes.bonusesOf(annexRows), moods);
     const effects = effectsOf(levels, bonuses, extra);
     const charges = chargesAt(stock, effects.maxCharges, Date.now(), effects.regenMs);
-    const taken = new Set([...annexCells, ...tiles.map(keyOf)]);
+    const taken = new Set([...annexCells, ...decor.map(keyOf)]);
     const have = new Set(owned);
     const plans = Object.values(SITES).flatMap(s => s.levels.map(l => l.plan)).filter(Boolean);
-    const known = book.describe([...tiles.map(t => t.element), ...plans]);
+    const known = book.describe(plans);
     const production = productionAll(levels, builtAt, stock.collected_at, Date.now(), bonuses, extra);
     const sites = Object.entries(SITES).map(([id, site]) => {
         const level = levels[id] || 0;
@@ -681,6 +723,7 @@ async function view(userId, owned, book) {
     const pendingStock = Object.fromEntries(RESOURCES.map(r => [r, production.filter(p => p.resource === r).reduce((sum, p) => sum + p.amount, 0)]));
     const claimed = await claimedOf(userId);
     const visiting = await visitorNow(userId);
+    const epreuves = await epreuvesOf(userId);
     return {
         size: SIZE,
         map: {
@@ -701,10 +744,14 @@ async function view(userId, owned, book) {
         harvest: { maxMoves: effects.maxMoves, kinds: effects.kinds, boosts: effects.boosts, coinEvery: HARVEST_COIN_EVERY },
         rates: { produce: PRODUCE_PER_LEVEL, coins: COINS_PER_LEVEL },
         capHours: CAP_HOURS,
-        decoPrices: DECO_PRICES,
         pending: production.reduce((sum, p) => sum + p.coins, 0),
         pendingStock,
-        tiles: tiles.map(t => ({ x: t.x, y: t.y, element: t.element, ...(known[t.element] || {}) })),
+        // Ancien champ des décorations (éléments du Livre posés, remboursés au lot 8) : toujours vide
+        tiles: [],
+        // Créations d'île : paliers, catalogue, réserve et cases où poser, créations posées
+        crafts: craftsView(craftRows, craftCtx(levels, zones, annexRows, craftRows), {
+            owned: have, stock, open: crafts.tiersOpen(book.finished || new Set(), epreuves), epreuves
+        }, id => sites.find(site => site.id === id)?.name || id),
         // Habitants (bâtiment bâti dans un quartier à soi) : prénom, goûts, amitié, déjà vus ou gâtés aujourd'hui ; leurs
         // besoins, leur humeur et ce qu'elle fait
         villagers: (() => {
@@ -752,7 +799,7 @@ async function view(userId, owned, book) {
         },
         annexes: annexRows.filter(r => annexes.ANNEX_BY_ID[r.annex]).map(r => ({ x: r.x, y: r.y, annex: r.annex, site: annexes.ANNEX_BY_ID[r.annex].site })),
         // Brume, l'esprit de la brume : la quête active (ou son dernier mot)
-        brume: quests.boardOf(claimed, { tiles: tiles.length, runs: await runsOf(userId), stars: book.stars ?? 0, zones, levels }),
+        brume: quests.boardOf(claimed, { crafts: decor.length, runs: await runsOf(userId), stars: book.stars ?? 0, zones, levels }),
         // Coffres : en attente, du jour, bouteille à la mer
         chests: chestsView(await openedOf(userId, Date.now()), book.openChapters, claimed)
     };
@@ -983,7 +1030,7 @@ async function fillNeeds(userId, targets = null, now = Date.now()) {
         const { levels } = await levelsOf(userId, conn);
         const zones = await zonesOf(userId, conn);
         const residents = residentsOf(levels, zones, await settlersOf(userId, conn));
-        const moods = moodsOf(residents, levels, zones, await tilesOf(userId, conn), await needRowsOf(userId, conn), now);
+        const moods = moodsOf(residents, levels, zones, placedOf(await craftsOf(userId, conn)), await needRowsOf(userId, conn), now);
         const wanted = targets || Object.entries(moods).flatMap(([villager, m]) => m.needs.filter(n => n.cost).map(n => ({ villager, need: n.id })));
         const spent = Object.fromEntries(RESOURCES.map(r => [r, 0]));
         const filled = [];
@@ -1072,6 +1119,109 @@ async function settleVisitor(userId, visitorId, now = Date.now()) {
     });
 }
 
+// Décorations de l'ancienne règle (éléments du Livre posés n'importe où) : remboursées au prix payé, une seule fois,
+// puis retirées de l'île (lot 8). priceOf(élément) : prix selon son chapitre. { count, coins } (count 0 : rien à faire)
+async function refundDecorations(userId, priceOf) {
+    const seen = await db.query('SELECT 1 FROM world_tiles WHERE user_id = $1 LIMIT 1', [userId]);
+    if (!seen.rows.length) return { count: 0, coins: 0 };
+    // Les cartes d'avant d'abord : leur passage paie encore les écus dus par les décorations
+    await migrate(userId);
+    return db.transaction(async conn => {
+        await stockOf(userId, conn, true);
+        const { rows } = await conn.query('SELECT element FROM world_tiles WHERE user_id = $1 FOR UPDATE', [userId]);
+        if (!rows.length) return { count: 0, coins: 0 };
+        const coins = rows.reduce((sum, r) => sum + (priceOf(r.element) || 0), 0);
+        if (coins > 0) await ledger.credit(userId, coins, 'remboursement', 'decorations', conn);
+        await conn.query('DELETE FROM world_tiles WHERE user_id = $1', [userId]);
+        return { count: rows.length, coins };
+    });
+}
+
+// Assemblage d'une création : palier ouvert, celles d'avant déjà fabriquées, savoir-faire du Livre, ressources. Une
+// graine, les pièces à poser (rien n'est payé avant la réussite). owned : éléments du Livre ; finished : chapitres
+// finis. { run: { id, craft, shape, pieces, turned } } ou { status, message }
+async function startCraft(userId, craftId, owned, finished) {
+    if (!Object.hasOwn(crafts.CRAFT_BY_ID, craftId)) return { status: 404, message: 'Création inconnue.' };
+    const c = crafts.CRAFT_BY_ID[craftId];
+    await migrate(userId);
+    return db.transaction(async conn => {
+        const stock = await stockOf(userId, conn, true);
+        const open = crafts.tiersOpen(finished, await epreuvesOf(userId, conn));
+        const block = crafts.blockOf(c, { made: madeOf(await craftsOf(userId, conn)), owned: new Set(owned), stock, open });
+        if (block) return db.rollback({ status: 403, message: block });
+        const seed = crypto.randomInt(1, 2147483647);
+        const { rows } = await conn.query('INSERT INTO world_craft_runs (user_id, craft, seed) VALUES ($1, $2, $3) RETURNING id', [userId, craftId, seed]);
+        return { run: { id: Number(rows[0].id), craft: c.id, shape: c.shape, pieces: crafts.piecesOf(c.shape, seed, c.tier), turned: crafts.TURNED[c.tier] } };
+    });
+}
+
+// Fin d'un assemblage : le serveur vérifie que les pièces couvrent le gabarit, puis prend les ressources et met la
+// création en réserve. L'assemblage ne se rend qu'une fois, même refusé. { made, craft } ou { status, message }
+function finishCraft(userId, runId, layout, owned, finished) {
+    return db.transaction(async conn => {
+        const stock = await stockOf(userId, conn, true);
+        const { rows } = await conn.query(
+            'SELECT craft, seed, created_at FROM world_craft_runs WHERE id = $1 AND user_id = $2 AND finished_at IS NULL FOR UPDATE', [runId, userId]);
+        if (!rows.length) return db.rollback({ status: 404, message: 'Cet assemblage est déjà rendu.' });
+        await conn.query('UPDATE world_craft_runs SET finished_at = NOW() WHERE id = $1', [runId]);
+        const { craft: craftId, seed, created_at: createdAt } = rows[0];
+        const c = crafts.CRAFT_BY_ID[craftId];
+        if (Date.now() - new Date(createdAt).getTime() > CRAFT_TTL_MS) return { status: 400, message: 'Assemblage refusé : temps écoulé.' };
+        const done = crafts.check(c.shape, crafts.piecesOf(c.shape, seed, c.tier), layout);
+        if (!done.ok) return { status: 400, message: `Assemblage refusé : ${done.error}.` };
+        // Entre le début et la fin, le stock ou le Livre ont pu changer
+        const open = crafts.tiersOpen(finished, await epreuvesOf(userId, conn));
+        const block = crafts.blockOf(c, { made: madeOf(await craftsOf(userId, conn)), owned: new Set(owned), stock, open });
+        if (block) return { status: 409, message: block };
+        const n = r => c.cost[r] || 0;
+        await conn.query('UPDATE world_stock SET stone = stone - $2, wood = wood - $3, water = water - $4, food = food - $5 WHERE user_id = $1',
+            [userId, n('stone'), n('wood'), n('water'), n('food')]);
+        await conn.query('INSERT INTO world_crafts (user_id, craft) VALUES ($1, $2)', [userId, craftId]);
+        return { made: c.name, craft: c.id };
+    });
+}
+
+// Pose une création de la réserve sur une case permise par sa règle. { } ou { status, message }
+async function placeCraft(userId, craftId, x, y) {
+    if (!Object.hasOwn(crafts.CRAFT_BY_ID, craftId)) return { status: 404, message: 'Création inconnue.' };
+    const c = crafts.CRAFT_BY_ID[craftId];
+    await migrate(userId);
+    return db.transaction(async conn => {
+        await stockOf(userId, conn, true);
+        const rows = await craftsOf(userId, conn);
+        const row = rows.find(r => r.craft === craftId && r.x === null);
+        if (!row) return db.rollback({ status: 409, message: `Pas de « ${c.name} » en réserve : fabrique d’abord cette création.` });
+        const { levels } = await levelsOf(userId, conn);
+        const block = crafts.spotBlock(c, x, y, craftCtx(levels, await zonesOf(userId, conn), await annexesOf(userId, conn), rows));
+        if (block) return db.rollback({ status: 400, message: block });
+        await conn.query('UPDATE world_crafts SET x = $2, y = $3 WHERE id = $1', [row.id, x, y]);
+        return {};
+    });
+}
+
+// Déplace une création posée vers une autre case permise (gratuit). { } ou { status, message }
+async function moveCraft(userId, x, y, toX, toY) {
+    await migrate(userId);
+    return db.transaction(async conn => {
+        await stockOf(userId, conn, true);
+        const rows = await craftsOf(userId, conn);
+        const row = rows.find(r => r.x === x && r.y === y);
+        if (!row) return db.rollback({ status: 404, message: 'Aucune création sur cette case.' });
+        const { levels } = await levelsOf(userId, conn);
+        const block = crafts.spotBlock(crafts.CRAFT_BY_ID[row.craft], toX, toY, craftCtx(levels, await zonesOf(userId, conn), await annexesOf(userId, conn), rows, row.id));
+        if (block) return db.rollback({ status: 400, message: block });
+        await conn.query('UPDATE world_crafts SET x = $2, y = $3 WHERE id = $1', [row.id, toX, toY]);
+        return {};
+    });
+}
+
+// Range une création posée dans la réserve (elle se repose plus tard, sans rien payer). { } ou { status, message }
+async function storeCraft(userId, x, y) {
+    await migrate(userId);
+    const { rows } = await db.query('UPDATE world_crafts SET x = NULL, y = NULL WHERE user_id = $1 AND x = $2 AND y = $3 RETURNING id', [userId, x, y]);
+    return rows.length ? {} : { status: 404, message: 'Aucune création sur cette case.' };
+}
+
 // Ajoute des ressources au stock (ligne verrouillée par l'appelant)
 function addStock(userId, add, conn) {
     const n = r => add[r] || 0;
@@ -1151,44 +1301,14 @@ async function openAll(userId, openChapters, now = Date.now()) {
     });
 }
 
-// Pose (ou déplace) un élément possédé en décoration sur une case libre d'un quartier possédé.
-// Une nouvelle décoration s'achète (prix selon le chapitre de l'élément) ; la déplacer est gratuit.
-// price : prix de l'élément (calculé par la route avec le Livre). { status, message } en cas de refus
-async function place(userId, owned, element, x, y, price) {
-    if (!owned.includes(element)) return { status: 403, message: 'Cet élément n’est pas dans ton carnet.' };
-    if (![x, y].every(v => Number.isInteger(v)) || !map.isLand(x, y)) return { status: 400, message: 'Case hors de l’île.' };
-    if (!map.buildable(x, y)) return { status: 400, message: 'Rien ne se pose ici (chemin, eau, forêt ou rocher).' };
-    await migrate(userId);
-    return db.transaction(async conn => {
-        await stockOf(userId, conn, true);
-        if (map.inFootprint(x, y, (await levelsOf(userId, conn)).levels)) return db.rollback({ status: 400, message: 'Cette place est réservée à un chantier.' });
-        if (!(await zonesOf(userId, conn)).has(map.zoneAt(x, y))) return db.rollback({ status: 403, message: 'Achète d’abord ce quartier de l’île.' });
-        const occupied = await conn.query('SELECT element FROM world_tiles WHERE user_id = $1 AND x = $2 AND y = $3 FOR UPDATE', [userId, x, y]);
-        if (occupied.rows.length && occupied.rows[0].element !== element) return db.rollback({ status: 409, message: 'Cette case est déjà occupée.' });
-        if (await annexAt(userId, x, y, conn)) return db.rollback({ status: 409, message: 'Une annexe occupe déjà cette case.' });
-        // Déjà posé ailleurs : on le déplace gratuitement ; sinon on l'achète et on le pose
-        const moved = await conn.query('UPDATE world_tiles SET x = $3, y = $4 WHERE user_id = $1 AND element = $2 RETURNING element', [userId, element, x, y]);
-        if (moved.rows.length) return {};
-        const coins = await ledger.debit(userId, price, 'deco', conn);
-        if (coins === null) return db.rollback({ status: 400, message: `Cette décoration coûte ${price} écus.` });
-        await conn.query('INSERT INTO world_tiles (user_id, x, y, element) VALUES ($1, $2, $3, $4)', [userId, x, y, element]);
-        return { coins };
-    });
-}
-
-async function remove(userId, x, y) {
-    await migrate(userId);
-    await db.query('DELETE FROM world_tiles WHERE user_id = $1 AND x = $2 AND y = $3', [userId, x, y]);
-}
-
 // Annexe posée sur cette case (ligne verrouillée), ou null
 async function annexAt(userId, x, y, conn) {
     const { rows } = await conn.query('SELECT annex FROM world_annexes WHERE user_id = $1 AND x = $2 AND y = $3 FOR UPDATE', [userId, x, y]);
     return rows[0] || null;
 }
-// Case déjà prise par une décoration ou une annexe
+// Case déjà prise par une création d'île ou une annexe
 async function cellTaken(userId, x, y, conn) {
-    const { rows } = await conn.query('SELECT 1 FROM world_tiles WHERE user_id = $1 AND x = $2 AND y = $3', [userId, x, y]);
+    const { rows } = await conn.query('SELECT 1 FROM world_crafts WHERE user_id = $1 AND x = $2 AND y = $3', [userId, x, y]);
     return rows.length > 0 || Boolean(await annexAt(userId, x, y, conn));
 }
 const SPOT_MESSAGE = 'Une annexe se pose sur une case libre du quartier, à deux cases au plus de son bâtiment.';
@@ -1387,6 +1507,7 @@ async function collect(userId) {
 
 module.exports = {
     SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, isFree, pendingOf, chargesAt, effectsOf, productionOf,
-    view, build, buyZone, buyItem, undoItem, chooseSkin, startRun, finishRun, place, remove, collect, migrate, claimQuest, board, openChest, openAll,
-    placeAnnex, moveAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename
+    view, build, buyZone, buyItem, undoItem, chooseSkin, startRun, finishRun, collect, migrate, claimQuest, board, openChest, openAll,
+    placeAnnex, moveAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename,
+    refundDecorations, startCraft, finishCraft, placeCraft, moveCraft, storeCraft
 };
