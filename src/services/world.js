@@ -21,6 +21,7 @@ const visitors = require('./visitors');
 const crafts = require('./crafts');
 const naming = require('./naming');
 const landmarks = require('./landmarks');
+const finds = require('./finds');
 
 const SIZE = map.SIZE;
 const CAP_HOURS = 8;
@@ -444,6 +445,17 @@ async function zonesOf(userId, conn = db) {
     const { rows } = await conn.query('SELECT zone FROM world_zones WHERE user_id = $1', [userId]);
     return new Set(['coeur', ...rows.map(r => r.zone)]);
 }
+// Trouvailles de climat en réserve : { trouvaille: nombre } (toutes, 0 par défaut)
+async function findsOf(userId, conn = db) {
+    const { rows } = await conn.query('SELECT find, amount FROM world_finds WHERE user_id = $1', [userId]);
+    const have = Object.fromEntries(rows.map(r => [r.find, r.amount]));
+    return Object.fromEntries(finds.FINDS.map(f => [f.id, have[f.id] || 0]));
+}
+// Gisements déjà ramassés : Map identifiant → date du dernier ramassage
+async function depositsOf(userId, conn = db) {
+    const { rows } = await conn.query('SELECT deposit, gathered_at FROM world_deposits WHERE user_id = $1', [userId]);
+    return new Map(rows.map(r => [r.deposit, r.gathered_at]));
+}
 // Lieux remarquables découverts : Map identifiant → date de la découverte
 async function foundOf(userId, conn = db) {
     const { rows } = await conn.query('SELECT landmark, found_at FROM world_landmarks WHERE user_id = $1', [userId]);
@@ -611,6 +623,28 @@ async function findLandmark(userId, landmarkId, now = Date.now()) {
     });
 }
 
+// Ramasse un gisement d'un quartier à soi, s'il a repoussé : quelques trouvailles de son climat, versées une seule fois
+// (même en double clic : la ligne de stock est verrouillée). { find, amount } ou { status, message }
+async function gatherDeposit(userId, depositId, now = Date.now()) {
+    const deposit = Object.hasOwn(finds.DEPOSIT_BY_ID, depositId) ? finds.DEPOSIT_BY_ID[depositId] : null;
+    if (!deposit) return { status: 404, message: 'Gisement inconnu.' };
+    await migrate(userId);
+    return db.transaction(async conn => {
+        await stockOf(userId, conn, true);
+        if (!(await zonesOf(userId, conn)).has(deposit.zone)) return db.rollback({ status: 403, message: 'Achète d’abord ce quartier de l’île.' });
+        const wait = finds.readyIn((await depositsOf(userId, conn)).get(deposit.id), now);
+        if (wait > 0) return db.rollback({ status: 409, message: `Ce gisement repousse : reviens dans ${Math.ceil(wait / 60000)} min.` });
+        const amount = finds.GATHER.min + crypto.randomInt(0, finds.GATHER.max - finds.GATHER.min + 1);
+        await conn.query(
+            `INSERT INTO world_finds (user_id, find, amount) VALUES ($1, $2, $3)
+             ON CONFLICT (user_id, find) DO UPDATE SET amount = world_finds.amount + EXCLUDED.amount`, [userId, deposit.find, amount]);
+        await conn.query(
+            `INSERT INTO world_deposits (user_id, deposit, gathered_at) VALUES ($1, $2, $3)
+             ON CONFLICT (user_id, deposit) DO UPDATE SET gathered_at = EXCLUDED.gathered_at`, [userId, deposit.id, new Date(now)]);
+        return { find: deposit.find, amount };
+    });
+}
+
 // Créations d'île (lot 8) : [{ id, craft, x, y }] (x, y vides : en réserve)
 async function craftsOf(userId, conn = db) {
     const { rows } = await conn.query('SELECT id, craft, x, y FROM world_crafts WHERE user_id = $1 ORDER BY id', [userId]);
@@ -620,7 +654,7 @@ const placedOf = rows => rows.filter(r => r.x !== null);
 // Créations déjà fabriquées, par sorte (posées ou en réserve) : { création: nombre }
 const madeOf = rows => rows.reduce((out, r) => ({ ...out, [r.craft]: (out[r.craft] || 0) + 1 }), {});
 // Contexte des règles de pose (crafts.spotBlock) : sol, case libre (sur l'île, hors chantier, quartier à soi, ni annexe,
-// ni autre création, ni lieu remarquable), emprise d'un bâtiment bâti, créations posées (sauf skip : celle qu'on déplace)
+// ni autre création, ni lieu remarquable, ni gisement), emprise d'un bâtiment bâti, créations posées (sauf skip : celle qu'on déplace)
 // (cells : les cases libres, calculées une fois pour toutes les créations)
 function craftCtx(levels, zones, annexRows, rows, skip = null) {
     const others = placedOf(rows).filter(r => r.id !== skip);
@@ -629,7 +663,7 @@ function craftCtx(levels, zones, annexRows, rows, skip = null) {
     const cells = [];
     for (let y = 0; y < SIZE; y++) {
         for (let x = 0; x < SIZE; x++) {
-            if (!map.isLand(x, y) || !zones.has(map.zoneAt(x, y)) || busy.has(y * SIZE + x) || map.inFootprint(x, y, levels) || landmarks.isLandmark(x, y)) continue;
+            if (!map.isLand(x, y) || !zones.has(map.zoneAt(x, y)) || busy.has(y * SIZE + x) || map.inFootprint(x, y, levels) || landmarks.isLandmark(x, y) || finds.isDeposit(x, y)) continue;
             open[y * SIZE + x] = 1;
             cells.push({ x, y });
         }
@@ -834,6 +868,8 @@ async function view(userId, owned, book) {
     const epreuves = await epreuvesOf(userId);
     const discovered = await discoveredOf(userId);
     const going = await expeditionOf(userId);
+    const stockFinds = await findsOf(userId);
+    const gathered = await depositsOf(userId);
     const veil = map.veiled(new Set(map.ZONES.filter(z => !isKnown(z, discovered)).map(z => z.code)));
     return {
         size: SIZE,
@@ -861,6 +897,11 @@ async function view(userId, owned, book) {
             id: l.id, name: l.name, zone: l.zone, x: l.x, y: l.y, text: l.text, effect: landmarks.effectText(l), chest: l.chest,
             found: found.has(l.id), foundAt: found.get(l.id) || null
         } : { id: l.id, zone: l.zone, known: false })),
+        // Trouvailles de climat (réserve à part) : nom, climat, nombre
+        finds: finds.FINDS.map(f => ({ id: f.id, name: f.name, climate: f.climate, amount: stockFinds[f.id] })),
+        // Gisements des quartiers connus : case, trouvaille, temps avant de repousser (ms, 0 : prêt)
+        deposits: finds.DEPOSITS.filter(d => isKnown(map.ZONE_BY_ID[d.zone], discovered))
+            .map(d => ({ id: d.id, zone: d.zone, find: d.find, x: d.x, y: d.y, readyIn: finds.readyIn(gathered.get(d.id)) })),
         // Expédition en route : vers quel quartier, retour dans combien de temps (ms)
         expedition: going ? { zone: going.zone, endsIn: Math.max(0, new Date(going.ends_at).getTime() - Date.now()) } : null,
         sites,
@@ -1638,5 +1679,5 @@ module.exports = {
     SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, pendingOf, chargesAt, effectsOf, productionOf,
     view, build, buyZone, buyItem, undoItem, chooseSkin, startRun, finishRun, collect, migrate, claimQuest, board, openChest, openAll,
     placeAnnex, moveAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename,
-    refundDecorations, startCraft, finishCraft, placeCraft, moveCraft, storeCraft, startExpedition, findLandmark
+    refundDecorations, startCraft, finishCraft, placeCraft, moveCraft, storeCraft, startExpedition, findLandmark, gatherDeposit
 };

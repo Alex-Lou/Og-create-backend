@@ -171,6 +171,15 @@ router.post('/world/landmark', withAccount(async (req, res, owner, b) => {
     res.json({ landmark: done.landmark, fresh: done.fresh, world: await worldView(owner, b) });
 }));
 
+// Gisement d'un quartier de climat à soi (lot 9d) : ramasser ses trouvailles → { find, amount, world }
+router.post('/world/deposit', withAccount(async (req, res, owner, b) => {
+    const id = String(req.body.id || '');
+    if (!/^[a-z]{1,16}-\d$/.test(id)) return res.status(400).json({ message: 'Gisement invalide' });
+    const done = await world.gatherDeposit(owner.id, id);
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json({ find: done.find, amount: done.amount, world: await worldView(owner, b) });
+}));
+
 // Chantier : niveau suivant, avec son plan (élément du Livre) et ses ressources
 router.post('/world/build', withAccount(async (req, res, owner, b) => {
     const site = String(req.body.site || '');

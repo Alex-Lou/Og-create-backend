@@ -777,6 +777,47 @@ test('lieux remarquables : cachés avec leur quartier, découverts une fois dans
   assert.equal(all.data.world.harvest.maxMoves, first.harvest.maxMoves + 4);
 });
 
+test('trouvailles de climat : gisements des quartiers connus, ramassés une fois dans un quartier à soi, puis ils repoussent', async () => {
+  const player = await newPlayer();
+  const view = async () => (await api('GET', '/play/world', null, player)).data;
+  const gather = id => api('POST', '/play/world/deposit', { id }, player);
+  const first = await view();
+  // Réserve à part, vide ; aucun gisement tant que les terres nouvelles sont inconnues
+  assert.deepEqual(first.finds.map(f => [f.id, f.amount]), [['glace', 0], ['laine', 0], ['roseau', 0], ['sel', 0], ['fruits', 0], ['obsidienne', 0]]);
+  assert.deepEqual(first.deposits, []);
+  assert.equal((await gather('menhirs-1')).status, 403);
+  assert.equal((await gather('nulle-1')).status, 404);
+  assert.equal((await gather('DROP')).status, 400);
+  // Lande aux Menhirs découverte et à soi ; Falaises découvertes seulement
+  await sql(`INSERT INTO world_expeditions (user_id, zone, ends_at) VALUES ($1, 'menhirs', NOW() - INTERVAL '1 hour'), ($1, 'falaises', NOW() - INTERVAL '1 hour'),
+    ($1, 'dunes', NOW() - INTERVAL '1 hour')`, [player.userId]);
+  await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'menhirs'), ($1, 'dunes')`, [player.userId]);
+  const known = await view();
+  assert.deepEqual([...new Set(known.deposits.map(d => d.zone))].sort(), ['dunes', 'falaises', 'menhirs']);
+  const deposit = known.deposits.find(d => d.id === 'menhirs-1');
+  assert.deepEqual([deposit.find, deposit.readyIn], ['laine', 0]);
+  assert.match((await gather('falaises-1')).data.message, /Achète d’abord/);
+  // Un ramassage, une seule fois (même en double clic) : 2 à 4 laines
+  const twice = await Promise.all([gather('menhirs-1'), gather('menhirs-1')]);
+  assert.deepEqual(twice.map(r => r.status).sort(), [200, 409]);
+  const done = twice.find(r => r.status === 200).data;
+  assert.equal(done.find, 'laine');
+  assert.ok(done.amount >= 2 && done.amount <= 4);
+  assert.equal(done.world.finds.find(f => f.id === 'laine').amount, done.amount);
+  const regrowing = done.world.deposits.find(d => d.id === 'menhirs-1');
+  assert.ok(Math.abs(regrowing.readyIn - 6 * 3600 * 1000) < 60000);
+  assert.match((await gather('menhirs-1')).data.message, /repousse/);
+  // Six heures plus tard, il a repoussé
+  await sql(`UPDATE world_deposits SET gathered_at = NOW() - INTERVAL '6 hours 1 minute' WHERE user_id = $1`, [player.userId]);
+  const again = await gather('menhirs-1');
+  assert.equal(again.status, 200);
+  assert.equal(again.data.world.finds.find(f => f.id === 'laine').amount, done.amount + again.data.amount);
+  // Rien ne se pose sur un gisement (le sel des Dunes est sur le sable)
+  const salt = known.deposits.find(d => d.id === 'dunes-1');
+  await sql(`INSERT INTO world_crafts (user_id, craft) VALUES ($1, 'longuevue')`, [player.userId]);
+  assert.match((await api('POST', '/play/world/craft/place', { craft: 'longuevue', x: salt.x, y: salt.y }, player)).data.message, /occupée/);
+});
+
 test('le Monde : une île de la carte v3 devient le cœur de la très grande île ; tout ce qui est posé glisse', async () => {
   const player = await newPlayer();
   await api('GET', '/play/world', null, player);

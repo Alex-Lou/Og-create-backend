@@ -359,6 +359,35 @@ test('la très grande île : calques cohérents, le cœur intact, chantiers à p
   assert.equal(map.isLand(map.SITE_BIG.foyer.x, map.SITE_BIG.foyer.y), true);
 });
 
+test('gisements de trouvailles : trois par quartier de climat, sur le sol de leur trouvaille, écartés, hors des lieux', () => {
+  const map = require('../src/services/worldMap');
+  const finds = require('../src/services/finds');
+  const landmarks = require('../src/services/landmarks');
+  assert.deepEqual(finds.FINDS.map(f => f.climate).sort(), ['cimes', 'dunes', 'jungle', 'landes', 'marais', 'volcan']);
+  const climateZones = map.ZONES.filter(z => z.climate !== 'tempere');
+  assert.equal(finds.DEPOSITS.length, climateZones.length * finds.PER_ZONE);
+  assert.equal(new Set(finds.DEPOSITS.map(d => d.id)).size, finds.DEPOSITS.length);
+  for (const zone of climateZones) {
+    const here = finds.DEPOSITS.filter(d => d.zone === zone.id);
+    assert.equal(here.length, finds.PER_ZONE, zone.id);
+    for (const d of here) {
+      const find = finds.FIND_BY_ID[d.find];
+      assert.equal(find.climate, zone.climate);
+      assert.equal(map.zoneAt(d.x, d.y), zone.id);
+      assert.ok(find.grounds.includes(map.groundAt(d.x, d.y)), d.id);
+      assert.ok(!landmarks.isLandmark(d.x, d.y) && finds.isDeposit(d.x, d.y));
+      assert.ok(here.every(o => o === d || Math.max(Math.abs(o.x - d.x), Math.abs(o.y - d.y)) >= finds.SPREAD), d.id);
+      assert.ok(landmarks.LANDMARKS.every(l => Math.max(Math.abs(l.x - d.x), Math.abs(l.y - d.y)) >= finds.SPREAD), d.id);
+      assert.notDeepEqual(map.ANCHORS[zone.id], { x: d.x, y: d.y });
+    }
+  }
+  // Repousse : 6 h après le ramassage
+  const now = Date.parse('2026-10-05T12:00:00Z');
+  assert.equal(finds.readyIn(null, now), 0);
+  assert.equal(finds.readyIn(new Date(now - 3600 * 1000), now), 5 * 3600 * 1000);
+  assert.equal(finds.readyIn(new Date(now - 7 * 3600 * 1000), now), 0);
+});
+
 test('lieux remarquables : un par case, dans son quartier des terres nouvelles, hors chemin ; effets additionnés', () => {
   const map = require('../src/services/worldMap');
   const landmarks = require('../src/services/landmarks');
