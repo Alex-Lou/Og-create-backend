@@ -2,7 +2,7 @@
 // un joueur d'avant la bible ne recule jamais
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { QUESTS, LEGACY, QUEST_CHESTS, BEASTS, doneOf, progressOf, active, boardOf } = require('../src/services/quests');
+const { QUESTS, LEGACY, QUEST_CHESTS, BEASTS, doneOf, progressOf, active, boardOf, actsDoneOf } = require('../src/services/quests');
 const map = require('../src/services/worldMap');
 const { SITES } = require('../src/services/world');
 const { CRAFT_BY_ID } = require('../src/services/crafts');
@@ -119,6 +119,17 @@ test('la quête active est la première pas encore faite ; à la fin, Brume se r
   assert.equal(board.quest, null);
   assert.equal(board.done, QUESTS.length);
   assert.ok(board.rested.length > 10);
+  assert.deepEqual(board.acts, ACTS);
+});
+
+test('les actes finis se lisent dans les quêtes faites (veillées, étape de civilisation)', () => {
+  assert.deepEqual(actsDoneOf(doneOf(new Set())), []);
+  // Le Puits réclamé : le prologue est fini ; la lanterne : l'acte I aussi
+  assert.deepEqual(actsDoneOf(doneOf(new Set(['puits-ondin']))), ['T']);
+  assert.deepEqual(actsDoneOf(doneOf(new Set(['lanterne']))), ['T', 'I']);
+  assert.deepEqual(boardOf(new Set(['cabane']), facts()).acts, ['T', 'I', 'II']);
+  // Un joueur d'avant la bible : ses anciennes quêtes rangées comptent
+  assert.deepEqual(actsDoneOf(doneOf(new Set(['source', 'puits', 'lisiere', 'cabane']))), ['T', 'I', 'II']);
 });
 
 test('un joueur d’avant la bible ne recule jamais : ses anciennes quêtes se rangent dans la nouvelle chaîne', () => {

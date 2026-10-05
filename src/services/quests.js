@@ -234,11 +234,18 @@ function active(claimed, facts) {
 }
 
 // Ce que la vue de l'île montre de Brume : la quête active, ou son dernier mot
+// Actes finis (leur dernière quête faite), dans l'ordre : les veillées et l'étape de civilisation s'en déduisent
+// (bible, § 6.8 et § 6.10), rien n'est stocké
+const ACTS = [...new Set(QUESTS.map(quest => quest.act))];
+function actsDoneOf(done) {
+    return ACTS.filter(act => done.has(QUESTS.filter(quest => quest.act === act).pop().id));
+}
+
 function boardOf(claimed, facts) {
     const done = doneOf(claimed);
-    return { quest: active(claimed, facts), done: QUESTS.filter(quest => done.has(quest.id)).length, total: QUESTS.length, rested: RESTED };
+    return { quest: active(claimed, facts), done: QUESTS.filter(quest => done.has(quest.id)).length, total: QUESTS.length, acts: actsDoneOf(done), rested: RESTED };
 }
 // Quand tout est fait
 const RESTED = 'La brume s’est levée sur toute l’île. Merci, alchimiste : elle est de nouveau vivante.';
 
-module.exports = { QUESTS, LEGACY, QUEST_CHESTS, BEASTS, reachOf, doneOf, currentOf, progressOf, active, boardOf };
+module.exports = { QUESTS, LEGACY, QUEST_CHESTS, BEASTS, reachOf, doneOf, currentOf, progressOf, active, boardOf, actsDoneOf };

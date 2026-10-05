@@ -570,9 +570,11 @@ function boardWith(claimed, facts, openChapters) {
     if (chapter && !openChapters.has(chapter)) quest.chapter = chapter;
     return out;
 }
-// Brume seule (quête active), sans le reste de l'île : le Grimoire la consulte après une découverte
+// Brume seule (quête active), sans le reste de l'île : le Grimoire la consulte après une découverte ; avec le nom du
+// peuple, pour l'étape de civilisation (l'Ex libris du Grimoire)
 async function board(userId, owned, stars, openChapters) {
-    return boardWith(await claimedOf(userId), await factsOf(userId, owned, stars), openChapters);
+    const out = boardWith(await claimedOf(userId), await factsOf(userId, owned, stars), openChapters);
+    return { ...out, people: (await namesOf(userId)).peuple || null };
 }
 
 // Passage aux cartes suivantes, une fois par joueur, au premier passage, verrouillé (deux requêtes ne migrent pas

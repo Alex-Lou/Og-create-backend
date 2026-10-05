@@ -1872,6 +1872,10 @@ test('chaque objectif de la chaîne se lit dans l’état (création, annexe, ex
     assert.equal(named.data.people, 'Les Lucioles');
   });
   assert.equal((await api('POST', '/play/world/people', { name: 'Les Marées' }, player)).data.people, 'Les Marées');
+  // Brume seule (le Grimoire) dit aussi le nom du peuple et les actes finis
+  const alone = (await api('GET', '/play/world/brume', null, player)).data;
+  assert.equal(alone.people, 'Les Marées');
+  assert.ok(alone.acts.includes('IV') && !alone.acts.includes('V'));
   assert.equal((await api('POST', '/play/world/people', { name: 'Les Marées' }, { cookies: {} })).status, 401);
   // Le nom du joueur, écrit dans le Grimoire au tutoriel : même règle, rangé à part du nom du peuple
   assert.equal((await api('POST', '/play/world/player', { name: '?' }, player)).status, 400);
