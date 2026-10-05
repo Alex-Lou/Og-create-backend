@@ -323,6 +323,24 @@ CREATE TABLE IF NOT EXISTS world_annexes (
     built_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (user_id, x, y)
 );
+-- Enseignes (services/signs.js), dès le palier V d'un bâtiment : le nom écrit dessus (un pour toute l'île), les styles
+-- achetés (la planche de bois est offerte) et le style porté par chaque bâtiment
+CREATE TABLE IF NOT EXISTS world_sign_names (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    name VARCHAR(14) NOT NULL
+);
+CREATE TABLE IF NOT EXISTS world_sign_styles (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    style VARCHAR(20) NOT NULL,
+    bought_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, style)
+);
+CREATE TABLE IF NOT EXISTS world_signs (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    site VARCHAR(20) NOT NULL,
+    style VARCHAR(20) NOT NULL,
+    PRIMARY KEY (user_id, site)
+);
 
 -- Le Livre : mélanges ratés sur une page à portée (l'encre de la page devient offerte après quelques essais différents)
 CREATE TABLE IF NOT EXISTS book_tries (

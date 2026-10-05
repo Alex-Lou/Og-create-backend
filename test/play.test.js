@@ -805,6 +805,50 @@ test('le Monde : les paliers III à VII demandent chapitre et écus, le palier I
   assert.match(fifth.data.message, /chapitre V/);
 });
 
+test('enseignes : dès le palier V, au nom choisi, un style par bâtiment, acheté une seule fois', async () => {
+  const player = await newPlayer({ coins: 400 });
+  const sign = body => api('POST', '/play/world/sign', body, player);
+  const start = (await api('GET', '/play/world', null, player)).data;
+  // Nom proposé : le premier mot de l'identifiant ; styles : le bois offert, les autres à acheter ; pas d'enseigne avant V
+  assert.equal(start.signs.name, 'Test');
+  assert.equal(start.signs.level, 5);
+  assert.deepEqual(start.signs.styles.filter(s => s.owned).map(s => s.id), ['bois']);
+  assert.ok(start.sites.every(s => s.sign === null));
+  assert.equal((await sign({ site: 'potager', style: 'bois' })).status, 403);
+  // Nom choisi, nettoyé ; refusé s'il ne convient pas
+  const named = await api('POST', '/play/world/sign/name', { name: '  Zoé   des Îles ' }, player);
+  assert.equal(named.status, 200);
+  assert.equal(named.data.signs.name, 'Zoé des Îles');
+  assert.equal((await api('POST', '/play/world/sign/name', { name: '<script>' }, player)).status, 400);
+  assert.equal((await api('POST', '/play/world/sign/name', { name: 'x'.repeat(15) }, player)).status, 400);
+  // Potager au palier V : planche de bois d'office
+  await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'potager', 5), ($1, 'carriere', 6)`, [player.userId]);
+  const five = (await api('GET', '/play/world', null, player)).data;
+  assert.equal(five.sites.find(s => s.id === 'potager').sign, 'bois');
+  assert.equal(five.sites.find(s => s.id === 'ponton').sign, null);
+  // Ardoise : 150 écus, une seule fois même en double clic, puis portée
+  const [a, b] = await Promise.all([1, 2].map(() => sign({ site: 'potager', style: 'ardoise' })));
+  assert.deepEqual([a.status, b.status], [200, 200]);
+  assert.equal(await coinsOf(player), 250);
+  assert.deepEqual([a.data.coins, b.data.coins].filter(c => c !== undefined), [250]);
+  assert.equal(a.data.world.sites.find(s => s.id === 'potager').sign, 'ardoise');
+  assert.equal(a.data.world.signs.styles.find(s => s.id === 'ardoise').owned, true);
+  // Déjà achetée : portée gratuitement sur un autre bâtiment ; trop chère : refusée, rien n'est pris
+  const carriere = await sign({ site: 'carriere', style: 'ardoise' });
+  assert.equal(carriere.data.coins, undefined);
+  assert.equal(carriere.data.world.sites.find(s => s.id === 'carriere').sign, 'ardoise');
+  assert.equal((await sign({ site: 'carriere', style: 'lanterne' })).status, 400);
+  assert.equal(await coinsOf(player), 250);
+  assert.equal((await sql('SELECT COUNT(*)::int AS n FROM world_sign_styles WHERE user_id = $1', [player.userId]))[0].n, 1);
+  // Retour au bois, offert
+  assert.equal((await sign({ site: 'potager', style: 'bois' })).data.world.sites.find(s => s.id === 'potager').sign, 'bois');
+  // Entrées invalides ; compte requis
+  assert.equal((await sign({ site: 'potager', style: 'neon' })).status, 404);
+  assert.equal((await sign({ site: 'nulle', style: 'bois' })).status, 404);
+  assert.equal((await sign({ site: 'potager', style: 'Bois!' })).status, 400);
+  assert.equal((await api('POST', '/play/world/sign', { site: 'potager', style: 'bois' }, await guest())).status, 402);
+});
+
 test('annexes : posées autour du bâtiment au palier voulu, payées une fois, déplacées gratuitement, elles produisent', async () => {
   const player = await newPlayer({ coins: 0 });
   const potagerOf = world => world.sites.find(s => s.id === 'potager');
