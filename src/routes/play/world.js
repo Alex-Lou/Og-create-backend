@@ -162,6 +162,15 @@ router.post('/world/expedition', withAccount(async (req, res, owner, b) => {
     res.json({ expedition: done, world: await worldView(owner, b) });
 }));
 
+// Lieu remarquable d'un quartier à soi (lot 9c) : le découvrir → { landmark, fresh, world } (fresh : première fois)
+router.post('/world/landmark', withAccount(async (req, res, owner, b) => {
+    const id = String(req.body.id || '');
+    if (!/^[a-z]{1,20}$/.test(id)) return res.status(400).json({ message: 'Lieu invalide' });
+    const done = await world.findLandmark(owner.id, id);
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json({ landmark: done.landmark, fresh: done.fresh, world: await worldView(owner, b) });
+}));
+
 // Chantier : niveau suivant, avec son plan (élément du Livre) et ses ressources
 router.post('/world/build', withAccount(async (req, res, owner, b) => {
     const site = String(req.body.site || '');
@@ -250,10 +259,10 @@ router.post('/world/visitor/settle', withAccount(async (req, res, owner, b) => {
     res.json({ settled: done.settled, world: await worldView(owner, b) });
 }));
 
-// Coffre qui attend : du jour, bouteille à la mer, chapitre du Livre ouvert, quête de Brume réclamée
+// Coffre qui attend : du jour, bouteille à la mer, chapitre du Livre ouvert, quête de Brume réclamée, lieu découvert
 router.post('/world/chest', withAccount(async (req, res, owner, b) => {
     const source = String(req.body.source || '');
-    if (!/^(jour|bouteille|chapitre:[IVX]{1,4}|quete:[a-z0-9]{1,30})$/.test(source)) return res.status(400).json({ message: 'Coffre invalide' });
+    if (!/^(jour|bouteille|chapitre:[IVX]{1,4}|quete:[a-z0-9]{1,30}|lieu:[a-z]{1,20})$/.test(source)) return res.status(400).json({ message: 'Coffre invalide' });
     const done = await world.openChest(owner.id, source, bookPages.openChapters(b, await players.elements(owner)));
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ chest: done.chest, coins: done.coins, world: await worldView(owner, b) });

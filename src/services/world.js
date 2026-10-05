@@ -20,6 +20,7 @@ const villagers = require('./villagers');
 const visitors = require('./visitors');
 const crafts = require('./crafts');
 const naming = require('./naming');
+const landmarks = require('./landmarks');
 
 const SIZE = map.SIZE;
 const CAP_HOURS = 8;
@@ -159,10 +160,6 @@ for (const [id, site] of Object.entries(SITES)) {
     site.levels.forEach((l, i) => { l.effect = effectOf(id, i + 1); l.chapter = CHAPTER_OF_LEVEL[i]; });
 }
 
-// Case où l'on peut poser une décoration : sol constructible (herbe, sable, prairie), hors emprise d'un chantier
-// (selon son niveau) et des annexes (blocked : clés y * SIZE + x), dans un quartier possédé
-const isFree = (x, y, zones, levels, blocked = null) => Number.isInteger(x) && Number.isInteger(y) && map.buildable(x, y)
-    && !map.inFootprint(x, y, levels) && zones.has(map.zoneAt(x, y)) && !blocked?.has(y * SIZE + x);
 const keyOf = cell => cell.y * SIZE + cell.x;
 
 // Écus dus selon l'ancienne règle (décorations) : chaque source compte depuis sa pose ou la dernière récolte, plafonnée
@@ -334,6 +331,18 @@ function withMoods(bonuses, extra, moods) {
     }
     return { bonuses: { ...bonuses, prod, moves }, extra: { ...extra, regenCut } };
 }
+// Bonus avec ceux des lieux remarquables découverts (lm : landmarks.bonusesOf) : production en plus (après le plafond
+// de la boutique), réserve des bâtiments, parties, coups, retour des parties
+function withLandmarks({ bonuses, extra }, lm) {
+    const prod = { ...bonuses.prod };
+    for (const [site, part] of Object.entries(lm.prod)) prod[site] = (prod[site] || 0) + part;
+    const cap = { ...extra.cap };
+    for (const [site, hours] of Object.entries(lm.cap)) cap[site] = (cap[site] || 0) + hours;
+    return {
+        bonuses: { ...bonuses, prod },
+        extra: { ...extra, cap, charges: extra.charges + lm.charges, moves: extra.moves + lm.moves, regenCut: extra.regenCut + lm.regenCut }
+    };
+}
 // Un habitant arrive comblé : la première vue de l'île après son arrivée inscrit l'heure de ses besoins (ou de celui
 // qui apparaît, travailler avec l'Atelier), une seule fois
 async function welcome(userId, moods, filled) {
@@ -393,14 +402,15 @@ async function annexesOf(userId, conn = db) {
     const { rows } = await conn.query('SELECT x, y, annex, built_at FROM world_annexes WHERE user_id = $1 ORDER BY built_at, y, x', [userId]);
     return rows;
 }
-// Bonus de la boutique, des annexes et de l'humeur des habitants : { bonuses, extra } (ce que lisent effectsOf et
-// productionAll)
+// Bonus de la boutique, des annexes, de l'humeur des habitants et des lieux découverts : { bonuses, extra } (ce que
+// lisent effectsOf et productionAll)
 async function bonusesFor(userId, conn = db) {
     const { levels } = await levelsOf(userId, conn);
     const zones = await zonesOf(userId, conn);
     const residents = residentsOf(levels, zones, await settlersOf(userId, conn));
     const moods = moodsOf(residents, levels, zones, placedOf(await craftsOf(userId, conn)), await needRowsOf(userId, conn));
-    return withMoods(shop.bonusesOf(await itemsOf(userId, conn)), annexes.bonusesOf(await annexesOf(userId, conn)), moods);
+    const mooded = withMoods(shop.bonusesOf(await itemsOf(userId, conn)), annexes.bonusesOf(await annexesOf(userId, conn)), moods);
+    return withLandmarks(mooded, landmarks.bonusesOf((await foundOf(userId, conn)).keys()));
 }
 
 async function levelsOf(userId, conn = db) {
@@ -433,6 +443,11 @@ async function tilesOf(userId, conn = db) {
 async function zonesOf(userId, conn = db) {
     const { rows } = await conn.query('SELECT zone FROM world_zones WHERE user_id = $1', [userId]);
     return new Set(['coeur', ...rows.map(r => r.zone)]);
+}
+// Lieux remarquables découverts : Map identifiant → date de la découverte
+async function foundOf(userId, conn = db) {
+    const { rows } = await conn.query('SELECT landmark, found_at FROM world_landmarks WHERE user_id = $1', [userId]);
+    return new Map(rows.map(r => [r.landmark, r.found_at]));
 }
 
 // Quêtes de Brume réclamées, et récoltes terminées (objectifs des quêtes)
@@ -579,6 +594,23 @@ async function startExpedition(userId, zoneId, now = Date.now()) {
     });
 }
 
+// Découvre un lieu remarquable d'un quartier à soi : une seule fois (même en double clic ; redécouvrir ne fait rien).
+// La production en cours est encaissée d'abord (l'effet ne vaut que pour la suite). Son coffre attend alors parmi les
+// coffres. { landmark, fresh } ou { status, message }
+async function findLandmark(userId, landmarkId, now = Date.now()) {
+    const place = Object.hasOwn(landmarks.LANDMARK_BY_ID, landmarkId) ? landmarks.LANDMARK_BY_ID[landmarkId] : null;
+    if (!place) return { status: 404, message: 'Lieu inconnu.' };
+    await migrate(userId);
+    return db.transaction(async conn => {
+        const stock = await stockOf(userId, conn, true);
+        if (!(await zonesOf(userId, conn)).has(place.zone)) return db.rollback({ status: 403, message: 'Achète d’abord ce quartier de l’île.' });
+        if ((await foundOf(userId, conn)).has(place.id)) return { landmark: place.id, fresh: false };
+        await gather(userId, conn, stock);
+        await conn.query('INSERT INTO world_landmarks (user_id, landmark, found_at) VALUES ($1, $2, $3)', [userId, place.id, new Date(now)]);
+        return { landmark: place.id, fresh: true };
+    });
+}
+
 // Créations d'île (lot 8) : [{ id, craft, x, y }] (x, y vides : en réserve)
 async function craftsOf(userId, conn = db) {
     const { rows } = await conn.query('SELECT id, craft, x, y FROM world_crafts WHERE user_id = $1 ORDER BY id', [userId]);
@@ -587,8 +619,8 @@ async function craftsOf(userId, conn = db) {
 const placedOf = rows => rows.filter(r => r.x !== null);
 // Créations déjà fabriquées, par sorte (posées ou en réserve) : { création: nombre }
 const madeOf = rows => rows.reduce((out, r) => ({ ...out, [r.craft]: (out[r.craft] || 0) + 1 }), {});
-// Contexte des règles de pose (crafts.spotBlock) : sol, case libre (sur l'île, hors chantier, quartier à soi, ni annexe
-// ni autre création), emprise d'un bâtiment bâti, créations posées (sauf skip : celle qu'on déplace)
+// Contexte des règles de pose (crafts.spotBlock) : sol, case libre (sur l'île, hors chantier, quartier à soi, ni annexe,
+// ni autre création, ni lieu remarquable), emprise d'un bâtiment bâti, créations posées (sauf skip : celle qu'on déplace)
 // (cells : les cases libres, calculées une fois pour toutes les créations)
 function craftCtx(levels, zones, annexRows, rows, skip = null) {
     const others = placedOf(rows).filter(r => r.id !== skip);
@@ -597,7 +629,7 @@ function craftCtx(levels, zones, annexRows, rows, skip = null) {
     const cells = [];
     for (let y = 0; y < SIZE; y++) {
         for (let x = 0; x < SIZE; x++) {
-            if (!map.isLand(x, y) || !zones.has(map.zoneAt(x, y)) || busy.has(y * SIZE + x) || map.inFootprint(x, y, levels)) continue;
+            if (!map.isLand(x, y) || !zones.has(map.zoneAt(x, y)) || busy.has(y * SIZE + x) || map.inFootprint(x, y, levels) || landmarks.isLandmark(x, y)) continue;
             open[y * SIZE + x] = 1;
             cells.push({ x, y });
         }
@@ -648,13 +680,13 @@ function craftsView(rows, ctx, { owned, stock, open, epreuves }, siteName) {
     };
 }
 
-// Coffres déjà ouverts parmi les sources à surveiller : chapitres, quêtes, jour (et veille), bouteille. Map source → ligne
+// Coffres déjà ouverts parmi les sources à surveiller : chapitres, quêtes, lieux, jour (et veille), bouteille. Map source → ligne
 const QUEST_CHESTS = quests.QUESTS.filter(q => q.chest);
 async function openedOf(userId, now, conn = db) {
     const { day, slot } = loot.parisOf(now);
     const keys = [
         ...Object.keys(loot.CHAPTER_RARES).map(c => `chapitre:${c}`), ...QUEST_CHESTS.map(q => `quete:${q.id}`),
-        `jour:${day}`, `jour:${loot.dayBefore(day)}`, `bouteille:${day}-${slot}`
+        ...landmarks.LANDMARKS.map(l => `lieu:${l.id}`), `jour:${day}`, `jour:${loot.dayBefore(day)}`, `bouteille:${day}-${slot}`
     ];
     const { rows } = await conn.query('SELECT source, streak FROM world_chests WHERE user_id = $1 AND source = ANY($2)', [userId, keys]);
     return { day, slot, opened: new Map(rows.map(r => [r.source, r])) };
@@ -663,9 +695,10 @@ async function openedOf(userId, now, conn = db) {
 // Série du coffre du jour : celle d'hier plus un, sinon 1 (un jour manqué la remet à 1)
 const streakOf = (opened, day) => (opened.get(`jour:${loot.dayBefore(day)}`)?.streak || 0) + 1;
 
-// Ce que la vue montre des coffres : ceux qui attendent (chapitres ouverts, quêtes réclamées), le coffre du jour (série,
-// rareté du jour et du lendemain s'il est ouvert, semaine en cours) et la bouteille de la tranche
-function chestsView({ day, slot, opened }, openChapters, claimed) {
+// Ce que la vue montre des coffres : ceux qui attendent (chapitres ouverts, quêtes réclamées, lieux découverts), le
+// coffre du jour (série, rareté du jour et du lendemain s'il est ouvert, semaine en cours) et la bouteille de la tranche.
+// found : lieux découverts (identifiants)
+function chestsView({ day, slot, opened }, openChapters, claimed, found) {
     const today = opened.get(`jour:${day}`);
     const streak = today ? today.streak : streakOf(opened, day);
     const first = streak - ((streak - 1) % 7);
@@ -674,7 +707,9 @@ function chestsView({ day, slot, opened }, openChapters, claimed) {
             ...Object.entries(loot.CHAPTER_RARES).filter(([c]) => openChapters.has(c) && !opened.has(`chapitre:${c}`))
                 .map(([c]) => ({ source: `chapitre:${c}`, rarity: 'legendaire', label: `Chapitre ${c} du Livre` })),
             ...QUEST_CHESTS.filter(q => claimed.has(q.id) && !opened.has(`quete:${q.id}`))
-                .map(q => ({ source: `quete:${q.id}`, rarity: q.chest, label: `Quête : ${q.label}` }))
+                .map(q => ({ source: `quete:${q.id}`, rarity: q.chest, label: `Quête : ${q.label}` })),
+            ...landmarks.LANDMARKS.filter(l => found.has(l.id) && !opened.has(`lieu:${l.id}`))
+                .map(l => ({ source: `lieu:${l.id}`, rarity: l.chest, label: `Lieu : ${l.name}` }))
         ],
         daily: {
             available: !today, streak, rarity: loot.dailyRarity(streak), tomorrow: loot.dailyRarity(streak + 1),
@@ -685,10 +720,10 @@ function chestsView({ day, slot, opened }, openChapters, claimed) {
 }
 
 // Case où une annexe de ce bâtiment peut se poser (sans compter ce qui l'occupe) : sol constructible du quartier du
-// bâtiment, hors des grandes emprises des chantiers, à annexes.REACH cases au plus de la sienne
+// bâtiment, hors des grandes emprises des chantiers et des lieux remarquables, à annexes.REACH cases au plus de la sienne
 function annexSpotOk(siteId, x, y) {
     const at = map.SITE_BIG[siteId];
-    return Boolean(at) && Number.isInteger(x) && Number.isInteger(y) && map.buildable(x, y) && !map.inSite(x, y)
+    return Boolean(at) && Number.isInteger(x) && Number.isInteger(y) && map.buildable(x, y) && !map.inSite(x, y) && !landmarks.isLandmark(x, y)
         && map.zoneAt(x, y) === map.siteZone(siteId) && annexes.reachOf(x, y, at) <= annexes.REACH;
 }
 // Cases libres où poser une annexe de ce bâtiment (taken : clés des cases occupées), des plus proches aux plus lointaines
@@ -738,7 +773,9 @@ async function view(userId, owned, book) {
     const residents = residentsOf(levels, zones, settlers);
     const moods = moodsOf(residents, levels, zones, decor, filled);
     await welcome(userId, moods, filled);
-    const { bonuses, extra } = withMoods(shopBonuses, annexes.bonusesOf(annexRows), moods);
+    const found = await foundOf(userId);
+    const lmBonuses = landmarks.bonusesOf(found.keys());
+    const { bonuses, extra } = withLandmarks(withMoods(shopBonuses, annexes.bonusesOf(annexRows), moods), lmBonuses);
     const effects = effectsOf(levels, bonuses, extra);
     const charges = chargesAt(stock, effects.maxCharges, Date.now(), effects.regenMs);
     const taken = new Set([...annexCells, ...decor.map(keyOf)]);
@@ -775,6 +812,8 @@ async function view(userId, owned, book) {
             // Style de son enseigne (dès le palier V ; la planche de bois tant qu'aucun autre n'est choisi)
             sign: level >= signs.SIGN_LEVEL ? signed.worn[id] || 'bois' : null,
             bonus: Math.round((shopBonuses.prod[id] || 0) * 100),
+            // Part de production en plus apportée par les lieux remarquables découverts
+            landmarkBonus: Math.round((lmBonuses.prod[id] || 0) * 100),
             // Part de production en plus (ou en moins) selon l'humeur de son habitant
             moodBonus: site.produce ? Object.values(moods).filter(m => m.site === id).reduce((sum, m) => sum + villagers.moodSign(m.mood), 0) * Math.round(villagers.MOOD_STEP.prod * 100) : 0,
             // Tous les paliers, pour la fiche du bâtiment (atteints, suivant, à venir)
@@ -816,6 +855,12 @@ async function view(userId, owned, book) {
                 trip: z.trip, cost: expeditionCost(z), explorable: !going && map.NEIGHBORS[z.id].some(id => zones.has(id))
             }))
         },
+        // Lieux remarquables : ceux des quartiers connus (case, nom, ce qu'ils racontent et font, découverts ou non) ;
+        // ceux des quartiers inconnus ne disent rien, sinon qu'ils existent
+        landmarks: landmarks.LANDMARKS.map(l => (isKnown(map.ZONE_BY_ID[l.zone], discovered) ? {
+            id: l.id, name: l.name, zone: l.zone, x: l.x, y: l.y, text: l.text, effect: landmarks.effectText(l), chest: l.chest,
+            found: found.has(l.id), foundAt: found.get(l.id) || null
+        } : { id: l.id, zone: l.zone, known: false })),
         // Expédition en route : vers quel quartier, retour dans combien de temps (ms)
         expedition: going ? { zone: going.zone, endsIn: Math.max(0, new Date(going.ends_at).getTime() - Date.now()) } : null,
         sites,
@@ -826,8 +871,6 @@ async function view(userId, owned, book) {
         capHours: CAP_HOURS,
         pending: production.reduce((sum, p) => sum + p.coins, 0),
         pendingStock,
-        // Ancien champ des décorations (éléments du Livre posés, remboursés au lot 8) : toujours vide
-        tiles: [],
         // Créations d'île : paliers, catalogue, réserve et cases où poser, créations posées
         crafts: craftsView(craftRows, craftCtx(levels, zones, annexRows, craftRows), {
             owned: have, stock, open: crafts.tiersOpen(book.finished || new Set(), epreuves), epreuves
@@ -881,7 +924,7 @@ async function view(userId, owned, book) {
         // Brume, l'esprit de la brume : la quête active (ou son dernier mot)
         brume: quests.boardOf(claimed, { crafts: decor.length, runs: await runsOf(userId), stars: book.stars ?? 0, zones, levels }),
         // Coffres : en attente, du jour, bouteille à la mer
-        chests: chestsView(await openedOf(userId, Date.now()), book.openChapters, claimed)
+        chests: chestsView(await openedOf(userId, Date.now()), book.openChapters, claimed, found)
     };
 }
 
@@ -1332,27 +1375,29 @@ async function grant(userId, source, rarity, conn, { wanted = null, streak = nul
 }
 
 // Ouvre un coffre qui attend : 'jour' (série), 'bouteille' (tranche de 6 h), 'chapitre:<id>' (chapitre ouvert, sa
-// pièce rare), 'quete:<id>' (quête réclamée qui en donne un). openChapters : Set des chapitres ouverts.
-// { chest, coins } ou { status, message } si refus
+// pièce rare), 'quete:<id>' (quête réclamée qui en donne un), 'lieu:<id>' (lieu remarquable découvert).
+// openChapters : Set des chapitres ouverts. { chest, coins } ou { status, message } si refus
 async function openChest(userId, source, openChapters, now = Date.now()) {
     const [kind, id] = source.split(':');
     const chapter = kind === 'chapitre' ? loot.CHAPTER_RARES[id] : null;
     const quest = kind === 'quete' ? QUEST_CHESTS.find(q => q.id === id) : null;
-    if (!['jour', 'bouteille'].includes(source) && !chapter && !quest) return { status: 404, message: 'Coffre inconnu.' };
+    const place = kind === 'lieu' && Object.hasOwn(landmarks.LANDMARK_BY_ID, id) ? landmarks.LANDMARK_BY_ID[id] : null;
+    if (!['jour', 'bouteille'].includes(source) && !chapter && !quest && !place) return { status: 404, message: 'Coffre inconnu.' };
     if (chapter && !openChapters.has(id)) return { status: 403, message: `Ouvre d’abord le chapitre ${id} du Livre.` };
     await migrate(userId);
     return db.transaction(async conn => {
         await stockOf(userId, conn, true);
         const { day, slot, opened } = await openedOf(userId, now, conn);
         if (quest && !(await claimedOf(userId, conn)).has(quest.id)) return db.rollback({ status: 403, message: 'Réclame d’abord cette quête de Brume.' });
+        if (place && !(await foundOf(userId, conn)).has(place.id)) return db.rollback({ status: 403, message: 'Découvre d’abord ce lieu sur l’île.' });
         const chest = await grantSource(userId, source, { day, slot, opened }, conn);
         if (!chest) return db.rollback({ status: 409, message: source === 'bouteille' ? 'La prochaine bouteille n’est pas encore arrivée.' : 'Ce coffre est déjà ouvert.' });
         return { chest, coins: await balanceOf(userId, conn) };
     });
 }
 
-// Tire et donne le coffre d'une source déjà validée ('jour', 'bouteille', 'chapitre:<id>', 'quete:<id>'), dans la
-// transaction : sa clé et sa rareté selon le jour, la tranche et la série. null s'il est déjà ouvert
+// Tire et donne le coffre d'une source déjà validée ('jour', 'bouteille', 'chapitre:<id>', 'quete:<id>', 'lieu:<id>'),
+// dans la transaction : sa clé et sa rareté selon le jour, la tranche et la série. null s'il est déjà ouvert
 function grantSource(userId, source, { day, slot, opened }, conn) {
     if (source === 'jour') {
         const streak = streakOf(opened, day);
@@ -1360,11 +1405,12 @@ function grantSource(userId, source, { day, slot, opened }, conn) {
     }
     if (source === 'bouteille') return grant(userId, `bouteille:${day}-${slot}`, loot.rarityOf(loot.BOTTLE.odds, random), conn);
     const [kind, id] = source.split(':');
+    if (kind === 'lieu') return grant(userId, source, landmarks.LANDMARK_BY_ID[id].chest, conn);
     const chapter = kind === 'chapitre' ? loot.CHAPTER_RARES[id] : null;
     return grant(userId, source, chapter ? 'legendaire' : QUEST_CHESTS.find(q => q.id === id).chest, conn, { wanted: chapter });
 }
 
-// « Tout ouvrir » : tout ce qui attend (coffre du jour, chapitres ouverts, quêtes réclamées, bouteille), dans une seule
+// « Tout ouvrir » : tout ce qui attend (coffre du jour, chapitres ouverts, quêtes réclamées, lieux découverts, bouteille), dans une seule
 // transaction. La liste est celle que montre la vue, établie ici sous verrou, jamais reçue du client.
 // { chests, coins } ou { status, message } s'il n'y a rien à ouvrir
 async function openAll(userId, openChapters, now = Date.now()) {
@@ -1372,7 +1418,7 @@ async function openAll(userId, openChapters, now = Date.now()) {
     return db.transaction(async conn => {
         await stockOf(userId, conn, true);
         const state = await openedOf(userId, now, conn);
-        const { daily, pending, bottle } = chestsView(state, openChapters, await claimedOf(userId, conn));
+        const { daily, pending, bottle } = chestsView(state, openChapters, await claimedOf(userId, conn), new Set((await foundOf(userId, conn)).keys()));
         const sources = [...(daily.available ? ['jour'] : []), ...pending.map(c => c.source), ...(bottle.available ? ['bouteille'] : [])];
         const chests = [];
         for (const source of sources) {
@@ -1589,8 +1635,8 @@ async function collect(userId) {
 }
 
 module.exports = {
-    SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, isFree, pendingOf, chargesAt, effectsOf, productionOf,
+    SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, pendingOf, chargesAt, effectsOf, productionOf,
     view, build, buyZone, buyItem, undoItem, chooseSkin, startRun, finishRun, collect, migrate, claimQuest, board, openChest, openAll,
     placeAnnex, moveAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename,
-    refundDecorations, startCraft, finishCraft, placeCraft, moveCraft, storeCraft, startExpedition
+    refundDecorations, startCraft, finishCraft, placeCraft, moveCraft, storeCraft, startExpedition, findLandmark
 };

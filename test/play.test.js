@@ -397,7 +397,7 @@ test('le Monde : compte requis ; les décorations de l’ancienne règle sont re
   const start = await api('GET', '/play/world', null, player);
   assert.equal(start.status, 200);
   assert.equal(start.data.size, 96);
-  assert.deepEqual(start.data.tiles, []);
+  assert.equal(start.data.tiles, undefined);
   assert.equal(start.data.refund, undefined);
   assert.equal(start.data.map.grid.length, 96);
   assert.deepEqual([start.data.map.height.length, start.data.map.ground.length, start.data.map.region.length], [96, 96, 96]);
@@ -406,7 +406,6 @@ test('le Monde : compte requis ; les décorations de l’ancienne règle sont re
   await sql(`INSERT INTO world_tiles (user_id, x, y, element) VALUES ($1, 31, 35, 'Eau'), ($1, 32, 35, 'Boue')`, [player.userId]);
   const both = await Promise.all([1, 2].map(() => api('GET', '/play/world', null, player)));
   assert.deepEqual(both.map(r => r.data.refund).filter(Boolean), [{ count: 2, coins: 25, balance: 25 }]);
-  both.forEach(r => assert.deepEqual(r.data.tiles, []));
   assert.equal(await coinsOf(player), 25);
   assert.equal((await sql('SELECT COUNT(*)::int AS n FROM world_tiles WHERE user_id = $1', [player.userId]))[0].n, 0);
   assert.equal((await api('GET', '/play/world', null, player)).data.refund, undefined);
@@ -669,8 +668,7 @@ test('le Monde : une île de l’ancienne carte passe à la nouvelle sans rien p
   const view = a.data;
   // v1 → v2 → v3 : quartiers offerts, écus dus par la décoration versés une seule fois (3) ; puis la décoration est
   // remboursée (lot 8 : Eau, chapitre I, 10 écus) et retirée
-  assert.deepEqual(view.tiles, []);
-  assert.deepEqual(b.data.tiles, []);
+  assert.equal((await sql('SELECT COUNT(*)::int AS n FROM world_tiles WHERE user_id = $1', [player.userId]))[0].n, 0);
   const owned = view.map.zones.filter(z => z.owned).map(z => z.id).sort();
   assert.deepEqual(owned, ['coeur', 'jardins', 'lisiere']);
   assert.equal(await coinsOf(player), 13);
@@ -728,6 +726,57 @@ test('terres nouvelles : quartier inconnu masqué, expédition (voisinage, coût
   assert.equal((await api('POST', '/play/world/expedition', { zone: 'roselieres' }, await guest())).status, 402);
 });
 
+test('lieux remarquables : cachés avec leur quartier, découverts une fois dans un quartier à soi, coffre et effet durable', async () => {
+  const player = await newPlayer();
+  const view = async () => (await api('GET', '/play/world', null, player)).data;
+  const find = id => api('POST', '/play/world/landmark', { id }, player);
+  const chest = source => api('POST', '/play/world/chest', { source }, player);
+  const landmarkOf = (world, id) => world.landmarks.find(l => l.id === id);
+  const first = await view();
+  // Quartier inconnu : le lieu ne dit ni son nom, ni sa case
+  assert.equal(first.landmarks.length, 13);
+  assert.deepEqual(landmarkOf(first, 'menhirs'), { id: 'menhirs', zone: 'menhirs', known: false });
+  assert.equal((await find('menhirs')).status, 403);
+  assert.equal((await find('nulle')).status, 404);
+  assert.equal((await find('DROP')).status, 400);
+  // Découvert (expédition revenue) mais pas encore acheté : visible, pas encore trouvé
+  await sql(`INSERT INTO world_expeditions (user_id, zone, ends_at) VALUES ($1, 'menhirs', NOW() - INTERVAL '1 hour'), ($1, 'falaises', NOW() - INTERVAL '1 hour'),
+    ($1, 'dunes', NOW() - INTERVAL '1 hour')`, [player.userId]);
+  const seen = landmarkOf(await view(), 'menhirs');
+  assert.deepEqual([seen.name, seen.x, seen.y, seen.found, seen.chest, seen.effect], ['Le Cercle de menhirs', 13, 22, false, 'rare', '+2 coups par Récolte']);
+  assert.match((await find('menhirs')).data.message, /Achète d’abord/);
+  assert.equal((await chest('lieu:menhirs')).status, 403);
+  // À soi : un toucher le découvre, une seule fois (même en double clic) ; l'effet dure, le coffre attend
+  await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'menhirs'), ($1, 'falaises'), ($1, 'dunes')`, [player.userId]);
+  const twice = await Promise.all([find('menhirs'), find('menhirs')]);
+  assert.deepEqual(twice.map(r => r.status), [200, 200]);
+  assert.deepEqual(twice.map(r => r.data.fresh).sort(), [false, true]);
+  const after = (await view());
+  const lm = landmarkOf(after, 'menhirs');
+  assert.equal(lm.found, true);
+  assert.ok(Math.abs(new Date(lm.foundAt).getTime() - Date.now()) < 60000);
+  assert.equal(after.harvest.maxMoves, first.harvest.maxMoves + 2);
+  assert.deepEqual(after.chests.pending.filter(c => c.source.startsWith('lieu:')), [{ source: 'lieu:menhirs', rarity: 'rare', label: 'Lieu : Le Cercle de menhirs' }]);
+  const opened = await chest('lieu:menhirs');
+  assert.equal(opened.status, 200);
+  assert.equal(opened.data.chest.rarity, 'rare');
+  assert.equal((await chest('lieu:menhirs')).status, 409);
+  assert.equal((await chest('lieu:nulle')).status, 404);
+  // L'Arche : +10 % de production pour la Carrière (affiché sur sa fiche)
+  assert.equal((await find('arche')).data.fresh, true);
+  assert.equal((await view()).sites.find(s => s.id === 'carriere').landmarkBonus, 10);
+  // La Pyramide est sur le sable : rien ne s'y pose ; son coffre légendaire part avec « Tout ouvrir »
+  await sql(`INSERT INTO world_crafts (user_id, craft) VALUES ($1, 'longuevue')`, [player.userId]);
+  const place = (x, y) => api('POST', '/play/world/craft/place', { craft: 'longuevue', x, y }, player);
+  assert.match((await place(26, 88)).data.message, /occupée/);
+  assert.equal((await place(27, 88)).status, 200);
+  await find('pyramide');
+  const all = await api('POST', '/play/world/chests/all', {}, player);
+  assert.equal(all.status, 200);
+  assert.ok(all.data.chests.some(c => c.source === 'lieu:pyramide' && c.rarity === 'legendaire'));
+  assert.equal(all.data.world.harvest.maxMoves, first.harvest.maxMoves + 4);
+});
+
 test('le Monde : une île de la carte v3 devient le cœur de la très grande île ; tout ce qui est posé glisse', async () => {
   const player = await newPlayer();
   await api('GET', '/play/world', null, player);
@@ -756,7 +805,6 @@ test('le Monde : une île de la carte v2 passe à la grande île ; ses décorati
   const [a, b] = await Promise.all([api('GET', '/play/world', null, player), api('GET', '/play/world', null, player)]);
   for (const view of [a.data, b.data]) {
     assert.equal(view.size, 96);
-    assert.deepEqual(view.tiles, []);
     assert.deepEqual(view.map.zones.filter(z => z.owned).map(z => z.id).sort(), ['coeur', 'crique', 'jardins', 'lisiere']);
     assert.equal(view.sites.find(s => s.id === 'ponton').level, 2);
   }
@@ -764,6 +812,7 @@ test('le Monde : une île de la carte v2 passe à la grande île ; ses décorati
   await api('GET', '/play/world', null, player);
   assert.equal(await coinsOf(player), before + 55);
   assert.equal((await sql('SELECT map_version FROM world_stock WHERE user_id = $1', [player.userId]))[0].map_version, 4);
+  assert.equal((await sql('SELECT COUNT(*)::int AS n FROM world_tiles WHERE user_id = $1', [player.userId]))[0].n, 0);
 });
 
 // Première chaîne jouable d'un plateau (recherche en profondeur), pour jouer comme un joueur

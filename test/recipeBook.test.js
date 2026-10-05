@@ -187,7 +187,7 @@ test('le pendu : lettre posée dans une case, verdicts, masque et illustration',
 });
 
 test('le Monde : écus dus (ancienne règle), parties qui reviennent, effets et production des bâtiments', () => {
-  const { pendingOf, chargesAt, effectsOf, productionOf, isFree, CAP_HOURS, REGEN_MS } = require('../src/services/world');
+  const { pendingOf, chargesAt, effectsOf, productionOf, CAP_HOURS, REGEN_MS } = require('../src/services/world');
   const now = Date.parse('2026-10-03T12:00:00Z');
   const hoursAgo = h => new Date(now - h * 3600000).toISOString();
   const tiles = [{ placed_at: hoursAgo(3) }, { placed_at: hoursAgo(20) }];
@@ -216,20 +216,6 @@ test('le Monde : écus dus (ancienne règle), parties qui reviennent, effets et 
   assert.deepEqual(productionOf('carriere', 2, hoursAgo(20), null, now), { resource: 'stone', amount: 48, coins: 32 });
   assert.deepEqual(productionOf('potager', 1, hoursAgo(3), hoursAgo(1), now), { resource: 'food', amount: 3, coins: 2 });
   assert.equal(productionOf('atelier', 1, hoursAgo(3), null, now), null);
-
-  // Cases libres : terre, hors chantier, dans un quartier possédé
-  const core = new Set(['coeur']);
-  // Le cœur (la grande île, décalée) : herbe de la Grève libre ; chantier du Foyer, mer, chemin et arbre refusés ; la
-  // Source à acheter
-  const { OFFSET } = require('../src/services/worldMap');
-  const free = (x, y, zones = core) => isFree(x + OFFSET.x, y + OFFSET.y, zones);
-  assert.equal(free(30, 32), false);
-  assert.equal(free(31, 35), true);
-  assert.equal(isFree(0, 0, core), false);
-  assert.equal(free(27, 31), false);
-  assert.equal(free(30, 35), false);
-  assert.equal(free(24, 33), false);
-  assert.equal(free(24, 33, new Set(['coeur', 'source'])), true);
 });
 
 test('la boutique des ateliers : bonus additionnés et plafonnés, effets sur la Récolte et la production', () => {
@@ -371,4 +357,37 @@ test('la très grande île : calques cohérents, le cœur intact, chantiers à p
   for (const [zone, count] of Object.entries(old)) assert.ok(map.freeSpots(zone, all).length >= count, zone);
   assert.equal(map.isLand(0, 0), false);
   assert.equal(map.isLand(map.SITE_BIG.foyer.x, map.SITE_BIG.foyer.y), true);
+});
+
+test('lieux remarquables : un par case, dans son quartier des terres nouvelles, hors chemin ; effets additionnés', () => {
+  const map = require('../src/services/worldMap');
+  const landmarks = require('../src/services/landmarks');
+  const { annexSpotOk } = require('../src/services/world');
+  const { LANDMARKS } = landmarks;
+  assert.equal(LANDMARKS.length, 13);
+  assert.equal(new Set(LANDMARKS.map(l => l.id)).size, 13);
+  assert.equal(new Set(LANDMARKS.map(l => `${l.x},${l.y}`)).size, 13);
+  for (const l of LANDMARKS) {
+    const zone = map.ZONE_BY_ID[l.zone];
+    assert.ok(zone && zone.trip > 0, l.id);
+    assert.equal(map.zoneAt(l.x, l.y), l.zone, l.id);
+    assert.ok(map.isLand(l.x, l.y) && !'pk'.includes(map.groundAt(l.x, l.y)), l.id);
+    assert.ok(!map.inSite(l.x, l.y), l.id);
+    assert.ok(['rare', 'legendaire'].includes(l.chest), l.id);
+    assert.ok(landmarks.effectText(l).length > 10 && l.text.length > 20, l.id);
+    assert.equal(landmarks.isLandmark(l.x, l.y), true);
+    for (const site of ['foyer', 'atelier', ...landmarks.PRODUCERS]) assert.equal(annexSpotOk(site, l.x, l.y), false);
+  }
+  // Chaque climat a son lieu ; les plus lointains (Cratère, Coulées, Cascade) donnent un coffre légendaire
+  assert.deepEqual([...new Set(LANDMARKS.map(l => map.ZONE_BY_ID[l.zone].climate))].sort(), ['cimes', 'dunes', 'jungle', 'landes', 'marais', 'volcan']);
+  assert.ok(LANDMARKS.filter(l => map.ZONE_BY_ID[l.zone].trip >= 7).every(l => l.chest === 'legendaire'));
+  assert.equal(landmarks.isLandmark(0, 0), false);
+  // Effets : additionnés ; la réserve vaut pour chaque bâtiment qui produit
+  assert.deepEqual(landmarks.bonusesOf([]), { prod: {}, cap: {}, charges: 0, moves: 0, regenCut: 0 });
+  const all = landmarks.bonusesOf(LANDMARKS.map(l => l.id));
+  assert.deepEqual([all.charges, all.moves, all.regenCut], [2, 4, 6 * 60 * 1000]);
+  assert.deepEqual(all.cap, { carriere: 4, bosquet: 4, puits: 4, potager: 4, ponton: 4 });
+  assert.deepEqual(Object.keys(all.prod).sort(), ['bosquet', 'carriere', 'ponton', 'potager', 'puits']);
+  assert.ok(Object.values(all.prod).every(p => Math.abs(p - 0.1) < 1e-9));
+  assert.deepEqual(landmarks.bonusesOf(['nulle']), landmarks.bonusesOf([]));
 });
