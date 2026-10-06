@@ -10,6 +10,7 @@ const { SIZE, CRAFT_TTL_MS, keyOf } = require('./rules');
 const { annexesOf, levelsOf, stockOf, zonesOf, findsOf, spendFinds, craftsOf, placedOf, madeOf } = require('./reads');
 const { migrate } = require('./migrate');
 const { livesHere } = require('./people');
+const { gatherBefore } = require('./produce');
 
 // Contexte des règles de pose (crafts.spotBlock) : sol, case libre (sur l'île, hors chantier, quartier à soi, ni annexe,
 // ni autre création, ni lieu remarquable, ni gisement), emprise d'un bâtiment bâti, créations posées (sauf skip : celle qu'on déplace)
@@ -120,45 +121,57 @@ function finishCraft(userId, runId, layout, owned, finished, stars = 0) {
     });
 }
 
-// Pose une création de la réserve sur une case permise par sa règle. { } ou { status, message }
+// Une création posée, déplacée ou rangée change ce qui distrait les habitants (leur humeur) : ce qui a été produit
+// avant est encaissé d'abord quand leur production en change (produce.gatherBefore). { coins } (solde) si des écus
+// ont été encaissés, sinon { }
+async function setSpot(userId, conn, stock, row, x, y) {
+    const decor = island => [...island.decor.filter(r => r.id !== row.id), ...(x === null ? [] : [{ ...row, x, y }])];
+    const coins = await gatherBefore(userId, conn, stock, island => ({ ...island, decor: decor(island) }));
+    await conn.query('UPDATE world_crafts SET x = $2, y = $3 WHERE id = $1', [row.id, x, y]);
+    return coins !== undefined ? { coins } : {};
+}
+
+// Pose une création de la réserve sur une case permise par sa règle. { coins? } ou { status, message }
 async function placeCraft(userId, craftId, x, y) {
     if (!Object.hasOwn(crafts.CRAFT_BY_ID, craftId)) return { status: 404, message: 'Création inconnue.' };
     const c = crafts.CRAFT_BY_ID[craftId];
     await migrate(userId);
     return db.transaction(async conn => {
-        await stockOf(userId, conn, true);
+        const stock = await stockOf(userId, conn, true);
         const rows = await craftsOf(userId, conn);
         const row = rows.find(r => r.craft === craftId && r.x === null);
         if (!row) return db.rollback({ status: 409, message: `Pas de « ${c.name} » en réserve : fabrique d’abord cette création.` });
         const { levels } = await levelsOf(userId, conn);
         const block = crafts.spotBlock(c, x, y, craftCtx(levels, await zonesOf(userId, conn), await annexesOf(userId, conn), rows));
         if (block) return db.rollback({ status: 400, message: block });
-        await conn.query('UPDATE world_crafts SET x = $2, y = $3 WHERE id = $1', [row.id, x, y]);
-        return {};
+        return setSpot(userId, conn, stock, row, x, y);
     });
 }
 
-// Déplace une création posée vers une autre case permise (gratuit). { } ou { status, message }
+// Déplace une création posée vers une autre case permise (gratuit). { coins? } ou { status, message }
 async function moveCraft(userId, x, y, toX, toY) {
     await migrate(userId);
     return db.transaction(async conn => {
-        await stockOf(userId, conn, true);
+        const stock = await stockOf(userId, conn, true);
         const rows = await craftsOf(userId, conn);
         const row = rows.find(r => r.x === x && r.y === y);
         if (!row) return db.rollback({ status: 404, message: 'Aucune création sur cette case.' });
         const { levels } = await levelsOf(userId, conn);
         const block = crafts.spotBlock(crafts.CRAFT_BY_ID[row.craft], toX, toY, craftCtx(levels, await zonesOf(userId, conn), await annexesOf(userId, conn), rows, row.id));
         if (block) return db.rollback({ status: 400, message: block });
-        await conn.query('UPDATE world_crafts SET x = $2, y = $3 WHERE id = $1', [row.id, toX, toY]);
-        return {};
+        return setSpot(userId, conn, stock, row, toX, toY);
     });
 }
 
-// Range une création posée dans la réserve (elle se repose plus tard, sans rien payer). { } ou { status, message }
+// Range une création posée dans la réserve (elle se repose plus tard, sans rien payer). { coins? } ou { status, message }
 async function storeCraft(userId, x, y) {
     await migrate(userId);
-    const { rows } = await db.query('UPDATE world_crafts SET x = NULL, y = NULL WHERE user_id = $1 AND x = $2 AND y = $3 RETURNING id', [userId, x, y]);
-    return rows.length ? {} : { status: 404, message: 'Aucune création sur cette case.' };
+    return db.transaction(async conn => {
+        const stock = await stockOf(userId, conn, true);
+        const row = placedOf(await craftsOf(userId, conn)).find(r => r.x === x && r.y === y);
+        if (!row) return db.rollback({ status: 404, message: 'Aucune création sur cette case.' });
+        return setSpot(userId, conn, stock, row, null, null);
+    });
 }
 
 module.exports = {

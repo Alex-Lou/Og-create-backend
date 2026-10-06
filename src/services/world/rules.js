@@ -192,14 +192,34 @@ function effectsOf(levels, bonuses = NO_BONUS, extra = NO_ANNEX) {
 // heures des réserves) : { resource, amount, coins }.
 // bonus = { prod: part en plus, coins: écus par heure en plus (boutique de l'atelier), cap: heures en plus (réserve) } ;
 // annexList = [{ rate, earn, at }] (annexes.bonusesOf) : ressources et écus par heure en plus, comptés depuis at,
-// avec la même part de production en plus que le bâtiment
-function productionOf(siteId, level, builtAt, collectedAt, now = Date.now(), bonus = { prod: 0, coins: 0 }, annexList = []) {
+// avec la même part de production en plus que le bâtiment.
+// steps = [{ at (ms), prod }] dans l'ordre, quand la part en plus change en cours de route (humeur des habitants) :
+// chacune vaut de son heure à la suivante (la première depuis le début) et remplace bonus.prod ; chaque heure produite
+// compte avec la part de son moment (la réserve se remplit pendant les cap premières heures)
+function productionOf(siteId, level, builtAt, collectedAt, now = Date.now(), bonus = { prod: 0, coins: 0 }, annexList = [], steps = null) {
     const site = SITES[siteId];
     if (!site.produce || !level) return null;
     const cap = CAP_HOURS + (bonus.cap || 0);
     const collected = collectedAt ? new Date(collectedAt).getTime() : 0;
-    const hoursSince = at => Math.min(cap, Math.max(0, (now - Math.max(collected, new Date(at).getTime())) / 3600000));
+    const startOf = at => Math.max(collected, new Date(at).getTime());
+    const hoursSince = at => Math.min(cap, Math.max(0, (now - startOf(at)) / 3600000));
     const hours = hoursSince(builtAt);
+    if (steps) {
+        const boosted = at => boostedHours(startOf(at), hoursSince(at), steps);
+        const own = boosted(builtAt);
+        let amount = own * PRODUCE_PER_LEVEL * level;
+        let coins = own * COINS_PER_LEVEL * level;
+        for (const a of annexList) {
+            const h = boosted(a.at);
+            amount += h * a.rate;
+            coins += h * a.earn;
+        }
+        return {
+            resource: site.produce,
+            amount: Math.floor(amount + 1e-9),
+            coins: Math.floor(coins + hours * (bonus.coins || 0) + 1e-9)
+        };
+    }
     let amount = hours * PRODUCE_PER_LEVEL * level;
     let coins = hours * COINS_PER_LEVEL * level;
     for (const a of annexList) {
@@ -214,6 +234,18 @@ function productionOf(siteId, level, builtAt, collectedAt, now = Date.now(), bon
         coins: Math.floor(coins * boost + hours * (bonus.coins || 0) + 1e-9)
     };
 }
+// Heures de from à from + hours, chacune comptée avec la part en plus de son moment : Σ durée × (1 + part) (steps :
+// comme productionOf)
+function boostedHours(from, hours, steps) {
+    const to = from + hours * 3600000;
+    let sum = 0;
+    steps.forEach((step, i) => {
+        const a = i ? Math.max(from, step.at) : from;
+        const b = i + 1 < steps.length ? Math.min(to, steps[i + 1].at) : to;
+        if (b > a) sum += (b - a) / 3600000 * (1 + step.prod);
+    });
+    return sum;
+}
 // Rendement par heure d'un bâtiment producteur et de ses annexes : { amount, coins }, arrondis au dixième
 function perHourOf(level, prod = 0, coins = 0, annexList = []) {
     const boost = 1 + prod;
@@ -222,13 +254,20 @@ function perHourOf(level, prod = 0, coins = 0, annexList = []) {
     const earn = annexList.reduce((sum, a) => sum + a.earn, 0);
     return { amount: round((PRODUCE_PER_LEVEL * level + rate) * boost), coins: round((COINS_PER_LEVEL * level + earn) * boost + coins) };
 }
-function productionAll(levels, builtAt, collectedAt, now = Date.now(), bonuses = NO_BONUS, extra = NO_ANNEX) {
+// Production de tous les bâtiments. steps = [{ at (ms), prod: { bâtiment: part } }] : la part en plus de chacun à
+// chaque moment depuis la dernière récolte (people.prodSteps) ; un bâtiment dont la part n'a pas changé compte comme
+// avant, avec bonuses.prod
+function productionAll(levels, builtAt, collectedAt, now = Date.now(), bonuses = NO_BONUS, extra = NO_ANNEX, steps = null) {
     return Object.keys(SITES)
-        .map(id => ({
-            site: id,
-            ...productionOf(id, levels[id] || 0, builtAt[id], collectedAt, now,
-                { prod: bonuses.prod[id] || 0, coins: bonuses.coins[id] || 0, cap: extra.cap[id] || 0 }, extra.site[id] || [])
-        }))
+        .map(id => {
+            const own = steps && steps.map(s => ({ at: s.at, prod: s.prod[id] || 0 }));
+            const varies = own && own.some(s => s.prod !== own[0].prod);
+            return {
+                site: id,
+                ...productionOf(id, levels[id] || 0, builtAt[id], collectedAt, now,
+                    { prod: bonuses.prod[id] || 0, coins: bonuses.coins[id] || 0, cap: extra.cap[id] || 0 }, extra.site[id] || [], varies ? own : null)
+            };
+        })
         .filter(p => p.resource);
 }
 
@@ -237,5 +276,5 @@ module.exports = {
     FIRST_RUN_MOVES, FIRST_RUN_KINDS, RESOURCES, MAP_VERSION, EXPEDITION_COST, OLD_DECO_RATE, DECO_PRICES,
     HARVEST_COIN_EVERY, UNDO_SECONDS, random, CHAPTER_OF_LEVEL, BOOST_BY_LEVEL, ATELIER_MOVES, PRODUCE_PER_LEVEL,
     COINS_PER_LEVEL, WORDS, tier, SITES, BOOSTED, effectOf, keyOf, pendingOf, chargesAt, NO_BONUS, NO_ANNEX, effectsOf,
-    productionOf, perHourOf, productionAll
+    productionOf, boostedHours, perHourOf, productionAll
 };

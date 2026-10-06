@@ -34,8 +34,8 @@ const {
 const { migrate } = require('./world/migrate');
 const { openedOf, chestsView, grant, openChest, openAll } = require('./world/chests');
 const {
-    SLEEPERS, presenceOf, residentsOf, hungryOf, HUNGRY_AGO, moodsOf, withMoods, withLandmarks, runsSince, visitorNow,
-    visitorView, befriend, fillNeeds, satisfyVisitor, settleVisitor
+    SLEEPERS, presenceOf, residentsOf, hungryOf, HUNGRY_AGO, moodsOf, withMoods, withLandmarks, prodSteps, runsSince,
+    visitorNow, visitorView, befriend, fillNeeds, satisfyVisitor, settleVisitor
 } = require('./world/people');
 const { bonusesFor, gather, collect } = require('./world/produce');
 const { anyaOf, brumeSavoirOf, talkBrume, revealAnya, breatheAnya } = require('./world/anyaBrume');
@@ -156,7 +156,11 @@ async function view(userId, owned, book) {
     const have = new Set(owned);
     const plans = Object.values(SITES).flatMap(s => s.levels.map(l => l.plan)).filter(Boolean);
     const known = book.describe(plans);
-    const production = productionAll(levels, builtAt, stock.collected_at, Date.now(), bonuses, extra);
+    // Production en attente : chaque heure avec l'humeur de son moment, comme au ramassage (prodSteps)
+    const now = Date.now();
+    const island = { levels, zones, settlers, presence, decor, filled };
+    const steps = prodSteps(island, { bonuses: shopBonuses, extra: annexes.bonusesOf(annexRows) }, lmBonuses, stock.collected_at, now);
+    const production = productionAll(levels, builtAt, stock.collected_at, now, bonuses, extra, steps);
     const sites = Object.entries(SITES).map(([id, site]) => {
         const level = levels[id] || 0;
         const next = site.levels[level];

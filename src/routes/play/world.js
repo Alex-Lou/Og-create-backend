@@ -35,11 +35,14 @@ router.get('/world', withAccount(async (req, res, owner, b) => {
     res.json(await worldView(owner, b));
 }));
 
+// Solde d'écus quand une action a d'abord encaissé la production (changement d'humeur : produce.gatherBefore)
+const coinsOf = done => (done.coins !== undefined ? { coins: done.coins } : {});
+
 // Créations d'île (lot 8) : assembler (début : les pièces ; fin : la disposition, vérifiée), poser, déplacer, ranger
 const craftId = body => String(body.craft || '');
 const craftDone = async (res, owner, b, done, extra = {}) => {
     if (done.status) return res.status(done.status).json({ message: done.message });
-    res.json({ ...extra, world: await worldView(owner, b) });
+    res.json({ ...extra, ...coinsOf(done), world: await worldView(owner, b) });
 };
 router.post('/world/craft/start', withAccount(async (req, res, owner, b) => {
     const craft = craftId(req.body);
@@ -310,7 +313,7 @@ router.post('/world/villager/gift', withAccount(async (req, res, owner, b) => {
 // Besoins des habitants : en combler un (manger, travailler), ou tout ce qui peut l'être d'un coup
 const fed = async (res, owner, b, done) => {
     if (done.status) return res.status(done.status).json({ message: done.message });
-    res.json({ filled: done.filled, world: await worldView(owner, b) });
+    res.json({ filled: done.filled, ...coinsOf(done), world: await worldView(owner, b) });
 };
 router.post('/world/villager/need', withAccount(async (req, res, owner, b) => {
     const villager = String(req.body.villager || '');
@@ -329,13 +332,13 @@ router.post('/world/visitor', withAccount(async (req, res, owner, b) => {
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ reward: done.reward, coins: done.coins, world: await worldView(owner, b) });
 }));
-// Visiteur comblé : il reste, dans une maison libre → { settled, world }
+// Visiteur comblé : il reste, dans une maison libre → { settled, coins?, world }
 router.post('/world/visitor/settle', withAccount(async (req, res, owner, b) => {
     const id = Number(req.body.id);
     if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ message: 'Visiteur invalide' });
     const done = await world.settleVisitor(owner.id, id);
     if (done.status) return res.status(done.status).json({ message: done.message });
-    res.json({ settled: done.settled, world: await worldView(owner, b) });
+    res.json({ settled: done.settled, ...coinsOf(done), world: await worldView(owner, b) });
 }));
 
 // Coffre qui attend : du jour, bouteille à la mer, chapitre du Livre ouvert, quête de Brume réclamée, lieu découvert

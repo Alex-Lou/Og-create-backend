@@ -16,6 +16,8 @@ const {
 } = require('./reads');
 const { migrate } = require('./migrate');
 const { grant } = require('./chests');
+// Encaisser avant un changement d'humeur (produce.js, qui lit déjà ce module : chargé seulement à l'appel)
+const gatherBefore = (...args) => require('./produce').gatherBefore(...args);
 
 // Un habitant vit sur l'île quand son bâtiment est bâti, dans un quartier à soi
 const livesHere = (id, levels, zones) => (levels[id] || 0) >= 1 && zones.has(map.siteZone(id));
@@ -101,6 +103,39 @@ function withLandmarks({ bonuses, extra }, lm) {
         bonuses: { ...bonuses, prod },
         extra: { ...extra, cap, charges: extra.charges + lm.charges, moves: extra.moves + lm.moves, regenCut: extra.regenCut + lm.regenCut }
     };
+}
+// Instants où l'humeur change d'elle-même de from à to (ms) : l'échéance de chaque besoin comblé (manger, outils).
+// from d'abord, puis les échéances dans l'ordre
+function moodTimes(filled, from, to) {
+    const ends = new Set();
+    for (const rows of Object.values(filled)) {
+        for (const need of villagers.FILLABLE) {
+            const end = rows[need] ? new Date(rows[need]).getTime() + villagers.NEEDS[need].hours * 3600000 : NaN;
+            if (end > from && end < to) ends.add(end);
+        }
+    }
+    return [from, ...[...ends].sort((a, b) => a - b)];
+}
+// La part de production en plus de chaque bâtiment depuis la dernière récolte, à chaque instant où l'humeur change
+// d'elle-même (moodTimes) : [{ at, prod }] pour productionAll. island = { levels, zones, settlers, presence, decor,
+// filled } ; base = { bonuses, extra } de la boutique et des annexes ; lm : landmarks.bonusesOf
+function prodSteps(island, base, lm, collectedAt, now) {
+    const { levels, zones, settlers, presence, decor, filled } = island;
+    const residents = residentsOf(levels, zones, settlers, presence);
+    const from = collectedAt ? new Date(collectedAt).getTime() : 0;
+    return moodTimes(filled, from, now).map(at => {
+        const moods = moodsOf(residents, levels, zones, decor, filled, presence, at);
+        return { at, prod: withLandmarks(withMoods(base.bonuses, base.extra, moods), lm).bonuses.prod };
+    });
+}
+// Même part de production en plus pour chaque bâtiment à chaque instant (deux suites de prodSteps sur la même fenêtre)
+function sameSteps(a, b) {
+    const at = (steps, t) => steps.filter(s => s.at <= t).pop() || steps[0];
+    return [...a, ...b].every(({ at: t }) => {
+        const pa = at(a, t).prod;
+        const pb = at(b, t).prod;
+        return Object.keys({ ...pa, ...pb }).every(site => (pa[site] || 0) === (pb[site] || 0));
+    });
 }
 // Récoltes terminées depuis une date (demande d'un visiteur)
 async function runsSince(userId, since, conn = db) {
@@ -213,13 +248,17 @@ async function fillNeeds(userId, targets = null, now = Date.now()) {
     }
     await migrate(userId);
     return db.transaction(async conn => {
-        const stock = await stockOf(userId, conn, true);
+        const locked = await stockOf(userId, conn, true);
         const { levels } = await levelsOf(userId, conn);
         const zones = await zonesOf(userId, conn);
         const presence = await presenceOf(userId, conn, now);
         const residents = residentsOf(levels, zones, await settlersOf(userId, conn), presence);
         const moods = moodsOf(residents, levels, zones, placedOf(await craftsOf(userId, conn)), await needRowsOf(userId, conn), presence, now);
         const wanted = targets || Object.entries(moods).flatMap(([villager, m]) => m.needs.filter(n => n.cost).map(n => ({ villager, need: n.id })));
+        // Ce qui a été produit compte avec l'humeur d'avant (encaissé d'abord si elle change) ; le stock le comprend
+        const fed = filled => wanted.reduce((out, { villager, need }) => ({ ...out, [villager]: { ...out[villager], [need]: new Date(now) } }), filled);
+        const coins = await gatherBefore(userId, conn, locked, island => ({ ...island, filled: fed(island.filled) }));
+        const stock = await stockOf(userId, conn);
         const spent = Object.fromEntries(RESOURCES.map(r => [r, 0]));
         const filled = [];
         let short = false;
@@ -251,7 +290,7 @@ async function fillNeeds(userId, targets = null, now = Date.now()) {
                 `INSERT INTO world_needs (user_id, villager, need, filled_at) VALUES ($1, $2, $3, $4)
                  ON CONFLICT (user_id, villager, need) DO UPDATE SET filled_at = EXCLUDED.filled_at`, [userId, villager, need, new Date(now)]);
         }
-        return { filled };
+        return { filled, ...(coins !== undefined ? { coins } : {}) };
     });
 }
 
@@ -294,7 +333,7 @@ async function housesOf(userId, conn) {
 async function settleVisitor(userId, visitorId, now = Date.now()) {
     await migrate(userId);
     return db.transaction(async conn => {
-        await stockOf(userId, conn, true);
+        const stock = await stockOf(userId, conn, true);
         const { rows } = await conn.query('SELECT * FROM world_visitors WHERE id = $1 AND user_id = $2 FOR UPDATE', [visitorId, userId]);
         const row = rows[0];
         if (!row || row.settled_at || now >= new Date(row.leaves_at).getTime()) return db.rollback({ status: 404, message: 'Ce visiteur est déjà reparti.' });
@@ -302,13 +341,15 @@ async function settleVisitor(userId, visitorId, now = Date.now()) {
         if (!row.satisfied_at) return db.rollback({ status: 403, message: `Comble d’abord la demande de ${name}.` });
         const houses = await housesOf(userId, conn);
         if (houses.used >= houses.total) return db.rollback({ status: 409, message: 'Aucune maison libre : pose une Maison près du Foyer (annexes du Foyer).' });
+        // Son humeur ne compte qu'à partir d'aujourd'hui : ce qui a été produit avant est encaissé d'abord
+        const coins = await gatherBefore(userId, conn, stock, island => ({ ...island, settlers: [...island.settlers, row] }));
         await conn.query('UPDATE world_visitors SET settled_at = $2 WHERE id = $1', [visitorId, new Date(now)]);
-        return { settled: name };
+        return { settled: name, ...(coins !== undefined ? { coins } : {}) };
     });
 }
 
 module.exports = {
     livesHere, decosNear, SETTLER_ID, knownResident, SLEEPERS, metOf, presenceOf, residentsOf, hungryOf, HUNGRY_AGO,
-    moodsOf, withMoods, withLandmarks, runsSince, visitorNow, visitorView, friendRewards, befriend, fillNeeds,
-    satisfyVisitor, housesOf, settleVisitor
+    moodsOf, withMoods, withLandmarks, moodTimes, prodSteps, sameSteps, runsSince, visitorNow, visitorView,
+    friendRewards, befriend, fillNeeds, satisfyVisitor, housesOf, settleVisitor
 };
