@@ -221,6 +221,22 @@ function spotBlock(c, x, y, ctx) {
     return null;
 }
 
+// Ce qui empêche de déplacer une création posée (row) en (x, y), ou de la ranger (x null) : une autre création posée
+// qui tient sa règle « près de » (nearCraft) grâce à elle, et ne la tiendrait plus (texte), ou null. placed : toutes
+// les créations posées, [{ id, x, y, craft }]. Une création qui ne tenait déjà plus sa règle ne bloque rien
+function leaveBlock(row, x, y, placed) {
+    const holds = (d, set) => {
+        const { id, reach } = CRAFT_BY_ID[d.craft].place.nearCraft;
+        return set.some(o => o.craft === id && Math.max(Math.abs(o.x - d.x), Math.abs(o.y - d.y)) <= reach);
+    };
+    const after = [...placed.filter(o => o.id !== row.id), ...(x === null ? [] : [{ ...row, x, y }])];
+    const left = placed.find(d => d.id !== row.id && CRAFT_BY_ID[d.craft]?.place.nearCraft?.id === row.craft && holds(d, placed) && !holds(d, after));
+    if (!left) return null;
+    const { name, place } = CRAFT_BY_ID[left.craft];
+    return `« ${name} » a besoin de « ${CRAFT_BY_ID[row.craft].name} » à ${place.nearCraft.reach} cases au plus : déplace ou range d’abord « ${name} ».`;
+}
+
 module.exports = {
-    EPREUVES, STARS, TIERS, PIECE_MAX, TURNED, CRAFTS, CRAFT_BY_ID, cellsOf, mulberry32, normal, turn, piecesOf, check, tiersOpen, blockOf, placeText, gapTo, spotBlock
+    EPREUVES, STARS, TIERS, PIECE_MAX, TURNED, CRAFTS, CRAFT_BY_ID, cellsOf, mulberry32, normal, turn, piecesOf, check, tiersOpen, blockOf, placeText, gapTo, spotBlock,
+    leaveBlock
 };

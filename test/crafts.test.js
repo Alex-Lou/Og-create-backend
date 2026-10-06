@@ -82,6 +82,28 @@ test('règles de pose : sol, bord de chemin, près d’un bâtiment, près d’u
   assert.equal(crafts.placeText(by('cloture')), 'Se pose sur n’importe quelle case libre.');
 });
 
+test('règle « près de » tenue au déplacement et au rangement : la Lanterne garde son Banc à portée', () => {
+  const lanterne = { id: 1, x: 4, y: 4, craft: 'lanterne' };
+  const banc = { id: 2, x: 3, y: 3, craft: 'banc' };
+  const placed = [lanterne, banc];
+  // Ranger la Lanterne, ou l'éloigner : non ; la déplacer à 2 cases du Banc : oui
+  assert.equal(crafts.leaveBlock(lanterne, null, null, placed), '« Banc » a besoin de « Lanterne » à 2 cases au plus : déplace ou range d’abord « Banc ».');
+  assert.match(crafts.leaveBlock(lanterne, 9, 9, placed), /Banc/);
+  assert.equal(crafts.leaveBlock(lanterne, 5, 5, placed), null);
+  // Une autre Lanterne à portée du Banc : la première peut partir
+  assert.equal(crafts.leaveBlock(lanterne, null, null, [...placed, { id: 3, x: 1, y: 2, craft: 'lanterne' }]), null);
+  // Le Banc lui-même, ou une création dont rien ne dépend, part librement
+  assert.equal(crafts.leaveBlock(banc, null, null, placed), null);
+  const fence = { id: 4, x: 0, y: 0, craft: 'cloture' };
+  assert.equal(crafts.leaveBlock(fence, null, null, [...placed, fence]), null);
+  // Un Banc déjà loin de toute Lanterne (posé avant cette règle) ne bloque rien
+  assert.equal(crafts.leaveBlock(lanterne, 5, 5, [...placed, { id: 5, x: 9, y: 9, craft: 'banc' }]), null);
+  // La Fontaine garde son Bassin, à 3 cases
+  const fontaine = { id: 6, x: 0, y: 0, craft: 'fontaine' };
+  assert.match(crafts.leaveBlock(fontaine, null, null, [fontaine, { id: 7, x: 3, y: 3, craft: 'bassin' }]), /« Bassin » a besoin de « Fontaine » à 3 cases/);
+  assert.equal(crafts.leaveBlock(fontaine, 1, 0, [fontaine, { id: 7, x: 3, y: 3, craft: 'bassin' }]), null);
+});
+
 test('créations de climat : deux par climat, payées aussi en trouvailles, posées seulement dans leur climat et sur leur sol', () => {
   const map = require('../src/services/worldMap');
   const finds = require('../src/services/finds');

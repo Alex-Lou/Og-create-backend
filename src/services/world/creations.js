@@ -159,6 +159,9 @@ async function moveCraft(userId, x, y, toX, toY) {
         const { levels } = await levelsOf(userId, conn);
         const block = crafts.spotBlock(crafts.CRAFT_BY_ID[row.craft], toX, toY, craftCtx(levels, await zonesOf(userId, conn), await annexesOf(userId, conn), rows, row.id));
         if (block) return db.rollback({ status: 400, message: block });
+        // Une création posée près d'elle (règle « près de ») doit la garder à portée
+        const needed = crafts.leaveBlock(row, toX, toY, placedOf(rows));
+        if (needed) return db.rollback({ status: 409, message: needed });
         return setSpot(userId, conn, stock, row, toX, toY);
     });
 }
@@ -168,8 +171,11 @@ async function storeCraft(userId, x, y) {
     await migrate(userId);
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
-        const row = placedOf(await craftsOf(userId, conn)).find(r => r.x === x && r.y === y);
+        const placed = placedOf(await craftsOf(userId, conn));
+        const row = placed.find(r => r.x === x && r.y === y);
         if (!row) return db.rollback({ status: 404, message: 'Aucune création sur cette case.' });
+        const needed = crafts.leaveBlock(row, null, null, placed);
+        if (needed) return db.rollback({ status: 409, message: needed });
         return setSpot(userId, conn, stock, row, null, null);
     });
 }
