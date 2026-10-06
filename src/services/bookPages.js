@@ -294,4 +294,7 @@ function finishedChapters(b, owned) {
     }).map(c => c.id));
 }
 
-module.exports = { DIFFICULTY, view, arianeOf, reachableById, pageId, aim, telling, savoir, difficultyOf, chapterOf, openChapters, finishedChapters, starsOf };
+// Toutes les familles du Grimoire (le Souffle d'Anya porte sur n'importe quelle page)
+const FAMILIES = CHAPTERS.flatMap(chapter => chapter.families);
+
+module.exports = { DIFFICULTY, FAMILIES, view, arianeOf, reachableById, pageId, aim, telling, savoir, difficultyOf, chapterOf, openChapters, finishedChapters, starsOf };

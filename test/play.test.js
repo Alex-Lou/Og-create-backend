@@ -1236,6 +1236,50 @@ test('Savoirs des maîtres : un indice par jour en bavardant, la famille puis l�
   assert.equal(gift.data.savoir, undefined);
 });
 
+test('Anya : la Révélation une seule fois, le Souffle une fois par jour, la Bénédiction (bible, § 6.14)', async () => {
+  const { CORE, LANDS } = require('../src/services/anya');
+  const player = await newPlayer();
+  const talk = (body = {}) => api('POST', '/play/world/villager/talk', { villager: 'anya', ...body }, player);
+  const reveal = () => api('POST', '/play/world/anya/reveal', {}, player);
+  const view = async () => (await api('GET', '/play/world', null, player)).data;
+  // Elle dort : ni Révélation, ni Souffle ; Cannelle, affamée et sans décor autour du Foyer, est triste
+  await sql(`INSERT INTO world_needs (user_id, villager, need, filled_at) VALUES ($1, 'foyer', 'manger', NOW() - INTERVAL '30 days')
+             ON CONFLICT (user_id, villager, need) DO UPDATE SET filled_at = EXCLUDED.filled_at`, [player.userId]);
+  const asleep = await view();
+  assert.deepEqual(asleep.anya, { traces: [], awake: false, revealed: false, breathed: false });
+  assert.equal(asleep.villagers.find(v => v.id === 'foyer').mood, 'triste');
+  assert.equal((await talk()).status, 403);
+  assert.equal((await reveal()).status, 403);
+  // Les douze terres explorées et les neuf quartiers du cœur à soi : elle s'éveille
+  for (const [k, zone] of LANDS.entries()) await sql(`INSERT INTO world_expeditions (user_id, zone, ends_at) VALUES ($1, $2, NOW() - make_interval(hours => $3))`, [player.userId, zone, 30 - k]);
+  for (const zone of CORE) await sql('INSERT INTO world_zones (user_id, zone) VALUES ($1, $2) ON CONFLICT DO NOTHING', [player.userId, zone]);
+  const awake = (await view()).anya;
+  assert.deepEqual([awake.traces, awake.awake, awake.revealed], [LANDS, true, false]);
+  // La Révélation : une fois, d'un appareil à l'autre
+  const seen = await reveal();
+  assert.equal(seen.status, 200);
+  assert.equal(seen.data.anya.revealed, true);
+  assert.equal((await reveal()).data.anya.revealed, true);
+  assert.equal((await api('GET', '/play/world/brume', null, player)).data.anya.revealed, true);
+  // Le Souffle : un ingrédient, une fois par jour
+  const breath = await talk();
+  assert.equal(breath.status, 200);
+  assert.equal(typeof breath.data.savoir.ingredient, 'string');
+  assert.equal(breath.data.world.anya.breathed, true);
+  assert.equal((await talk()).status, 409);
+  await sql(`UPDATE world_friends SET talked_on = NULL WHERE user_id = $1 AND villager = 'anya'`, [player.userId]);
+  assert.equal((await talk({ known: [breath.data.savoir.page] })).status, 200);
+  // Sa ligne n'est pas une habitante : pas de cœur, pas d'amitié
+  const after = await view();
+  assert.equal(after.villagers.some(v => v.id === 'anya'), false);
+  // La Bénédiction : un gisement ramassé il y a 4 h 1 min a déjà repoussé
+  const deposit = after.deposits[0];
+  await sql(`INSERT INTO world_deposits (user_id, deposit, gathered_at) VALUES ($1, $2, NOW() - INTERVAL '4 hours 1 minute')`, [player.userId, deposit.id]);
+  assert.equal((await view()).deposits.find(d => d.id === deposit.id).readyIn, 0);
+  // Cannelle a toujours faim, mais ne descend plus sous « content »
+  assert.equal((await view()).villagers.find(v => v.id === 'foyer').mood, 'content');
+});
+
 test('besoins des habitants : manger, travailler, se distraire ; l’humeur change la production', async () => {
   const player = await newPlayer();
   const view = async () => (await api('GET', '/play/world', null, player)).data;

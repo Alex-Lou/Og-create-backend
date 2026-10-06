@@ -23,6 +23,7 @@ const naming = require('./naming');
 const landmarks = require('./landmarks');
 const finds = require('./finds');
 const players = require('./players');
+const anya = require('./anya');
 
 const SIZE = map.SIZE;
 const CAP_HOURS = 8;
@@ -313,9 +314,11 @@ function metOf(id, levels, zones, presence) {
     if (id === 'atelier') return presence.done.has('soupe');
     return zones.has(map.siteZone(id));
 }
-// Ce qu'il faut pour savoir qui est là : compte d'avant la bible, quêtes faites
+// Ce qu'il faut pour savoir qui est là : compte d'avant la bible, quêtes faites ; et la Bénédiction d'Anya (toute l'île
+// principale découverte : l'humeur ne descend plus sous « content »)
 async function presenceOf(userId, conn = db) {
-    return { veteran: await players.veteranOf(userId, conn), done: quests.doneOf(await claimedOf(userId, conn)) };
+    const blessed = anya.stateOf(await zonesOf(userId, conn), await exploredOf(userId, conn)).awake;
+    return { veteran: await players.veteranOf(userId, conn), done: quests.doneOf(await claimedOf(userId, conn)), blessed };
 }
 // Habitants de l'île : la troupe rencontrée (built : son bâtiment est bâti, dans un quartier à soi), puis les
 // visiteurs installés, qui travaillent au bâtiment de leur métier : [{ id, name, role, loves, likes, site, built, seed? }]
@@ -341,7 +344,8 @@ function moodsOf(residents, levels, zones, decor, filled, presence, now = Date.n
         const rows = hungryOf(id, presence) && !filled[id]?.manger ? { ...filled[id], manger: new Date(now - HUNGRY_AGO) } : filled[id] || {};
         const deco = built && !prologue;
         const needs = villagers.needsOf(rows, deco ? decosNear(decor, site, levels[site], villagers.NEEDS.deco.reach) : 0, atelier, now, { deco });
-        out[id] = { needs, mood: villagers.moodOf(needs), site, built };
+        const mood = villagers.moodOf(needs);
+        out[id] = { needs, mood: presence.blessed ? anya.blessedMood(mood) : mood, site, built };
     }
     return out;
 }
@@ -581,7 +585,8 @@ function boardWith(claimed, facts, openChapters) {
 // peuple, pour l'étape de civilisation (l'Ex libris du Grimoire)
 async function board(userId, owned, stars, openChapters) {
     const out = boardWith(await claimedOf(userId), await factsOf(userId, owned, stars), openChapters);
-    return { ...out, people: (await namesOf(userId)).peuple || null };
+    // Anya : le Grimoire allume sa gemme une fois la Révélation vue
+    return { ...out, people: (await namesOf(userId)).peuple || null, anya: await anyaOf(userId) };
 }
 
 // Passage aux cartes suivantes, une fois par joueur, au premier passage, verrouillé (deux requêtes ne migrent pas
@@ -665,8 +670,41 @@ async function toV4(userId, conn) {
 // Quartiers des terres nouvelles déjà découverts (expédition revenue) : Set des identifiants. Les quartiers du cœur
 // sont toujours connus
 async function discoveredOf(userId, conn = db, now = Date.now()) {
-    const { rows } = await conn.query('SELECT zone FROM world_expeditions WHERE user_id = $1 AND ends_at <= $2', [userId, new Date(now)]);
-    return new Set(rows.map(r => r.zone));
+    return new Set(await exploredOf(userId, conn, now));
+}
+// Les mêmes, dans l'ordre de leur retour (les traces d'Anya)
+async function exploredOf(userId, conn = db, now = Date.now()) {
+    const { rows } = await conn.query('SELECT zone FROM world_expeditions WHERE user_id = $1 AND ends_at <= $2 ORDER BY ends_at, zone', [userId, new Date(now)]);
+    return rows.map(r => r.zone);
+}
+// Anya (services/anya.js) : traces, éveil, Révélation vue, Souffle du jour (breathed)
+async function anyaOf(userId, conn = db, now = Date.now()) {
+    const { rows } = await conn.query(`SELECT to_char(talked_on, 'YYYY-MM-DD') AS talked FROM world_friends WHERE user_id = $1 AND villager = $2`, [userId, anya.TARGET]);
+    const state = anya.stateOf(await zonesOf(userId, conn), await exploredOf(userId, conn, now), rows.length > 0);
+    return { ...state, breathed: state.awake && rows[0]?.talked === loot.parisOf(now).day };
+}
+// La Révélation vue (une seule fois, d'un appareil à l'autre) : la ligne d'Anya, sans points. { anya } ou { status, message }
+async function revealAnya(userId, now = Date.now()) {
+    await migrate(userId);
+    return db.transaction(async conn => {
+        if (!(await anyaOf(userId, conn, now)).awake) return db.rollback({ status: 403, message: 'Anya dort encore : découvre d’abord toute l’île.' });
+        await conn.query('INSERT INTO world_friends (user_id, villager, points) VALUES ($1, $2, 0) ON CONFLICT DO NOTHING', [userId, anya.TARGET]);
+        return { anya: await anyaOf(userId, conn, now) };
+    });
+}
+// Le Souffle d'Anya : une fois par jour (heure de Paris), une fois éveillée. {} ou { status, message } (l'indice est
+// calculé par la route, comme le Savoir d'un maître)
+async function breatheAnya(userId, now = Date.now()) {
+    await migrate(userId);
+    return db.transaction(async conn => {
+        const state = await anyaOf(userId, conn, now);
+        if (!state.awake) return db.rollback({ status: 403, message: 'Anya dort encore.' });
+        if (state.breathed) return db.rollback({ status: 409, message: 'Anya t’a déjà soufflé un Savoir aujourd’hui : reviens à l’aube ou au crépuscule de demain.' });
+        await conn.query(
+            `INSERT INTO world_friends (user_id, villager, points, talked_on) VALUES ($1, $2, 0, $3::date)
+             ON CONFLICT (user_id, villager) DO UPDATE SET talked_on = EXCLUDED.talked_on`, [userId, anya.TARGET, loot.parisOf(now).day]);
+        return {};
+    });
 }
 const isKnown = (zone, discovered) => !zone.trip || discovered.has(zone.id);
 // Ce qu'emporte une expédition vers ce quartier : { food, wood }
@@ -737,7 +775,8 @@ async function gatherDeposit(userId, depositId, now = Date.now()) {
     return db.transaction(async conn => {
         await stockOf(userId, conn, true);
         if (!(await zonesOf(userId, conn)).has(deposit.zone)) return db.rollback({ status: 403, message: 'Achète d’abord ce quartier de l’île.' });
-        const wait = finds.readyIn((await depositsOf(userId, conn)).get(deposit.id), now);
+        const { blessed } = await presenceOf(userId, conn);
+        const wait = finds.readyIn((await depositsOf(userId, conn)).get(deposit.id), now, blessed ? anya.BLESSING.regrowMs : finds.REGROW_MS);
         if (wait > 0) return db.rollback({ status: 409, message: `Ce gisement repousse : reviens dans ${Math.ceil(wait / 60000)} min.` });
         const amount = finds.GATHER.min + crypto.randomInt(0, finds.GATHER.max - finds.GATHER.min + 1) + craftBonusOf(placedOf(await craftsOf(userId, conn)), deposit.zone);
         await conn.query(
@@ -1012,7 +1051,7 @@ async function view(userId, owned, book) {
         // Gisements des quartiers connus : case, trouvaille, temps avant de repousser (ms, 0 : prêt), trouvailles de plus
         // grâce aux créations de climat de leur quartier
         deposits: finds.DEPOSITS.filter(d => isKnown(map.ZONE_BY_ID[d.zone], discovered))
-            .map(d => ({ id: d.id, zone: d.zone, find: d.find, x: d.x, y: d.y, readyIn: finds.readyIn(gathered.get(d.id)), bonus: craftBonusOf(decor, d.zone) })),
+            .map(d => ({ id: d.id, zone: d.zone, find: d.find, x: d.x, y: d.y, readyIn: finds.readyIn(gathered.get(d.id), Date.now(), presence.blessed ? anya.BLESSING.regrowMs : finds.REGROW_MS), bonus: craftBonusOf(decor, d.zone) })),
         // Expédition en route : vers quel quartier, retour dans combien de temps (ms)
         expedition: going ? { zone: going.zone, endsIn: Math.max(0, new Date(going.ends_at).getTime() - Date.now()) } : null,
         sites,
@@ -1088,7 +1127,9 @@ async function view(userId, owned, book) {
         // Coffres : en attente, du jour, bouteille à la mer
         chests: chestsView(await openedOf(userId, Date.now()), book.openChapters, claimed, found),
         // Les mots d'Héliane déjà lus (la Chronique) et l'acte dont le mot attend la prochaine bouteille
-        heliane: await helianeOfUser(userId)
+        heliane: await helianeOfUser(userId),
+        // Anya : ses traces, son éveil, la Révélation vue, son Souffle du jour
+        anya: await anyaOf(userId)
     };
 }
 
@@ -1840,5 +1881,6 @@ module.exports = {
     SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, pendingOf, chargesAt, effectsOf, productionOf,
     view, build, buyZone, buyItem, undoItem, chooseSkin, startRun, finishRun, collect, migrate, claimQuest, board, openChest, openAll,
     placeAnnex, moveAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople, namePlayer, arianeTargets,
-    refundDecorations, startCraft, finishCraft, placeCraft, moveCraft, storeCraft, startExpedition, findLandmark, gatherDeposit
+    refundDecorations, startCraft, finishCraft, placeCraft, moveCraft, storeCraft, startExpedition, findLandmark, gatherDeposit,
+    revealAnya, breatheAnya
 };
