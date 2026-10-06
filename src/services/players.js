@@ -51,8 +51,10 @@ const asList = value => (Array.isArray(value) ? value.filter(v => typeof v === '
 
 // Joueurs d'avant la bible (lot H1, HISTOIRE.md du dépôt front) : comptes créés avant le déploiement du lot. Rien ne
 // recule pour eux : le chapitre II leur reste ouvert d'emblée, chaque habitant dont le bâtiment est bâti reste là,
-// Cannelle arrive comblée. Un invité n'en est jamais un : le prologue est fait pour lui. Date à régler sur l'heure du
-// déploiement du lot H1 (un compte créé entre le déploiement et cette date garde simplement les anciennes règles).
+// Cannelle arrive comblée. Un invité n'en est jamais un : le prologue est fait pour lui.
+// Le lot H1 a été fusionné le 2026-10-05 à 21:40:27 UTC (PR #80) ; cette date-ci l'accompagne depuis. Ne pas
+// l'avancer : un compte créé entre les deux a reçu les anciennes règles dès sa création, et les lui retirer le ferait
+// reculer.
 const VETERAN_BEFORE = new Date('2026-10-06T06:00:00Z');
 async function veteranOf(userId, conn = db) {
     const { rows } = await conn.query('SELECT created_at < $2 AS veteran FROM users WHERE id = $1', [userId, VETERAN_BEFORE]);
