@@ -47,6 +47,7 @@ const {
 } = require('./world/creations');
 const { annexSpotOk, annexSpots, annexesView, placeAnnex, moveAnnex } = require('./world/annexPlots');
 const { startNights, repelCreature, repairSite, nightsView } = require('./world/nights');
+const { feedBeast, collectBeasts, beastsView } = require('./world/beasts');
 
 // Un habitant arrive comblé (Cannelle, pendant le prologue, affamée : hungryOf) : la première vue de l'île après son
 // arrivée inscrit l'heure de ses besoins (ou de celui qui apparaît, travailler avec l'Atelier), une seule fois
@@ -334,7 +335,9 @@ async function view(userId, owned, book) {
         anya: await anyaOf(userId),
         // Les nuits de créatures (v6, § 6.15) : présentées ou non, la nuit en cours ou la prochaine, ses égarés et leur
         // sort, le bâtiment embrumé et le prix de sa réparation
-        nights: await nightsView(userId)
+        nights: await nightsView(userId),
+        // Les bêtes de ferme (v6, § 6.16) : le prix d'un repas, et pour chacune, contente ou non, sa bulle
+        beasts: await beastsView(userId)
     };
 }
 
@@ -680,5 +683,6 @@ module.exports = {
     view, build, buyZone, buyItem, undoItem, chooseSkin, startRun, finishRun, collect, migrate, claimQuest, board, openChest, openAll,
     placeAnnex, moveAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople, namePlayer, arianeTargets,
     refundDecorations, startCraft, finishCraft, placeCraft, moveCraft, storeCraft, startExpedition, findLandmark, gatherDeposit,
-    anyaOf, breathRefused, revealAnya, breatheAnya, brumeSavoirOf, talkBrume, startNights, repelCreature, repairSite
+    anyaOf, breathRefused, revealAnya, breatheAnya, brumeSavoirOf, talkBrume, startNights, repelCreature, repairSite,
+    feedBeast, collectBeasts
 };

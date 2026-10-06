@@ -347,6 +347,19 @@ router.post('/world/villager/need', withAccount(async (req, res, owner, b) => {
 router.post('/world/villagers/needs', withAccount(async (req, res, owner, b) => {
     await fed(res, owner, b, await world.fillNeeds(owner.id));
 }));
+// Bêtes de ferme (v6, § 6.16) : en nourrir une depuis sa fiche (sa bulle est ramassée d'abord) → { beast, collected, world }
+router.post('/world/beast/feed', withAccount(async (req, res, owner, b) => {
+    const id = String(req.body.beast || '');
+    if (!/^[a-z-]{1,20}$/.test(id)) return res.status(400).json({ message: 'Bête invalide' });
+    const done = await world.feedBeast(owner.id, id);
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json({ beast: done.beast, collected: done.collected, world: await worldView(owner, b) });
+}));
+// Ramasser les bulles de toutes les bêtes → { food, world }
+router.post('/world/beasts/collect', withAccount(async (req, res, owner, b) => {
+    const { food } = await world.collectBeasts(owner.id);
+    res.json({ food, world: await worldView(owner, b) });
+}));
 // Visiteur : combler sa demande (livrer, ou ses Récoltes faites) → { reward, coins, world }
 router.post('/world/visitor', withAccount(async (req, res, owner, b) => {
     const id = Number(req.body.id);
