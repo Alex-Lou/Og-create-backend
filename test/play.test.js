@@ -312,6 +312,17 @@ test('l’Encre du Livre : payée d’emblée, compte requis, page à portée se
   assert.equal(ink.data.free, false);
   assert.equal(ink.data.coins, 70);
   assert.equal(await coinsOf(player), 70);
+  // Retenue par le serveur : le Livre la montre, sur tout appareil (une autre session), et elle ne se repaie pas
+  const elsewhere = { email: player.email, password: player.password, cookies: {} };
+  assert.equal((await api('POST', '/auth/login', { email: player.email, password: player.password }, elsewhere)).status, 200);
+  const seen = (await chapterPages(elsewhere, 'III')).find(p => p.id === page.id);
+  assert.equal(seen.ink, ink.data.ingredient);
+  assert.ok((await chapterPages(elsewhere, 'III')).filter(p => p.id !== page.id).every(p => p.ink === undefined));
+  const again = await api('POST', '/play/ink', { page: page.id }, elsewhere);
+  assert.deepEqual([again.status, again.data.ingredient, again.data.coins], [200, ink.data.ingredient, 70]);
+  assert.equal(await coinsOf(player), 70);
+  const paid = await sql(`SELECT amount, ref FROM coin_ledger WHERE user_id = $1 AND reason = 'encre'`, [player.userId]);
+  assert.deepEqual(paid, [{ amount: -50, ref: page.id }]);
 });
 
 test('le Livre : pages ouvertes bornées, plateau d’éléments possédés, aides selon le chapitre', async () => {
@@ -363,11 +374,12 @@ test('le Livre : un mélange visé dit combien d’ingrédients sont justes, pui
   assert.equal(third.data.aim.misses, 3);
   assert.equal(third.data.aim.freeInk, true);
 
-  // Encre offerte : sans écus, sans débit
+  // Encre offerte : sans écus, sans débit ; retenue elle aussi (le Livre la montre)
   const ink = await api('POST', '/play/ink', { page }, player);
   assert.equal(ink.status, 200);
   assert.equal(ink.data.free, true);
   assert.equal(await coinsOf(player), 0);
+  assert.equal((await api('GET', '/play/book', null, player)).data.chapters.flatMap(c => c.pages).find(p => p.id === page).ink, ink.data.ingredient);
 
   // La bonne recette inscrit la page : pas de verdict, et les essais s'effacent
   const found = await aimAt(player, recipe.ingredients);

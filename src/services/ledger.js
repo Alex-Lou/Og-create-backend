@@ -32,9 +32,31 @@ async function debit(userId, amount, reason, client = null) {
   return rows[0].coins;
 }
 
+// Débite `amount` une seule fois pour (reason, ref) : une aide déjà achetée (l'Encre d'une page) ne se repaie pas, même
+// depuis un autre appareil. { coins, again } (again : déjà inscrite, rien n'est débité), ou null si le solde est
+// insuffisant (rien n'est écrit)
+async function debitOnce(userId, amount, reason, ref) {
+  return db.transaction(async conn => {
+    const { rows } = await conn.query('SELECT coins FROM progress WHERE user_id = $1 FOR UPDATE', [userId]);
+    const coins = rows[0]?.coins ?? 0;
+    const seen = await conn.query('SELECT 1 FROM coin_ledger WHERE user_id = $1 AND reason = $2 AND ref = $3', [userId, reason, String(ref)]);
+    if (seen.rows.length) return { coins, again: true };
+    if (coins < amount) return null;
+    await conn.query('INSERT INTO coin_ledger (user_id, amount, reason, ref) VALUES ($1, $2, $3, $4)', [userId, -amount, reason, String(ref)]);
+    const paid = await conn.query('UPDATE progress SET coins = coins - $1 WHERE user_id = $2 RETURNING coins', [amount, userId]);
+    return { coins: paid.rows[0].coins, again: false };
+  });
+}
+
+// Références déjà inscrites pour ce motif (les pages où l'Encre a servi…) : Set
+async function refsOf(userId, reason) {
+  const { rows } = await db.query('SELECT ref FROM coin_ledger WHERE user_id = $1 AND reason = $2 AND ref IS NOT NULL', [userId, reason]);
+  return new Set(rows.map(row => row.ref));
+}
+
 async function balance(userId) {
   const { rows } = await db.query('SELECT coins FROM progress WHERE user_id = $1', [userId]);
   return rows[0]?.coins ?? 0;
 }
 
-module.exports = { credit, debit, balance };
+module.exports = { credit, debit, debitOnce, refsOf, balance };
