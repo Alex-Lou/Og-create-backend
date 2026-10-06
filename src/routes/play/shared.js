@@ -22,7 +22,8 @@ const playerKey = req => {
     return `g:${readCookie(req, 'oc_guest') || req.ip}`;
 };
 const playLimiter = limiter({ minutes: 1, max: 120, key: playerKey, message: SLOW_DOWN });
-const addressLimiter = limiter({ minutes: 1, max: 600, key: req => req.ip, message: SLOW_DOWN });
+// Par adresse : 600 requêtes par minute (PLAY_ADDRESS_RATE_LIMIT : les tests, qui viennent tous de la même adresse)
+const addressLimiter = limiter({ minutes: 1, max: Number(process.env.PLAY_ADDRESS_RATE_LIMIT) || 600, key: req => req.ip, message: SLOW_DOWN });
 const guestLimiter = limiter({ minutes: 60, max: 20, key: req => req.ip, message: SLOW_DOWN });
 
 const fail = (res, error, what) => {
@@ -54,6 +55,13 @@ async function pay(owner, reason) {
     if (coins === null) return { status: 400, message: `Il te faut ${HELP_PRICE} écus.` };
     return { coins };
 }
+// Débit d'une aide attachée à une chose précise (ref : une page) : une seule fois, même depuis un autre appareil
+async function payOnce(owner, reason, ref) {
+    if (owner.kind !== 'user') return { status: 402, message: 'Les aides payantes demandent un compte.' };
+    const done = await ledger.debitOnce(owner.id, HELP_PRICE, reason, ref);
+    if (!done) return { status: 400, message: `Il te faut ${HELP_PRICE} écus.` };
+    return { coins: done.coins };
+}
 
 // Nouvelle découverte du Livre (mélange ou pendu) : sa page n'a plus de pendu ni d'essais ratés, les succès
 // sont revus (compte). Renvoie les mélanges encore inexplorés de chaque élément possédé.
@@ -67,4 +75,4 @@ async function discovered(owner, b, owned, name) {
     return book.unexplored(b, [...owned, name]);
 }
 
-module.exports = { NAME, PAGE, playLimiter, addressLimiter, guestLimiter, fail, withPlayer, withAccount, pay, discovered };
+module.exports = { NAME, PAGE, playLimiter, addressLimiter, guestLimiter, fail, withPlayer, withAccount, pay, payOnce, discovered };

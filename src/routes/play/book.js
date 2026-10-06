@@ -8,7 +8,7 @@ const bookLetters = require('../../services/bookLetters');
 const world = require('../../services/world');
 const hangman = require('../../services/hangman');
 const book = require('../../services/recipeBook');
-const { PAGE, playLimiter, withPlayer, pay, discovered } = require('./shared');
+const { PAGE, playLimiter, withPlayer, payOnce, discovered } = require('./shared');
 
 const router = express.Router();
 
@@ -18,11 +18,14 @@ router.get('/book', playLimiter, withPlayer(async (req, res, owner, b) => {
     const owned = await players.elements(owner);
     // Le fil d'Ariane suit la quête active de l'île (compte seulement)
     const ariane = owner.kind === 'user' ? bookPages.arianeOf(b, owned, await world.arianeTargets(owner.id)) : null;
-    res.json(bookPages.view(b, owned, misses, await bookLetters.byPage(owner), await players.isVeteran(owner), ariane));
+    // Pages où l'Encre a déjà servi : leur ingrédient se revoit sur tout appareil
+    const inked = owner.kind === 'user' ? await ledger.refsOf(owner.id, 'encre') : new Set();
+    res.json(bookPages.view(b, owned, misses, await bookLetters.byPage(owner), await players.isVeteran(owner), ariane, inked));
 }));
 
 // Encre : révèle un ingrédient (déjà possédé) d'une page à portée ; offerte à un compte
-// après quelques mélanges ratés différents sur cette page, payée sinon
+// après quelques mélanges ratés différents sur cette page, payée sinon. Retenue au grand livre (référence : la page) :
+// elle se revoit sur tout appareil et ne se paie qu'une fois
 router.post('/ink', playLimiter, withPlayer(async (req, res, owner, b) => {
     const id = String(req.body.page || '');
     if (!PAGE.test(id)) return res.status(400).json({ message: 'Page invalide' });
@@ -30,7 +33,7 @@ router.post('/ink', playLimiter, withPlayer(async (req, res, owner, b) => {
     if (!target) return res.status(404).json({ message: 'Cette page n’est pas à portée.' });
     const rules = bookPages.difficultyOf(b.meta.get(target.name)?.family);
     const free = owner.kind === 'user' && await bookTries.misses(owner.id, id) >= rules.freeInkAfter;
-    const paid = free ? { coins: await ledger.balance(owner.id) } : await pay(owner, 'encre');
+    const paid = free ? await ledger.credit(owner.id, 0, 'encre', id) : await payOnce(owner, 'encre', id);
     if (paid.status) return res.status(paid.status).json({ message: paid.message });
     res.json({ page: id, ingredient: bookPages.telling(target.parts), coins: paid.coins, free });
 }));

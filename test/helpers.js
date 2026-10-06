@@ -30,8 +30,9 @@ async function startServer() {
   BASE = `http://127.0.0.1:${port}/api`;
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [path.join(__dirname, '..', 'src', 'server.js')], {
-      // Fenêtre de tolérance des rafraîchissements concurrents à 0 : la réutilisation d'un jeton se teste sans attendre
-      env: { ...process.env, PORT: String(port), NODE_ENV: 'test', LOG_LEVEL: 'error', AUTH_RACE_SECONDS: '0', REGISTER_RATE_LIMIT: '200' },
+      // Fenêtre de tolérance des rafraîchissements concurrents à 0 : la réutilisation d'un jeton se teste sans attendre.
+      // Tous les joueurs d'un fichier de tests viennent de la même adresse : sa limite de requêtes de jeu est relevée
+      env: { ...process.env, PORT: String(port), NODE_ENV: 'test', LOG_LEVEL: 'error', AUTH_RACE_SECONDS: '0', REGISTER_RATE_LIMIT: '200', PLAY_ADDRESS_RATE_LIMIT: '5000' },
       stdio: ['ignore', 'pipe', 'pipe']
     });
     let output = '';
