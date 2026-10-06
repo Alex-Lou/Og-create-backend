@@ -9,7 +9,6 @@ const db = require('../config/db');
 const ledger = require('./ledger');
 const harvest = require('./harvest');
 const map = require('./worldMap');
-const legacy = require('./worldMapV2');
 const shop = require('./worldShop');
 const quests = require('./quests');
 const loot = require('./loot');
@@ -24,269 +23,20 @@ const landmarks = require('./landmarks');
 const finds = require('./finds');
 const players = require('./players');
 const anya = require('./anya');
+const {
+    SIZE, CAP_HOURS, REGEN_MS, RUN_TTL_MS, RENAME_LEVEL, GAME_TTL_MS, GAME_SLACK_MS, CRAFT_TTL_MS, FIRST_RUN_MOVES,
+    FIRST_RUN_KINDS, RESOURCES, EXPEDITION_COST, DECO_PRICES, HARVEST_COIN_EVERY, UNDO_SECONDS, random,
+    CHAPTER_OF_LEVEL, PRODUCE_PER_LEVEL, COINS_PER_LEVEL, WORDS, SITES, effectOf, keyOf, pendingOf, chargesAt,
+    effectsOf, productionOf, perHourOf, productionAll
+} = require('./world/rules');
+const {
+    itemsOf, skinsOf, signsOf, namesOf, friendsOf, needRowsOf, settlersOf, gamesOf, annexesOf, levelsOf, stockOf,
+    zonesOf, findsOf, spendFinds, depositsOf, foundOf, claimedOf, helianeOfUser, runsOf, countOf, discoveredOf,
+    exploredOf, craftsOf, placedOf, madeOf, addStock, balanceOf
+} = require('./world/reads');
+const { migrate } = require('./world/migrate');
+const { openedOf, chestsView, grant, openChest, openAll } = require('./world/chests');
 
-const SIZE = map.SIZE;
-const CAP_HOURS = 8;
-const REGEN_MS = 30 * 60 * 1000; // une partie de Récolte revient toutes les 30 minutes
-const RUN_TTL_MS = 24 * 3600 * 1000; // une partie non rendue après 24 h est perdue
-const RENAME_LEVEL = 3; // un bâtiment se renomme dès son palier III (un quartier, dès qu'il est à soi)
-const GAME_TTL_MS = 15 * 60 * 1000; // une partie de mini-jeu non rendue après 15 min est perdue
-const GAME_SLACK_MS = 3000; // tolérance d'horloge : un geste ne peut dater de plus tard que la partie elle-même
-const CRAFT_TTL_MS = 30 * 60 * 1000; // un assemblage non rendu après 30 min est perdu (rien n'est encore payé)
-const MOVES = 15;
-// Première Récolte du joueur (le tutoriel de la bible, § 9, étape 2) : un plateau généreux, sans l'eau (le Puits n'est
-// pas encore là) et avec des coups en plus ; la configuration est figée dans la partie, le rejeu la suit
-const FIRST_RUN_MOVES = 4;
-const FIRST_RUN_KINDS = harvest.BASE_KINDS.filter(kind => kind !== 'water');
-const RESOURCES = ['stone', 'wood', 'water', 'food'];
-// 1 : île 14 × 14 ; 2 : île 20 × 20 (worldMapV2.js) ; 3 : la grande île 48 × 48 ; 4 : la très grande île 96 × 96, dont
-// la précédente est le cœur (worldMap.js)
-const MAP_VERSION = 4;
-// Expédition vers un quartier des terres nouvelles : par heure de voyage, ce qu'elle emporte (et une partie de Récolte)
-const EXPEDITION_COST = { food: 10, wood: 5 };
-// Ancienne règle (v1) : une décoration rapportait 1 écu par heure ; payée une dernière fois à la migration
-const OLD_DECO_RATE = 1;
-// Prix d'une décoration selon le chapitre de l'élément posé
-const DECO_PRICES = { I: 10, II: 15, III: 25, IV: 40, V: 60, VI: 90, VII: 140 };
-// Récolte : 1 écu par tranche de 10 ressources gagnées
-const HARVEST_COIN_EVERY = 10;
-// Un achat de la boutique s'annule dans les secondes qui suivent (le front montre « Annuler » 4 s ; marge réseau)
-const UNDO_SECONDS = 6;
-// Hasard des coffres (loot.js) : rand() dans [0, 1), tiré par le serveur
-const random = () => crypto.randomInt(0, 2 ** 32) / 2 ** 32;
-
-// Chantiers : 7 paliers, un par chapitre du Livre (le palier N demande le chapitre N ouvert), chacun avec son plan
-// (élément découvert), son coût en ressources et en écus (dès le palier III) ; l'emprise passe à 3 × 3 au palier IV.
-// produce : ressource produite en continu, PRODUCE_PER_LEVEL par heure et par niveau, avec COINS_PER_LEVEL écus.
-const CHAPTER_OF_LEVEL = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
-const BOOST_BY_LEVEL = [1, 2, 3, 4, 4, 5, 5, 6]; // multiplicateur de Récolte de la ressource du bâtiment (entier)
-const ATELIER_MOVES = [0, 3, 5, 6, 7, 8, 9, 10]; // coups de Récolte en plus selon le niveau de l'Atelier
-const PRODUCE_PER_LEVEL = 3; // ressources par heure et par niveau
-const COINS_PER_LEVEL = 2; // écus par heure et par niveau
-// Noms des ressources dans les textes d'effet : production, Récolte
-const WORDS = { stone: ['pierres', 'la pierre'], wood: ['bûches', 'le bois'], water: ['seaux d’eau', 'l’eau'], food: ['vivres', 'la nourriture'] };
-const tier = (name, plan, cost, coins = 0) => ({ name, plan, cost, coins });
-const SITES = {
-    foyer: {
-        levels: [
-            tier('Feu de camp', null, {}),
-            tier('Abri', 'Bois', { wood: 20, stone: 10 }),
-            tier('Cabane', 'Cabane', { stone: 40, wood: 30, water: 20 }, 150),
-            tier('Maison de l’alchimiste', 'Potion', { stone: 60, wood: 50, water: 30, food: 20 }, 300),
-            tier('Tour d’étude', 'Livre', { stone: 100, wood: 90, water: 50, food: 40 }, 600),
-            tier('Grande tour', 'Télescope', { stone: 170, wood: 150, water: 90, food: 70 }, 1000),
-            tier('Phare de Brume', 'Feu follet', { stone: 300, wood: 240, water: 140, food: 120 }, 1800)
-        ]
-    },
-    carriere: {
-        produce: 'stone',
-        levels: [
-            tier('Fissure', 'Pierre', { wood: 5 }),
-            tier('Carrière', 'Marteau', { stone: 30, wood: 20 }),
-            tier('Mine', 'Poulie', { wood: 45, stone: 30, food: 15 }, 150),
-            tier('Galerie', 'Rails', { wood: 70, stone: 50, water: 20, food: 20 }, 300),
-            tier('Puits de mine', 'Fer', { wood: 110, stone: 90, water: 40, food: 40 }, 600),
-            tier('Mine de cristal', 'Cristal', { wood: 180, stone: 150, water: 90, food: 60 }, 1000),
-            tier('Cité minière', 'Ville', { wood: 300, stone: 250, water: 130, food: 120 }, 1800)
-        ]
-    },
-    bosquet: {
-        produce: 'wood',
-        levels: [
-            tier('Bosquet', 'Arbre', { stone: 5 }),
-            tier('Grand bosquet', 'Forêt', { wood: 25, water: 15 }),
-            tier('Clairière du bûcheron', 'Bûcheron', { stone: 35, water: 35, food: 20 }, 150),
-            tier('Chênaie', 'Chêne', { stone: 60, water: 50, wood: 30, food: 20 }, 300),
-            tier('Scierie', 'Menuisier', { stone: 100, wood: 70, water: 70, food: 40 }, 600),
-            tier('Exploitation forestière', 'Grue', { stone: 170, wood: 120, water: 110, food: 80 }, 1000),
-            tier('Forêt enchantée', 'Fée', { stone: 280, wood: 200, water: 180, food: 140 }, 1800)
-        ]
-    },
-    puits: {
-        produce: 'water',
-        levels: [
-            tier('Puits', 'Puits', { stone: 10 }),
-            tier('Fontaine', 'Fontaine', { stone: 30, water: 15 }),
-            tier('Lavoir', 'Savon', { stone: 45, wood: 30, food: 15 }, 150),
-            tier('Bassin', 'Source', { stone: 70, wood: 50, water: 20, food: 20 }, 300),
-            tier('Aqueduc', 'Arche', { stone: 110, wood: 80, water: 50, food: 40 }, 600),
-            tier('Moulin à eau', 'Moulin à eau', { stone: 180, wood: 130, water: 90, food: 80 }, 1000),
-            tier('Fontaine de jouvence', 'Élixir', { stone: 300, wood: 220, water: 150, food: 130 }, 1800)
-        ]
-    },
-    potager: {
-        produce: 'food',
-        levels: [
-            tier('Potager', 'Plante', { water: 8 }),
-            tier('Serre', 'Serre', { wood: 20, water: 25, food: 10 }),
-            tier('Verger', 'Pomme', { wood: 35, water: 35, stone: 20 }, 150),
-            tier('Ferme', 'Ferme', { wood: 55, water: 55, stone: 30, food: 20 }, 300),
-            tier('Moulin', 'Moulin', { wood: 95, water: 90, stone: 55, food: 40 }, 600),
-            tier('Domaine', 'Tracteur', { wood: 160, water: 150, stone: 100, food: 70 }, 1000),
-            tier('Jardin de la Licorne', 'Licorne', { wood: 270, water: 250, stone: 160, food: 120 }, 1800)
-        ]
-    },
-    atelier: {
-        levels: [
-            tier('Atelier', 'Four', { stone: 15, wood: 10 }),
-            tier('Forge', 'Forge', { stone: 35, wood: 25 }),
-            tier('Fonderie', 'Bronze', { stone: 45, wood: 35, water: 10 }, 150),
-            tier('Grande forge', 'Acier', { stone: 70, wood: 55, water: 20, food: 15 }, 300),
-            tier('Manufacture', 'Forgeron', { stone: 120, wood: 90, water: 40, food: 30 }, 600),
-            tier('Usine', 'Usine', { stone: 200, wood: 150, water: 70, food: 60 }, 1000),
-            tier('Atelier de l’Alchimiste', 'Alchimie', { stone: 330, wood: 250, water: 120, food: 100 }, 1800)
-        ]
-    },
-    ponton: {
-        produce: 'food',
-        levels: [
-            tier('Ponton', 'Bateau', { wood: 25 }),
-            tier('Port de pêche', 'Port', { wood: 40, stone: 15 }),
-            tier('Chantier naval', 'Voile', { wood: 50, stone: 25, water: 15 }, 150),
-            tier('Grand port', 'Phare', { wood: 80, stone: 45, water: 20, food: 15 }, 300),
-            tier('Criée', 'Pêcheur', { wood: 130, stone: 80, water: 40, food: 30 }, 600),
-            tier('Port à vapeur', 'Bateau à vapeur', { wood: 220, stone: 130, water: 70, food: 60 }, 1000),
-            tier('Port du Kraken', 'Kraken', { wood: 360, stone: 220, water: 120, food: 100 }, 1800)
-        ]
-    }
-};
-const BOOSTED = { carriere: 'stone', bosquet: 'wood', puits: 'water', potager: 'food' };
-
-// Ce que fait un palier (texte de la fiche), calculé depuis les règles : jamais en désaccord avec elles
-function effectOf(siteId, n) {
-    const site = SITES[siteId];
-    const grows = n === map.BIG_FROM ? ' Le bâtiment s’agrandit (3 × 3 cases).' : '';
-    if (siteId === 'foyer') return `${2 + n} parties de Récolte en réserve.${grows}`;
-    if (siteId === 'atelier') return `${ATELIER_MOVES[n]} coups de plus par Récolte.${grows}`;
-    const [many] = WORDS[site.produce];
-    const made = `${PRODUCE_PER_LEVEL * n} ${many} et ${COINS_PER_LEVEL * n} écus par heure`;
-    if (siteId === 'ponton') return `Pêche ${made} ; des poissons à la Récolte${n >= 2 ? ', 2 coups de plus' : ''}.${grows}`;
-    return `Produit ${made} ; ${WORDS[site.produce][1]} rapporte ×${BOOST_BY_LEVEL[n]} à la Récolte.${grows}`;
-}
-for (const [id, site] of Object.entries(SITES)) {
-    site.levels.forEach((l, i) => { l.effect = effectOf(id, i + 1); l.chapter = CHAPTER_OF_LEVEL[i]; });
-}
-
-const keyOf = cell => cell.y * SIZE + cell.x;
-
-// Écus dus selon l'ancienne règle (décorations) : chaque source compte depuis sa pose ou la dernière récolte, plafonnée
-function pendingOf(sources, collectedAt, now = Date.now()) {
-    const since = collectedAt ? new Date(collectedAt).getTime() : 0;
-    let total = 0;
-    for (const source of sources) {
-        const start = Math.max(since, new Date(source.placed_at).getTime());
-        total += Math.min(CAP_HOURS, Math.max(0, (now - start) / 3600000)) * (source.rate ?? OLD_DECO_RATE);
-    }
-    return Math.floor(total);
-}
-
-// Parties disponibles à l'instant : réserve + parties revenues depuis charges_at, plafonnées
-function chargesAt(stock, max, now = Date.now(), regen = REGEN_MS) {
-    const since = new Date(stock.charges_at).getTime();
-    const ticks = Math.max(0, Math.floor((now - since) / regen));
-    if (stock.charges + ticks >= max) return { count: max, since: now };
-    return { count: stock.charges + ticks, since: since + ticks * regen };
-}
-
-// Effets des bâtiments construits : réserve, coups, tuiles, multiplicateurs de Récolte (BOOST_BY_LEVEL), avec les
-// bonus de la boutique (bonuses) et des annexes (extra)
-const NO_BONUS = shop.bonusesOf([]);
-const NO_ANNEX = annexes.bonusesOf([]);
-function effectsOf(levels, bonuses = NO_BONUS, extra = NO_ANNEX) {
-    const boosts = {};
-    for (const [site, resource] of Object.entries(BOOSTED)) if (levels[site]) boosts[resource] = BOOST_BY_LEVEL[levels[site]];
-    const foyer = levels.foyer || 1;
-    const atelier = levels.atelier || 0;
-    const ponton = levels.ponton || 0;
-    return {
-        maxCharges: 2 + foyer + bonuses.charges + extra.charges,
-        maxMoves: MOVES + ATELIER_MOVES[atelier] + (ponton >= 2 ? 2 : 0) + bonuses.moves + extra.moves,
-        kinds: [...harvest.BASE_KINDS, ...(ponton ? ['fish'] : [])],
-        boosts,
-        regenMs: annexes.regenWith(bonuses.regenMs || REGEN_MS, extra.regenCut)
-    };
-}
-
-// Production d'un bâtiment et de ses annexes depuis leur pose ou la dernière récolte (plafonnée à CAP_HOURS, plus les
-// heures des réserves) : { resource, amount, coins }.
-// bonus = { prod: part en plus, coins: écus par heure en plus (boutique de l'atelier), cap: heures en plus (réserve) } ;
-// annexList = [{ rate, earn, at }] (annexes.bonusesOf) : ressources et écus par heure en plus, comptés depuis at,
-// avec la même part de production en plus que le bâtiment
-function productionOf(siteId, level, builtAt, collectedAt, now = Date.now(), bonus = { prod: 0, coins: 0 }, annexList = []) {
-    const site = SITES[siteId];
-    if (!site.produce || !level) return null;
-    const cap = CAP_HOURS + (bonus.cap || 0);
-    const collected = collectedAt ? new Date(collectedAt).getTime() : 0;
-    const hoursSince = at => Math.min(cap, Math.max(0, (now - Math.max(collected, new Date(at).getTime())) / 3600000));
-    const hours = hoursSince(builtAt);
-    let amount = hours * PRODUCE_PER_LEVEL * level;
-    let coins = hours * COINS_PER_LEVEL * level;
-    for (const a of annexList) {
-        const h = hoursSince(a.at);
-        amount += h * a.rate;
-        coins += h * a.earn;
-    }
-    const boost = 1 + (bonus.prod || 0);
-    return {
-        resource: site.produce,
-        amount: Math.floor(amount * boost + 1e-9),
-        coins: Math.floor(coins * boost + hours * (bonus.coins || 0) + 1e-9)
-    };
-}
-// Rendement par heure d'un bâtiment producteur et de ses annexes : { amount, coins }, arrondis au dixième
-function perHourOf(level, prod = 0, coins = 0, annexList = []) {
-    const boost = 1 + prod;
-    const round = n => Math.round(n * 10) / 10;
-    const rate = annexList.reduce((sum, a) => sum + a.rate, 0);
-    const earn = annexList.reduce((sum, a) => sum + a.earn, 0);
-    return { amount: round((PRODUCE_PER_LEVEL * level + rate) * boost), coins: round((COINS_PER_LEVEL * level + earn) * boost + coins) };
-}
-function productionAll(levels, builtAt, collectedAt, now = Date.now(), bonuses = NO_BONUS, extra = NO_ANNEX) {
-    return Object.keys(SITES)
-        .map(id => ({
-            site: id,
-            ...productionOf(id, levels[id] || 0, builtAt[id], collectedAt, now,
-                { prod: bonuses.prod[id] || 0, coins: bonuses.coins[id] || 0, cap: extra.cap[id] || 0 }, extra.site[id] || [])
-        }))
-        .filter(p => p.resource);
-}
-
-async function itemsOf(userId, conn = db) {
-    const { rows } = await conn.query('SELECT item FROM world_items WHERE user_id = $1', [userId]);
-    return new Set(rows.map(r => r.item));
-}
-async function skinsOf(userId, conn = db) {
-    const { rows } = await conn.query('SELECT site, skin FROM world_skins WHERE user_id = $1', [userId]);
-    return Object.fromEntries(rows.map(r => [r.site, r.skin]));
-}
-// Enseignes : nom écrit dessus (choisi, ou tiré de l'identifiant), styles achetés, style porté par bâtiment
-async function signsOf(userId, conn = db) {
-    const named = await conn.query('SELECT name FROM world_sign_names WHERE user_id = $1', [userId]);
-    const name = named.rows.length ? named.rows[0].name
-        : signs.defaultName((await conn.query('SELECT username FROM users WHERE id = $1', [userId])).rows[0]?.username);
-    const bought = await conn.query('SELECT style FROM world_sign_styles WHERE user_id = $1', [userId]);
-    const worn = await conn.query('SELECT site, style FROM world_signs WHERE user_id = $1', [userId]);
-    return { name, owned: new Set(bought.rows.map(r => r.style)), worn: Object.fromEntries(worn.rows.map(r => [r.site, r.style])) };
-}
-// Noms choisis par le joueur : { 'site:<id>' | 'zone:<id>': nom }
-async function namesOf(userId, conn = db) {
-    const { rows } = await conn.query('SELECT target, name FROM world_names WHERE user_id = $1', [userId]);
-    return Object.fromEntries(rows.map(r => [r.target, r.name]));
-}
-// Amitié des habitants : { habitant: { points, talked, gifted } } (jours 'AAAA-MM-JJ', heure de Paris)
-async function friendsOf(userId, conn = db) {
-    const { rows } = await conn.query(
-        `SELECT villager, points, to_char(talked_on, 'YYYY-MM-DD') AS talked, to_char(gifted_on, 'YYYY-MM-DD') AS gifted
-         FROM world_friends WHERE user_id = $1`, [userId]);
-    return Object.fromEntries(rows.map(r => [r.villager, r]));
-}
-// Besoins comblés des habitants : { habitant: { besoin: filled_at } }
-async function needRowsOf(userId, conn = db) {
-    const { rows } = await conn.query('SELECT villager, need, filled_at FROM world_needs WHERE user_id = $1', [userId]);
-    const out = {};
-    for (const r of rows) (out[r.villager] = out[r.villager] || {})[r.need] = r.filled_at;
-    return out;
-}
 // Un habitant vit sur l'île quand son bâtiment est bâti, dans un quartier à soi
 const livesHere = (id, levels, zones) => (levels[id] || 0) >= 1 && zones.has(map.siteZone(id));
 // Décorations à reach cases au plus (en tous sens) de l'emprise d'un bâtiment
@@ -294,11 +44,6 @@ function decosNear(tiles, siteId, level, reach) {
     const at = map.footprintOf(siteId, level);
     const gap = (v, from, size) => Math.max(from - v, 0, v - (from + size - 1));
     return tiles.filter(t => Math.max(gap(t.x, at.x, at.w), gap(t.y, at.y, at.h)) <= reach).length;
-}
-// Visiteurs installés (lot 7d), dans l'ordre où ils sont restés : [{ id, seed, site, settled_at }]
-async function settlersOf(userId, conn = db) {
-    const { rows } = await conn.query('SELECT id, seed, site, settled_at FROM world_visitors WHERE user_id = $1 AND settled_at IS NOT NULL ORDER BY settled_at, id', [userId]);
-    return rows;
 }
 // Identifiant d'un visiteur installé, parmi les habitants : 'v<numéro de sa visite>'
 const SETTLER_ID = /^v\d{1,9}$/;
@@ -425,18 +170,8 @@ function visitorView(row, runs, now = Date.now()) {
         request, leavesIn: Math.max(0, new Date(row.leaves_at).getTime() - now), satisfied: Boolean(row.satisfied_at)
     };
 }
-// Mini-jeux : réserve de parties de chaque jeu ({ jeu: { plays, plays_at } } ; absent : réserve pleine)
-async function gamesOf(userId, conn = db) {
-    const { rows } = await conn.query('SELECT game, plays, plays_at FROM world_games WHERE user_id = $1', [userId]);
-    return Object.fromEntries(rows.map(r => [r.game, r]));
-}
 // Parties d'un jeu à l'instant now (une de plus toutes les 2 h, 3 au plus) : { count, since }
 const playsOf = (row, now) => chargesAt({ charges: row ? row.plays : minigames.PLAYS, charges_at: row ? row.plays_at : now }, minigames.PLAYS, now, minigames.PLAY_REGEN_MS);
-// Annexes posées : [{ x, y, annex, built_at }]
-async function annexesOf(userId, conn = db) {
-    const { rows } = await conn.query('SELECT x, y, annex, built_at FROM world_annexes WHERE user_id = $1 ORDER BY built_at, y, x', [userId]);
-    return rows;
-}
 // Bonus de la boutique, des annexes, de l'humeur des habitants et des lieux découverts : { bonuses, extra } (ce que
 // lisent effectsOf et productionAll)
 async function bonusesFor(userId, conn = db) {
@@ -449,81 +184,6 @@ async function bonusesFor(userId, conn = db) {
     return withLandmarks(mooded, landmarks.bonusesOf((await foundOf(userId, conn)).keys()));
 }
 
-async function levelsOf(userId, conn = db) {
-    const { rows } = await conn.query('SELECT site, level, built_at FROM world_buildings WHERE user_id = $1', [userId]);
-    const levels = { foyer: 1 };
-    const builtAt = {};
-    for (const row of rows) {
-        levels[row.site] = row.level;
-        builtAt[row.site] = row.built_at;
-    }
-    return { levels, builtAt };
-}
-
-// Ligne de stock du joueur (créée à la première visite, avec une réserve pleine ;
-// la dernière récolte d'écus de la v1 est reprise pour ne pas la payer deux fois)
-async function stockOf(userId, conn = db, lock = false) {
-    await conn.query(
-        `INSERT INTO world_stock (user_id, charges, collected_at)
-         SELECT $1, 3, (SELECT world_collected_at FROM progress WHERE user_id = $1)
-         ON CONFLICT (user_id) DO NOTHING`, [userId]);
-    const { rows } = await conn.query(`SELECT * FROM world_stock WHERE user_id = $1${lock ? ' FOR UPDATE' : ''}`, [userId]);
-    return rows[0];
-}
-
-async function tilesOf(userId, conn = db) {
-    const { rows } = await conn.query('SELECT x, y, element, placed_at FROM world_tiles WHERE user_id = $1 ORDER BY y, x', [userId]);
-    return rows;
-}
-
-async function zonesOf(userId, conn = db) {
-    const { rows } = await conn.query('SELECT zone FROM world_zones WHERE user_id = $1', [userId]);
-    return new Set(['coeur', ...rows.map(r => r.zone)]);
-}
-// Trouvailles de climat en réserve : { trouvaille: nombre } (toutes, 0 par défaut)
-async function findsOf(userId, conn = db) {
-    const { rows } = await conn.query('SELECT find, amount FROM world_finds WHERE user_id = $1', [userId]);
-    const have = Object.fromEntries(rows.map(r => [r.find, r.amount]));
-    return Object.fromEntries(finds.FINDS.map(f => [f.id, have[f.id] || 0]));
-}
-// Dépense des trouvailles (déjà vérifiées, dans la transaction de l'appelant) : { trouvaille: nombre }
-async function spendFinds(userId, spent, conn) {
-    for (const [find, n] of Object.entries(spent)) {
-        if (n) await conn.query('UPDATE world_finds SET amount = amount - $3 WHERE user_id = $1 AND find = $2', [userId, find, n]);
-    }
-}
-// Gisements déjà ramassés : Map identifiant → date du dernier ramassage
-async function depositsOf(userId, conn = db) {
-    const { rows } = await conn.query('SELECT deposit, gathered_at FROM world_deposits WHERE user_id = $1', [userId]);
-    return new Map(rows.map(r => [r.deposit, r.gathered_at]));
-}
-// Lieux remarquables découverts : Map identifiant → date de la découverte
-async function foundOf(userId, conn = db) {
-    const { rows } = await conn.query('SELECT landmark, found_at FROM world_landmarks WHERE user_id = $1', [userId]);
-    return new Map(rows.map(r => [r.landmark, r.found_at]));
-}
-
-// Quêtes de Brume réclamées, et récoltes terminées (objectifs des quêtes)
-async function claimedOf(userId, conn = db) {
-    const { rows } = await conn.query('SELECT quest FROM world_quests WHERE user_id = $1', [userId]);
-    return new Set(rows.map(r => r.quest));
-}
-// Les mots d'Héliane (loot.helianeOf) : déduits des quêtes réclamées et des bouteilles ouvertes, avec leurs heures
-async function helianeOfUser(userId, conn = db) {
-    const claimed = await conn.query('SELECT quest, claimed_at FROM world_quests WHERE user_id = $1', [userId]);
-    const bottles = await conn.query(`SELECT opened_at FROM world_chests WHERE user_id = $1 AND source LIKE 'bouteille:%'`, [userId]);
-    const starts = quests.actStartsOf(claimed.rows.map(r => ({ quest: r.quest, at: r.claimed_at.getTime() })));
-    return loot.helianeOf(starts, bottles.rows.map(r => r.opened_at.getTime()));
-}
-async function runsOf(userId, conn = db) {
-    const { rows } = await conn.query('SELECT COUNT(*)::int AS n FROM world_runs WHERE user_id = $1 AND finished_at IS NOT NULL', [userId]);
-    return rows[0].n;
-}
-// Un nombre lu en base (COUNT)
-async function countOf(conn, sql, params) {
-    const { rows } = await conn.query(sql, params);
-    return rows[0].n;
-}
 // Ce que lisent les objectifs des quêtes (quests.HAVE) : owned = éléments du Grimoire ; stars = ses découvertes.
 // moods : besoins des habitants déjà calculés (la vue de l'île), sinon calculés ici
 async function factsOf(userId, owned, stars, conn = db, moods = null) {
@@ -589,94 +249,6 @@ async function board(userId, owned, stars, openChapters) {
     return { ...out, people: (await namesOf(userId)).peuple || null, anya: await anyaOf(userId) };
 }
 
-// Passage aux cartes suivantes, une fois par joueur, au premier passage, verrouillé (deux requêtes ne migrent pas
-// deux fois) et d'un seul tenant (tout ou rien) : v1 → v2 → v3 → v4 selon l'île du joueur.
-function migrate(userId) {
-    return db.transaction(async conn => {
-        const stock = await stockOf(userId, conn, true);
-        if (stock.map_version >= MAP_VERSION) return false;
-        if (stock.map_version < 2) await toV2(userId, stock, conn);
-        if (stock.map_version < 3) await toV3(userId, conn);
-        await toV4(userId, conn);
-        await conn.query('UPDATE world_stock SET map_version = $2 WHERE user_id = $1', [userId, MAP_VERSION]);
-        return true;
-    });
-}
-
-// v1 → v2 : les écus encore dus par les décorations (ancienne règle) sont versés, tout ce qui était posé glisse de
-// OFFSET cases, et les quartiers où le joueur avait déjà un bâtiment ou une décoration lui sont offerts
-async function toV2(userId, stock, conn) {
-    const tiles = await tilesOf(userId, conn);
-    const { levels, builtAt } = await levelsOf(userId, conn);
-    const oldFoyerRate = ((levels.foyer || 1) - 1) * 2;
-    const owed = pendingOf([...tiles.map(t => ({ ...t, rate: OLD_DECO_RATE })), ...(oldFoyerRate ? [{ placed_at: builtAt.foyer, rate: oldFoyerRate }] : [])], stock.collected_at);
-    if (owed > 0) await ledger.credit(userId, owed, 'monde', 'carte-v2', conn);
-    // Décalage en deux temps : la clé (joueur, x, y) ne se heurte jamais à elle-même pendant la mise à jour
-    await conn.query('UPDATE world_tiles SET x = x + 1000, y = y + 1000 WHERE user_id = $1', [userId]);
-    await conn.query('UPDATE world_tiles SET x = x - 1000 + $2, y = y - 1000 + $2 WHERE user_id = $1', [userId, legacy.OFFSET]);
-    const gifts = new Set();
-    Object.keys(levels).forEach(id => { if (SITES[id] && levels[id] && id !== 'foyer') gifts.add(legacy.siteZone(id)); });
-    tiles.forEach(t => { const zone = legacy.zoneAt(t.x + legacy.OFFSET, t.y + legacy.OFFSET); if (zone) gifts.add(zone); });
-    gifts.delete('coeur');
-    for (const zone of gifts) {
-        await conn.query('INSERT INTO world_zones (user_id, zone) VALUES ($1, $2) ON CONFLICT DO NOTHING', [userId, zone]);
-    }
-    await conn.query('UPDATE world_stock SET collected_at = NOW() WHERE user_id = $1', [userId]);
-}
-
-// v2 → v3 (la grande île) : les quartiers achetés restent (mêmes identifiants), les bâtiments gardent leur palier
-// (leur place vient de la carte) ; chaque décoration rejoint son quartier, sur une case libre au plus près de son
-// panneau, dans l'ordre où elles étaient rangées (de haut en bas, de gauche à droite). Un quartier trop petit
-// déborde sur la Grève.
-async function toV3(userId, conn) {
-    const tiles = await tilesOf(userId, conn);
-    if (!tiles.length) return;
-    const { levels } = await levelsOf(userId, conn);
-    const byZone = new Map();
-    for (const tile of tiles) {
-        const zone = legacy.zoneAt(tile.x, tile.y) || 'coeur';
-        byZone.set(zone, [...(byZone.get(zone) || []), tile]);
-    }
-    // Décalage en deux temps : la clé (joueur, x, y) ne se heurte jamais à une case encore occupée
-    await conn.query('UPDATE world_tiles SET x = x + 1000, y = y + 1000 WHERE user_id = $1', [userId]);
-    const taken = new Set();
-    // Cases de la carte v3 : celles du cœur de la carte v4, moins son décalage (toV4 les replace ensuite)
-    const v3Spots = zone => map.freeSpots(zone, levels).map(sp => ({ x: sp.x - map.OFFSET.x, y: sp.y - map.OFFSET.y }));
-    const spare = v3Spots('coeur');
-    for (const [zone, list] of byZone) {
-        const spots = [...v3Spots(zone), ...spare];
-        for (const tile of list) {
-            const spot = spots.find(s => !taken.has(s.y * SIZE + s.x));
-            if (!spot) break;
-            taken.add(spot.y * SIZE + spot.x);
-            await conn.query('UPDATE world_tiles SET x = $4, y = $5 WHERE user_id = $1 AND x = $2 AND y = $3', [userId, tile.x + 1000, tile.y + 1000, spot.x, spot.y]);
-        }
-    }
-    // Chaque ancien quartier tient dans le nouveau (test/play.test.js) ; les décorations sont ensuite remboursées
-    // (refundDecorations, lot 8)
-}
-
-// v3 → v4 (la très grande île) : la grande île devient le cœur, posée en map.OFFSET ; tout ce que le joueur y a posé
-// (annexes, créations, anciennes décorations) glisse d'autant. Les bâtiments n'ont rien à faire : leur place vient
-// de la carte. Décalage en deux temps : la clé (joueur, x, y) ne se heurte jamais à une case encore occupée
-async function toV4(userId, conn) {
-    const { x, y } = map.OFFSET;
-    for (const table of ['world_annexes', 'world_crafts', 'world_tiles']) {
-        await conn.query(`UPDATE ${table} SET x = x + 1000, y = y + 1000 WHERE user_id = $1 AND x IS NOT NULL`, [userId]);
-        await conn.query(`UPDATE ${table} SET x = x - 1000 + $2, y = y - 1000 + $3 WHERE user_id = $1 AND x IS NOT NULL`, [userId, x, y]);
-    }
-}
-
-// Quartiers des terres nouvelles déjà découverts (expédition revenue) : Set des identifiants. Les quartiers du cœur
-// sont toujours connus
-async function discoveredOf(userId, conn = db, now = Date.now()) {
-    return new Set(await exploredOf(userId, conn, now));
-}
-// Les mêmes, dans l'ordre de leur retour (les traces d'Anya)
-async function exploredOf(userId, conn = db, now = Date.now()) {
-    const { rows } = await conn.query('SELECT zone FROM world_expeditions WHERE user_id = $1 AND ends_at <= $2 ORDER BY ends_at, zone', [userId, new Date(now)]);
-    return rows.map(r => r.zone);
-}
 // Anya (services/anya.js) : traces, éveil, Révélation vue, Souffle du jour (breathed)
 async function anyaOf(userId, conn = db, now = Date.now()) {
     const { rows } = await conn.query(`SELECT to_char(talked_on, 'YYYY-MM-DD') AS talked FROM world_friends WHERE user_id = $1 AND villager = $2`, [userId, anya.TARGET]);
@@ -815,14 +387,6 @@ async function gatherDeposit(userId, depositId, now = Date.now()) {
     });
 }
 
-// Créations d'île (lot 8) : [{ id, craft, x, y }] (x, y vides : en réserve)
-async function craftsOf(userId, conn = db) {
-    const { rows } = await conn.query('SELECT id, craft, x, y FROM world_crafts WHERE user_id = $1 ORDER BY id', [userId]);
-    return rows;
-}
-const placedOf = rows => rows.filter(r => r.x !== null);
-// Créations déjà fabriquées, par sorte (posées ou en réserve) : { création: nombre }
-const madeOf = rows => rows.reduce((out, r) => ({ ...out, [r.craft]: (out[r.craft] || 0) + 1 }), {});
 // Contexte des règles de pose (crafts.spotBlock) : sol, case libre (sur l'île, hors chantier, quartier à soi, ni annexe,
 // ni autre création, ni lieu remarquable, ni gisement), emprise d'un bâtiment bâti, créations posées (sauf skip : celle qu'on déplace)
 // (cells : les cases libres, calculées une fois pour toutes les créations)
@@ -884,45 +448,6 @@ function craftsView(rows, ctx, { owned, stock, open, epreuves, stars = 0, have }
             };
         }),
         placed: placedOf(rows).map(r => ({ x: r.x, y: r.y, craft: r.craft }))
-    };
-}
-
-// Coffres déjà ouverts parmi les sources à surveiller : chapitres, quêtes, lieux, jour (et veille), bouteille. Map source → ligne
-const { QUEST_CHESTS } = quests;
-async function openedOf(userId, now, conn = db) {
-    const { day, slot } = loot.parisOf(now);
-    const keys = [
-        ...Object.keys(loot.CHAPTER_RARES).map(c => `chapitre:${c}`), ...QUEST_CHESTS.map(q => `quete:${q.id}`),
-        ...landmarks.LANDMARKS.map(l => `lieu:${l.id}`), `jour:${day}`, `jour:${loot.dayBefore(day)}`, `bouteille:${day}-${slot}`
-    ];
-    const { rows } = await conn.query('SELECT source, streak FROM world_chests WHERE user_id = $1 AND source = ANY($2)', [userId, keys]);
-    return { day, slot, opened: new Map(rows.map(r => [r.source, r])) };
-}
-
-// Série du coffre du jour : celle d'hier plus un, sinon 1 (un jour manqué la remet à 1)
-const streakOf = (opened, day) => (opened.get(`jour:${loot.dayBefore(day)}`)?.streak || 0) + 1;
-
-// Ce que la vue montre des coffres : ceux qui attendent (chapitres ouverts, quêtes réclamées, lieux découverts), le
-// coffre du jour (série, rareté du jour et du lendemain s'il est ouvert, semaine en cours) et la bouteille de la tranche.
-// found : lieux découverts (identifiants)
-function chestsView({ day, slot, opened }, openChapters, claimed, found) {
-    const today = opened.get(`jour:${day}`);
-    const streak = today ? today.streak : streakOf(opened, day);
-    const first = streak - ((streak - 1) % 7);
-    return {
-        pending: [
-            ...Object.entries(loot.CHAPTER_RARES).filter(([c]) => openChapters.has(c) && !opened.has(`chapitre:${c}`))
-                .map(([c]) => ({ source: `chapitre:${c}`, rarity: 'legendaire', label: `Chapitre ${c} du Grimoire` })),
-            ...QUEST_CHESTS.filter(q => claimed.has(q.id) && !opened.has(`quete:${q.id}`))
-                .map(q => ({ source: `quete:${q.id}`, rarity: q.chest, label: `Quête : ${q.label}` })),
-            ...landmarks.LANDMARKS.filter(l => found.has(l.id) && !opened.has(`lieu:${l.id}`))
-                .map(l => ({ source: `lieu:${l.id}`, rarity: l.chest, label: `Lieu : ${l.name}` }))
-        ],
-        daily: {
-            available: !today, streak, rarity: loot.dailyRarity(streak), tomorrow: loot.dailyRarity(streak + 1),
-            week: Array.from({ length: 7 }, (_, i) => loot.dailyRarity(first + i))
-        },
-        bottle: { key: `${day}-${slot}`, available: !opened.has(`bouteille:${day}-${slot}`) }
     };
 }
 
@@ -1584,95 +1109,6 @@ async function storeCraft(userId, x, y) {
     await migrate(userId);
     const { rows } = await db.query('UPDATE world_crafts SET x = NULL, y = NULL WHERE user_id = $1 AND x = $2 AND y = $3 RETURNING id', [userId, x, y]);
     return rows.length ? {} : { status: 404, message: 'Aucune création sur cette case.' };
-}
-
-// Ajoute des ressources au stock (ligne verrouillée par l'appelant)
-function addStock(userId, add, conn) {
-    const n = r => add[r] || 0;
-    return conn.query('UPDATE world_stock SET stone = stone + $2, wood = wood + $3, water = water + $4, food = food + $5 WHERE user_id = $1',
-        [userId, n('stone'), n('wood'), n('water'), n('food')]);
-}
-async function balanceOf(userId, conn) {
-    const { rows } = await conn.query('SELECT coins FROM progress WHERE user_id = $1', [userId]);
-    return rows[0]?.coins ?? 0;
-}
-
-// Donne un coffre, une seule fois par source (même en double clic) : tire son lot selon l'île, l'applique (écus au
-// grand livre, ressources au stock, teinte ou pièce rare à la collection) et l'inscrit. Dans la transaction de
-// l'appelant, ligne de stock verrouillée. { source, rarity, prize }, ou null si ce coffre est déjà ouvert
-async function grant(userId, source, rarity, conn, { wanted = null, streak = null } = {}) {
-    const prize = loot.prizeOf(rarity, { levels: (await levelsOf(userId, conn)).levels, owned: await itemsOf(userId, conn) }, random, wanted);
-    const added = await conn.query(
-        `INSERT INTO world_chests (user_id, source, rarity, prize, streak) VALUES ($1, $2, $3, $4, $5)
-         ON CONFLICT DO NOTHING RETURNING source`, [userId, source, rarity, JSON.stringify(prize), streak]);
-    if (!added.rows.length) return null;
-    if (prize.kind === 'coins') await ledger.credit(userId, prize.amount, 'butin', source, conn);
-    if (prize.kind === 'stock') await addStock(userId, prize.stock, conn);
-    if (prize.item) await conn.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'butin') ON CONFLICT DO NOTHING`, [userId, prize.item]);
-    return { source, rarity, prize };
-}
-
-// Ouvre un coffre qui attend : 'jour' (série), 'bouteille' (tranche de 6 h), 'chapitre:<id>' (chapitre ouvert, sa
-// pièce rare), 'quete:<id>' (quête réclamée qui en donne un), 'lieu:<id>' (lieu remarquable découvert).
-// openChapters : Set des chapitres ouverts. { chest, coins } ou { status, message } si refus
-async function openChest(userId, source, openChapters, now = Date.now()) {
-    const [kind, id] = source.split(':');
-    const chapter = kind === 'chapitre' ? loot.CHAPTER_RARES[id] : null;
-    const quest = kind === 'quete' ? QUEST_CHESTS.find(q => q.id === id) : null;
-    const place = kind === 'lieu' && Object.hasOwn(landmarks.LANDMARK_BY_ID, id) ? landmarks.LANDMARK_BY_ID[id] : null;
-    if (!['jour', 'bouteille'].includes(source) && !chapter && !quest && !place) return { status: 404, message: 'Coffre inconnu.' };
-    if (chapter && !openChapters.has(id)) return { status: 403, message: `Ouvre d’abord le chapitre ${id} du Grimoire.` };
-    await migrate(userId);
-    return db.transaction(async conn => {
-        await stockOf(userId, conn, true);
-        const { day, slot, opened } = await openedOf(userId, now, conn);
-        if (quest && !(await claimedOf(userId, conn)).has(quest.id)) return db.rollback({ status: 403, message: 'Réclame d’abord cette quête de Brume.' });
-        if (place && !(await foundOf(userId, conn)).has(place.id)) return db.rollback({ status: 403, message: 'Découvre d’abord ce lieu sur l’île.' });
-        const chest = await grantSource(userId, source, { day, slot, opened }, conn);
-        if (!chest) return db.rollback({ status: 409, message: source === 'bouteille' ? 'La prochaine bouteille n’est pas encore arrivée.' : 'Ce coffre est déjà ouvert.' });
-        return { chest, coins: await balanceOf(userId, conn) };
-    });
-}
-
-// Tire et donne le coffre d'une source déjà validée ('jour', 'bouteille', 'chapitre:<id>', 'quete:<id>', 'lieu:<id>'),
-// dans la transaction : sa clé et sa rareté selon le jour, la tranche et la série. null s'il est déjà ouvert
-function grantSource(userId, source, { day, slot, opened }, conn) {
-    if (source === 'jour') {
-        const streak = streakOf(opened, day);
-        return grant(userId, `jour:${day}`, loot.dailyRarity(streak), conn, { streak });
-    }
-    if (source === 'bouteille') return bottleOf(userId, `bouteille:${day}-${slot}`, conn);
-    const [kind, id] = source.split(':');
-    if (kind === 'lieu') return grant(userId, source, landmarks.LANDMARK_BY_ID[id].chest, conn);
-    const chapter = kind === 'chapitre' ? loot.CHAPTER_RARES[id] : null;
-    return grant(userId, source, chapter ? 'legendaire' : QUEST_CHESTS.find(q => q.id === id).chest, conn, { wanted: chapter });
-}
-
-// Une bouteille à la mer : la première ouverte pendant un acte porte son mot d'histoire (story : l'acte)
-async function bottleOf(userId, source, conn) {
-    const { next } = await helianeOfUser(userId, conn);
-    const chest = await grant(userId, source, loot.rarityOf(loot.BOTTLE.odds, random), conn);
-    return chest && next ? { ...chest, story: next } : chest;
-}
-
-// « Tout ouvrir » : tout ce qui attend (coffre du jour, chapitres ouverts, quêtes réclamées, lieux découverts, bouteille), dans une seule
-// transaction. La liste est celle que montre la vue, établie ici sous verrou, jamais reçue du client.
-// { chests, coins } ou { status, message } s'il n'y a rien à ouvrir
-async function openAll(userId, openChapters, now = Date.now()) {
-    await migrate(userId);
-    return db.transaction(async conn => {
-        await stockOf(userId, conn, true);
-        const state = await openedOf(userId, now, conn);
-        const { daily, pending, bottle } = chestsView(state, openChapters, await claimedOf(userId, conn), new Set((await foundOf(userId, conn)).keys()));
-        const sources = [...(daily.available ? ['jour'] : []), ...pending.map(c => c.source), ...(bottle.available ? ['bouteille'] : [])];
-        const chests = [];
-        for (const source of sources) {
-            const chest = await grantSource(userId, source, state, conn);
-            if (chest) chests.push(chest);
-        }
-        if (!chests.length) return db.rollback({ status: 409, message: 'Aucun coffre à ouvrir.' });
-        return { chests, coins: await balanceOf(userId, conn) };
-    });
 }
 
 // Annexe posée sur cette case (ligne verrouillée), ou null
