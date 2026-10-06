@@ -513,6 +513,23 @@ test('créations d’île : assembler (pièces vérifiées), payer à la réussi
   assert.equal((await make('banc')).status, 200);
   assert.equal((await place('banc', X(32), Y(35))).status, 400);
   assert.equal((await place('banc', X(29), Y(31))).status, 200);
+  // Le Banc compte sur la Lanterne : ni rangée ni éloignée tant qu'il est là ; à 2 cases de lui, elle peut bouger
+  const lamp = { x: X(28), y: Y(31) };
+  const bench = { x: X(29), y: Y(31) };
+  const far = s => Math.max(Math.abs(s.x - bench.x), Math.abs(s.y - bench.y));
+  const lampSpots = cat(await view(), 'lanterne').spots;
+  const away = lampSpots.find(s => far(s) > 2);
+  const close = lampSpots.find(s => far(s) <= 2);
+  assert.ok(away && close, 'cases de Lanterne loin du Banc et près de lui');
+  const kept = await api('POST', '/play/world/craft/store', lamp, player);
+  assert.deepEqual([kept.status, kept.data.message], [409, '« Banc » a besoin de « Lanterne » à 2 cases au plus : déplace ou range d’abord « Banc ».']);
+  assert.equal((await api('POST', '/play/world/craft/move', { ...lamp, toX: away.x, toY: away.y }, player)).status, 409);
+  const move = (from, to) => api('POST', '/play/world/craft/move', { ...from, toX: to.x, toY: to.y }, player).then(r => r.status);
+  assert.deepEqual([await move(lamp, close), await move(close, lamp)], [200, 200]);
+  // Le Banc rangé, la Lanterne est libre ; puis tout reprend sa place
+  assert.equal((await api('POST', '/play/world/craft/store', bench, player)).status, 200);
+  assert.deepEqual([await move(lamp, away), await move(away, lamp)], [200, 200]);
+  assert.equal((await place('banc', bench.x, bench.y)).status, 200);
   // Les créations comptent pour les quêtes de Brume (la quête « deco » du prologue) ; entrées invalides ; compte requis
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'soupe')`, [player.userId]);
   assert.deepEqual([(await view()).brume.quest.id, (await view()).brume.quest.done], ['deco', true]);
