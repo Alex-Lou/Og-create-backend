@@ -1,6 +1,7 @@
 // Démarre le vrai serveur sur une base de test et fournit de quoi l'interroger.
 // Variables attendues : DATABASE_URL (ou DB_*), JWT_SECRET ; la base doit avoir reçu `npm run db:setup`.
 const { spawn } = require('node:child_process');
+const net = require('node:net');
 const path = require('node:path');
 const { Client } = require('pg');
 const crypto = require('node:crypto');
@@ -8,15 +9,29 @@ const crypto = require('node:crypto');
 // Mots de passe de test tirés au hasard à chaque exécution : aucun secret écrit en dur dans le dépôt
 const randomPassword = () => crypto.randomBytes(18).toString('base64url');
 
-// Un port par fichier de tests (node --test lance les fichiers en parallèle, chacun dans son processus)
-const PORT = process.env.TEST_PORT || 3900 + (process.pid % 90);
-const BASE = `http://127.0.0.1:${PORT}/api`;
+// Un port par fichier de tests (node --test lance les fichiers en parallèle, chacun dans son processus) : un port libre
+// demandé au système au démarrage du serveur (TEST_PORT l'impose). Un port tiré du numéro de processus pouvait être
+// celui d'un autre fichier, ou d'un serveur d'une exécution précédente pas encore éteint
+let BASE = null;
+function freePort() {
+  return new Promise((resolve, reject) => {
+    const probe = net.createServer();
+    probe.unref();
+    probe.on('error', reject);
+    probe.listen(0, '127.0.0.1', () => {
+      const { port } = probe.address();
+      probe.close(() => resolve(port));
+    });
+  });
+}
 
-function startServer() {
+async function startServer() {
+  const port = process.env.TEST_PORT || await freePort();
+  BASE = `http://127.0.0.1:${port}/api`;
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [path.join(__dirname, '..', 'src', 'server.js')], {
       // Fenêtre de tolérance des rafraîchissements concurrents à 0 : la réutilisation d'un jeton se teste sans attendre
-      env: { ...process.env, PORT: String(PORT), NODE_ENV: 'test', LOG_LEVEL: 'error', AUTH_RACE_SECONDS: '0', REGISTER_RATE_LIMIT: '200' },
+      env: { ...process.env, PORT: String(port), NODE_ENV: 'test', LOG_LEVEL: 'error', AUTH_RACE_SECONDS: '0', REGISTER_RATE_LIMIT: '200' },
       stdio: ['ignore', 'pipe', 'pipe']
     });
     let output = '';
