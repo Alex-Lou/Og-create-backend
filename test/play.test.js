@@ -1331,9 +1331,17 @@ test('Savoirs des maîtres : un indice par jour en bavardant, la famille puis l�
   assert.equal(gift.data.savoir, undefined);
 });
 
-test('Anya : la Révélation une seule fois, le Souffle une fois par jour, la Bénédiction (bible, § 6.14)', async () => {
-  const { CORE, LANDS } = require('../src/services/anya');
-  const player = await newPlayer();
+test('Anya : la Révélation une seule fois, le Souffle une fois par passage, la Bénédiction (bible, § 6.14, v6)', async () => {
+  const anyaRules = require('../src/services/anya');
+  const { CORE } = anyaRules;
+  const loot = require('../src/services/loot');
+  const world = require('../src/services/world');
+  // Anya passe deux ou trois jours par semaine, tirés du joueur : un joueur qu'elle visite aujourd'hui (un sur trois en
+  // moyenne ; vingt essais au plus)
+  const today = loot.parisOf(Date.now()).day;
+  let player = await newPlayer();
+  for (let i = 0; i < 20 && !anyaRules.visitsOn(player.userId, today); i++) player = await newPlayer();
+  assert.ok(anyaRules.visitsOn(player.userId, today), 'aucun joueur qu’Anya visite aujourd’hui');
   const talk = (body = {}) => api('POST', '/play/world/villager/talk', { villager: 'anya', ...body }, player);
   const reveal = () => api('POST', '/play/world/anya/reveal', {}, player);
   const view = async () => (await api('GET', '/play/world', null, player)).data;
@@ -1341,15 +1349,14 @@ test('Anya : la Révélation une seule fois, le Souffle une fois par jour, la B�
   await sql(`INSERT INTO world_needs (user_id, villager, need, filled_at) VALUES ($1, 'foyer', 'manger', NOW() - INTERVAL '30 days')
              ON CONFLICT (user_id, villager, need) DO UPDATE SET filled_at = EXCLUDED.filled_at`, [player.userId]);
   const asleep = await view();
-  assert.deepEqual(asleep.anya, { traces: [], awake: false, revealed: false, breathed: false });
+  assert.deepEqual(asleep.anya, { traces: [], awake: false, revealed: false, visit: null, breathed: false });
   assert.equal(asleep.villagers.find(v => v.id === 'foyer').mood, 'triste');
   assert.equal((await talk()).status, 403);
   assert.equal((await reveal()).status, 403);
-  // Les douze terres explorées et les neuf quartiers du cœur à soi : elle s'éveille
-  for (const [k, zone] of LANDS.entries()) await sql(`INSERT INTO world_expeditions (user_id, zone, ends_at) VALUES ($1, $2, NOW() - make_interval(hours => $3))`, [player.userId, zone, 30 - k]);
+  // Le cœur de l'île libéré (les neuf quartiers, sans aucune terre lointaine) : elle s'éveille, les huit traces sont là
   for (const zone of CORE) await sql('INSERT INTO world_zones (user_id, zone) VALUES ($1, $2) ON CONFLICT DO NOTHING', [player.userId, zone]);
   const awake = (await view()).anya;
-  assert.deepEqual([awake.traces, awake.awake, awake.revealed], [LANDS, true, false]);
+  assert.deepEqual([awake.traces, awake.awake, awake.revealed, awake.visit], [[1, 2, 3, 4, 5, 6, 7, 8], true, false, null]);
   // Pas de Souffle avant la Révélation (et la tenter ne la marque pas comme vue)
   assert.equal((await talk()).status, 403);
   assert.equal((await view()).anya.revealed, false);
@@ -1359,6 +1366,16 @@ test('Anya : la Révélation une seule fois, le Souffle une fois par jour, la B�
   assert.equal(seen.data.anya.revealed, true);
   assert.equal((await reveal()).data.anya.revealed, true);
   assert.equal((await api('GET', '/play/world/brume', null, player)).data.anya.revealed, true);
+  // Révélée, elle erre : aujourd'hui, elle passe à l'aube ou au crépuscule, sur une case de l'île à soi
+  const { visit } = (await view()).anya;
+  assert.ok(anyaRules.SLOTS.includes(visit.slot));
+  assert.ok(new Set(['coeur', ...CORE]).has(require('../src/services/worldMap').zoneAt(visit.x, visit.y)));
+  // Un jour sans passage (cette semaine) : ni Anya, ni Souffle
+  const { monday } = anyaRules.weekOf(today);
+  const away = [0, 1, 2, 3, 4, 5, 6].find(rank => !anyaRules.visitsOf(player.userId, monday).some(v => v.rank === rank));
+  const awayNoon = Date.parse(`${monday}T10:00:00Z`) + away * 24 * 3600 * 1000;
+  assert.equal((await world.anyaOf(player.userId, undefined, awayNoon)).visit, null);
+  assert.deepEqual(await world.breatheAnya(player.userId, awayNoon), { status: 409, message: 'Anya n’est pas là : elle passe à l’aube ou au crépuscule, certains jours.' });
   // Aucune page à souffler (toutes déjà connues de l'appareil) : rien n'est compté
   // (les pages à portée, calculées comme la route : éléments, essais ratés, compte d'avant la bible, fil d'Ariane)
   const book = await require('../src/services/recipeBook').load();
@@ -1373,7 +1390,7 @@ test('Anya : la Révélation une seule fois, le Souffle une fois par jour, la B�
   assert.ok(reach.length > 0);
   const nothing = await talk({ known: reach });
   assert.deepEqual([nothing.status, nothing.data.savoir, nothing.data.world.anya.breathed], [200, null, false]);
-  // Le Souffle : un ingrédient, une fois par jour
+  // Le Souffle : un ingrédient, une fois par passage
   const breath = await talk();
   assert.equal(breath.status, 200);
   assert.equal(typeof breath.data.savoir.ingredient, 'string');
@@ -1385,13 +1402,15 @@ test('Anya : la Révélation une seule fois, le Souffle une fois par jour, la B�
   // pour que les cinq transactions se chevauchent vraiment
   await sql(`UPDATE world_friends SET talked_on = NULL WHERE user_id = $1 AND villager = 'anya'`, [player.userId]);
   await Promise.all([1, 2, 3, 4, 5].map(() => require('../src/config/db').query('SELECT pg_sleep(0.05)')));
-  const race = await Promise.all([1, 2, 3, 4, 5].map(() => require('../src/services/world').breatheAnya(player.userId)));
+  const race = await Promise.all([1, 2, 3, 4, 5].map(() => world.breatheAnya(player.userId)));
   assert.deepEqual(race.map(r => r.status || 200).sort(), [200, 409, 409, 409, 409]);
   // Sa ligne n'est pas une habitante : pas de cœur, pas d'amitié
   const after = await view();
   assert.equal(after.villagers.some(v => v.id === 'anya'), false);
-  // La Bénédiction : un gisement ramassé il y a 4 h 1 min a déjà repoussé
-  const deposit = after.deposits[0];
+  // La Bénédiction : un gisement ramassé il y a 4 h 1 min a déjà repoussé (les gisements sont dans les terres lointaines :
+  // celle du premier est découverte, son expédition revenue)
+  await sql(`INSERT INTO world_expeditions (user_id, zone, ends_at) VALUES ($1, $2, NOW() - INTERVAL '1 hour')`, [player.userId, require('../src/services/finds').DEPOSITS[0].zone]);
+  const deposit = (await view()).deposits[0];
   await sql(`INSERT INTO world_deposits (user_id, deposit, gathered_at) VALUES ($1, $2, NOW() - INTERVAL '4 hours 1 minute')`, [player.userId, deposit.id]);
   assert.equal((await view()).deposits.find(d => d.id === deposit.id).readyIn, 0);
   // Cannelle a toujours faim, mais ne descend plus sous « content »
