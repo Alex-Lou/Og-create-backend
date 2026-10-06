@@ -12,7 +12,7 @@ const players = require('../players');
 const anya = require('../anya');
 const { RESOURCES, WORDS, SITES } = require('./rules');
 const {
-    needRowsOf, settlersOf, levelsOf, stockOf, zonesOf, claimedOf, exploredOf, craftsOf, placedOf, balanceOf
+    needRowsOf, settlersOf, levelsOf, stockOf, zonesOf, claimedOf, craftsOf, placedOf, balanceOf
 } = require('./reads');
 const { migrate } = require('./migrate');
 const { grant } = require('./chests');
@@ -41,10 +41,10 @@ function metOf(id, levels, zones, presence) {
     if (id === 'atelier') return presence.done.has('soupe');
     return zones.has(map.siteZone(id));
 }
-// Ce qu'il faut pour savoir qui est là : compte d'avant la bible, quêtes faites ; et la Bénédiction d'Anya (toute l'île
-// principale découverte : l'humeur ne descend plus sous « content »)
-async function presenceOf(userId, conn = db, now = Date.now()) {
-    const blessed = anya.stateOf(await zonesOf(userId, conn), await exploredOf(userId, conn, now)).awake;
+// Ce qu'il faut pour savoir qui est là : compte d'avant la bible, quêtes faites ; et la Bénédiction d'Anya (le cœur de
+// l'île libéré : l'humeur ne descend plus sous « content »)
+async function presenceOf(userId, conn = db) {
+    const blessed = anya.awakeOf(await zonesOf(userId, conn));
     return { veteran: await players.veteranOf(userId, conn), done: quests.doneOf(await claimedOf(userId, conn)), blessed };
 }
 // Habitants de l'île : la troupe rencontrée (built : son bâtiment est bâti, dans un quartier à soi), puis les

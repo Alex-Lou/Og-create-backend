@@ -38,7 +38,7 @@ const {
     visitorNow, visitorView, befriend, fillNeeds, satisfyVisitor, settleVisitor
 } = require('./world/people');
 const { bonusesFor, gather, collect } = require('./world/produce');
-const { anyaOf, brumeSavoirOf, talkBrume, revealAnya, breatheAnya } = require('./world/anyaBrume');
+const { anyaOf, breathRefused, brumeSavoirOf, talkBrume, revealAnya, breatheAnya } = require('./world/anyaBrume');
 const {
     isKnown, expeditionCost, expeditionOf, startExpedition, findLandmark, craftBonusOf, gatherDeposit
 } = require('./world/lands');
@@ -673,5 +673,5 @@ module.exports = {
     view, build, buyZone, buyItem, undoItem, chooseSkin, startRun, finishRun, collect, migrate, claimQuest, board, openChest, openAll,
     placeAnnex, moveAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople, namePlayer, arianeTargets,
     refundDecorations, startCraft, finishCraft, placeCraft, moveCraft, storeCraft, startExpedition, findLandmark, gatherDeposit,
-    anyaOf, revealAnya, breatheAnya, brumeSavoirOf, talkBrume
+    anyaOf, breathRefused, revealAnya, breatheAnya, brumeSavoirOf, talkBrume
 };

@@ -283,11 +283,10 @@ router.post('/world/villager/talk', withAccount(async (req, res, owner, b) => {
         }
         return res.json({ savoir, world: await worldView(owner, b) });
     }
-    // Anya, la Révélation vue : son Souffle n'est compté que s'il y a une page à souffler
+    // Anya, la Révélation vue, de passage : son Souffle n'est compté que s'il y a une page à souffler
     if (villager === anya.TARGET) {
-        const state = await world.anyaOf(owner.id);
-        if (!state.revealed) return res.status(403).json({ message: 'Anya dort encore.' });
-        if (state.breathed) return res.status(409).json({ message: 'Anya t’a déjà soufflé un Savoir aujourd’hui : reviens à l’aube ou au crépuscule de demain.' });
+        const refused = world.breathRefused(await world.anyaOf(owner.id));
+        if (refused) return res.status(refused.status).json({ message: refused.message });
         const inputs = await savoirInputs(owner, b);
         const savoir = bookPages.savoir(b, inputs.owned, bookPages.FAMILIES, { ...inputs, strong: true, known: pagesOf(req.body.known), heard: pagesOf(req.body.heard) });
         if (savoir) {
