@@ -13,7 +13,6 @@ const { failure } = require('../utils/failure');
 const router = express.Router();
 
 const isEmail = email => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-const isPassword = password => /^.{8,}$/.test(password);
 
 // Limites par adresse IP : essais de connexion (échecs compris) et créations de compte
 const TOO_MANY = 'Trop de tentatives, réessaie dans quelques minutes.';
@@ -43,7 +42,8 @@ router.post('/register', registerLimiter, async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ message: 'Email et mot de passe requis' });
     if (!isEmail(email)) return res.status(400).json({ message: 'Format d\'email invalide' });
-    if (!isPassword(password)) return res.status(400).json({ message: 'Mot de passe invalide. Doit contenir au moins 8 caractères' });
+    const problem = accounts.passwordProblem(password);
+    if (problem) return res.status(400).json({ message: problem });
     try {
         const user = await accounts.register(email, password);
         if (!user) return res.status(400).json({ message: 'Email ou username déjà utilisé' });

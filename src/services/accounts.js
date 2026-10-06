@@ -9,6 +9,16 @@ const DUMMY_HASH = bcrypt.hashSync(crypto.randomBytes(16).toString('hex'), BCRYP
 
 const hashPassword = password => bcrypt.hash(password, BCRYPT_COST);
 
+// Nouveau mot de passe : 8 caractères au moins, sur une ligne ; 72 octets au plus, car bcrypt ne lit que les 72
+// premiers (au-delà, la fin ne compterait pas). Les mots de passe déjà choisis ne changent pas. Ce qui ne va pas
+// (texte), ou null
+const PASSWORD_MAX_BYTES = 72;
+function passwordProblem(password) {
+    if (typeof password !== 'string' || !/^.{8,}$/.test(password)) return 'Le mot de passe doit contenir au moins 8 caractères.';
+    if (Buffer.byteLength(password, 'utf8') > PASSWORD_MAX_BYTES) return 'Mot de passe trop long : 72 caractères au plus (moins avec des accents ou des emojis).';
+    return null;
+}
+
 // Nom affiché : début de l'adresse et quatre chiffres
 const usernameFor = email => `${email.split('@')[0]}_${Math.floor(Math.random() * 9000) + 1000}`;
 
@@ -36,4 +46,4 @@ async function setPassword(userId, password, conn = db) {
     await conn.query('UPDATE users SET password_hash = $1 WHERE id = $2', [await hashPassword(password), userId]);
 }
 
-module.exports = { register, login, setPassword };
+module.exports = { passwordProblem, register, login, setPassword };

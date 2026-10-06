@@ -1,13 +1,13 @@
 // Mot de passe oublié (services/passwordReset.js) : la réponse ne dit jamais si l'adresse existe.
 const express = require('express');
 const passwordReset = require('../services/passwordReset');
+const { passwordProblem } = require('../services/accounts');
 const { limiter } = require('../middleware/rateLimit');
 const { isToken } = require('../utils/crypto');
 const { log } = require('../utils/logger');
 
 const router = express.Router();
 
-const MIN_PASSWORD_LENGTH = 8;
 const GENERIC_REPLY = { message: 'Si un compte existe pour cette adresse, un lien vient de lui être envoyé.' };
 const INVALID_LINK = { message: 'Lien invalide ou expiré' };
 
@@ -29,9 +29,8 @@ router.post('/forgot-password', tooMany(5), async (req, res) => {
 router.post('/reset-password', tooMany(10), async (req, res) => {
     const { token, password } = req.body;
     if (!isToken(token)) return res.status(400).json(INVALID_LINK);
-    if (typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH || password.length > 200) {
-        return res.status(400).json({ message: `Le mot de passe doit contenir au moins ${MIN_PASSWORD_LENGTH} caractères` });
-    }
+    const problem = passwordProblem(password);
+    if (problem) return res.status(400).json({ message: problem });
     try {
         if (!(await passwordReset.reset(token, password))) return res.status(400).json(INVALID_LINK);
         res.status(200).json({ message: 'Mot de passe changé. Tu peux te connecter.' });

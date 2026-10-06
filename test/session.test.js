@@ -20,6 +20,24 @@ test('la connexion pose des cookies httpOnly et ne renvoie aucun jeton', async (
   assert.ok(login.setCookies.some(line => /^oc_refresh=.*Path=\/api\/auth/i.test(line)));
 });
 
+test('un nouveau mot de passe : 8 caractères au moins, 72 octets au plus (bcrypt ne lit pas plus loin)', async () => {
+  const register = password => api('POST', '/auth/register', { email: `long-${Date.now()}-${Math.random()}@exemple.fr`, password });
+  const tooLong = /trop long : 72 caractères au plus/;
+  assert.equal((await register('court')).status, 400);
+  const long = await register('a'.repeat(73));
+  assert.deepEqual([long.status, tooLong.test(long.data.message)], [400, true]);
+  // 37 « é » font 74 octets ; 36, 72
+  assert.equal((await register('é'.repeat(37))).status, 400);
+  assert.equal((await register('é'.repeat(36))).status, 201);
+  assert.equal((await register('a'.repeat(72))).status, 201);
+  // Même règle pour un mot de passe oublié (vérifiée avant le lien)
+  const reset = password => api('POST', '/auth/reset-password', { token: 'a'.repeat(64), password });
+  const longReset = await reset('a'.repeat(73));
+  assert.deepEqual([longReset.status, tooLong.test(longReset.data.message)], [400, true]);
+  assert.match((await reset('court')).data.message, /au moins 8 caractères/);
+  assert.match((await reset('a'.repeat(72))).data.message, /Lien invalide/);
+});
+
 test('un mauvais mot de passe et une adresse inconnue répondent pareil', async () => {
   const player = await newPlayer();
   const guess = randomPassword();
