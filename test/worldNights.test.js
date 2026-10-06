@@ -22,14 +22,15 @@ const settle = (userId, now) => db.transaction(async conn => worldNights.settleN
 const view = (userId, now) => worldNights.nightsView(userId, db, now);
 const blightsOf = async userId => (await sql('SELECT blights FROM world_nights WHERE user_id = $1', [userId]))[0].blights;
 
-// Une île : la Grève et la Source, le Puits bâti ; sans défense posée ; ses habitants sans besoin comblé (aucun
-// camarade content)
+// Une île : la Grève et la Source, le Puits bâti ; sans défense posée ; ses habitants tristes, sans repas depuis un mois
+// (aucun camarade content : un habitant sans ligne de besoins arrive comblé, donc content)
 const ISLAND = { owned: new Set(['coeur', 'source']), sites: [{ id: 'foyer', level: 1 }, { id: 'puits', level: 1 }], acts: 0 };
 const FIRE = nights.defenseOf([], { foyer: 1 });
 async function islandPlayer() {
   const player = await newPlayer();
   await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'source')`, [player.userId]);
   await sql(`INSERT INTO world_buildings (user_id, site, level, built_at) VALUES ($1, 'puits', 1, NOW() - INTERVAL '30 days')`, [player.userId]);
+  await sql(`INSERT INTO world_needs (user_id, villager, need, filled_at) VALUES ($1, 'puits', 'manger', NOW() - INTERVAL '30 days'), ($1, 'foyer', 'manger', NOW() - INTERVAL '30 days')`, [player.userId]);
   return player;
 }
 // La première nuit, dès from, où pick(plan) est vrai (le plan tiré de la graine du joueur)
@@ -104,8 +105,8 @@ test('un camarade content repousse un égaré par nuit', async () => {
   const helped = p => JSON.stringify(nights.outcomeOf(p, FIRE).panne) !== JSON.stringify(nights.outcomeOf(p, FIRE, new Set(['puits'])).panne);
   const { plan, start, end } = nightWhere(id, Date.now() + 2 * DAY, helped);
   await startBefore(id, start);
-  // L'habitant du Puits a mangé et travaillé (deux besoins sur trois) : il est content au matin
-  await sql(`INSERT INTO world_needs (user_id, villager, need, filled_at) VALUES ($1, 'puits', 'manger', $2), ($1, 'puits', 'outils', $2)`, [id, iso(end)]);
+  // L'habitant du Puits a mangé (il ne lui manque que ses décorations) : il est content au matin
+  await sql(`UPDATE world_needs SET filled_at = $2 WHERE user_id = $1 AND villager = 'puits' AND need = 'manger'`, [id, iso(end)]);
   const expected = nights.outcomeOf(plan, FIRE, new Set(['puits']));
   const evening = await view(id, start - HOUR);
   assert.ok(evening.creatures.some(c => c.end === 'camarade'));

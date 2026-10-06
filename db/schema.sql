@@ -454,6 +454,15 @@ CREATE TABLE IF NOT EXISTS world_nights (
     blights JSONB NOT NULL DEFAULT '[]',
     repelled JSONB NOT NULL DEFAULT '{}'
 );
+-- Les bêtes de ferme (v6, § 6.16 ; services/beasts.js et world/beasts.js) : une ligne par bête nourrie au moins une
+-- fois. fed_at : son dernier repas (contente un jour) ; collected_at : jusqu'où sa bulle de nourriture a été ramassée
+CREATE TABLE IF NOT EXISTS world_beasts (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    beast VARCHAR(20) NOT NULL,
+    fed_at TIMESTAMPTZ NOT NULL,
+    collected_at TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (user_id, beast)
+);
 -- Besoins des habitants (services/villagers.js) : dernière fois que chacun a été comblé ('manger', 'outils'). La ligne
 -- naît quand l'habitant arrive (il arrive comblé) ; se distraire se lit sur l'île (décorations), sans ligne.
 CREATE TABLE IF NOT EXISTS world_needs (
