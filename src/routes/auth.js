@@ -56,6 +56,43 @@ router.post('/register', registerLimiter, async (req, res) => {
     }
 });
 
+// Compte provisoire (bible v6, § 9 ; V20) : créé en coulisse quand l'île sert au tutoriel, avant le compte. Ni adresse
+// ni mot de passe connus : seule la session de l'appareil l'ouvre. Le carnet invité le rejoint.
+router.post('/provisional', registerLimiter, async (req, res) => {
+    if (authSession.verifyAccess(req)) return res.status(409).json({ message: 'Tu as déjà un compte.' });
+    try {
+        await accounts.sweepProvisional();
+        const user = await accounts.registerProvisional();
+        const session = await authSession.issue(res, user);
+        await adoptGuest(req, res, session.userId);
+        log('info', 'Compte provisoire créé', { userId: session.userId });
+        res.status(201).json({ ...session, provisional: true });
+    } catch (error) {
+        failure(res, 'Erreur lors de la création du compte', error);
+    }
+});
+
+// Signer la page de garde (étape 6) : le compte provisoire prend l'adresse et le mot de passe du joueur, une fois
+router.post('/claim', registerLimiter, authMiddleware, async (req, res) => {
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ message: 'Email et mot de passe requis' });
+    if (!isEmail(email) || email.length > 255 || accounts.isProvisional(email)) return res.status(400).json({ message: 'Format d\'email invalide' });
+    const problem = accounts.passwordProblem(password);
+    if (problem) return res.status(400).json({ message: problem });
+    try {
+        const done = await accounts.claim(req.user.id, email, password);
+        if (done.status) return res.status(done.status).json({ message: done.message });
+        // Le nom du compte change avec l'adresse : une session neuve le porte
+        const session = await authSession.issue(res, done.user);
+        log('info', 'Compte provisoire signé', { userId: session.userId });
+        res.status(200).json({ message: 'Compte créé avec succès', ...session, provisional: false });
+    } catch (error) {
+        // Deux signatures en même temps avec la même adresse : la seconde bute sur l'unicité
+        if (error.code === '23505') return res.status(400).json({ message: 'Email ou username déjà utilisé' });
+        failure(res, 'Erreur lors de la création du compte', error);
+    }
+});
+
 router.post('/login', loginLimiter, accountLimiter, async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ message: 'Email et mot de passe requis' });
@@ -84,8 +121,12 @@ router.post('/refresh', refreshLimiter, async (req, res) => {
 });
 
 // Qui suis-je : l'interface vérifie ainsi qu'une session est valable
-router.get('/me', authMiddleware, (req, res) => {
-    res.status(200).json({ userId: req.user.id, username: req.user.username });
+router.get('/me', authMiddleware, async (req, res) => {
+    try {
+        res.status(200).json({ userId: req.user.id, username: req.user.username, provisional: await accounts.provisionalOf(req.user.id) });
+    } catch (error) {
+        failure(res, 'Erreur lors de la vérification de session', error);
+    }
 });
 
 // Déconnexion : la session du cookie présenté est révoquée, les cookies effacés

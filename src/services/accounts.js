@@ -46,4 +46,55 @@ async function setPassword(userId, password, conn = db) {
     await conn.query('UPDATE users SET password_hash = $1 WHERE id = $2', [await hashPassword(password), userId]);
 }
 
-module.exports = { passwordProblem, register, login, setPassword };
+// Compte provisoire (bible v6, § 9 ; V20) : le tutoriel ouvre l'île avant le compte. Son adresse est réservée et ne
+// mène nulle part (« .invalid », RFC 2606) ; son mot de passe, tiré au hasard, n'est connu de personne : seule la
+// session de l'appareil l'ouvre. Signer la page de garde (claim) y met la vraie adresse et le vrai mot de passe.
+const PROVISIONAL_DOMAIN = 'provisoire.invalid';
+const isProvisional = email => typeof email === 'string' && email.endsWith(`@${PROVISIONAL_DOMAIN}`);
+async function registerProvisional() {
+    const tag = crypto.randomBytes(8).toString('hex');
+    const { rows } = await db.query(
+        'INSERT INTO users (email, password_hash, username, created_at) VALUES ($1, $2, $3, NOW()) RETURNING id, email, username',
+        [`naufrage-${tag}@${PROVISIONAL_DOMAIN}`, await hashPassword(crypto.randomBytes(24).toString('hex')), `naufrage_${tag}`]);
+    return rows[0];
+}
+async function provisionalOf(userId) {
+    const { rows } = await db.query('SELECT email FROM users WHERE id = $1', [userId]);
+    return rows.length > 0 && isProvisional(rows[0].email);
+}
+
+// Signer : le compte provisoire prend l'adresse et le mot de passe du joueur (une seule fois). { user }, ou
+// { status, message } si le compte n'est pas provisoire ou si l'adresse est prise
+async function claim(userId, email, password) {
+    return db.transaction(async conn => {
+        const { rows } = await conn.query('SELECT email FROM users WHERE id = $1 FOR UPDATE', [userId]);
+        if (!rows.length) return db.rollback({ status: 404, message: 'Compte introuvable.' });
+        if (!isProvisional(rows[0].email)) return db.rollback({ status: 409, message: 'Ce compte a déjà son adresse.' });
+        const username = usernameFor(email);
+        const taken = await conn.query('SELECT 1 FROM users WHERE (LOWER(email) = LOWER($1) OR username = $2) AND id <> $3', [email, username, userId]);
+        if (taken.rows.length) return db.rollback({ status: 400, message: 'Email ou username déjà utilisé' });
+        const updated = await conn.query(
+            'UPDATE users SET email = $1, password_hash = $2, username = $3 WHERE id = $4 RETURNING id, email, username',
+            [email, await hashPassword(password), username, userId]);
+        return { user: updated.rows[0] };
+    });
+}
+
+// Les comptes provisoires abandonnés (aucune session depuis PROVISIONAL_DAYS jours) s'effacent, avec tout ce qui va
+// avec (île, carnet : ON DELETE CASCADE). Au plus une fois par heure, sauf si force ; renvoie le nombre de comptes effacés
+const PROVISIONAL_DAYS = 30;
+let sweptAt = 0;
+async function sweepProvisional({ force = false, now = Date.now() } = {}) {
+    if (!force && now - sweptAt < 3600 * 1000) return 0;
+    sweptAt = now;
+    const { rowCount } = await db.query(
+        `DELETE FROM users u WHERE u.email LIKE $1 AND u.created_at < NOW() - make_interval(days => $2)
+           AND NOT EXISTS (SELECT 1 FROM auth_sessions s WHERE s.user_id = u.id AND s.created_at > NOW() - make_interval(days => $2))`,
+        [`%@${PROVISIONAL_DOMAIN}`, PROVISIONAL_DAYS]);
+    return rowCount;
+}
+
+module.exports = {
+    passwordProblem, register, login, setPassword,
+    PROVISIONAL_DAYS, isProvisional, registerProvisional, provisionalOf, claim, sweepProvisional
+};

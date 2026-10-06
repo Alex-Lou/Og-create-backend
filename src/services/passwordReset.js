@@ -14,7 +14,8 @@ const APP_URL = (process.env.APP_URL || 'https://og-create.onrender.com').replac
 // Envoie un lien si un compte existe pour cette adresse (l'appelant répond pareil dans tous les cas)
 async function request(email) {
     const { rows } = await db.query('SELECT id, email FROM users WHERE LOWER(email) = LOWER($1)', [email]);
-    if (!rows.length) return;
+    // Un compte provisoire n'a pas de vraie adresse : aucun lien ne part
+    if (!rows.length || accounts.isProvisional(rows[0].email)) return;
     const user = rows[0];
     const token = newToken();
     // Un seul lien valable à la fois : les précédents sont annulés
