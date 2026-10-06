@@ -1280,6 +1280,32 @@ test('Anya : la Révélation une seule fois, le Souffle une fois par jour, la B�
   assert.equal((await view()).villagers.find(v => v.id === 'foyer').mood, 'content');
 });
 
+test('le Savoir de Brume : après le Phare, un indice par jour sur les Légendes (bible, § 6.4)', async () => {
+  const book = await require('../src/services/recipeBook').load();
+  const talk = (player, body = {}) => api('POST', '/play/world/villager/talk', { villager: 'brume', ...body }, player);
+  const player = await newPlayer();
+  // Avant le Phare : elle garde son Savoir
+  assert.equal((await talk(player)).status, 403);
+  assert.deepEqual((await api('GET', '/play/world', null, player)).data.brumeSavoir, { open: false, talked: false });
+  // Le Phare allumé, mais aucune page des Légendes à portée : rien n'est soufflé, rien n'est compté
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'phare-brume')`, [player.userId]);
+  const empty = await talk(player);
+  assert.deepEqual([empty.status, empty.data.savoir, empty.data.world.brumeSavoir], [200, null, { open: true, talked: false }]);
+  // Le chapitre VII ouvert, une Légende à portée : un ingrédient, une fois par jour
+  const legend = book.entries.find(([parts, result]) => book.meta.get(result)?.family === 'Légendes' && parts.every(part => book.meta.has(part)));
+  const fillers = [...book.meta.keys()].filter(name => book.meta.get(name).family !== 'Légendes').slice(0, 90);
+  const owned = [...new Set(['Eau', 'Feu', 'Terre', 'Air', ...legend[0], ...fillers])].filter(name => name !== legend[1]);
+  await sql('UPDATE progress SET infinite_elements = $2::jsonb WHERE user_id = $1', [player.userId, JSON.stringify(owned)]);
+  const hint = await talk(player);
+  assert.equal(hint.status, 200);
+  assert.equal(hint.data.savoir.chapter, 'VII');
+  assert.equal(typeof hint.data.savoir.ingredient, 'string');
+  assert.deepEqual(hint.data.world.brumeSavoir, { open: true, talked: true });
+  assert.equal((await talk(player)).status, 409);
+  // Sa ligne n'en fait pas une habitante
+  assert.equal(hint.data.world.villagers.some(v => v.id === 'brume'), false);
+});
+
 test('besoins des habitants : manger, travailler, se distraire ; l’humeur change la production', async () => {
   const player = await newPlayer();
   const view = async () => (await api('GET', '/play/world', null, player)).data;

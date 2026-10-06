@@ -267,6 +267,19 @@ async function savoirInputs(owner, b) {
 router.post('/world/villager/talk', withAccount(async (req, res, owner, b) => {
     const villager = String(req.body.villager || '');
     if (!/^[a-z0-9]{1,20}$/.test(villager)) return res.status(400).json({ message: 'Habitant invalide' });
+    // Brume, une fois le Phare allumé : un indice par jour sur les Légendes (rien n'est compté s'il n'y a pas de page)
+    if (villager === 'brume') {
+        const state = await world.brumeSavoirOf(owner.id);
+        if (!state.open) return res.status(403).json({ message: 'Brume garde son Savoir pour la fin : allume d’abord le Phare.' });
+        if (state.talked) return res.status(409).json({ message: 'Brume t’a déjà soufflé un Savoir aujourd’hui.' });
+        const inputs = await savoirInputs(owner, b);
+        const savoir = bookPages.savoir(b, inputs.owned, ['Légendes'], { ...inputs, strong: true, known: pagesOf(req.body.known), heard: pagesOf(req.body.heard) });
+        if (savoir) {
+            const done = await world.talkBrume(owner.id);
+            if (done.status) return res.status(done.status).json({ message: done.message });
+        }
+        return res.json({ savoir, world: await worldView(owner, b) });
+    }
     if (villager === anya.TARGET) {
         const inputs = await savoirInputs(owner, b);
         const done = await world.breatheAnya(owner.id);
