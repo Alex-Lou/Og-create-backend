@@ -106,6 +106,11 @@ async function depositsOf(userId, conn = db) {
     const { rows } = await conn.query('SELECT deposit, gathered_at FROM world_deposits WHERE user_id = $1', [userId]);
     return new Map(rows.map(r => [r.deposit, r.gathered_at]));
 }
+// Bâtiments embrumés par les égarés (world/nights.js) : [{ site, since, until }] (until : null tant qu'il n'est pas réparé)
+async function blightsOf(userId, conn = db) {
+    const { rows } = await conn.query('SELECT blights FROM world_nights WHERE user_id = $1', [userId]);
+    return rows[0]?.blights || [];
+}
 // Lieux remarquables découverts : Map identifiant → date de la découverte
 async function foundOf(userId, conn = db) {
     const { rows } = await conn.query('SELECT landmark, found_at FROM world_landmarks WHERE user_id = $1', [userId]);
@@ -167,6 +172,6 @@ async function balanceOf(userId, conn) {
 
 module.exports = {
     itemsOf, skinsOf, signsOf, namesOf, friendsOf, needRowsOf, settlersOf, gamesOf, annexesOf, levelsOf, stockOf,
-    tilesOf, zonesOf, findsOf, spendFinds, depositsOf, foundOf, claimedOf, helianeOfUser, runsOf, countOf,
+    tilesOf, zonesOf, findsOf, spendFinds, depositsOf, blightsOf, foundOf, claimedOf, helianeOfUser, runsOf, countOf,
     discoveredOf, exploredOf, craftsOf, placedOf, madeOf, addStock, balanceOf
 };

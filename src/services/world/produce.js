@@ -7,10 +7,10 @@ const annexes = require('../annexes');
 const landmarks = require('../landmarks');
 const { RESOURCES, productionAll } = require('./rules');
 const {
-    itemsOf, needRowsOf, settlersOf, annexesOf, levelsOf, stockOf, zonesOf, foundOf, craftsOf, placedOf
+    itemsOf, needRowsOf, settlersOf, annexesOf, levelsOf, stockOf, zonesOf, foundOf, craftsOf, placedOf, blightsOf
 } = require('./reads');
 const { migrate } = require('./migrate');
-const { presenceOf, withMoods, withLandmarks, residentsOf, moodsOf, prodSteps, sameSteps } = require('./people');
+const { presenceOf, withMoods, withLandmarks, withBlights, residentsOf, moodsOf, prodSteps, sameSteps } = require('./people');
 
 // Ce dont dépend la production : bâtiments, île (quartiers, habitants, créations posées, besoins), bonus de la
 // boutique et des annexes, lieux découverts
@@ -19,17 +19,18 @@ async function sourcesOf(userId, conn) {
     const zones = await zonesOf(userId, conn);
     const island = {
         levels, zones, settlers: await settlersOf(userId, conn), presence: await presenceOf(userId, conn),
-        decor: placedOf(await craftsOf(userId, conn)), filled: await needRowsOf(userId, conn)
+        decor: placedOf(await craftsOf(userId, conn)), filled: await needRowsOf(userId, conn), blights: await blightsOf(userId, conn)
     };
     const base = { bonuses: shop.bonusesOf(await itemsOf(userId, conn)), extra: annexes.bonusesOf(await annexesOf(userId, conn)) };
     return { builtAt, island, base, lm: landmarks.bonusesOf((await foundOf(userId, conn)).keys()) };
 }
 
-// Bonus avec l'humeur des habitants à l'instant at (sources : sourcesOf) : { bonuses, extra }
+// Bonus avec l'humeur des habitants à l'instant at, et les bâtiments embrumés (sources : sourcesOf) : { bonuses, extra }
 function bonusesAt({ island, base, lm }, at) {
-    const { levels, zones, settlers, presence, decor, filled } = island;
+    const { levels, zones, settlers, presence, decor, filled, blights } = island;
     const moods = moodsOf(residentsOf(levels, zones, settlers, presence), levels, zones, decor, filled, presence, at);
-    return withLandmarks(withMoods(base.bonuses, base.extra, moods), lm);
+    const { bonuses, extra } = withLandmarks(withMoods(base.bonuses, base.extra, moods), lm);
+    return { bonuses: withBlights(bonuses, blights, at), extra };
 }
 
 // Bonus de la boutique, des annexes, de l'humeur des habitants et des lieux découverts : { bonuses, extra } (ce que

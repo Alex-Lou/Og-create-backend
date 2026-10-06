@@ -188,6 +188,30 @@ router.post('/world/expedition', withAccount(async (req, res, owner, b) => {
     res.json({ expedition: done, world: await worldView(owner, b) });
 }));
 
+// Les nuits de créatures (v6, § 6.15) : Brume les présente (une fois ; la première nuit vient un jour après) → { world }
+router.post('/world/nights/start', withAccount(async (req, res, owner, b) => {
+    await world.startNights(owner.id);
+    res.json({ world: await worldView(owner, b) });
+}));
+
+// Repousser un égaré d'un toucher, la nuit, sur son chemin → { id, world }
+router.post('/world/nights/repel', withAccount(async (req, res, owner, b) => {
+    const id = String(req.body.id || '');
+    if (!/^\d{4}-\d{2}-\d{2}:\d$/.test(id)) return res.status(400).json({ message: 'Égaré invalide' });
+    const done = await world.repelCreature(owner.id, id);
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json({ id: done.id, world: await worldView(owner, b) });
+}));
+
+// Réparer le bâtiment embrumé (un peu de pierre ou de bois) → { site, cost, world }
+router.post('/world/repair', withAccount(async (req, res, owner, b) => {
+    const site = String(req.body.site || '');
+    if (!/^[a-z]{1,20}$/.test(site)) return res.status(400).json({ message: 'Bâtiment invalide' });
+    const done = await world.repairSite(owner.id, site);
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json({ site: done.site, cost: done.cost, world: await worldView(owner, b) });
+}));
+
 // Lieu remarquable d'un quartier à soi (lot 9c) : le découvrir → { landmark, fresh, world } (fresh : première fois)
 router.post('/world/landmark', withAccount(async (req, res, owner, b) => {
     const id = String(req.body.id || '');

@@ -28,14 +28,14 @@ const {
 } = require('./world/rules');
 const {
     itemsOf, skinsOf, signsOf, namesOf, friendsOf, needRowsOf, settlersOf, gamesOf, annexesOf, levelsOf, stockOf,
-    zonesOf, findsOf, depositsOf, foundOf, claimedOf, helianeOfUser, runsOf, countOf, discoveredOf, craftsOf, placedOf,
-    addStock, balanceOf
+    zonesOf, findsOf, depositsOf, blightsOf, foundOf, claimedOf, helianeOfUser, runsOf, countOf, discoveredOf, craftsOf,
+    placedOf, addStock, balanceOf
 } = require('./world/reads');
 const { migrate } = require('./world/migrate');
 const { openedOf, chestsView, grant, openChest, openAll } = require('./world/chests');
 const {
-    SLEEPERS, presenceOf, residentsOf, hungryOf, HUNGRY_AGO, moodsOf, withMoods, withLandmarks, prodSteps, runsSince,
-    visitorNow, visitorView, befriend, fillNeeds, satisfyVisitor, settleVisitor
+    SLEEPERS, presenceOf, residentsOf, hungryOf, HUNGRY_AGO, moodsOf, withMoods, withLandmarks, withBlights, prodSteps,
+    runsSince, visitorNow, visitorView, befriend, fillNeeds, satisfyVisitor, settleVisitor
 } = require('./world/people');
 const { bonusesFor, gather, collect } = require('./world/produce');
 const { anyaOf, breathRefused, brumeSavoirOf, talkBrume, revealAnya, breatheAnya } = require('./world/anyaBrume');
@@ -46,6 +46,7 @@ const {
     craftCtx, stowCrafts, epreuvesOf, craftsView, startCraft, finishCraft, placeCraft, moveCraft, storeCraft
 } = require('./world/creations');
 const { annexSpotOk, annexSpots, annexesView, placeAnnex, moveAnnex } = require('./world/annexPlots');
+const { startNights, repelCreature, repairSite, nightsView } = require('./world/nights');
 
 // Un habitant arrive comblé (Cannelle, pendant le prologue, affamée : hungryOf) : la première vue de l'île après son
 // arrivée inscrit l'heure de ses besoins (ou de celui qui apparaît, travailler avec l'Atelier), une seule fois
@@ -156,11 +157,14 @@ async function view(userId, owned, book) {
     const have = new Set(owned);
     const plans = Object.values(SITES).flatMap(s => s.levels.map(l => l.plan)).filter(Boolean);
     const known = book.describe(plans);
-    // Production en attente : chaque heure avec l'humeur de son moment, comme au ramassage (prodSteps)
+    // Production en attente : chaque heure avec l'humeur de son moment, comme au ramassage (prodSteps) ; un bâtiment
+    // embrumé ne produit plus (withBlights)
     const now = Date.now();
-    const island = { levels, zones, settlers, presence, decor, filled };
+    const blights = await blightsOf(userId);
+    const island = { levels, zones, settlers, presence, decor, filled, blights };
     const steps = prodSteps(island, { bonuses: shopBonuses, extra: annexes.bonusesOf(annexRows) }, lmBonuses, stock.collected_at, now);
-    const production = productionAll(levels, builtAt, stock.collected_at, now, bonuses, extra, steps);
+    const blighted = withBlights(bonuses, blights, now);
+    const production = productionAll(levels, builtAt, stock.collected_at, now, blighted, extra, steps);
     const sites = Object.entries(SITES).map(([id, site]) => {
         const level = levels[id] || 0;
         const next = site.levels[level];
@@ -198,7 +202,7 @@ async function view(userId, owned, book) {
             levels: site.levels.map(step),
             pending: made ? { coins: made.coins, [made.resource]: made.amount } : null,
             // Rendement horaire avec les bonus de la boutique et les annexes (pour la fiche), heures de production gardées
-            perHour: site.produce && level ? perHourOf(level, bonuses.prod[id] || 0, bonuses.coins[id] || 0, extra.site[id] || []) : null,
+            perHour: site.produce && level ? perHourOf(level, blighted.prod[id] || 0, bonuses.coins[id] || 0, extra.site[id] || []) : null,
             capHours: CAP_HOURS + (extra.cap[id] || 0),
             // Annexes : catalogue du bâtiment et cases libres où en poser une (dès le palier II)
             annexes: annexesView(id, annexRows),
@@ -327,7 +331,10 @@ async function view(userId, owned, book) {
         // Les mots d'Héliane déjà lus (la Chronique) et l'acte dont le mot attend la prochaine bouteille
         heliane: await helianeOfUser(userId),
         // Anya : ses traces, son éveil, la Révélation vue, son Souffle du jour
-        anya: await anyaOf(userId)
+        anya: await anyaOf(userId),
+        // Les nuits de créatures (v6, § 6.15) : présentées ou non, la nuit en cours ou la prochaine, ses égarés et leur
+        // sort, le bâtiment embrumé et le prix de sa réparation
+        nights: await nightsView(userId)
     };
 }
 
@@ -673,5 +680,5 @@ module.exports = {
     view, build, buyZone, buyItem, undoItem, chooseSkin, startRun, finishRun, collect, migrate, claimQuest, board, openChest, openAll,
     placeAnnex, moveAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople, namePlayer, arianeTargets,
     refundDecorations, startCraft, finishCraft, placeCraft, moveCraft, storeCraft, startExpedition, findLandmark, gatherDeposit,
-    anyaOf, breathRefused, revealAnya, breatheAnya, brumeSavoirOf, talkBrume
+    anyaOf, breathRefused, revealAnya, breatheAnya, brumeSavoirOf, talkBrume, startNights, repelCreature, repairSite
 };

@@ -116,16 +116,32 @@ function moodTimes(filled, from, to) {
     }
     return [from, ...[...ends].sort((a, b) => a - b)];
 }
-// La part de production en plus de chaque bâtiment depuis la dernière récolte, à chaque instant où l'humeur change
-// d'elle-même (moodTimes) : [{ at, prod }] pour productionAll. island = { levels, zones, settlers, presence, decor,
-// filled } ; base = { bonuses, extra } de la boutique et des annexes ; lm : landmarks.bonusesOf
+// Un bâtiment embrumé par un égaré (world/nights.js) ne produit plus, annexes comprises, jusqu'à sa réparation : sa part
+// de production vaut −1 (productionOf compte chaque heure × (1 + part)). blights : [{ site, since, until }] (until :
+// null tant qu'il n'est pas réparé). bonuses : { prod, … } ; at : l'instant
+function withBlights(bonuses, blights = [], at = Date.now()) {
+    const out = blights.filter(b => new Date(b.since).getTime() <= at && (!b.until || at < new Date(b.until).getTime()));
+    if (!out.length) return bonuses;
+    const prod = { ...bonuses.prod };
+    out.forEach(b => { prod[b.site] = -1; });
+    return { ...bonuses, prod };
+}
+// Les instants où une panne commence ou finit, dans ]from, to[
+const blightTimes = (blights = [], from, to) => blights.flatMap(b => [b.since, b.until].filter(Boolean).map(t => new Date(t).getTime()))
+    .filter(t => t > from && t < to);
+
+// La part de production en plus de chaque bâtiment depuis la dernière récolte, à chaque instant où elle change d'elle-même
+// (l'humeur, à l'échéance d'un besoin : moodTimes ; une panne qui commence ou finit) : [{ at, prod }] pour
+// productionAll. island = { levels, zones, settlers, presence, decor, filled, blights } ; base = { bonuses, extra } de
+// la boutique et des annexes ; lm : landmarks.bonusesOf
 function prodSteps(island, base, lm, collectedAt, now) {
-    const { levels, zones, settlers, presence, decor, filled } = island;
+    const { levels, zones, settlers, presence, decor, filled, blights } = island;
     const residents = residentsOf(levels, zones, settlers, presence);
     const from = collectedAt ? new Date(collectedAt).getTime() : 0;
-    return moodTimes(filled, from, now).map(at => {
+    const times = [...new Set([...moodTimes(filled, from, now), ...blightTimes(blights, from, now)])].sort((a, b) => a - b);
+    return times.map(at => {
         const moods = moodsOf(residents, levels, zones, decor, filled, presence, at);
-        return { at, prod: withLandmarks(withMoods(base.bonuses, base.extra, moods), lm).bonuses.prod };
+        return { at, prod: withBlights(withLandmarks(withMoods(base.bonuses, base.extra, moods), lm).bonuses, blights, at).prod };
     });
 }
 // Même part de production en plus pour chaque bâtiment à chaque instant (deux suites de prodSteps sur la même fenêtre)
@@ -350,6 +366,6 @@ async function settleVisitor(userId, visitorId, now = Date.now()) {
 
 module.exports = {
     livesHere, decosNear, SETTLER_ID, knownResident, SLEEPERS, metOf, presenceOf, residentsOf, hungryOf, HUNGRY_AGO,
-    moodsOf, withMoods, withLandmarks, moodTimes, prodSteps, sameSteps, runsSince, visitorNow, visitorView,
+    moodsOf, withMoods, withLandmarks, withBlights, moodTimes, prodSteps, sameSteps, runsSince, visitorNow, visitorView,
     friendRewards, befriend, fillNeeds, satisfyVisitor, housesOf, settleVisitor
 };
