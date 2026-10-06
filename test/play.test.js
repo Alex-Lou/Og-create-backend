@@ -1255,12 +1255,29 @@ test('Anya : la Révélation une seule fois, le Souffle une fois par jour, la B�
   for (const zone of CORE) await sql('INSERT INTO world_zones (user_id, zone) VALUES ($1, $2) ON CONFLICT DO NOTHING', [player.userId, zone]);
   const awake = (await view()).anya;
   assert.deepEqual([awake.traces, awake.awake, awake.revealed], [LANDS, true, false]);
+  // Pas de Souffle avant la Révélation (et la tenter ne la marque pas comme vue)
+  assert.equal((await talk()).status, 403);
+  assert.equal((await view()).anya.revealed, false);
   // La Révélation : une fois, d'un appareil à l'autre
   const seen = await reveal();
   assert.equal(seen.status, 200);
   assert.equal(seen.data.anya.revealed, true);
   assert.equal((await reveal()).data.anya.revealed, true);
   assert.equal((await api('GET', '/play/world/brume', null, player)).data.anya.revealed, true);
+  // Aucune page à souffler (toutes déjà connues de l'appareil) : rien n'est compté
+  // (les pages à portée, calculées comme la route : éléments, essais ratés, compte d'avant la bible, fil d'Ariane)
+  const book = await require('../src/services/recipeBook').load();
+  const bookPages = require('../src/services/bookPages');
+  const players = require('../src/services/players');
+  const owner = { kind: 'user', id: player.userId };
+  const owned = await players.elements(owner);
+  const ariane = bookPages.arianeOf(book, owned, await require('../src/services/world').arianeTargets(player.userId));
+  const misses = await require('../src/services/bookTries').missesByPage(player.userId);
+  const reach = bookPages.view(book, owned, misses, {}, await players.isVeteran(owner), ariane).chapters
+    .flatMap(chapter => chapter.pages).filter(page => page.status === 'reach').map(page => page.id);
+  assert.ok(reach.length > 0);
+  const nothing = await talk({ known: reach });
+  assert.deepEqual([nothing.status, nothing.data.savoir, nothing.data.world.anya.breathed], [200, null, false]);
   // Le Souffle : un ingrédient, une fois par jour
   const breath = await talk();
   assert.equal(breath.status, 200);
@@ -1269,6 +1286,12 @@ test('Anya : la Révélation une seule fois, le Souffle une fois par jour, la B�
   assert.equal((await talk()).status, 409);
   await sql(`UPDATE world_friends SET talked_on = NULL WHERE user_id = $1 AND villager = 'anya'`, [player.userId]);
   assert.equal((await talk({ known: [breath.data.savoir.page] })).status, 200);
+  // Cinq Souffles en même temps (le service, sans attendre la route) : un seul passe. Cinq connexions ouvertes d'abord,
+  // pour que les cinq transactions se chevauchent vraiment
+  await sql(`UPDATE world_friends SET talked_on = NULL WHERE user_id = $1 AND villager = 'anya'`, [player.userId]);
+  await Promise.all([1, 2, 3, 4, 5].map(() => require('../src/config/db').query('SELECT pg_sleep(0.05)')));
+  const race = await Promise.all([1, 2, 3, 4, 5].map(() => require('../src/services/world').breatheAnya(player.userId)));
+  assert.deepEqual(race.map(r => r.status || 200).sort(), [200, 409, 409, 409, 409]);
   // Sa ligne n'est pas une habitante : pas de cœur, pas d'amitié
   const after = await view();
   assert.equal(after.villagers.some(v => v.id === 'anya'), false);
@@ -1289,7 +1312,8 @@ test('le Savoir de Brume : après le Phare, un indice par jour sur les Légendes
   assert.deepEqual((await api('GET', '/play/world', null, player)).data.brumeSavoir, { open: false, talked: false });
   // Le Phare allumé, mais aucune page des Légendes à portée : rien n'est soufflé, rien n'est compté
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'phare-brume')`, [player.userId]);
-  const empty = await talk(player);
+  // (des pages mal formées envoyées par l'appareil sont ignorées, sans erreur)
+  const empty = await talk(player, { known: [{ toString: 1 }, 42, null], heard: [{ toString: 1 }] });
   assert.deepEqual([empty.status, empty.data.savoir, empty.data.world.brumeSavoir], [200, null, { open: true, talked: false }]);
   // Le chapitre VII ouvert, une Légende à portée : un ingrédient, une fois par jour
   const legend = book.entries.find(([parts, result]) => book.meta.get(result)?.family === 'Légendes' && parts.every(part => book.meta.has(part)));
@@ -1302,6 +1326,10 @@ test('le Savoir de Brume : après le Phare, un indice par jour sur les Légendes
   assert.equal(typeof hint.data.savoir.ingredient, 'string');
   assert.deepEqual(hint.data.world.brumeSavoir, { open: true, talked: true });
   assert.equal((await talk(player)).status, 409);
+  // Cinq bavardages en même temps (le service, sans attendre la route) : un seul compte
+  await sql(`UPDATE world_friends SET talked_on = NULL WHERE user_id = $1 AND villager = 'brume'`, [player.userId]);
+  const race = await Promise.all([1, 2, 3, 4, 5].map(() => require('../src/services/world').talkBrume(player.userId)));
+  assert.deepEqual(race.map(r => r.status || 200).sort(), [200, 409, 409, 409, 409]);
   // Sa ligne n'en fait pas une habitante
   assert.equal(hint.data.world.villagers.some(v => v.id === 'brume'), false);
 });

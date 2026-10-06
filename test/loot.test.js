@@ -98,6 +98,8 @@ test('les mots d’Héliane : un par acte, dans la première bouteille ouverte p
   assert.deepEqual(starts, { I: 100, II: 200 });
   // Une quête de l'acte en cours ne déplace pas son début ; une ancienne quête inconnue non plus
   assert.deepEqual(actStartsOf([{ quest: 'puits-ondin', at: 100 }, { quest: 'lisiere', at: 150 }, { quest: 'vieille-quete', at: 999 }]), { I: 100 });
+  // Une ancienne quête (d'avant la bible) compte dans l'acte où elle se range : « source » (prologue), « ponton » (acte IV)
+  assert.deepEqual(actStartsOf([{ quest: 'source', at: 100 }, { quest: 'ponton', at: 300 }]), { I: 100, II: 100, III: 100, IV: 100 });
   // Bouteilles : avant l'acte I (rien), pendant l'acte I (son mot), puis rien encore pendant l'acte II
   assert.deepEqual(loot.helianeOf(starts, [50, 120, 130]), { found: ['I'], next: 'II' });
   assert.deepEqual(loot.helianeOf(starts, [250]), { found: ['II'], next: null });
