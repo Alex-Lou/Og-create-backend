@@ -256,7 +256,7 @@ router.post('/world/anya/reveal', withAccount(async (req, res, owner, b) => {
     res.json({ anya: done.anya, world: await worldView(owner, b) });
 }));
 // Pages dont l'appareil a déjà un indice (envoyées avec le bavardage) : identifiants valides, liste bornée
-const pagesOf = list => (Array.isArray(list) ? list.slice(-400).map(String).filter(id => PAGE.test(id)) : []);
+const pagesOf = list => (Array.isArray(list) ? list.slice(-400).filter(id => typeof id === 'string' && PAGE.test(id)) : []);
 // Ce qu'il faut pour le Savoir d'un maître : éléments écrits, essais ratés par page, fil d'Ariane
 async function savoirInputs(owner, b) {
     const owned = await players.elements(owner);
@@ -280,11 +280,17 @@ router.post('/world/villager/talk', withAccount(async (req, res, owner, b) => {
         }
         return res.json({ savoir, world: await worldView(owner, b) });
     }
+    // Anya, la Révélation vue : son Souffle n'est compté que s'il y a une page à souffler
     if (villager === anya.TARGET) {
+        const state = await world.anyaOf(owner.id);
+        if (!state.revealed) return res.status(403).json({ message: 'Anya dort encore.' });
+        if (state.breathed) return res.status(409).json({ message: 'Anya t’a déjà soufflé un Savoir aujourd’hui : reviens à l’aube ou au crépuscule de demain.' });
         const inputs = await savoirInputs(owner, b);
-        const done = await world.breatheAnya(owner.id);
-        if (done.status) return res.status(done.status).json({ message: done.message });
         const savoir = bookPages.savoir(b, inputs.owned, bookPages.FAMILIES, { ...inputs, strong: true, known: pagesOf(req.body.known), heard: pagesOf(req.body.heard) });
+        if (savoir) {
+            const done = await world.breatheAnya(owner.id);
+            if (done.status) return res.status(done.status).json({ message: done.message });
+        }
         return res.json({ savoir, world: await worldView(owner, b) });
     }
     const families = villagers.SAVOIRS[villager];

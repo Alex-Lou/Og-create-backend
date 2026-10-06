@@ -247,10 +247,13 @@ function boardOf(claimed, facts) {
 }
 // Début de chaque acte commencé (les mots d'Héliane, bible § 6.13) : l'heure où la dernière quête des actes d'avant a été
 // réclamée (0 si rien n'a été réclamé avant lui). rows : [{ quest, at (ms) }]. { acte: ms } pour les actes I à VII
-// commencés, dans l'ordre
+// commencés, dans l'ordre. Une ancienne quête (LEGACY) compte dans l'acte de la quête où elle se range
 function actStartsOf(rows) {
     const done = actsDoneOf(doneOf(new Set(rows.map(r => r.quest))));
-    const actOf = new Map(QUESTS.map(quest => [quest.id, quest.act]));
+    const actOf = new Map([
+        ...QUESTS.map(quest => [quest.id, quest.act]),
+        ...Object.entries(LEGACY).map(([id, old]) => [id, QUESTS[INDEX.get(old.at)].act])
+    ]);
     const out = {};
     ACTS.forEach((act, i) => {
         const before = ACTS.slice(0, i);

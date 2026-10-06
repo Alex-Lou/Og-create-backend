@@ -316,8 +316,8 @@ function metOf(id, levels, zones, presence) {
 }
 // Ce qu'il faut pour savoir qui est là : compte d'avant la bible, quêtes faites ; et la Bénédiction d'Anya (toute l'île
 // principale découverte : l'humeur ne descend plus sous « content »)
-async function presenceOf(userId, conn = db) {
-    const blessed = anya.stateOf(await zonesOf(userId, conn), await exploredOf(userId, conn)).awake;
+async function presenceOf(userId, conn = db, now = Date.now()) {
+    const blessed = anya.stateOf(await zonesOf(userId, conn), await exploredOf(userId, conn, now)).awake;
     return { veteran: await players.veteranOf(userId, conn), done: quests.doneOf(await claimedOf(userId, conn)), blessed };
 }
 // Habitants de l'île : la troupe rencontrée (built : son bâtiment est bâti, dans un quartier à soi), puis les
@@ -696,6 +696,8 @@ async function brumeSavoirOf(userId, conn = db, now = Date.now()) {
 async function talkBrume(userId, now = Date.now()) {
     await migrate(userId);
     return db.transaction(async conn => {
+        // Le verrou du stock (comme pour un maître) : deux bavardages simultanés ne soufflent pas deux Savoirs
+        await stockOf(userId, conn, true);
         const state = await brumeSavoirOf(userId, conn, now);
         if (!state.open) return db.rollback({ status: 403, message: 'Brume garde son Savoir pour la fin : allume d’abord le Phare.' });
         if (state.talked) return db.rollback({ status: 409, message: 'Brume t’a déjà soufflé un Savoir aujourd’hui.' });
@@ -714,13 +716,15 @@ async function revealAnya(userId, now = Date.now()) {
         return { anya: await anyaOf(userId, conn, now) };
     });
 }
-// Le Souffle d'Anya : une fois par jour (heure de Paris), une fois éveillée. {} ou { status, message } (l'indice est
-// calculé par la route, comme le Savoir d'un maître)
+// Le Souffle d'Anya : une fois par jour (heure de Paris), une fois éveillée et la Révélation vue. {} ou
+// { status, message } (l'indice est calculé par la route, qui ne compte le Souffle que s'il y a une page)
 async function breatheAnya(userId, now = Date.now()) {
     await migrate(userId);
     return db.transaction(async conn => {
+        // Le verrou du stock (comme pour un maître) : deux Souffles simultanés ne passent pas tous les deux
+        await stockOf(userId, conn, true);
         const state = await anyaOf(userId, conn, now);
-        if (!state.awake) return db.rollback({ status: 403, message: 'Anya dort encore.' });
+        if (!state.revealed) return db.rollback({ status: 403, message: 'Anya dort encore.' });
         if (state.breathed) return db.rollback({ status: 409, message: 'Anya t’a déjà soufflé un Savoir aujourd’hui : reviens à l’aube ou au crépuscule de demain.' });
         await conn.query(
             `INSERT INTO world_friends (user_id, villager, points, talked_on) VALUES ($1, $2, 0, $3::date)
@@ -797,7 +801,7 @@ async function gatherDeposit(userId, depositId, now = Date.now()) {
     return db.transaction(async conn => {
         await stockOf(userId, conn, true);
         if (!(await zonesOf(userId, conn)).has(deposit.zone)) return db.rollback({ status: 403, message: 'Achète d’abord ce quartier de l’île.' });
-        const { blessed } = await presenceOf(userId, conn);
+        const { blessed } = await presenceOf(userId, conn, now);
         const wait = finds.readyIn((await depositsOf(userId, conn)).get(deposit.id), now, blessed ? anya.BLESSING.regrowMs : finds.REGROW_MS);
         if (wait > 0) return db.rollback({ status: 409, message: `Ce gisement repousse : reviens dans ${Math.ceil(wait / 60000)} min.` });
         const amount = finds.GATHER.min + crypto.randomInt(0, finds.GATHER.max - finds.GATHER.min + 1) + craftBonusOf(placedOf(await craftsOf(userId, conn)), deposit.zone);
@@ -1340,7 +1344,7 @@ async function befriend(userId, villagerId, resource = null, now = Date.now()) {
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
         const { levels } = await levelsOf(userId, conn);
-        const villager = residentsOf(levels, await zonesOf(userId, conn), await settlersOf(userId, conn), await presenceOf(userId, conn)).find(r => r.id === villagerId);
+        const villager = residentsOf(levels, await zonesOf(userId, conn), await settlersOf(userId, conn), await presenceOf(userId, conn, now)).find(r => r.id === villagerId);
         if (!villager) {
             const base = villagers.VILLAGERS[villagerId];
             return db.rollback(base ? { status: 403, message: `${base.name} n’habite pas encore ton île.` } : { status: 404, message: 'Habitant inconnu.' });
@@ -1386,7 +1390,7 @@ async function fillNeeds(userId, targets = null, now = Date.now()) {
         const stock = await stockOf(userId, conn, true);
         const { levels } = await levelsOf(userId, conn);
         const zones = await zonesOf(userId, conn);
-        const presence = await presenceOf(userId, conn);
+        const presence = await presenceOf(userId, conn, now);
         const residents = residentsOf(levels, zones, await settlersOf(userId, conn), presence);
         const moods = moodsOf(residents, levels, zones, placedOf(await craftsOf(userId, conn)), await needRowsOf(userId, conn), presence, now);
         const wanted = targets || Object.entries(moods).flatMap(([villager, m]) => m.needs.filter(n => n.cost).map(n => ({ villager, need: n.id })));
@@ -1906,5 +1910,5 @@ module.exports = {
     view, build, buyZone, buyItem, undoItem, chooseSkin, startRun, finishRun, collect, migrate, claimQuest, board, openChest, openAll,
     placeAnnex, moveAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople, namePlayer, arianeTargets,
     refundDecorations, startCraft, finishCraft, placeCraft, moveCraft, storeCraft, startExpedition, findLandmark, gatherDeposit,
-    revealAnya, breatheAnya, brumeSavoirOf, talkBrume
+    anyaOf, revealAnya, breatheAnya, brumeSavoirOf, talkBrume
 };
