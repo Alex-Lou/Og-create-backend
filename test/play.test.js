@@ -517,7 +517,12 @@ test('créations d’île : assembler (pièces vérifiées), payer à la réussi
   const lamp = { x: X(28), y: Y(31) };
   const bench = { x: X(29), y: Y(31) };
   const far = s => Math.max(Math.abs(s.x - bench.x), Math.abs(s.y - bench.y));
-  const lampSpots = cat(await view(), 'lanterne').spots;
+  const guarded = await view();
+  assert.deepEqual(guarded.crafts.placed.find(c => c.craft === 'lanterne'), {
+    ...lamp, craft: 'lanterne', keeps: [{ ...bench, reach: 2 }], keepText: '« Banc » a besoin de « Lanterne » à 2 cases au plus : déplace ou range d’abord « Banc ».'
+  });
+  assert.deepEqual(guarded.crafts.placed.find(c => c.craft === 'banc'), { ...bench, craft: 'banc' });
+  const lampSpots = cat(guarded, 'lanterne').spots;
   const away = lampSpots.find(s => far(s) > 2);
   const close = lampSpots.find(s => far(s) <= 2);
   assert.ok(away && close, 'cases de Lanterne loin du Banc et près de lui');

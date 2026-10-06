@@ -90,6 +90,9 @@ test('règle « près de » tenue au déplacement et au rangement : la Lanterne 
   assert.equal(crafts.leaveBlock(lanterne, null, null, placed), '« Banc » a besoin de « Lanterne » à 2 cases au plus : déplace ou range d’abord « Banc ».');
   assert.match(crafts.leaveBlock(lanterne, 9, 9, placed), /Banc/);
   assert.equal(crafts.leaveBlock(lanterne, 5, 5, placed), null);
+  // Ce que la Lanterne garde à portée (la vue le dit au navigateur) : le Banc ; le Banc, lui, ne garde rien
+  assert.deepEqual(crafts.strandedBy(lanterne, null, null, placed), [banc]);
+  assert.deepEqual(crafts.strandedBy(banc, null, null, placed), []);
   // Une autre Lanterne à portée du Banc : la première peut partir
   assert.equal(crafts.leaveBlock(lanterne, null, null, [...placed, { id: 3, x: 1, y: 2, craft: 'lanterne' }]), null);
   // Le Banc lui-même, ou une création dont rien ne dépend, part librement

@@ -55,9 +55,18 @@ async function epreuvesOf(userId, conn = db) {
     return Object.values(done).flatMap(cats => Object.values(cats || {})).reduce((n, ids) => n + (Array.isArray(ids) ? ids.length : 0), 0);
 }
 // Ce que la vue montre des créations d'île : paliers ouverts, catalogue (ce qui manque pour fabriquer, réserve, cases
-// où poser ou déplacer une création déjà fabriquée), créations posées
+// où poser ou déplacer une création déjà fabriquée), créations posées. Une création posée dont d'autres ont besoin
+// (règle « près de ») dit lesquelles : keeps = leurs cases et leur portée (elle ne se déplace qu'à portée de chacune),
+// keepText = pourquoi elle ne se range pas (crafts.leaveBlock)
 function craftsView(rows, ctx, { owned, stock, open, epreuves, stars = 0, have }, siteName) {
     const made = madeOf(rows);
+    const placed = placedOf(rows);
+    const keepsOf = r => {
+        const kept = crafts.strandedBy(r, null, null, placed);
+        if (!kept.length) return {};
+        const keeps = kept.map(d => ({ x: d.x, y: d.y, reach: crafts.CRAFT_BY_ID[d.craft].place.nearCraft.reach }));
+        return { keeps, keepText: crafts.leaveBlock(r, null, null, placed) };
+    };
     return {
         epreuves: { have: epreuves, need: crafts.EPREUVES },
         // Découvertes du Grimoire qui ouvrent le palier I (l'autre clé : les questions de l'Épreuve)
@@ -72,7 +81,7 @@ function craftsView(rows, ctx, { owned, stock, open, epreuves, stars = 0, have }
                 spots: made[c.id] ? craftSpots(c, ctx) : []
             };
         }),
-        placed: placedOf(rows).map(r => ({ x: r.x, y: r.y, craft: r.craft }))
+        placed: placed.map(r => ({ x: r.x, y: r.y, craft: r.craft, ...keepsOf(r) }))
     };
 }
 
