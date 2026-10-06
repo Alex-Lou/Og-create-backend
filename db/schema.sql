@@ -443,6 +443,17 @@ CREATE TABLE IF NOT EXISTS world_deposits (
     gathered_at TIMESTAMPTZ NOT NULL,
     PRIMARY KEY (user_id, deposit)
 );
+-- Les nuits de créatures (v6, § 6.15 ; services/nights.js et world/nights.js) : une ligne par joueur, née quand Brume
+-- les présente (la première nuit vient un jour après). seen_until : nuits réglées jusque-là ; blights : bâtiments
+-- embrumés [{ site, since, until, by }] (until : null tant qu'il n'est pas réparé ; une fenêtre déjà comptée à la
+-- récolte s'efface) ; repelled : égarés repoussés d'un toucher pendant la nuit en cours { night, ids }
+CREATE TABLE IF NOT EXISTS world_nights (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    seen_until TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    blights JSONB NOT NULL DEFAULT '[]',
+    repelled JSONB NOT NULL DEFAULT '{}'
+);
 -- Besoins des habitants (services/villagers.js) : dernière fois que chacun a été comblé ('manger', 'outils'). La ligne
 -- naît quand l'habitant arrive (il arrive comblé) ; se distraire se lit sur l'île (décorations), sans ligne.
 CREATE TABLE IF NOT EXISTS world_needs (

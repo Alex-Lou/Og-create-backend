@@ -63,13 +63,15 @@ function visitOn(userId, day, places) {
     const cell = place.cells[bytes[1] % place.cells.length];
     return { slot: visit.slot, x: cell.x, y: cell.y };
 }
-// Anya passe-t-elle ce jour-là ? (sans chercher où)
-const visitsOn = (userId, day) => {
+// Le moment de son passage ce jour-là ('aube' ou 'crepuscule'), ou null (sans chercher où)
+const slotOn = (userId, day) => {
     const { monday, rank } = weekOf(day);
-    return visitsOf(userId, monday).some(v => v.rank === rank);
+    return visitsOf(userId, monday).find(v => v.rank === rank)?.slot || null;
 };
+// Anya passe-t-elle ce jour-là ?
+const visitsOn = (userId, day) => slotOn(userId, day) !== null;
 
 // L'humeur sous la Bénédiction : jamais sous « content »
 const blessedMood = mood => (mood === 'triste' ? BLESSING.moodFloor : mood);
 
-module.exports = { CORE, LANDS, TARGET, BLESSING, TRACE_COUNT, SLOTS, awakeOf, stateOf, weekOf, visitsOf, visitOn, visitsOn, blessedMood };
+module.exports = { CORE, LANDS, TARGET, BLESSING, TRACE_COUNT, SLOTS, awakeOf, stateOf, weekOf, visitsOf, visitOn, slotOn, visitsOn, blessedMood };

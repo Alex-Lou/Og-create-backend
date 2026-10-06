@@ -7,11 +7,16 @@ const legacy = require('../worldMapV2');
 const { SIZE, MAP_VERSION, OLD_DECO_RATE, SITES, pendingOf } = require('./rules');
 const { levelsOf, stockOf, tilesOf } = require('./reads');
 
+// Les nuits de créatures (world/nights.js, qui passe lui-même par migrate) : chargé à l'appel
+const settleNights = (...args) => require('./nights').settleNights(...args);
+
 // Passage aux cartes suivantes, une fois par joueur, au premier passage, verrouillé (deux requêtes ne migrent pas
-// deux fois) et d'un seul tenant (tout ou rien) : v1 → v2 → v3 → v4 selon l'île du joueur.
+// deux fois) et d'un seul tenant (tout ou rien) : v1 → v2 → v3 → v4 selon l'île du joueur. Chaque passage règle
+// aussi les nuits finies depuis le précédent (v6), avant tout changement de l'île
 function migrate(userId) {
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
+        await settleNights(userId, conn, stock);
         if (stock.map_version >= MAP_VERSION) return false;
         if (stock.map_version < 2) await toV2(userId, stock, conn);
         if (stock.map_version < 3) await toV3(userId, conn);
