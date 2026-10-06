@@ -46,7 +46,8 @@ async function startExpedition(userId, zoneId, now = Date.now()) {
         await conn.query('UPDATE world_stock SET charges = $2, charges_at = $3, food = food - $4, wood = wood - $5 WHERE user_id = $1',
             [userId, charges.count - 1, new Date(charges.since), cost.food, cost.wood]);
         const endsAt = new Date(now + zone.trip * 3600 * 1000);
-        await conn.query('INSERT INTO world_expeditions (user_id, zone, ends_at) VALUES ($1, $2, $3)', [userId, zone.id, endsAt]);
+        // Heure prise après le verrou de la réserve, comme le départ d'une partie de Récolte (undoItem)
+        await conn.query('INSERT INTO world_expeditions (user_id, zone, ends_at, started_at) VALUES ($1, $2, $3, clock_timestamp())', [userId, zone.id, endsAt]);
         return { zone: zone.id, endsAt: endsAt.toISOString() };
     });
 }

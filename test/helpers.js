@@ -79,12 +79,18 @@ async function api(method, route, body, player, { csrf = true, headers = {} } = 
   return { status: response.status, data, setCookies };
 }
 
-// Accès direct à la base, pour préparer un état (jamais pour vérifier à la place de l'API)
-async function sql(query, params) {
+// Connexion directe à la base de test (à fermer : client.end())
+async function connect() {
   const client = new Client(process.env.DATABASE_URL ? { connectionString: process.env.DATABASE_URL } : {
     user: process.env.DB_USER, password: process.env.DB_PASSWORD, host: process.env.DB_HOST, port: process.env.DB_PORT, database: process.env.DB_NAME
   });
   await client.connect();
+  return client;
+}
+
+// Accès direct à la base, pour préparer un état (jamais pour vérifier à la place de l'API)
+async function sql(query, params) {
+  const client = await connect();
   try {
     return (await client.query(query, params)).rows;
   } finally {
@@ -106,8 +112,34 @@ async function newPlayer({ coins = 0, veteran = true } = {}) {
   return player;
 }
 
+// Course entre deux requêtes, rejouée à coup sûr : `hold` ouvre une transaction et y fait ses écritures (verrous
+// tenus) ; `request` part alors ; dès qu'elle attend un verrou de cette transaction, celle-ci est validée. Renvoie la
+// réponse de `request`.
+async function whileHeld(hold, request) {
+  const tx = await connect();
+  try {
+    await tx.query('BEGIN');
+    await hold(tx);
+    const pid = (await tx.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+    let done = false;
+    const pending = request().finally(() => { done = true; });
+    for (let i = 0; ; i++) {
+      if ((await tx.query('SELECT 1 FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))', [pid])).rows.length) break;
+      if (done || i === 200) {
+        await pending.catch(() => {});
+        throw new Error(done ? 'la requête a fini sans attendre la transaction' : 'la requête n’a jamais attendu la transaction');
+      }
+      await new Promise(resolve => setTimeout(resolve, 25));
+    }
+    await tx.query('COMMIT');
+    return await pending;
+  } finally {
+    await tx.end();
+  }
+}
+
 async function coinsOf(player) {
   return (await api('GET', '/coins/balance', null, player)).data.coins;
 }
 
-module.exports = { startServer, api, sql, newPlayer, coinsOf, randomPassword };
+module.exports = { startServer, api, sql, whileHeld, newPlayer, coinsOf, randomPassword };
