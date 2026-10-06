@@ -1,11 +1,12 @@
 // Serveur de jeu : les recettes ne sortent jamais, seul un mélange réussi enrichit un carnet
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { startServer, api, sql, newPlayer, coinsOf, randomPassword } = require('./helpers');
+const { startServer, api, sql, whileHeld, newPlayer, coinsOf, randomPassword } = require('./helpers');
 const loot = require('../src/services/loot');
 const minigames = require('../src/services/minigames');
 // Cases du cœur : coordonnées de la grande île (v3) + décalage dans la très grande île (v4)
-const { OFFSET } = require('../src/services/worldMap');
+const worldMap = require('../src/services/worldMap');
+const { OFFSET } = worldMap;
 const X = x => x + OFFSET.x;
 const Y = y => y + OFFSET.y;
 
@@ -655,6 +656,66 @@ test('le Monde : la boutique d’un atelier vend outils, objets et skins, une se
   await sql(`UPDATE world_stock SET collected_at = NOW() - INTERVAL '3 hours' WHERE user_id = $1`, [player.userId]);
   const view = (await api('GET', '/play/world', null, player)).data;
   assert.deepEqual(view.sites.find(s => s.id === 'carriere').pending, { coins: 7, stone: 10 });
+});
+
+test('le Monde : un article de la Récolte qui a servi ne se rend plus ; un skin dont l’achat s’annule n’est plus porté', async () => {
+  const player = await newPlayer({ coins: 3000 });
+  const buy = item => api('POST', '/play/world/item', { item }, player);
+  const undo = item => api('POST', '/play/world/item/undo', { item }, player);
+  await api('GET', '/play/world', null, player);
+  await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'colline'), ($1, 'est'), ($1, 'lisiere')`, [player.userId]);
+  await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'carriere', 1), ($1, 'atelier', 1)`, [player.userId]);
+  // L'établi (+1 coup) part avec une partie de Récolte : il ne se rend plus, ses écus restent dépensés
+  const paid = (await buy('etabli')).data.coins;
+  assert.equal((await api('POST', '/play/world/harvest/start', {}, player)).status, 200);
+  const late = await undo('etabli');
+  assert.equal(late.status, 409);
+  assert.match(late.data.message, /déjà servi/);
+  assert.equal(await coinsOf(player), paid);
+  // La Cuisine (recharge) part avec une expédition, qui emporte une partie : elle ne se rend plus non plus
+  await sql('UPDATE world_stock SET food = 50, wood = 50 WHERE user_id = $1', [player.userId]);
+  const kitchen = (await buy('cuisine')).data.coins;
+  assert.equal((await api('POST', '/play/world/expedition', { zone: 'roselieres' }, player)).status, 200);
+  assert.equal((await undo('cuisine')).status, 409);
+  assert.equal(await coinsOf(player), kitchen);
+  const shop = (await api('GET', '/play/world', null, player)).data.sites;
+  assert.ok(shop.find(s => s.id === 'atelier').shop.find(i => i.id === 'etabli').owned);
+  assert.ok(shop.find(s => s.id === 'foyer').shop.find(i => i.id === 'cuisine').owned);
+  // Un article de production ne part pas avec une partie : la pioche se rend encore, remboursée
+  const before = await coinsOf(player);
+  await buy('pioche');
+  assert.equal((await api('POST', '/play/world/harvest/start', {}, player)).status, 200);
+  const back = await undo('pioche');
+  assert.equal(back.status, 200);
+  assert.equal(back.data.coins, before);
+  // Un skin remis pendant que son achat s'annule (l'annulation tient l'article) : elle passe d'abord, et le skin
+  // remboursé n'est plus porté
+  await buy('roche-ocre');
+  const chosen = await whileHeld(async tx => {
+    await tx.query(`DELETE FROM world_items WHERE user_id = $1 AND item = 'roche-ocre'`, [player.userId]);
+    await tx.query(`DELETE FROM world_skins WHERE user_id = $1 AND site = 'carriere'`, [player.userId]);
+  }, () => api('POST', '/play/world/skin', { site: 'carriere', skin: 'roche-ocre' }, player));
+  assert.equal(chosen.status, 403);
+  assert.deepEqual(await sql('SELECT skin FROM world_skins WHERE user_id = $1', [player.userId]), []);
+});
+
+test('le Monde : une création déplacée pendant que l’île s’ouvre n’est pas rangée par erreur', async () => {
+  const player = await newPlayer();
+  await api('GET', '/play/world', null, player);
+  const foyer = worldMap.footprintOf('foyer', 1);
+  const [{ id }] = await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'cloture', $2, $3) RETURNING id`, [player.userId, foyer.x, foyer.y]);
+  const cell = async () => (await sql('SELECT x, y FROM world_crafts WHERE id = $1', [id]))[0];
+  // Sur une case prise (le Foyer), elle est rangée dans la réserve à l'ouverture de l'île
+  await api('GET', '/play/world', null, player);
+  assert.deepEqual(await cell(), { x: null, y: null });
+  // Déplacée sur une case libre pendant que l'île s'ouvre (le déplacement tient la création) : elle reste posée
+  await sql('UPDATE world_crafts SET x = $2, y = $3 WHERE id = $1', [id, foyer.x, foyer.y]);
+  const opened = await whileHeld(
+    tx => tx.query('UPDATE world_crafts SET x = $2, y = $3 WHERE id = $1', [id, X(31), Y(35)]),
+    () => api('GET', '/play/world', null, player));
+  assert.equal(opened.status, 200);
+  assert.deepEqual(await cell(), { x: X(31), y: Y(35) });
+  assert.deepEqual(opened.data.crafts.placed.map(r => [r.x, r.y]), [[X(31), Y(35)]]);
 });
 
 test('le Monde : une teinte s’achète et se porte ; une pièce rare ne s’achète pas mais se porte une fois trouvée', async () => {

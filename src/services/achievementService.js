@@ -34,25 +34,29 @@ async function getUserAchievements(userId) {
 
 // Recalcule les succès d'un joueur depuis ses découvertes enregistrées (mode Infini).
 // `claimed` ({ "<nom>": { unlockedAt } }, envoyé par le client) ne sert qu'à garder la date affichée.
+// La ligne est verrouillée le temps du calcul : deux recalculs en même temps (deux onglets) ne s'écrasent pas.
 async function syncAchievements(userId, claimed = {}) {
   if (!userId) throw new Error('ID utilisateur requis');
-  const { rows } = await db.query('SELECT achievements, infinite_elements FROM progress WHERE user_id = $1', [userId]);
-  if (!rows.length) return { achievements: {}, newlyUnlocked: [] };
+  const all = await getAllAchievements();
+  return db.transaction(async conn => {
+    const { rows } = await conn.query('SELECT achievements, infinite_elements FROM progress WHERE user_id = $1 FOR UPDATE', [userId]);
+    if (!rows.length) return { achievements: {}, newlyUnlocked: [] };
 
-  const updated = { ...(rows[0].achievements || {}) };
-  const discovered = rows[0].infinite_elements || [];
-  const newlyUnlocked = [];
-  for (const achievement of await getAllAchievements()) {
-    if (updated[achievement.name]?.unlocked || !isConditionMet(achievement.condition, discovered)) continue;
-    const claimedAt = Date.parse(claimed?.[achievement.name]?.unlockedAt);
-    const unlockedAt = Number.isNaN(claimedAt) || claimedAt > Date.now() ? new Date().toISOString() : new Date(claimedAt).toISOString();
-    updated[achievement.name] = { unlocked: true, unlockedAt };
-    newlyUnlocked.push({ ...achievement, unlockedAt });
-  }
-  if (newlyUnlocked.length) {
-    await db.query('UPDATE progress SET achievements = $1, last_saved = CURRENT_TIMESTAMP WHERE user_id = $2', [JSON.stringify(updated), userId]);
-  }
-  return { achievements: updated, newlyUnlocked };
+    const updated = { ...(rows[0].achievements || {}) };
+    const discovered = rows[0].infinite_elements || [];
+    const newlyUnlocked = [];
+    for (const achievement of all) {
+      if (updated[achievement.name]?.unlocked || !isConditionMet(achievement.condition, discovered)) continue;
+      const claimedAt = Date.parse(claimed?.[achievement.name]?.unlockedAt);
+      const unlockedAt = Number.isNaN(claimedAt) || claimedAt > Date.now() ? new Date().toISOString() : new Date(claimedAt).toISOString();
+      updated[achievement.name] = { unlocked: true, unlockedAt };
+      newlyUnlocked.push({ ...achievement, unlockedAt });
+    }
+    if (newlyUnlocked.length) {
+      await conn.query('UPDATE progress SET achievements = $1, last_saved = CURRENT_TIMESTAMP WHERE user_id = $2', [JSON.stringify(updated), userId]);
+    }
+    return { achievements: updated, newlyUnlocked };
+  });
 }
 
 async function updateUserAchievements(userId, claimed) {

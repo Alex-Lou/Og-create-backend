@@ -45,7 +45,11 @@ async function stowCrafts(userId, rows, levels, zones, annexRows) {
     const ctx = craftCtx(levels, zones, annexRows, []);
     const out = placedOf(rows).filter(r => !ctx.free(r.x, r.y));
     if (!out.length) return rows;
-    await db.query('UPDATE world_crafts SET x = NULL, y = NULL WHERE user_id = $1 AND id = ANY($2::int[])', [userId, out.map(r => r.id)]);
+    // Seulement si elle est toujours sur cette case : déplacée entre-temps (/craft/move), elle reste où elle est
+    await db.query(
+        `UPDATE world_crafts c SET x = NULL, y = NULL FROM unnest($2::int[], $3::int[], $4::int[]) AS seen(id, x, y)
+         WHERE c.user_id = $1 AND c.id = seen.id AND c.x = seen.x AND c.y = seen.y`,
+        [userId, out.map(r => r.id), out.map(r => r.x), out.map(r => r.y)]);
     return craftsOf(userId);
 }
 // Questions de l'Épreuve réussies (progress.timer_progress : niveau → catégorie → identifiants)

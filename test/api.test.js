@@ -1,7 +1,7 @@
 // Tests de l'API sur une vraie base : le serveur est le seul juge des écus et des succès
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { startServer, api, sql, newPlayer, coinsOf } = require('./helpers');
+const { startServer, api, sql, whileHeld, newPlayer, coinsOf } = require('./helpers');
 
 let server;
 test.before(async () => { server = await startServer(); });
@@ -35,6 +35,19 @@ test('un succès se mérite côté serveur, pas en le déclarant', async () => {
   assert.equal(after.achievements['Maître des Arcanes'].unlocked, true);
   const owned = (await api('GET', '/customization/unlocked', null, player)).data.map(item => item.image_path);
   assert.ok(owned.includes('ouroboros'));
+});
+
+test('deux recalculs des succès en même temps ne s’écrasent pas', async () => {
+  const player = await newPlayer();
+  await sql(`UPDATE progress SET achievements = '{}'::jsonb, infinite_elements = '["Eau","Feu","Terre","Air","Vapeur"]'::jsonb WHERE user_id = $1`, [player.userId]);
+  // Un autre recalcul inscrit un succès (transaction tenue) : celui-ci l'attend, puis ajoute le sien sans l'effacer
+  const synced = await whileHeld(
+    tx => tx.query(`UPDATE progress SET achievements = '{"Témoin": {"unlocked": true, "unlockedAt": "2026-01-01T00:00:00.000Z"}}'::jsonb WHERE user_id = $1`, [player.userId]),
+    () => api('POST', '/achievements/update', { achievements: { 'Eurêka': { unlocked: true, unlockedAt: '2026-01-02T00:00:00.000Z' } } }, player));
+  assert.equal(synced.status, 200);
+  assert.deepEqual(synced.data.newlyUnlocked.map(a => a.name), ['Eurêka']);
+  const [row] = await sql('SELECT achievements FROM progress WHERE user_id = $1', [player.userId]);
+  assert.deepEqual(Object.keys(row.achievements).sort(), ['Eurêka', 'Témoin']);
 });
 
 test('un achat au Cabinet est inscrit au grand livre', async () => {

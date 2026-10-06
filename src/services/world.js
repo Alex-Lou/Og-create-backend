@@ -412,8 +412,10 @@ function startRun(userId) {
         const { boosts } = effects;
         const kinds = first ? FIRST_RUN_KINDS : effects.kinds;
         const maxMoves = effects.maxMoves + (first ? FIRST_RUN_MOVES : 0);
+        // Heure prise après le verrou de la réserve (et non au début de la transaction) : un achat passé avant ce
+        // départ est toujours plus ancien (undoItem)
         const { rows } = await conn.query(
-            'INSERT INTO world_runs (user_id, seed, config) VALUES ($1, $2, $3) RETURNING id',
+            'INSERT INTO world_runs (user_id, seed, config, created_at) VALUES ($1, $2, $3, clock_timestamp()) RETURNING id',
             [userId, seed, JSON.stringify({ kinds, maxMoves, boosts })]);
         return { run: { id: Number(rows[0].id), seed, kinds, maxMoves, boosts } };
     });
@@ -531,9 +533,20 @@ async function buyItem(userId, itemId) {
     });
 }
 
+// Effets de la boutique figés au départ d'une partie de Récolte ou d'une expédition : coups, réserve, recharge
+const RUN_EFFECTS = ['moves', 'charges', 'regenMs'];
+// Une partie de Récolte ou une expédition partie depuis `since` ?
+async function startedSince(userId, conn, since) {
+    const { rows } = await conn.query(
+        `SELECT 1 FROM world_runs WHERE user_id = $1 AND created_at >= $2
+         UNION ALL SELECT 1 FROM world_expeditions WHERE user_id = $1 AND started_at >= $2 LIMIT 1`, [userId, since]);
+    return rows.length > 0;
+}
+
 // Annulation d'un achat de la boutique juste après (achat en un toucher) : l'article est rendu, ses écus remboursés
 // une seule fois (même en double clic), son skin retiré s'il était porté. Un article gagné dans un coffre ne se rend
-// pas. { status, message } si refus ou trop tard
+// pas, ni un article qui a déjà servi (une partie ou une expédition partie depuis l'achat a emporté ses coups, sa
+// réserve ou sa recharge). { status, message } si refus ou trop tard
 async function undoItem(userId, itemId) {
     const item = shop.ITEM_BY_ID[itemId];
     if (!item) return { status: 404, message: 'Article inconnu.' };
@@ -545,6 +558,9 @@ async function undoItem(userId, itemId) {
             `DELETE FROM world_items WHERE user_id = $1 AND item = $2 AND source = 'boutique' AND bought_at > NOW() - make_interval(secs => $3) RETURNING bought_at`,
             [userId, item.id, UNDO_SECONDS]);
         if (!removed.rows.length) return db.rollback({ status: 409, message: 'Trop tard pour annuler cet achat.' });
+        if (RUN_EFFECTS.some(effect => item.effect?.[effect]) && await startedSince(userId, conn, removed.rows[0].bought_at)) {
+            return db.rollback({ status: 409, message: 'Cet article a déjà servi à une partie : il ne se rend plus.' });
+        }
         await conn.query('DELETE FROM world_skins WHERE user_id = $1 AND site = $2 AND skin = $3', [userId, item.site, item.id]);
         const { coins } = await ledger.credit(userId, item.price, 'boutique-annulee', `${item.id}:${removed.rows[0].bought_at.getTime()}`, conn);
         return { undone: item.name, coins };
@@ -560,10 +576,15 @@ async function chooseSkin(userId, siteId, skinId) {
     }
     const item = shop.ITEM_BY_ID[skinId];
     if (!item || item.kind !== 'skin' || item.site !== siteId) return { status: 400, message: 'Ce skin ne va pas sur ce bâtiment.' };
-    if (!(await itemsOf(userId)).has(skinId)) return { status: 403, message: item.rare ? 'Trouve d’abord cette pièce rare dans les butins.' : 'Achète d’abord ce skin.' };
-    await db.query(`INSERT INTO world_skins (user_id, site, skin) VALUES ($1, $2, $3)
-        ON CONFLICT (user_id, site) DO UPDATE SET skin = EXCLUDED.skin`, [userId, siteId, skinId]);
-    return {};
+    // L'article reste verrouillé le temps de le porter : une annulation de son achat (undoItem) attend, ou se fait
+    // attendre puis le retire ; sans ce verrou, un skin remboursé pouvait rester porté
+    return db.transaction(async conn => {
+        const owned = await conn.query('SELECT 1 FROM world_items WHERE user_id = $1 AND item = $2 FOR SHARE', [userId, skinId]);
+        if (!owned.rows.length) return db.rollback({ status: 403, message: item.rare ? 'Trouve d’abord cette pièce rare dans les butins.' : 'Achète d’abord ce skin.' });
+        await conn.query(`INSERT INTO world_skins (user_id, site, skin) VALUES ($1, $2, $3)
+            ON CONFLICT (user_id, site) DO UPDATE SET skin = EXCLUDED.skin`, [userId, siteId, skinId]);
+        return {};
+    });
 }
 
 // Le nom du peuple (bible, § 6.11 ; la quête « peuple » de l'acte V) : même règle que les autres noms, rangé dans
