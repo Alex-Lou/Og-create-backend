@@ -20,6 +20,20 @@ CREATE TABLE IF NOT EXISTS users (
     created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
+-- Réglages du compte (services/accountSettings.js) : suspendu depuis (en pause, sans mail ; se reconnecter le
+-- réactive) ; suppression prévue le (sept jours de grâce : se reconnecter l'annule)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS delete_at TIMESTAMPTZ;
+
+-- Nouvelle adresse en attente : confirmée par un lien envoyé à cette adresse, valable une heure (seule l'empreinte
+-- SHA-256 du jeton est gardée) ; une seule demande par compte
+CREATE TABLE IF NOT EXISTS email_changes (
+    user_id    INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    new_email  VARCHAR(255) NOT NULL,
+    token_hash CHAR(64) NOT NULL UNIQUE,
+    expires_at TIMESTAMPTZ NOT NULL
+);
+
 -- ---------------------------------------------------------------------
 -- Ancienne table des jetons de rafraîchissement, remplacée par auth_sessions
 -- ---------------------------------------------------------------------
