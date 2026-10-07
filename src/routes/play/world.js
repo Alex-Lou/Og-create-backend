@@ -12,6 +12,25 @@ const { PAGE, playLimiter, withAccount } = require('./shared');
 const router = express.Router();
 router.use('/world', playLimiter);
 
+// Les calques de la carte (relief, sol, quartiers : 85 Ko) ne voyagent que si le navigateur ne les a pas déjà : il
+// envoie la clé des siens (X-Map-Key) ; la vue (seule ou dans world) part alors sans eux, avec la même clé
+const LAYERS = ['grid', 'height', 'ground', 'region'];
+function withoutKnownMap(body, known) {
+    const view = body && (body.map ? body : body.world);
+    if (!view || !view.map || view.map.key !== known) return body;
+    const map = Object.fromEntries(Object.entries(view.map).filter(([k]) => !LAYERS.includes(k)));
+    const light = { ...view, map };
+    return body.map ? light : { ...body, world: light };
+}
+router.use('/world', (req, res, next) => {
+    const known = req.get('X-Map-Key');
+    if (known) {
+        const json = res.json.bind(res);
+        res.json = body => json(withoutKnownMap(body, known));
+    }
+    next();
+});
+
 // Chapitres ouverts du joueur (un joueur d'avant la bible garde le chapitre II ouvert d'emblée)
 const chaptersOf = async (owner, b, owned) => bookPages.openChapters(b, owned, await players.isVeteran(owner));
 

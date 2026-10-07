@@ -29,7 +29,7 @@ app.use(helmet({
 app.use(cors({
     origin: process.env.CORS_ORIGIN || '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'X-Requested-With'],
+    allowedHeaders: ['Content-Type', 'X-Requested-With', 'X-Map-Key'],
     credentials: true,
     optionsSuccessStatus: 200
 }));
