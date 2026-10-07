@@ -2205,6 +2205,15 @@ test('chaque objectif de la chaîne se lit dans l’état (création, annexe, ex
   assert.equal((await api('POST', '/play/world/player', { name: 'Ana' }, { cookies: {} })).status, 401);
   const me = (await api('POST', '/play/world/player', { name: '  Ana  Lys ' }, player)).data;
   assert.deepEqual([me.player, me.people], ['Ana Lys', 'Les Marées']);
+  // Son avatar, choisi sur la carte d'embarquement : l'un des douze exemples de la bibliothèque ; il peut changer
+  assert.equal(me.avatar, null);
+  for (const look of ['avatar-00', 'avatar-13', 'avatar-1', '', 'autre', ['avatar-01'], { look: 'avatar-01' }]) {
+    assert.equal((await api('POST', '/play/world/avatar', { look }, player)).status, 400, JSON.stringify(look));
+  }
+  assert.equal((await api('POST', '/play/world/avatar', { look: 'avatar-07' }, { cookies: {} })).status, 401);
+  assert.equal((await api('POST', '/play/world/avatar', { look: 'avatar-07' }, player)).data.avatar, 'avatar-07');
+  assert.equal((await api('POST', '/play/world/avatar', { look: 'avatar-12' }, player)).data.avatar, 'avatar-12');
+  assert.equal((await api('GET', '/play/world', null, player)).data.avatar, 'avatar-12');
   // Un quartier dont le chapitre est encore fermé : Brume dit lequel ouvrir
   const hameau = await after('installe');
   assert.deepEqual([hameau.id, hameau.chapter], ['hameau', 'V']);
