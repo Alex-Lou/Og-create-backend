@@ -11,7 +11,7 @@
 // charges, regenCut, moves : réserve, retour d'une partie, coups de Récolte (comme la boutique) ; house : un logement.
 // Fonctions pures, sans base de données.
 
-const REACH = 2;
+const REACH = 4;
 const SMALL_LEVELS = [2, 3, 5]; // palier du bâtiment qui ouvre chaque exemplaire d'une petite annexe
 const SMALL_COINS = [100, 250, 600];
 const KIND_LEVEL = { reserve: 4, grand: 6, climate: 3 };

@@ -11,55 +11,55 @@ const PRODUCERS = Object.keys(SITE_LABEL);
 // cap (heures de production gardées, pour chaque bâtiment qui produit), prod ({ bâtiment: part en plus })
 const LANDMARKS = [
     {
-        id: 'grotte', name: 'La Grotte de glace', zone: 'neiges', x: 52, y: 10, chest: 'legendaire', effect: { charges: 1 },
+        id: 'grotte', name: 'La Grotte de glace', zone: 'neiges', x: 78, y: 15, chest: 'legendaire', effect: { charges: 1 },
         text: 'Une bouche bleue s’ouvre au pied du glacier ; dedans, la glace chante quand le vent passe.'
     },
     {
-        id: 'lac', name: 'Le Lac gelé', zone: 'neiges', x: 44, y: 8, chest: 'rare', effect: { cap: 2 },
+        id: 'lac', name: 'Le Lac gelé', zone: 'neiges', x: 66, y: 12, chest: 'rare', effect: { cap: 2 },
         text: 'Sous la glace claire dorment des poissons d’argent, immobiles comme des souvenirs.'
     },
     {
-        id: 'col', name: 'Le Col du Vent', zone: 'contreforts', x: 36, y: 14, chest: 'rare', effect: { regenCut: 3 * 60 * 1000 },
+        id: 'col', name: 'Le Col du Vent', zone: 'contreforts', x: 54, y: 21, chest: 'rare', effect: { regenCut: 3 * 60 * 1000 },
         text: 'Des fanions claquent entre deux pics : ici, le vent pousse toujours dans le dos du voyageur.'
     },
     {
-        id: 'menhirs', name: 'Le Cercle de menhirs', zone: 'menhirs', x: 13, y: 22, chest: 'rare', effect: { moves: 2 },
+        id: 'menhirs', name: 'Le Cercle de menhirs', zone: 'menhirs', x: 20, y: 33, chest: 'rare', effect: { moves: 2 },
         text: 'Sept pierres dressées, plus vieilles que l’île ; leurs gravures luisent à la nuit tombée.'
     },
     {
-        id: 'arche', name: 'L’Arche des falaises', zone: 'falaises', x: 3, y: 14, chest: 'rare', effect: { prod: { carriere: 0.1 } },
+        id: 'arche', name: 'L’Arche des falaises', zone: 'falaises', x: 5, y: 21, chest: 'rare', effect: { prod: { carriere: 0.1 } },
         text: 'La mer a percé la falaise d’une arche immense, où nichent les goélands.'
     },
     {
-        id: 'saule', name: 'Le Saule millénaire', zone: 'roselieres', x: 22, y: 45, chest: 'rare', effect: { prod: { potager: 0.1 } },
+        id: 'saule', name: 'Le Saule millénaire', zone: 'roselieres', x: 33, y: 68, chest: 'rare', effect: { prod: { potager: 0.1 } },
         text: 'Ses branches trempent dans l’eau dormante ; les grenouilles le disent aussi vieux que la brume.'
     },
     {
-        id: 'pilotis', name: 'La Cabane sur pilotis', zone: 'bayou', x: 10, y: 52, chest: 'rare', effect: { prod: { ponton: 0.1 } },
+        id: 'pilotis', name: 'La Cabane sur pilotis', zone: 'bayou', x: 15, y: 78, chest: 'rare', effect: { prod: { ponton: 0.1 } },
         text: 'Une cabane de pêcheur oubliée, perchée sur l’eau ; les lucioles y tiennent conseil chaque soir.'
     },
     {
-        id: 'oasis', name: 'La Source de l’oasis', zone: 'oasis', x: 20, y: 80, chest: 'rare', effect: { prod: { puits: 0.1 } },
+        id: 'oasis', name: 'La Source de l’oasis', zone: 'oasis', x: 30, y: 120, chest: 'rare', effect: { prod: { puits: 0.1 } },
         text: 'Au milieu du sable, une eau fraîche jaillit d’un rocher, à l’ombre de trois palmiers.'
     },
     {
-        id: 'pyramide', name: 'La Pyramide ensablée', zone: 'dunes', x: 26, y: 88, chest: 'legendaire', effect: { moves: 2 },
+        id: 'pyramide', name: 'La Pyramide ensablée', zone: 'dunes', x: 39, y: 132, chest: 'legendaire', effect: { moves: 2 },
         text: 'Seul son sommet dépasse des dunes ; le soleil couchant y dessine des signes oubliés.'
     },
     {
-        id: 'arbre', name: 'L’Arbre-géant', zone: 'canopee', x: 44, y: 82, chest: 'rare', effect: { prod: { bosquet: 0.1 } },
+        id: 'arbre', name: 'L’Arbre-géant', zone: 'canopee', x: 66, y: 123, chest: 'rare', effect: { prod: { bosquet: 0.1 } },
         text: 'Son tronc vaut dix maisons ; dans ses racines, la jungle entière semble respirer.'
     },
     {
-        id: 'cascade', name: 'La Grande cascade', zone: 'cascade', x: 62, y: 80, chest: 'legendaire', effect: { cap: 2 },
+        id: 'cascade', name: 'La Grande cascade', zone: 'cascade', x: 93, y: 120, chest: 'legendaire', effect: { cap: 2 },
         text: 'L’eau tombe de la falaise en un rideau blanc ; dans ses embruns flotte toujours un arc-en-ciel.'
     },
     {
-        id: 'geyser', name: 'Le Geyser', zone: 'coulees', x: 80, y: 86, chest: 'legendaire', effect: { regenCut: 3 * 60 * 1000 },
+        id: 'geyser', name: 'Le Geyser', zone: 'coulees', x: 120, y: 129, chest: 'legendaire', effect: { regenCut: 3 * 60 * 1000 },
         text: 'Toutes les quelques minutes, la terre souffle une colonne de vapeur brûlante vers le ciel.'
     },
     {
-        id: 'cratere', name: 'Le Lac de lave', zone: 'cratere', x: 84, y: 80, chest: 'legendaire', effect: { charges: 1 },
+        id: 'cratere', name: 'Le Lac de lave', zone: 'cratere', x: 126, y: 120, chest: 'legendaire', effect: { charges: 1 },
         text: 'Au cœur du cratère, la lave bouillonne lentement ; ses lueurs se voient depuis toute l’île.'
     }
 ];

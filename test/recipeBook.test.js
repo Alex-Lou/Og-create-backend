@@ -310,14 +310,33 @@ test('la très grande île : calques cohérents, le cœur intact, chantiers à p
       else assert.ok(map.heightAt(x, y) >= 0 && map.heightAt(x, y) <= 6 && map.zoneAt(x, y), `${x},${y}`);
     }
   }
-  // Le cœur : chaque case de terre de la grande île, telle quelle, en OFFSET
-  for (let y = 0; y < 48; y++) {
-    for (let x = 0; x < 48; x++) {
-      if (heart.GROUND[y][x] === '~') continue;
-      const X = x + map.OFFSET.x, Y = y + map.OFFSET.y;
-      assert.deepEqual([map.GROUND[Y][X], map.HEIGHT[Y][X], map.REGION[Y][X]], [heart.GROUND[y][x], heart.HEIGHT[y][x], heart.REGION[y][x]], `${x},${y}`);
+  // La grande carte : la très grande île (v4) à l'échelle × 1,5. Chaque case v5 reprend sa case v4 (formes, quartiers,
+  // ponts, chemins) ; seule la mer a pu devenir terre, au lissage des côtes, et quelques cases devenir chemin (un
+  // bâtiment au bout du sien), jamais là où arrive une position v4. Une position de joueur v4 passe sur une case du même
+  // sol et du même quartier (worldMap.fromV4)
+  const v4 = require('../src/services/worldMapV4');
+  const src = X => Math.floor((2 * X) / 3);
+  assert.equal(map.SIZE, (v4.SIZE * 3) / 2);
+  for (let y = 0; y < map.SIZE; y++) {
+    for (let x = 0; x < map.SIZE; x++) {
+      const [g, h, r] = [v4.GROUND[src(y)][src(x)], v4.HEIGHT[src(y)][src(x)], v4.REGION[src(y)][src(x)]];
+      const raccord = map.GROUND[y][x] === 'p' && 'gsm'.includes(g) && (x % 3 === 1 || y % 3 === 1);
+      if (g !== '~') assert.deepEqual([raccord ? g : map.GROUND[y][x], map.HEIGHT[y][x], map.REGION[y][x]], [g, h, r], `${x},${y}`);
+      else if (map.GROUND[y][x] !== '~') assert.ok('sgm'.includes(map.GROUND[y][x]), `${x},${y}`);
     }
   }
+  for (let y = 0; y < v4.SIZE; y++) {
+    for (let x = 0; x < v4.SIZE; x++) {
+      if (!v4.isLand(x, y)) continue;
+      const [X, Y] = [map.fromV4(x), map.fromV4(y)];
+      assert.deepEqual([map.groundAt(X, Y), map.zoneAt(X, Y)], [v4.groundAt(x, y), v4.zoneAt(x, y)], `${x},${y}`);
+    }
+  }
+  // Deux cases v4 voisines restent deux cases v5 distinctes : rien ne se heurte à la migration
+  assert.ok(Array.from({ length: v4.SIZE - 1 }, (_, v) => map.fromV4(v + 1) - map.fromV4(v)).every(d => d === 1 || d === 2));
+  assert.deepEqual(map.NEIGHBORS, v4.NEIGHBORS);
+  // Le cœur de la grande île (v3) est toujours là, en son centre
+  assert.equal(heart.GROUND[0].length, 48);
   // Chaque chantier : grande emprise 3 × 3 plate, constructible, dans un seul quartier ; la petite y est incluse
   for (const [id, p] of Object.entries(map.SITE_BIG)) {
     const cells = [];

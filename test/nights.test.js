@@ -73,13 +73,13 @@ test('ils sortent du bord de la brume et marchent droit vers le bâtiment le plu
   assert.deepEqual(nights.planOf(42, '2026-10-06', { ...island, sites: [] }), []);
 });
 
-test('la lumière les change en lucioles (2 cases), la clôture barre sa case, le feu du Foyer éclaire', () => {
+test('la lumière les change en lucioles (3 cases), la clôture barre sa case, le feu du Foyer éclaire', () => {
   const walker = { id: 'n:0', site: 'puits', path: nights.lineOf({ x: 10, y: 10 }, { x: 20, y: 10 }), at: 0, arrives: 10 * nights.MS_PER_CELL };
   const none = nights.defenseOf([], {});
   assert.deepEqual(nights.fateOf(walker, none), { end: 'arrive', step: 10 });
-  // Une lanterne à 2 cases du chemin : luciole dès la première case à portée
-  assert.deepEqual(nights.fateOf(walker, nights.defenseOf([{ craft: 'lanterne', x: 15, y: 12 }], {})), { end: 'luciole', step: 3 });
-  assert.deepEqual(nights.fateOf(walker, nights.defenseOf([{ craft: 'lanterne', x: 15, y: 13 }], {})), { end: 'arrive', step: 10 });
+  // Une lanterne à 3 cases du chemin : luciole dès la première case à portée ; à 4, rien
+  assert.deepEqual(nights.fateOf(walker, nights.defenseOf([{ craft: 'lanterne', x: 15, y: 13 }], {})), { end: 'luciole', step: 2 });
+  assert.deepEqual(nights.fateOf(walker, nights.defenseOf([{ craft: 'lanterne', x: 15, y: 14 }], {})), { end: 'arrive', step: 10 });
   // Une clôture sur le chemin ; à côté, rien
   assert.deepEqual(nights.fateOf(walker, nights.defenseOf([{ craft: 'cloture', x: 14, y: 10 }], {})), { end: 'barre', step: 4 });
   assert.deepEqual(nights.fateOf(walker, nights.defenseOf([{ craft: 'muret', x: 14, y: 11 }], {})), { end: 'arrive', step: 10 });
@@ -88,7 +88,7 @@ test('la lumière les change en lucioles (2 cases), la clôture barre sa case, l
   // Le feu du Foyer : son emprise compte comme une lumière
   const foyer = map.footprintOf('foyer', 1);
   const toFoyer = { ...walker, path: nights.lineOf({ x: foyer.x - 6, y: foyer.y }, { x: foyer.x, y: foyer.y }) };
-  assert.deepEqual(nights.fateOf(toFoyer, nights.defenseOf([], { foyer: 1 })), { end: 'luciole', step: 4 });
+  assert.deepEqual(nights.fateOf(toFoyer, nights.defenseOf([], { foyer: 1 })), { end: 'luciole', step: 3 });
 });
 
 test('une nuit embrume au plus un bâtiment : le premier arrivé ; un camarade content en repousse un, le toucher aussi', () => {

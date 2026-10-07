@@ -54,7 +54,7 @@ const giftPoints = (villager, resource) => (resource === villager.loves ? GIFT.l
 const NEEDS = {
     manger: { label: 'Manger', hours: 24, cost: { food: 10 } },
     outils: { label: 'Travailler', hours: 48, cost: { stone: 5, wood: 5 } },
-    deco: { label: 'Se distraire', decos: 3, reach: 3 }
+    deco: { label: 'Se distraire', decos: 3, reach: 6 }
 };
 const FILLABLE = ['manger', 'outils'];
 const HOUR_MS = 3600000;

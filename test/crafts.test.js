@@ -65,20 +65,20 @@ test('paliers : I par le chapitre I fini ou 10 questions de l’Épreuve ; II et
 
 test('règles de pose : sol, bord de chemin, près d’un bâtiment, près d’une autre création', () => {
   const ground = (x, y) => (y === 0 ? 'p' : x > 5 ? 's' : 'g');
-  const ctx = (placed = []) => ({ ground, free: (x, y) => x >= 0 && y >= 0 && x < 10 && y < 10, site: id => (id === 'potager' ? { x: 0, y: 5, w: 2, h: 2 } : null), placed });
+  const ctx = (placed = []) => ({ ground, free: (x, y) => x >= 0 && y >= 0 && x < 20 && y < 20, site: id => (id === 'potager' ? { x: 0, y: 5, w: 2, h: 2 } : null), placed });
   const by = id => crafts.CRAFT_BY_ID[id];
   assert.equal(crafts.spotBlock(by('cloture'), 3, 3, ctx()), null);
-  assert.match(crafts.spotBlock(by('cloture'), 20, 3, ctx()), /occupée/);
+  assert.match(crafts.spotBlock(by('cloture'), 25, 3, ctx()), /occupée/);
   assert.match(crafts.spotBlock(by('massif'), 7, 3, ctx()), /herbe/);
   assert.equal(crafts.spotBlock(by('longuevue'), 7, 3, ctx()), null);
   assert.equal(crafts.spotBlock(by('lanterne'), 3, 1, ctx()), null);
   assert.match(crafts.spotBlock(by('lanterne'), 3, 3, ctx()), /chemin/);
   assert.equal(crafts.spotBlock(by('epouvantail'), 4, 6, ctx()), null);
-  assert.match(crafts.spotBlock(by('epouvantail'), 5, 1, ctx()), /bâtiment/);
+  assert.match(crafts.spotBlock(by('epouvantail'), 1, 14, ctx()), /bâtiment/);
   assert.match(crafts.spotBlock(by('nichoir'), 3, 3, ctx()), /bâtiment/);
   assert.match(crafts.spotBlock(by('banc'), 3, 3, ctx()), /Lanterne/);
   assert.equal(crafts.spotBlock(by('banc'), 3, 3, ctx([{ x: 4, y: 4, craft: 'lanterne' }])), null);
-  assert.match(crafts.placeText(by('epouvantail'), () => 'Serre'), /3 cases au plus de « Serre »/);
+  assert.match(crafts.placeText(by('epouvantail'), () => 'Serre'), /6 cases au plus de « Serre »/);
   assert.equal(crafts.placeText(by('cloture')), 'Se pose sur n’importe quelle case libre.');
 });
 
@@ -87,7 +87,7 @@ test('règle « près de » tenue au déplacement et au rangement : la Lanterne 
   const banc = { id: 2, x: 3, y: 3, craft: 'banc' };
   const placed = [lanterne, banc];
   // Ranger la Lanterne, ou l'éloigner : non ; la déplacer à 2 cases du Banc : oui
-  assert.equal(crafts.leaveBlock(lanterne, null, null, placed), '« Banc » a besoin de « Lanterne » à 2 cases au plus : déplace ou range d’abord « Banc ».');
+  assert.equal(crafts.leaveBlock(lanterne, null, null, placed), '« Banc » a besoin de « Lanterne » à 3 cases au plus : déplace ou range d’abord « Banc ».');
   assert.match(crafts.leaveBlock(lanterne, 9, 9, placed), /Banc/);
   assert.equal(crafts.leaveBlock(lanterne, 5, 5, placed), null);
   // Ce que la Lanterne garde à portée (la vue le dit au navigateur) : le Banc ; le Banc, lui, ne garde rien
@@ -101,9 +101,9 @@ test('règle « près de » tenue au déplacement et au rangement : la Lanterne 
   assert.equal(crafts.leaveBlock(fence, null, null, [...placed, fence]), null);
   // Un Banc déjà loin de toute Lanterne (posé avant cette règle) ne bloque rien
   assert.equal(crafts.leaveBlock(lanterne, 5, 5, [...placed, { id: 5, x: 9, y: 9, craft: 'banc' }]), null);
-  // La Fontaine garde son Bassin, à 3 cases
+  // La Fontaine garde son Bassin, à 5 cases
   const fontaine = { id: 6, x: 0, y: 0, craft: 'fontaine' };
-  assert.match(crafts.leaveBlock(fontaine, null, null, [fontaine, { id: 7, x: 3, y: 3, craft: 'bassin' }]), /« Bassin » a besoin de « Fontaine » à 3 cases/);
+  assert.match(crafts.leaveBlock(fontaine, null, null, [fontaine, { id: 7, x: 3, y: 3, craft: 'bassin' }]), /« Bassin » a besoin de « Fontaine » à 5 cases/);
   assert.equal(crafts.leaveBlock(fontaine, 1, 0, [fontaine, { id: 7, x: 3, y: 3, craft: 'bassin' }]), null);
 });
 

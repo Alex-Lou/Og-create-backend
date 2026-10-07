@@ -11,7 +11,8 @@
 //   case) ; le serveur vérifie que les pièces couvrent exactement le gabarit. Le front reçoit les pièces ; il ne
 //   recopie que le quart de tour (turn, src/world/crafts.js).
 // - Pose : sol permis (ground), au bord d'un chemin (path), près d'un bâtiment (nearSite) ou d'une autre création
-//   (nearCraft), à reach cases au plus (en tous sens), dans un quartier d'un climat (climate).
+//   (nearCraft), à reach cases au plus (en tous sens), dans un quartier d'un climat (climate). Les portées ont grandi
+//   avec la grande carte (× 1,5, carte v5) : aucune création déjà posée ne perd sa règle.
 // Fonctions pures, sans base de données.
 const map = require('./worldMap');
 const finds = require('./finds');
@@ -35,19 +36,19 @@ const CRAFTS = [
     craft('massif', 'Massif de fleurs', 'start', { water: 6, food: 4 }, ['Terre'], [], { ground: 'gm' }, ['.x.', 'xxx', 'xxx']),
     craft('muret', 'Muret de pierre', 'I', { stone: 12 }, ['Terre'], ['cloture'], {}, ['xxxx', 'xxxx']),
     craft('lanterne', 'Lanterne', 'I', { wood: 6, stone: 6 }, ['Feu', 'Lumière'], [], { path: true }, ['xxx', 'xxx', '.x.', '.x.']),
-    craft('banc', 'Banc', 'I', { wood: 14 }, [], ['cloture'], { nearCraft: { id: 'lanterne', reach: 2 } }, ['xxxx', 'xxxx', 'x..x']),
-    craft('epouvantail', 'Épouvantail', 'I', { wood: 8, food: 8 }, ['Vent'], ['massif'], { nearSite: { id: 'potager', reach: 3 } }, ['.x.', 'xxx', '.x.', 'xxx']),
-    craft('nichoir', 'Nichoir', 'I', { wood: 10 }, ['Air'], ['cloture'], { nearSite: { id: 'bosquet', reach: 3 } }, ['.x.', 'xxx', 'xxx', '.x.']),
+    craft('banc', 'Banc', 'I', { wood: 14 }, [], ['cloture'], { nearCraft: { id: 'lanterne', reach: 3 } }, ['xxxx', 'xxxx', 'x..x']),
+    craft('epouvantail', 'Épouvantail', 'I', { wood: 8, food: 8 }, ['Vent'], ['massif'], { nearSite: { id: 'potager', reach: 6 } }, ['.x.', 'xxx', '.x.', 'xxx']),
+    craft('nichoir', 'Nichoir', 'I', { wood: 10 }, ['Air'], ['cloture'], { nearSite: { id: 'bosquet', reach: 6 } }, ['.x.', 'xxx', 'xxx', '.x.']),
     craft('girouette', 'Girouette', 'I', { wood: 10, stone: 6 }, ['Vent'], ['muret'], {}, ['xxx', '.x.', '.x.', 'xxx']),
-    craft('fontaine', 'Fontaine', 'II', { stone: 30, water: 20 }, ['Pierre', 'Eau'], ['muret'], { nearSite: { id: 'puits', reach: 3 } }, ['.xx.', 'xxxx', 'xxxx', '.xx.']),
+    craft('fontaine', 'Fontaine', 'II', { stone: 30, water: 20 }, ['Pierre', 'Eau'], ['muret'], { nearSite: { id: 'puits', reach: 6 } }, ['.xx.', 'xxxx', 'xxxx', '.xx.']),
     craft('brasero', 'Brasero', 'II', { stone: 16, wood: 10 }, ['Fer', 'Charbon'], ['lanterne'], { path: true }, ['xxxx', 'xxxx', '.xx.', '.xx.']),
     craft('pergola', 'Pergola', 'II', { wood: 30, water: 10 }, ['Corde'], ['banc', 'massif'], {}, ['xxxxx', 'x.x.x', 'x.x.x']),
     craft('statue', 'Statue', 'II', { stone: 40 }, ['Marbre'], ['muret'], {}, ['.x.', 'xxx', '.x.', 'xxx', 'xxx']),
     craft('arche', 'Arche fleurie', 'II', { wood: 24, water: 16 }, ['Corde'], ['massif', 'cloture'], { path: true }, ['xxxx', 'x..x', 'x..x', 'x..x']),
-    craft('etal', 'Étal du marché', 'II', { wood: 24, food: 16 }, ['Tissu'], ['banc'], { nearSite: { id: 'foyer', reach: 4 } }, ['xxxxx', 'xxxxx', 'x...x']),
+    craft('etal', 'Étal du marché', 'II', { wood: 24, food: 16 }, ['Tissu'], ['banc'], { nearSite: { id: 'foyer', reach: 7 } }, ['xxxxx', 'xxxxx', 'x...x']),
     craft('kiosque', 'Kiosque', 'III', { wood: 60, stone: 40 }, ['Bronze'], ['pergola', 'lanterne'], {}, ['..x..', '.xxx.', 'xxxxx', '.x.x.', '.x.x.']),
     craft('cadran', 'Cadran solaire', 'III', { stone: 50 }, ['Soleil'], ['statue'], {}, ['..x..', '.xxx.', 'xxxxx', '.xxx.', '..x..']),
-    craft('bassin', 'Bassin', 'III', { stone: 40, water: 40 }, ['Source'], ['fontaine'], { nearCraft: { id: 'fontaine', reach: 3 } }, ['xxxxx', 'x...x', 'xxxxx']),
+    craft('bassin', 'Bassin', 'III', { stone: 40, water: 40 }, ['Source'], ['fontaine'], { nearCraft: { id: 'fontaine', reach: 5 } }, ['xxxxx', 'x...x', 'xxxxx']),
     craft('longuevue', 'Longue-vue', 'III', { stone: 20, wood: 20 }, ['Étoile', 'Lentille'], ['girouette'], { ground: 's' }, ['...xx', '..xx.', '.xx..', 'xxx..', 'x.x..']),
     // Créations de climat (lot 9d) : deux par climat, la seconde après la première
     craft('igloo', 'Igloo', 'climat', { wood: 10 }, ['Neige'], [], { climate: 'cimes', ground: 'n' }, ['.xxx.', 'xxxxx', 'xx.xx'], { glace: 8 }),

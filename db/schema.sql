@@ -276,7 +276,8 @@ CREATE TABLE IF NOT EXISTS world_buildings (
 );
 -- Le Monde v3 : carte commune de 20 × 20 (services/worldMap.js) et quartiers achetés par le joueur.
 -- map_version : 1 = ancienne île 14 × 14 ; 2 = île 20 × 20 ; 3 = grande île 48 × 48 ; 4 = très grande île 96 × 96 (la
--- précédente en est le cœur). Le passage se fait une fois par joueur, à sa première visite (services/world.js, migrate).
+-- précédente en est le cœur) ; 5 = la grande carte 144 × 144 (la v4 à l'échelle × 1,5). Le passage se fait une fois
+-- par joueur, à sa première visite (services/world/migrate.js).
 ALTER TABLE world_stock ADD COLUMN IF NOT EXISTS map_version SMALLINT NOT NULL DEFAULT 1;
 -- Ce que les bâtiments ont produit sans faire encore une unité entière (écus, pierre, bois, eau, nourriture) : gardé
 -- d'un ramassage au suivant, pour que rien ne se perde à l'arrondi (services/world/produce.js, gather)

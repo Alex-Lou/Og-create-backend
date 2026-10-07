@@ -1,17 +1,17 @@
-// Passage d'une île aux cartes suivantes (v1 → v4), une fois par joueur. Extrait de services/world.js (lot santé), sans
-// changement.
+// Passage d'une île aux cartes suivantes (v1 → v5), une fois par joueur. Les cartes d'avant restent figées dans leurs
+// modules (worldMapV2.js, worldMapV4.js) : chaque passage lit celle qu'il quitte, jamais la carte du moment.
 const db = require('../../config/db');
 const ledger = require('../ledger');
-const map = require('../worldMap');
+const v4 = require('../worldMapV4');
 const legacy = require('../worldMapV2');
-const { SIZE, MAP_VERSION, OLD_DECO_RATE, SITES, pendingOf } = require('./rules');
+const { MAP_VERSION, OLD_DECO_RATE, SITES, pendingOf } = require('./rules');
 const { levelsOf, stockOf, tilesOf } = require('./reads');
 
 // Les nuits de créatures (world/nights.js, qui passe lui-même par migrate) : chargé à l'appel
 const settleNights = (...args) => require('./nights').settleNights(...args);
 
 // Passage aux cartes suivantes, une fois par joueur, au premier passage, verrouillé (deux requêtes ne migrent pas
-// deux fois) et d'un seul tenant (tout ou rien) : v1 → v2 → v3 → v4 selon l'île du joueur. Chaque passage règle
+// deux fois) et d'un seul tenant (tout ou rien) : v1 → v2 → v3 → v4 → v5 selon l'île du joueur. Chaque passage règle
 // aussi les nuits finies depuis le précédent (v6), avant tout changement de l'île
 function migrate(userId) {
     return db.transaction(async conn => {
@@ -20,7 +20,8 @@ function migrate(userId) {
         if (stock.map_version >= MAP_VERSION) return false;
         if (stock.map_version < 2) await toV2(userId, stock, conn);
         if (stock.map_version < 3) await toV3(userId, conn);
-        await toV4(userId, conn);
+        if (stock.map_version < 4) await toV4(userId, conn);
+        await toV5(userId, conn);
         await conn.query('UPDATE world_stock SET map_version = $2 WHERE user_id = $1', [userId, MAP_VERSION]);
         return true;
     });
@@ -64,14 +65,14 @@ async function toV3(userId, conn) {
     await conn.query('UPDATE world_tiles SET x = x + 1000, y = y + 1000 WHERE user_id = $1', [userId]);
     const taken = new Set();
     // Cases de la carte v3 : celles du cœur de la carte v4, moins son décalage (toV4 les replace ensuite)
-    const v3Spots = zone => map.freeSpots(zone, levels).map(sp => ({ x: sp.x - map.OFFSET.x, y: sp.y - map.OFFSET.y }));
+    const v3Spots = zone => v4.freeSpots(zone, levels).map(sp => ({ x: sp.x - v4.OFFSET.x, y: sp.y - v4.OFFSET.y }));
     const spare = v3Spots('coeur');
     for (const [zone, list] of byZone) {
         const spots = [...v3Spots(zone), ...spare];
         for (const tile of list) {
-            const spot = spots.find(s => !taken.has(s.y * SIZE + s.x));
+            const spot = spots.find(s => !taken.has(s.y * v4.SIZE + s.x));
             if (!spot) break;
-            taken.add(spot.y * SIZE + spot.x);
+            taken.add(spot.y * v4.SIZE + spot.x);
             await conn.query('UPDATE world_tiles SET x = $4, y = $5 WHERE user_id = $1 AND x = $2 AND y = $3', [userId, tile.x + 1000, tile.y + 1000, spot.x, spot.y]);
         }
     }
@@ -79,15 +80,27 @@ async function toV3(userId, conn) {
     // (refundDecorations, lot 8)
 }
 
-// v3 → v4 (la très grande île) : la grande île devient le cœur, posée en map.OFFSET ; tout ce que le joueur y a posé
+// v3 → v4 (la très grande île) : la grande île devient le cœur, posée en OFFSET ; tout ce que le joueur y a posé
 // (annexes, créations, anciennes décorations) glisse d'autant. Les bâtiments n'ont rien à faire : leur place vient
 // de la carte. Décalage en deux temps : la clé (joueur, x, y) ne se heurte jamais à une case encore occupée
 async function toV4(userId, conn) {
-    const { x, y } = map.OFFSET;
+    const { x, y } = v4.OFFSET;
     for (const table of ['world_annexes', 'world_crafts', 'world_tiles']) {
         await conn.query(`UPDATE ${table} SET x = x + 1000, y = y + 1000 WHERE user_id = $1 AND x IS NOT NULL`, [userId]);
         await conn.query(`UPDATE ${table} SET x = x - 1000 + $2, y = y - 1000 + $3 WHERE user_id = $1 AND x IS NOT NULL`, [userId, x, y]);
     }
 }
 
-module.exports = { migrate, toV2, toV3, toV4 };
+// v4 → v5 (la grande carte, × 1,5) : chaque annexe, création ou ancienne décoration passe sur la case v5 qui reprend
+// sa case v4 (worldMap.fromV4 : round(1,5 x + 0,25)) : même sol, même quartier, deux voisines restent deux cases
+// distinctes (rien ne se heurte). Les bâtiments, les lieux et les gisements viennent de la carte. Une nuit en cours
+// garde ses égarés, mais ceux déjà repoussés le sont sur l'ancienne carte : la nuit repart de zéro repoussé
+async function toV5(userId, conn) {
+    for (const table of ['world_annexes', 'world_crafts', 'world_tiles']) {
+        await conn.query(`UPDATE ${table} SET x = x + 1000, y = y + 1000 WHERE user_id = $1 AND x IS NOT NULL`, [userId]);
+        await conn.query(`UPDATE ${table} SET x = ROUND(1.5 * (x - 1000) + 0.25), y = ROUND(1.5 * (y - 1000) + 0.25) WHERE user_id = $1 AND x IS NOT NULL`, [userId]);
+    }
+    await conn.query(`UPDATE world_nights SET repelled = '{}'::jsonb WHERE user_id = $1`, [userId]);
+}
+
+module.exports = { migrate, toV2, toV3, toV4, toV5 };
