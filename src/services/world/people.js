@@ -19,6 +19,7 @@ const { grant } = require('./chests');
 // Encaisser avant un changement d'humeur (produce.js, qui lit déjà ce module : chargé seulement à l'appel)
 const gatherBefore = (...args) => require('./produce').gatherBefore(...args);
 const gather = (...args) => require('./produce').gather(...args);
+const payWith = (...args) => require('./produce').payWith(...args);
 
 // Un habitant vit sur l'île quand son bâtiment est bâti, dans un quartier à soi
 const livesHere = (id, levels, zones) => (levels[id] || 0) >= 1 && zones.has(map.siteZone(id));
@@ -238,7 +239,9 @@ async function befriend(userId, villagerId, resource = null, now = Date.now()) {
             gained = villagers.TALK;
         } else {
             if (friend.gifted === day) return db.rollback({ status: 409, message: `${villager.name} a déjà reçu un cadeau aujourd’hui.` });
-            if (stock[resource] < villagers.GIFT.cost) return db.rollback({ status: 400, message: `Il te faut ${villagers.GIFT.cost} ${villagers.LABELS[resource]} pour ce cadeau.` });
+            // Ce qui attend dans les bâtiments est encaissé d'abord : cela compte pour le cadeau
+            const { stock: paid } = await payWith(userId, conn, stock);
+            if (paid[resource] < villagers.GIFT.cost) return db.rollback({ status: 400, message: `Il te faut ${villagers.GIFT.cost} ${villagers.LABELS[resource]} pour ce cadeau.` });
             // resource est l'une des quatre colonnes du stock (liste fermée ci-dessus)
             await conn.query(`UPDATE world_stock SET ${resource} = ${resource} - $2 WHERE user_id = $1`, [userId, villagers.GIFT.cost]);
             gained = villagers.giftPoints(villager, resource);
@@ -325,7 +328,9 @@ async function satisfyVisitor(userId, visitorId, now = Date.now()) {
         const r = row.request;
         if (r.kind === 'livrer') {
             if (!RESOURCES.includes(r.resource)) return db.rollback({ status: 400, message: 'Demande invalide.' });
-            if (stock[r.resource] < r.amount) return db.rollback({ status: 400, message: `Il te faut ${r.amount} ${WORDS[r.resource][0]}.` });
+            // Ce qui attend dans les bâtiments est encaissé d'abord : cela compte pour la livraison
+            const { stock: paid } = await payWith(userId, conn, stock);
+            if (paid[r.resource] < r.amount) return db.rollback({ status: 400, message: `Il te faut ${r.amount} ${WORDS[r.resource][0]}.` });
             // r.resource est l'une des quatre colonnes du stock (vérifié ci-dessus)
             await conn.query(`UPDATE world_stock SET ${r.resource} = ${r.resource} - $2 WHERE user_id = $1`, [userId, r.amount]);
         } else {

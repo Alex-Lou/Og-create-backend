@@ -10,7 +10,7 @@ const { SIZE, CRAFT_TTL_MS, keyOf } = require('./rules');
 const { annexesOf, levelsOf, stockOf, zonesOf, findsOf, spendFinds, craftsOf, placedOf, madeOf } = require('./reads');
 const { migrate } = require('./migrate');
 const { livesHere } = require('./people');
-const { gatherBefore } = require('./produce');
+const { gatherBefore, payWith } = require('./produce');
 
 // Contexte des règles de pose (crafts.spotBlock) : sol, case libre (sur l'île, hors chantier, quartier à soi, ni annexe,
 // ni autre création, ni lieu remarquable, ni gisement), emprise d'un bâtiment bâti, créations posées (sauf skip : celle qu'on déplace)
@@ -97,13 +97,17 @@ async function startCraft(userId, craftId, owned, finished, stars = 0) {
     const c = crafts.CRAFT_BY_ID[craftId];
     await migrate(userId);
     return db.transaction(async conn => {
-        const stock = await stockOf(userId, conn, true);
+        // Ce qui attend dans les bâtiments est encaissé d'abord : cela compte pour les matériaux
+        const { stock, balance } = await payWith(userId, conn, await stockOf(userId, conn, true));
         const open = crafts.tiersOpen(finished, await epreuvesOf(userId, conn), stars);
         const block = crafts.blockOf(c, { made: madeOf(await craftsOf(userId, conn)), owned: new Set(owned), stock, open, have: await findsOf(userId, conn) });
         if (block) return db.rollback({ status: 403, message: block });
         const seed = crypto.randomInt(1, 2147483647);
         const { rows } = await conn.query('INSERT INTO world_craft_runs (user_id, craft, seed) VALUES ($1, $2, $3) RETURNING id', [userId, craftId, seed]);
-        return { run: { id: Number(rows[0].id), craft: c.id, shape: c.shape, pieces: crafts.piecesOf(c.shape, seed, c.tier), turned: crafts.TURNED[c.tier] } };
+        return {
+            run: { id: Number(rows[0].id), craft: c.id, shape: c.shape, pieces: crafts.piecesOf(c.shape, seed, c.tier), turned: crafts.TURNED[c.tier] },
+            ...(balance !== undefined ? { coins: balance } : {})
+        };
     });
 }
 
@@ -121,16 +125,17 @@ function finishCraft(userId, runId, layout, owned, finished, stars = 0) {
         if (Date.now() - new Date(createdAt).getTime() > CRAFT_TTL_MS) return { status: 400, message: 'Assemblage refusé : temps écoulé.' };
         const done = crafts.check(c.shape, crafts.piecesOf(c.shape, seed, c.tier), layout);
         if (!done.ok) return { status: 400, message: `Assemblage refusé : ${done.error}.` };
-        // Entre le début et la fin, le stock ou le Livre ont pu changer
+        // Entre le début et la fin, le stock ou le Livre ont pu changer ; ce qui attend dans les bâtiments compte encore
+        const { stock: paid, balance } = await payWith(userId, conn, stock);
         const open = crafts.tiersOpen(finished, await epreuvesOf(userId, conn), stars);
-        const block = crafts.blockOf(c, { made: madeOf(await craftsOf(userId, conn)), owned: new Set(owned), stock, open, have: await findsOf(userId, conn) });
+        const block = crafts.blockOf(c, { made: madeOf(await craftsOf(userId, conn)), owned: new Set(owned), stock: paid, open, have: await findsOf(userId, conn) });
         if (block) return { status: 409, message: block };
         const n = r => c.cost[r] || 0;
         await conn.query('UPDATE world_stock SET stone = stone - $2, wood = wood - $3, water = water - $4, food = food - $5 WHERE user_id = $1',
             [userId, n('stone'), n('wood'), n('water'), n('food')]);
         await spendFinds(userId, c.finds, conn);
         await conn.query('INSERT INTO world_crafts (user_id, craft) VALUES ($1, $2)', [userId, craftId]);
-        return { made: c.name, craft: c.id };
+        return { made: c.name, craft: c.id, ...(balance !== undefined ? { coins: balance } : {}) };
     });
 }
 

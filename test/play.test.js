@@ -1631,6 +1631,63 @@ test('ramassage sans perte : les fractions sont gardées d’un ramassage au sui
   assert.deepEqual([built.data.built, built.data.world.stock.stone, built.data.world.stock.wood], ['Carrière', 0, 0]);
 });
 
+test('ce qui attend dans les bâtiments paie tout : expédition, établi, bête, cadeau, voyageur, quartier', async () => {
+  const player = await newPlayer({ coins: 0 });
+  const id = player.userId;
+  const view = async () => (await api('GET', '/play/world', null, player)).data;
+  // Réserves vides, huit heures de production en attente ; ce que « Tout ramasser » donnerait
+  const empty = async () => {
+    await sql('UPDATE world_stock SET collected_at = NOW() - INTERVAL \'8 hours\', stone = 0, wood = 0, water = 0, food = 0 WHERE user_id = $1', [id]);
+    const world = await view();
+    return { ...world.pendingStock, coins: world.pending };
+  };
+  const near = (a, b, label) => assert.ok(Math.abs(a - b) <= 1, `${label} : ${a} ≈ ${b}`);
+  await view();
+  // Bosquet III (bois), Potager III (vivres, poules), Ponton II (voyageurs), bâtis depuis deux jours
+  await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'lisiere'), ($1, 'jardins'), ($1, 'crique') ON CONFLICT DO NOTHING`, [id]);
+  await sql(`INSERT INTO world_buildings (user_id, site, level, built_at) VALUES ($1, 'bosquet', 3, NOW() - INTERVAL '2 days'),
+    ($1, 'potager', 3, NOW() - INTERVAL '2 days'), ($1, 'ponton', 2, NOW() - INTERVAL '2 days')`, [id]);
+  // Expédition (20 vivres, 10 bûches)
+  let pending = await empty();
+  const sent = await api('POST', '/play/world/expedition', { zone: 'roselieres' }, player);
+  assert.equal(sent.status, 200);
+  near(sent.data.world.stock.food, pending.food - 20, 'vivres');
+  near(sent.data.world.stock.wood, pending.wood - 10, 'bûches');
+  near(sent.data.coins, pending.coins, 'écus');
+  // Une Clôture (8 bûches)
+  pending = await empty();
+  const { run, coins } = (await api('POST', '/play/world/craft/start', { craft: 'cloture' }, player)).data;
+  assert.ok(coins > 0);
+  const made = await api('POST', '/play/world/craft/finish', { run: run.id, layout: solveCraft(run) }, player);
+  assert.equal(made.status, 200);
+  near(made.data.world.stock.wood, pending.wood - 8, 'bûches de la Clôture');
+  // Une poule (2 vivres)
+  pending = await empty();
+  const hen = await api('POST', '/play/world/beast/feed', { beast: 'poule-rousse' }, player);
+  assert.equal(hen.status, 200);
+  near(hen.data.world.stock.food, pending.food - 2, 'vivres de la poule');
+  // Un cadeau à Sylve (15 bûches)
+  pending = await empty();
+  const gift = await api('POST', '/play/world/villager/gift', { villager: 'bosquet', resource: 'wood' }, player);
+  assert.equal(gift.status, 200);
+  near(gift.data.world.stock.wood, pending.wood - 15, 'bûches du cadeau');
+  // Un voyageur qui demande 30 vivres
+  const guest = (await view()).visitor;
+  await sql(`UPDATE world_visitors SET request = '{"kind":"livrer","resource":"food","amount":30,"reward":60}' WHERE id = $1`, [guest.id]);
+  pending = await empty();
+  const served = await api('POST', '/play/world/visitor', { id: guest.id }, player);
+  assert.equal(served.status, 200);
+  near(served.data.world.stock.food, pending.food - 30, 'vivres du voyageur');
+  // La Source (100 écus) : 50 écus en bourse, le reste en attente
+  await sql('UPDATE progress SET coins = 50 WHERE user_id = $1', [id]);
+  const before = await coinsOf(player);
+  pending = await empty();
+  assert.ok(before < 100 && before + pending.coins >= 100, `${before} + ${pending.coins}`);
+  const bought = await api('POST', '/play/world/zone', { zone: 'source' }, player);
+  assert.equal(bought.status, 200);
+  near(bought.data.coins, before + pending.coins - 100, 'écus après la Source');
+});
+
 test('une Récolte quittée sans jouer ne compte pas ; Cannelle nourrie, la soupe reste faite même si elle a de nouveau faim', async () => {
   const player = await newPlayer({ veteran: false });
   const claim = id => api('POST', '/play/world/quest', { id }, player);

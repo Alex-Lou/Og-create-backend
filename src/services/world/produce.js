@@ -59,6 +59,13 @@ async function gather(userId, conn, stock) {
     return { gained: cash.coins, stock: got, balance };
 }
 
+// Avant une dépense : la production en attente est encaissée d'abord, et compte pour payer. Le stock verrouillé avec ce
+// qui vient d'être encaissé, et le solde d'écus s'il a changé (sinon undefined)
+async function payWith(userId, conn, stock) {
+    const { stock: got, balance } = await gather(userId, conn, stock);
+    return { stock: { ...stock, ...Object.fromEntries(RESOURCES.map(r => [r, stock[r] + (got[r] || 0)])) }, balance: balance ?? undefined };
+}
+
 // Avant un changement qui touche l'humeur des habitants (besoin comblé, création posée, déplacée ou rangée, visiteur
 // installé) : si la part de production en plus d'un bâtiment en aurait changé depuis la dernière récolte, on encaisse
 // d'abord, pour que ce qui a été produit compte avec l'humeur d'alors. change(island) : l'île après le changement.
@@ -83,4 +90,4 @@ async function collect(userId) {
     });
 }
 
-module.exports = { bonusesFor, gather, gatherBefore, collect };
+module.exports = { bonusesFor, gather, payWith, gatherBefore, collect };

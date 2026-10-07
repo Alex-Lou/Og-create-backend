@@ -37,7 +37,7 @@ const {
     SLEEPERS, presenceOf, residentsOf, hungryOf, HUNGRY_AGO, moodsOf, withMoods, withLandmarks, withBlights, prodSteps,
     runsSince, visitorNow, visitorView, befriend, fillNeeds, satisfyVisitor, settleVisitor
 } = require('./world/people');
-const { bonusesFor, gather, collect } = require('./world/produce');
+const { bonusesFor, gather, payWith, collect } = require('./world/produce');
 const { anyaOf, breathRefused, brumeSavoirOf, talkBrume, revealAnya, breatheAnya } = require('./world/anyaBrume');
 const {
     isKnown, expeditionCost, expeditionOf, startExpedition, findLandmark, craftBonusOf, gatherDeposit
@@ -222,6 +222,8 @@ async function view(userId, owned, book) {
     // Ce que « Tout ramasser » donnerait maintenant, avec ce qui restait du dernier ramassage (world_stock.carry)
     const cash = cashOf(production, stock.carry);
     const pendingStock = cash.stock;
+    // Ce qui paie une création : les réserves et ce qui attend (encaissé d'abord à l'assemblage)
+    const paidStock = { ...stock, ...Object.fromEntries(RESOURCES.map(r => [r, stock[r] + pendingStock[r]])) };
     const claimed = await claimedOf(userId);
     const facts = await factsOf(userId, owned, book.stars ?? 0, db, moods);
     const visiting = await visitorNow(userId);
@@ -275,7 +277,7 @@ async function view(userId, owned, book) {
         pendingStock,
         // Créations d'île : paliers, catalogue, réserve et cases où poser, créations posées
         crafts: craftsView(craftRows, craftCtx(levels, zones, annexRows, craftRows), {
-            owned: have, stock, open: crafts.tiersOpen(book.finished || new Set(), epreuves, book.stars ?? 0), epreuves, stars: book.stars ?? 0, have: stockFinds
+            owned: have, stock: paidStock, open: crafts.tiersOpen(book.finished || new Set(), epreuves, book.stars ?? 0), epreuves, stars: book.stars ?? 0, have: stockFinds
         }, id => sites.find(site => site.id === id)?.name || id),
         // Habitants (la troupe rencontrée, les visiteurs installés) : prénom, goûts, amitié, déjà vus ou gâtés
         // aujourd'hui ; leurs besoins, leur humeur et ce qu'elle fait ; built : son bâtiment est bâti (sinon il vit au
@@ -376,8 +378,11 @@ async function buyZone(userId, zoneId, openChapters) {
     if (!isKnown(zone, await discoveredOf(userId))) return { status: 403, message: 'Envoie d’abord une expédition découvrir ce quartier.' };
     if (zone.chapter && !openChapters.has(zone.chapter)) return { status: 403, message: `Ouvre d’abord le chapitre ${zone.chapter} du Grimoire.` };
     return db.transaction(async conn => {
+        const stock = await stockOf(userId, conn, true);
         const added = await conn.query('INSERT INTO world_zones (user_id, zone) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING zone', [userId, zone.id]);
         if (!added.rows.length) return db.rollback({ status: 409, message: 'Ce quartier est déjà à toi.' });
+        // Les écus qui attendent dans les bâtiments sont encaissés d'abord : ils comptent pour payer
+        await payWith(userId, conn, stock);
         const coins = await ledger.debit(userId, zone.price, `quartier:${zone.id}`, conn);
         if (coins === null) return db.rollback({ status: 400, message: `Il te faut ${zone.price} écus.` });
         return { bought: zone.name, coins };
@@ -686,12 +691,14 @@ async function chooseSign(userId, siteId, styleId) {
     if (!style) return { status: 404, message: 'Style d’enseigne inconnu.' };
     await migrate(userId);
     return db.transaction(async conn => {
-        await stockOf(userId, conn, true);
+        const stock = await stockOf(userId, conn, true);
         if (((await levelsOf(userId, conn)).levels[siteId] || 0) < signs.SIGN_LEVEL) return db.rollback({ status: 403, message: 'L’enseigne vient au palier V du bâtiment.' });
         let coins;
         if (style.price) {
             const bought = await conn.query('INSERT INTO world_sign_styles (user_id, style) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING style', [userId, style.id]);
             if (bought.rows.length) {
+                // Les écus qui attendent dans les bâtiments sont encaissés d'abord : ils comptent pour payer
+                await payWith(userId, conn, stock);
                 coins = await ledger.debit(userId, style.price, 'enseigne', conn);
                 if (coins === null) return db.rollback({ status: 400, message: `Ce style coûte ${style.price} écus.` });
             }
