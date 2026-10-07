@@ -587,6 +587,9 @@ test('le Monde : les bâtiments produisent ressources et écus, encaissés une s
   assert.equal(view.pending, 6);
   assert.equal(view.pendingStock.stone, 9);
   assert.deepEqual(view.sites.find(s => s.id === 'carriere').pending, { coins: 6, stone: 9 });
+  // Bâtie il y a 3 h, réserve de 8 h : pleine dans 5 h ; un bâtiment qui ne produit pas n'en a pas
+  assert.ok(Math.abs(view.sites.find(s => s.id === 'carriere').fullIn - 5 * 3600000) < 60000);
+  assert.equal(view.sites.find(s => s.id === 'foyer').fullIn, null);
   const [first, second] = await Promise.all([
     api('POST', '/play/world/collect', null, player),
     api('POST', '/play/world/collect', null, player)

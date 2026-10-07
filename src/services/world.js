@@ -24,7 +24,7 @@ const anya = require('./anya');
 const {
     SIZE, CAP_HOURS, REGEN_MS, RUN_TTL_MS, RENAME_LEVEL, GAME_TTL_MS, GAME_SLACK_MS, FIRST_RUN_MOVES, FIRST_RUN_KINDS,
     RESOURCES, DECO_PRICES, HARVEST_COIN_EVERY, UNDO_SECONDS, random, CHAPTER_OF_LEVEL, PRODUCE_PER_LEVEL,
-    COINS_PER_LEVEL, SITES, effectOf, keyOf, pendingOf, chargesAt, effectsOf, productionOf, perHourOf, productionAll, cashOf
+    COINS_PER_LEVEL, SITES, effectOf, keyOf, pendingOf, chargesAt, effectsOf, productionOf, fullInOf, perHourOf, productionAll, cashOf
 } = require('./world/rules');
 const {
     itemsOf, skinsOf, signsOf, namesOf, avatarOf, friendsOf, needRowsOf, settlersOf, gamesOf, annexesOf, levelsOf, stockOf,
@@ -211,6 +211,8 @@ async function view(userId, owned, book) {
             // Rendement horaire avec les bonus de la boutique et les annexes (pour la fiche), heures de production gardées
             perHour: site.produce && level ? perHourOf(level, blighted.prod[id] || 0, bonuses.coins[id] || 0, extra.site[id] || []) : null,
             capHours: CAP_HOURS + (extra.cap[id] || 0),
+            // Temps avant que sa réserve soit pleine (0 : pleine, la production attend le ramassage)
+            fullIn: site.produce && level ? fullInOf(builtAt[id], stock.collected_at, CAP_HOURS + (extra.cap[id] || 0), now) : null,
             // Annexes : catalogue du bâtiment et cases libres où en poser une (dès le palier II)
             annexes: annexesView(id, annexRows),
             spots: level >= 2 && zones.has(zone) ? annexSpots(id, taken) : [],

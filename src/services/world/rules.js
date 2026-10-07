@@ -245,6 +245,12 @@ function boostedHours(from, hours, steps) {
     });
     return sum;
 }
+// Temps (ms) avant que la réserve d'un bâtiment producteur soit pleine, depuis sa pose ou la dernière récolte (0 :
+// pleine, la production attend le ramassage). capHours : CAP_HOURS et les heures des réserves
+function fullInOf(builtAt, collectedAt, capHours, now = Date.now()) {
+    const start = Math.max(collectedAt ? new Date(collectedAt).getTime() : 0, new Date(builtAt).getTime());
+    return Math.max(0, start + capHours * 3600000 - now);
+}
 // Rendement par heure d'un bâtiment producteur et de ses annexes : { amount, coins }, arrondis au dixième
 function perHourOf(level, prod = 0, coins = 0, annexList = []) {
     const boost = 1 + prod;
@@ -296,5 +302,5 @@ module.exports = {
     FIRST_RUN_MOVES, FIRST_RUN_KINDS, RESOURCES, MAP_VERSION, EXPEDITION_COST, OLD_DECO_RATE, DECO_PRICES,
     HARVEST_COIN_EVERY, UNDO_SECONDS, random, CHAPTER_OF_LEVEL, BOOST_BY_LEVEL, ATELIER_MOVES, PRODUCE_PER_LEVEL,
     COINS_PER_LEVEL, WORDS, tier, SITES, BOOSTED, effectOf, keyOf, pendingOf, chargesAt, NO_BONUS, NO_ANNEX, effectsOf,
-    productionOf, boostedHours, perHourOf, productionAll, cashOf
+    productionOf, boostedHours, fullInOf, perHourOf, productionAll, cashOf
 };
