@@ -11,7 +11,7 @@ const { EXPEDITION_COST, chargesAt, effectsOf } = require('./rules');
 const { levelsOf, stockOf, zonesOf, depositsOf, foundOf, discoveredOf, craftsOf, placedOf } = require('./reads');
 const { migrate } = require('./migrate');
 const { presenceOf } = require('./people');
-const { bonusesFor, gather } = require('./produce');
+const { bonusesFor, gather, payWith } = require('./produce');
 
 const isKnown = (zone, discovered) => !zone.trip || discovered.has(zone.id);
 // Ce qu'emporte une expédition vers ce quartier : { food, wood }
@@ -37,7 +37,9 @@ async function startExpedition(userId, zoneId, now = Date.now()) {
         const zones = await zonesOf(userId, conn);
         if (!map.NEIGHBORS[zone.id].some(id => zones.has(id))) return db.rollback({ status: 403, message: 'Une expédition part d’un quartier à toi, vers un quartier voisin.' });
         const cost = expeditionCost(zone);
-        if (Object.entries(cost).some(([r, n]) => stock[r] < n)) return db.rollback({ status: 400, message: `Il faut emporter ${cost.food} vivres et ${cost.wood} bûches : joue une Récolte.` });
+        // Ce qui attend dans les bâtiments est encaissé d'abord : cela compte pour les provisions
+        const { stock: paid, balance } = await payWith(userId, conn, stock);
+        if (Object.entries(cost).some(([r, n]) => paid[r] < n)) return db.rollback({ status: 400, message: `Il faut emporter ${cost.food} vivres et ${cost.wood} bûches : joue une Récolte.` });
         const { levels } = await levelsOf(userId, conn);
         const { bonuses, extra } = await bonusesFor(userId, conn);
         const effects = effectsOf(levels, bonuses, extra);
@@ -48,7 +50,7 @@ async function startExpedition(userId, zoneId, now = Date.now()) {
         const endsAt = new Date(now + zone.trip * 3600 * 1000);
         // Heure prise après le verrou de la réserve, comme le départ d'une partie de Récolte (undoItem)
         await conn.query('INSERT INTO world_expeditions (user_id, zone, ends_at, started_at) VALUES ($1, $2, $3, clock_timestamp())', [userId, zone.id, endsAt]);
-        return { zone: zone.id, endsAt: endsAt.toISOString() };
+        return { zone: zone.id, endsAt: endsAt.toISOString(), ...(balance !== undefined ? { coins: balance } : {}) };
     });
 }
 

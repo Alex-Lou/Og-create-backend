@@ -50,7 +50,7 @@ router.post('/world/craft/start', withAccount(async (req, res, owner, b) => {
     const owned = await players.elements(owner);
     const done = await world.startCraft(owner.id, craft, owned, bookPages.finishedChapters(b, owned), bookPages.starsOf(b, owned));
     if (done.status) return res.status(done.status).json({ message: done.message });
-    res.json({ run: done.run });
+    res.json({ run: done.run, ...coinsOf(done) });
 }));
 router.post('/world/craft/finish', withAccount(async (req, res, owner, b) => {
     const run = Number(req.body.run);
@@ -186,13 +186,13 @@ router.post('/world/zone', withAccount(async (req, res, owner, b) => {
     res.json({ bought: done.bought, coins: done.coins, world: await worldView(owner, b) });
 }));
 
-// Expédition vers un quartier inconnu des terres nouvelles (lot 9) : { expedition: { zone, endsAt }, world }
+// Expédition vers un quartier inconnu des terres nouvelles (lot 9) : { expedition: { zone, endsAt }, coins?, world }
 router.post('/world/expedition', withAccount(async (req, res, owner, b) => {
     const zone = String(req.body.zone || '');
     if (!/^[a-z]{1,20}$/.test(zone)) return res.status(400).json({ message: 'Quartier invalide' });
     const done = await world.startExpedition(owner.id, zone);
     if (done.status) return res.status(done.status).json({ message: done.message });
-    res.json({ expedition: done, world: await worldView(owner, b) });
+    res.json({ expedition: { zone: done.zone, endsAt: done.endsAt }, ...coinsOf(done), world: await worldView(owner, b) });
 }));
 
 // Les nuits de créatures (v6, § 6.15) : Brume les présente (une fois ; la première nuit vient un jour après) → { world }
@@ -210,13 +210,13 @@ router.post('/world/nights/repel', withAccount(async (req, res, owner, b) => {
     res.json({ id: done.id, world: await worldView(owner, b) });
 }));
 
-// Réparer le bâtiment embrumé (un peu de pierre ou de bois) → { site, cost, world }
+// Réparer le bâtiment embrumé (un peu de pierre ou de bois) → { site, cost, coins?, world }
 router.post('/world/repair', withAccount(async (req, res, owner, b) => {
     const site = String(req.body.site || '');
     if (!/^[a-z]{1,20}$/.test(site)) return res.status(400).json({ message: 'Bâtiment invalide' });
     const done = await world.repairSite(owner.id, site);
     if (done.status) return res.status(done.status).json({ message: done.message });
-    res.json({ site: done.site, cost: done.cost, world: await worldView(owner, b) });
+    res.json({ site: done.site, cost: done.cost, ...coinsOf(done), world: await worldView(owner, b) });
 }));
 
 // Lieu remarquable d'un quartier à soi (lot 9c) : le découvrir → { landmark, fresh, world } (fresh : première fois)
@@ -354,13 +354,13 @@ router.post('/world/villager/need', withAccount(async (req, res, owner, b) => {
 router.post('/world/villagers/needs', withAccount(async (req, res, owner, b) => {
     await fed(res, owner, b, await world.fillNeeds(owner.id));
 }));
-// Bêtes de ferme (v6, § 6.16) : en nourrir une depuis sa fiche (sa bulle est ramassée d'abord) → { beast, collected, world }
+// Bêtes de ferme (v6, § 6.16) : en nourrir une depuis sa fiche (sa bulle est ramassée d'abord) → { beast, collected, coins?, world }
 router.post('/world/beast/feed', withAccount(async (req, res, owner, b) => {
     const id = String(req.body.beast || '');
     if (!/^[a-z-]{1,20}$/.test(id)) return res.status(400).json({ message: 'Bête invalide' });
     const done = await world.feedBeast(owner.id, id);
     if (done.status) return res.status(done.status).json({ message: done.message });
-    res.json({ beast: done.beast, collected: done.collected, world: await worldView(owner, b) });
+    res.json({ beast: done.beast, collected: done.collected, ...coinsOf(done), world: await worldView(owner, b) });
 }));
 // Ramasser les bulles de toutes les bêtes → { food, world }
 router.post('/world/beasts/collect', withAccount(async (req, res, owner, b) => {

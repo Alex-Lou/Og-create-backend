@@ -14,6 +14,7 @@ const quests = require('../quests');
 const { SITES } = require('./rules');
 const { stockOf, levelsOf, zonesOf, craftsOf, placedOf, claimedOf, needRowsOf, settlersOf } = require('./reads');
 const { migrate } = require('./migrate');
+const { payWith } = require('./produce');
 const { presenceOf, residentsOf, moodsOf } = require('./people');
 
 // Un jour de grâce entre la présentation et la première nuit
@@ -135,11 +136,13 @@ async function repairSite(userId, site, now = Date.now()) {
         if (!blight) return db.rollback({ status: 409, message: 'Ce bâtiment n’est pas embrumé.' });
         const { levels } = await levelsOf(userId, conn);
         const cost = nights.repairOf(site, levels[site] || 1);
-        if (stock[cost.resource] < cost.amount) return db.rollback({ status: 400, message: `Il te faut ${cost.amount} ${NAMES[cost.resource]} pour réparer.` });
+        // Ce qui attend dans les bâtiments est encaissé d'abord : cela compte pour payer
+        const { stock: paid, balance } = await payWith(userId, conn, stock);
+        if (paid[cost.resource] < cost.amount) return db.rollback({ status: 400, message: `Il te faut ${cost.amount} ${NAMES[cost.resource]} pour réparer.` });
         await conn.query(`UPDATE world_stock SET ${cost.resource} = ${cost.resource} - $2 WHERE user_id = $1`, [userId, cost.amount]);
         Object.assign(blight, { until: iso(now), by: 'reparation' });
         await conn.query('UPDATE world_nights SET blights = $2 WHERE user_id = $1', [userId, JSON.stringify(blights)]);
-        return { site, cost };
+        return { site, cost, ...(balance !== undefined ? { coins: balance } : {}) };
     });
 }
 

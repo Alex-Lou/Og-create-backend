@@ -174,9 +174,12 @@ test('un bâtiment embrumé ne produit plus ; la réparation (selon son palier) 
   assert.equal(done.data.world.nights.blight, null);
   assert.ok(done.data.world.sites.find(s => s.id === 'puits').perHour.amount > 0);
   assert.equal((await repair({ site: 'puits' })).status, 409);
-  // La panne compte encore à la récolte (de sa venue à la réparation) ; récoltée, elle s'efface
+  // La réparation encaisse d'abord ce qui attendait, la panne comprise (de sa venue à la réparation) : une heure
+  // produite, pas cinq ; la récolte suivante n'a rien de plus, et la panne, récoltée, s'efface
+  const got = done.data.world.stock.water - before.stock.water;
+  assert.ok(Math.abs(got - oneHour) <= 1, `${got} ≈ ${oneHour}`);
   const collected = await api('POST', '/play/world/collect', {}, player);
-  assert.ok(Math.abs(collected.data.stock.water - oneHour) <= 1, `${collected.data.stock.water} ≈ ${oneHour}`);
+  assert.equal(collected.data.stock.water, 0);
   await api('GET', '/play/world', null, player);
   assert.deepEqual(await blightsOf(id), []);
 });

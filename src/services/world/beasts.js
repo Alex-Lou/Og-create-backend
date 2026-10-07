@@ -6,6 +6,7 @@ const beasts = require('../beasts');
 const map = require('../worldMap');
 const { stockOf, levelsOf, zonesOf } = require('./reads');
 const { migrate } = require('./migrate');
+const { payWith } = require('./produce');
 
 const iso = ms => new Date(ms).toISOString();
 // Les bêtes de l'île : celles du Potager bâti, dans un quartier à soi
@@ -34,14 +35,16 @@ async function feedBeast(userId, id, now = Date.now()) {
         const row = (await rowsOf(userId, conn))[id];
         if (!beasts.stateOf(beast, row, now).refill) return db.rollback({ status: 409, message: `${beast.name} n’a pas encore faim.` });
         const { food } = beasts.FEED_COST;
-        if (stock.food < food) return db.rollback({ status: 400, message: `Il te faut ${food} vivres pour la nourrir.` });
+        // Ce qui attend dans les bâtiments est encaissé d'abord : cela compte pour payer
+        const { stock: paid, balance } = await payWith(userId, conn, stock);
+        if (paid.food < food) return db.rollback({ status: 400, message: `Il te faut ${food} vivres pour la nourrir.` });
         const fed = beasts.feedOf(beast, row, now);
         await conn.query('UPDATE world_stock SET food = food - $2 + $3 WHERE user_id = $1', [userId, food, fed.amount]);
         await conn.query(
             `INSERT INTO world_beasts (user_id, beast, fed_at, collected_at) VALUES ($1, $2, $3, $4)
              ON CONFLICT (user_id, beast) DO UPDATE SET fed_at = EXCLUDED.fed_at, collected_at = EXCLUDED.collected_at`,
             [userId, id, iso(fed.row.fed_at), iso(fed.row.collected_at)]);
-        return { beast: id, collected: fed.amount };
+        return { beast: id, collected: fed.amount, ...(balance !== undefined ? { coins: balance } : {}) };
     });
 }
 
