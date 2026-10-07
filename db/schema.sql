@@ -367,6 +367,13 @@ CREATE TABLE IF NOT EXISTS world_names (
     name VARCHAR(22) NOT NULL,
     PRIMARY KEY (user_id, target)
 );
+-- L'avatar du joueur (bible, § 6.17), choisi sur sa carte d'embarquement au tutoriel : en attendant son générateur
+-- (H9.4), l'un des exemples dessinés par la bibliothèque du front (avatar-01 à avatar-12)
+CREATE TABLE IF NOT EXISTS world_avatars (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    look VARCHAR(20) NOT NULL,
+    chosen_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 -- Amitié des habitants (services/villagers.js) : points, dernier jour où l'on a bavardé, dernier jour d'un cadeau
 -- (jours de Paris)
 CREATE TABLE IF NOT EXISTS world_friends (

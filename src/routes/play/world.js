@@ -135,6 +135,13 @@ router.post('/world/player', withAccount(async (req, res, owner, b) => {
     res.json(await worldView(owner, b));
 }));
 
+// L'avatar du joueur, choisi sur sa carte d'embarquement au tutoriel (bible, § 6.17)
+router.post('/world/avatar', withAccount(async (req, res, owner, b) => {
+    const done = await world.chooseAvatar(owner.id, req.body.look);
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json(await worldView(owner, b));
+}));
+
 // Enseignes (dès le palier V) : le nom écrit dessus, puis le style de celle d'un bâtiment (acheté au passage)
 router.post('/world/sign/name', withAccount(async (req, res, owner, b) => {
     const done = await world.nameSigns(owner.id, req.body.name);

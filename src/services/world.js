@@ -27,7 +27,7 @@ const {
     COINS_PER_LEVEL, SITES, effectOf, keyOf, pendingOf, chargesAt, effectsOf, productionOf, perHourOf, productionAll
 } = require('./world/rules');
 const {
-    itemsOf, skinsOf, signsOf, namesOf, friendsOf, needRowsOf, settlersOf, gamesOf, annexesOf, levelsOf, stockOf,
+    itemsOf, skinsOf, signsOf, namesOf, avatarOf, friendsOf, needRowsOf, settlersOf, gamesOf, annexesOf, levelsOf, stockOf,
     zonesOf, findsOf, depositsOf, blightsOf, foundOf, claimedOf, helianeOfUser, runsOf, countOf, discoveredOf, craftsOf,
     placedOf, addStock, balanceOf
 } = require('./world/reads');
@@ -315,9 +315,10 @@ async function view(userId, owned, book) {
             styles: signs.STYLES.map(st => ({ id: st.id, name: st.name, price: st.price, text: st.text, owned: !st.price || signed.owned.has(st.id) }))
         },
         annexes: annexRows.filter(r => annexes.ANNEX_BY_ID[r.annex]).map(r => ({ x: r.x, y: r.y, annex: r.annex, site: annexes.ANNEX_BY_ID[r.annex].site })),
-        // Le nom du peuple (bible, § 6.11), une fois choisi ; le nom du joueur (§ 9, étape 2)
+        // Le nom du peuple (bible, § 6.11), une fois choisi ; le nom du joueur (§ 9, étape 2) et son avatar (§ 6.17)
         people: named.peuple || null,
         player: named.joueur || null,
+        avatar: await avatarOf(userId),
         // Brume, le feu follet : la quête active (ou son dernier mot)
         brume: (() => {
             const out = boardWith(claimed, facts, book.openChapters);
@@ -619,6 +620,16 @@ async function namePlayer(userId, raw) {
     return { name };
 }
 
+// L'avatar du joueur (bible, § 6.17), choisi sur sa carte d'embarquement au tutoriel : l'un des exemples dessinés par la
+// bibliothèque du front, en attendant son générateur (H9.4). Il peut changer. { look } ou { status, message }
+const LOOK = /^avatar-(0[1-9]|1[0-2])$/;
+async function chooseAvatar(userId, look) {
+    if (typeof look !== 'string' || !LOOK.test(look)) return { status: 400, message: 'Avatar inconnu.' };
+    await db.query(`INSERT INTO world_avatars (user_id, look) VALUES ($1, $2)
+        ON CONFLICT (user_id) DO UPDATE SET look = EXCLUDED.look, chosen_at = NOW()`, [userId, look]);
+    return { look };
+}
+
 // Nom d'un bâtiment (dès son palier III) ou d'un quartier à soi ; un nom vide rend celui d'origine.
 // kind : 'site' | 'zone'. { status, message } si refus
 async function rename(userId, kind, id, raw) {
@@ -681,7 +692,7 @@ async function chooseSign(userId, siteId, styleId) {
 module.exports = {
     SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, pendingOf, chargesAt, effectsOf, productionOf,
     view, build, buyZone, buyItem, undoItem, chooseSkin, startRun, finishRun, collect, migrate, claimQuest, board, openChest, openAll,
-    placeAnnex, moveAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople, namePlayer, arianeTargets,
+    placeAnnex, moveAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople, namePlayer, chooseAvatar, arianeTargets,
     refundDecorations, startCraft, finishCraft, placeCraft, moveCraft, storeCraft, startExpedition, findLandmark, gatherDeposit,
     anyaOf, breathRefused, revealAnya, breatheAnya, brumeSavoirOf, talkBrume, startNights, repelCreature, repairSite,
     feedBeast, collectBeasts
