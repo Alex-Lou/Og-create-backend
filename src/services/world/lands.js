@@ -22,6 +22,10 @@ async function expeditionOf(userId, conn = db, now = Date.now()) {
     return rows[0] || null;
 }
 
+// Les quartiers du cœur de l'île (map.CORE) pas encore à soi, par leurs noms : les terres alentour restent fermées tant
+// qu'il en manque
+const coreMissing = zones => map.CORE.filter(id => !zones.has(id)).map(id => map.ZONE_BY_ID[id].name);
+
 // Envoie une expédition vers un quartier inconnu des terres nouvelles, voisin d'un quartier à soi : une à la fois ; elle
 // emporte des vivres, du bois et une partie de Récolte, et revient après zone.trip heures (le quartier est alors
 // découvert : on peut l'acheter). { zone, endsAt } ou { status, message }
@@ -35,6 +39,8 @@ async function startExpedition(userId, zoneId, now = Date.now()) {
         const going = await expeditionOf(userId, conn, now);
         if (going) return db.rollback({ status: 409, message: 'Une expédition est déjà en route : attends son retour.' });
         const zones = await zonesOf(userId, conn);
+        const missing = coreMissing(zones);
+        if (missing.length) return db.rollback({ status: 403, message: `Les terres alentour s’ouvrent quand le cœur de l’île est à toi. Il te manque : ${missing.join(', ')}.` });
         if (!map.NEIGHBORS[zone.id].some(id => zones.has(id))) return db.rollback({ status: 403, message: 'Une expédition part d’un quartier à toi, vers un quartier voisin.' });
         const cost = expeditionCost(zone);
         // Ce qui attend dans les bâtiments est encaissé d'abord : cela compte pour les provisions
@@ -99,4 +105,4 @@ async function gatherDeposit(userId, depositId, now = Date.now()) {
     });
 }
 
-module.exports = { isKnown, expeditionCost, expeditionOf, startExpedition, findLandmark, craftBonusOf, gatherDeposit };
+module.exports = { isKnown, coreMissing, expeditionCost, expeditionOf, startExpedition, findLandmark, craftBonusOf, gatherDeposit };

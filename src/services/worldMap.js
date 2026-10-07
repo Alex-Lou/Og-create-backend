@@ -53,6 +53,9 @@ const ZONES = [
     { id: 'cratere', name: 'Le Cratère', price: 5000, chapter: 'VI', code: 'x', climate: 'volcan', trip: 9 }
 ].map(z => ({ climate: 'tempere', trip: 0, ...z }));
 const ZONE_BY_ID = Object.fromEntries(ZONES.map(z => [z.id, z]));
+// Le cœur de l'île : ses quartiers des chapitres I à III (Cœur, Source, Lisière, Colline, Jardins, Faubourg, Hauteurs).
+// Les terres alentour (à expédition) restent fermées tant qu'ils ne sont pas tous à soi (décision de l'auteur, 7 oct.)
+const CORE = ZONES.filter(z => !z.trip && (!z.chapter || ['I', 'II', 'III'].includes(z.chapter))).map(z => z.id);
 const ZONE_BY_CODE = Object.fromEntries(ZONES.map(z => [z.code, z.id]));
 
 const cell = (layer, x, y) => (Number.isInteger(x) && Number.isInteger(y) ? layer[y]?.[x] : undefined);
@@ -148,12 +151,12 @@ const NEIGHBORS = (() => {
     return Object.fromEntries([...pairs].map(([id, set]) => [id, [...set].sort()]));
 })();
 
-// Calques vus par un joueur : les quartiers encore inconnus (hidden : lettres de leurs quartiers) gardent leur côte,
-// mais ni leur relief (plat, 1) ni leur sol ('u' : inconnu)
+// Calques vus par un joueur : les quartiers encore inconnus (hidden : lettres de leurs quartiers) gardent leur côte et
+// leur relief, qu'on devine sous la brume, mais pas leur sol ('u' : inconnu ; ni climat, ni ce qu'il cache)
 function veiled(hidden) {
     if (!hidden.size) return { height: data.HEIGHT, ground: data.GROUND };
     const mask = (layer, fill) => layer.map((row, y) => [...row].map((c, x) => (hidden.has(data.REGION[y][x]) ? fill : c)).join(''));
-    return { height: mask(data.HEIGHT, '1'), ground: mask(data.GROUND, 'u') };
+    return { height: data.HEIGHT, ground: mask(data.GROUND, 'u') };
 }
 
 // Cases libres d'un quartier pour y poser des décorations, de la plus proche de son panneau à la plus lointaine
@@ -172,7 +175,7 @@ function freeSpots(zoneId, levels = {}) {
 }
 
 module.exports = {
-    SIZE, OFFSET, CLIMATES, SITE_PLACES, SITE_BIG, BIG_FROM, ZONES, ZONE_BY_ID, GRID, ANCHORS, NEIGHBORS,
+    SIZE, OFFSET, CLIMATES, SITE_PLACES, SITE_BIG, BIG_FROM, ZONES, ZONE_BY_ID, CORE, GRID, ANCHORS, NEIGHBORS,
     HEIGHT: data.HEIGHT, GROUND: data.GROUND, REGION: data.REGION,
     isLand, buildable, groundAt, heightAt, zoneAt, siteZone, inSite, footprintOf, inFootprint, freeSpots, veiled
 };

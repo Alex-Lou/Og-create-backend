@@ -40,7 +40,7 @@ const {
 const { bonusesFor, gather, payWith, collect } = require('./world/produce');
 const { anyaOf, breathRefused, brumeSavoirOf, talkBrume, revealAnya, breatheAnya } = require('./world/anyaBrume');
 const {
-    isKnown, expeditionCost, expeditionOf, startExpedition, findLandmark, craftBonusOf, gatherDeposit
+    isKnown, coreMissing, expeditionCost, expeditionOf, startExpedition, findLandmark, craftBonusOf, gatherDeposit
 } = require('./world/lands');
 const {
     craftCtx, stowCrafts, epreuvesOf, craftsView, startCraft, finishCraft, placeCraft, moveCraft, storeCraft
@@ -233,15 +233,20 @@ async function view(userId, owned, book) {
     const stockFinds = await findsOf(userId);
     const gathered = await depositsOf(userId);
     const veil = map.veiled(new Set(map.ZONES.filter(z => !isKnown(z, discovered)).map(z => z.code)));
+    // Les terres alentour restent fermées tant que le cœur de l'île n'est pas à soi : ce qui en manque, par noms
+    const coreLeft = coreMissing(zones);
+    const closedLands = coreLeft.length > 0;
     return {
         size: SIZE,
         map: {
             // Calques de la très grande île (relief, sol, quartiers : voir islandData.js et islandOuter.js) ; grid : index
-            // des quartiers. Les quartiers encore inconnus n'y montrent que leur côte (worldMap.veiled)
+            // des quartiers. Les quartiers encore inconnus n'y montrent que leur côte et leur relief (worldMap.veiled)
             grid: map.GRID,
             height: veil.height,
             ground: veil.ground,
             region: map.REGION,
+            // Les quartiers du cœur de l'île pas encore à soi (noms) : tant qu'il en reste, les terres alentour sont fermées
+            coreLeft,
             // Un quartier inconnu ne dit ni son nom, ni son climat, ni son prix : seulement s'il peut être exploré
             // (voisin d'un quartier à soi), en combien d'heures, et ce qu'emporte l'expédition
             zones: map.ZONES.map(z => (isKnown(z, discovered) ? {
@@ -250,7 +255,9 @@ async function view(userId, owned, book) {
                 owned: zones.has(z.id), open: !z.chapter || book.openChapters.has(z.chapter)
             } : {
                 id: z.id, name: null, code: z.code, anchor: map.ANCHORS[z.id], known: false, owned: false, open: false,
-                trip: z.trip, cost: expeditionCost(z), explorable: !going && map.NEIGHBORS[z.id].some(id => zones.has(id))
+                // closed : le cœur de l'île n'est pas encore à soi (les terres alentour s'ouvrent après)
+                trip: z.trip, cost: expeditionCost(z), closed: closedLands,
+                explorable: !going && !closedLands && map.NEIGHBORS[z.id].some(id => zones.has(id))
             }))
         },
         // Lieux remarquables : ceux des quartiers connus (case, nom, ce qu'ils racontent et font, découverts ou non) ;

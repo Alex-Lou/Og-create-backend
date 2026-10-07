@@ -349,10 +349,12 @@ test('la très grande île : calques cohérents, le cœur intact, chantiers à p
     for (const z of fresh) if (!reached.has(z.id) && map.NEIGHBORS[z.id].some(id => reached.has(id))) { reached.add(z.id); grew = true; }
   }
   assert.equal(reached.size, 24);
-  // Un quartier inconnu ne montre que sa côte : relief plat, sol inconnu
+  // Un quartier inconnu montre sa côte et son relief, qu'on devine sous la brume, mais pas son sol
   const veil = map.veiled(new Set(['x']));
   const crater = [map.ANCHORS.cratere.x, map.ANCHORS.cratere.y];
-  assert.deepEqual([veil.ground[crater[1]][crater[0]], veil.height[crater[1]][crater[0]]], ['u', '1']);
+  assert.deepEqual([veil.ground[crater[1]][crater[0]], veil.height[crater[1]][crater[0]]], ['u', map.HEIGHT[crater[1]][crater[0]]]);
+  // Le cœur de l'île : ses quartiers des chapitres I à III, sans les terres à expédition
+  assert.deepEqual(map.CORE, ['coeur', 'source', 'lisiere', 'colline', 'jardins', 'est', 'hauteurs']);
   assert.equal(veil.ground[map.SITE_BIG.foyer.y][map.SITE_BIG.foyer.x], map.GROUND[map.SITE_BIG.foyer.y][map.SITE_BIG.foyer.x]);
   // Chaque ancien quartier tient dans le nouveau, même avec tous les chantiers au plus grand
   const all = Object.fromEntries(Object.keys(map.SITE_BIG).map(id => [id, 7]));
