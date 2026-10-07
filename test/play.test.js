@@ -1000,6 +1000,29 @@ test('le Monde : une île de la carte v3 devient le cœur de la très grande îl
   assert.equal((await sql('SELECT map_version FROM world_stock WHERE user_id = $1', [player.userId]))[0].map_version, 5);
 });
 
+test('le Monde : les calques de la carte ne voyagent que si le navigateur ne les a pas (X-Map-Key)', async () => {
+  const player = await newPlayer({ coins: 500 });
+  const full = (await api('GET', '/play/world', null, player)).data;
+  assert.ok(full.map.key && full.map.ground.length === worldMap.SIZE && full.map.grid.length === worldMap.SIZE);
+  const known = { headers: { 'X-Map-Key': full.map.key } };
+  // La même clé : la vue part sans relief, sol, quartiers ni grille ; le reste de la carte reste là
+  const light = (await api('GET', '/play/world', null, player, known)).data;
+  assert.deepEqual(['grid', 'height', 'ground', 'region'].map(k => light.map[k]), [undefined, undefined, undefined, undefined]);
+  assert.equal(light.map.key, full.map.key);
+  assert.deepEqual(light.map.zones, full.map.zones);
+  // Une autre clé (une ancienne carte, ou un quartier découvert depuis) : tout repart
+  const other = (await api('GET', '/play/world', null, player, { headers: { 'X-Map-Key': 'ancienne' } })).data;
+  assert.equal(other.map.ground.length, worldMap.SIZE);
+  // Dans une réponse d'action aussi (world)
+  const bought = (await api('POST', '/play/world/zone', { zone: 'source' }, player, known)).data;
+  assert.ok(bought.world && bought.world.map.key && bought.world.map.ground === undefined);
+  // Un quartier découvert change la clé (son sol se dévoile)
+  await sql(`INSERT INTO world_expeditions (user_id, zone, ends_at) VALUES ($1, 'menhirs', NOW() - INTERVAL '1 hour')`, [player.userId]);
+  const found = (await api('GET', '/play/world', null, player, known)).data;
+  assert.notEqual(found.map.key, full.map.key);
+  assert.equal(found.map.ground.length, worldMap.SIZE);
+});
+
 test('le Monde : une île v4 passe à la grande carte (× 1,5) ; tout ce qui est posé suit, une seule fois, sans rien ranger', async () => {
   const player = await newPlayer();
   await api('GET', '/play/world', null, player);

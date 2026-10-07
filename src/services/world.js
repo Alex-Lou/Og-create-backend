@@ -24,7 +24,7 @@ const anya = require('./anya');
 const {
     SIZE, CAP_HOURS, REGEN_MS, RUN_TTL_MS, RENAME_LEVEL, GAME_TTL_MS, GAME_SLACK_MS, FIRST_RUN_MOVES, FIRST_RUN_KINDS,
     RESOURCES, DECO_PRICES, HARVEST_COIN_EVERY, UNDO_SECONDS, random, CHAPTER_OF_LEVEL, PRODUCE_PER_LEVEL,
-    COINS_PER_LEVEL, SITES, effectOf, keyOf, pendingOf, chargesAt, effectsOf, productionOf, fullInOf, perHourOf, productionAll, cashOf
+    COINS_PER_LEVEL, SITES, MAP_VERSION, effectOf, keyOf, pendingOf, chargesAt, effectsOf, productionOf, fullInOf, perHourOf, productionAll, cashOf
 } = require('./world/rules');
 const {
     itemsOf, skinsOf, signsOf, namesOf, avatarOf, friendsOf, needRowsOf, settlersOf, gamesOf, annexesOf, levelsOf, stockOf,
@@ -232,15 +232,19 @@ async function view(userId, owned, book) {
     const going = await expeditionOf(userId);
     const stockFinds = await findsOf(userId);
     const gathered = await depositsOf(userId);
-    const veil = map.veiled(new Set(map.ZONES.filter(z => !isKnown(z, discovered)).map(z => z.code)));
+    const hidden = map.ZONES.filter(z => !isKnown(z, discovered)).map(z => z.code).sort();
+    const veil = map.veiled(new Set(hidden));
     // Les terres alentour restent fermées tant que le cœur de l'île n'est pas à soi : ce qui en manque, par noms
     const coreLeft = coreMissing(zones);
     const closedLands = coreLeft.length > 0;
     return {
         size: SIZE,
         map: {
-            // Calques de la très grande île (relief, sol, quartiers : voir islandData.js et islandOuter.js) ; grid : index
-            // des quartiers. Les quartiers encore inconnus n'y montrent que leur côte et leur relief (worldMap.veiled)
+            // Calques de la grande carte (relief, sol, quartiers : voir islandV5.js) ; grid : index des quartiers. Les
+            // quartiers encore inconnus n'y montrent que leur côte et leur relief (worldMap.veiled). key : ce qui les
+            // décide (la carte et ce qui reste voilé) ; un navigateur qui a déjà ces calques ne les reçoit plus
+            // (routes/play/world.js, X-Map-Key)
+            key: `${MAP_VERSION}:${hidden.join('')}`,
             grid: map.GRID,
             height: veil.height,
             ground: veil.ground,
