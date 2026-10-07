@@ -20,7 +20,7 @@ const OLD = ['deco', 'recolte', 'source', 'puits', 'lisiere', 'cabane', 'livre5'
   'crique', 'ponton', 'livre45', 'hameau', 'deco10', 'phare', 'livre70', 'legendes'];
 
 test('chaque quête désigne un vrai quartier, palier, création, lieu ou habitant, avec un texte et une récompense', () => {
-  assert.equal(QUESTS.length, 55);
+  assert.equal(QUESTS.length, 56);
   assert.equal(new Set(QUESTS.map(q => q.id)).size, QUESTS.length);
   for (const q of QUESTS) {
     assert.match(q.id, /^[a-z0-9-]{1,30}$/);
@@ -48,7 +48,7 @@ test('chaque quête désigne un vrai quartier, palier, création, lieu ou habita
   const acts = QUESTS.map(q => ACTS.indexOf(q.act));
   assert.deepEqual(acts, [...acts].sort((a, b) => a - b));
   assert.deepEqual(QUESTS.filter(q => q.chest).map(q => q.act), ACTS);
-  assert.equal(QUESTS.reduce((sum, q) => sum + q.coins, 0), 5080);
+  assert.equal(QUESTS.reduce((sum, q) => sum + q.coins, 0), 5140);
   // Le prologue paie La Source (100 écus) avant de la demander
   const source = QUESTS.findIndex(q => q.goal.zone === 'source');
   assert.equal(QUESTS.slice(0, source).reduce((sum, q) => sum + q.coins, 0), map.ZONE_BY_ID.source.price);
@@ -104,7 +104,7 @@ test('avancée de chaque objectif, plafonnée', () => {
 
 test('la quête active est la première pas encore faite ; à la fin, Brume se repose', () => {
   const first = active(new Set(), facts());
-  assert.deepEqual([first.id, first.act, first.step, first.total, first.kind, first.done], ['pages', 'T', 1, 55, 'stars', false]);
+  assert.deepEqual([first.id, first.act, first.step, first.total, first.kind, first.done], ['pages', 'T', 1, 56, 'stars', false]);
   assert.equal(active(new Set(), facts({ stars: 3 })).done, true);
   const ondin = active(new Set(['achat-source']), facts());
   assert.deepEqual([ondin.id, ondin.target], ['eveil-ondin', { villager: 'puits' }]);

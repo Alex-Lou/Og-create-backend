@@ -1,7 +1,7 @@
 // Serveur de jeu : les recettes ne sortent jamais, seul un mélange réussi enrichit un carnet
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { startServer, api, sql, whileHeld, newPlayer, coinsOf, randomPassword } = require('./helpers');
+const { startServer, api, sql, whileHeld, newPlayer, ownCore, coinsOf, randomPassword } = require('./helpers');
 const loot = require('../src/services/loot');
 const minigames = require('../src/services/minigames');
 // Cases du cœur : coordonnées de la grande île (v3) + décalage dans la très grande île (v4)
@@ -676,6 +676,7 @@ test('le Monde : un article de la Récolte qui a servi ne se rend plus ; un skin
   assert.match(late.data.message, /déjà servi/);
   assert.equal(await coinsOf(player), paid);
   // La Cuisine (recharge) part avec une expédition, qui emporte une partie : elle ne se rend plus non plus
+  await ownCore(player);
   await sql('UPDATE world_stock SET food = 50, wood = 50 WHERE user_id = $1', [player.userId]);
   const kitchen = (await buy('cuisine')).data.coins;
   assert.equal((await api('POST', '/play/world/expedition', { zone: 'roselieres' }, player)).status, 200);
@@ -792,10 +793,18 @@ test('terres nouvelles : quartier inconnu masqué, expédition (voisinage, coût
   assert.equal((await explore('roselieres')).status, 403);
   assert.equal((await explore('coeur')).status, 404);
   assert.equal((await explore('DROP')).status, 400);
-  // La Lisière à soi : les Roselières, voisines, s'explorent ; il faut emporter vivres et bois
+  // La Lisière à soi, voisine des Roselières : les terres alentour restent fermées tant que le cœur de l'île (ses
+  // quartiers des chapitres I à III) n'est pas à soi ; leur relief se devine déjà sous la brume
   await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'lisiere')`, [player.userId]);
   await sql('UPDATE world_stock SET food = 5, wood = 50 WHERE user_id = $1', [player.userId]);
-  assert.equal(zoneOf(await view(), 'roselieres').explorable, true);
+  const closed = await view();
+  assert.deepEqual([zoneOf(closed, 'roselieres').closed, zoneOf(closed, 'roselieres').explorable, closed.map.coreLeft.length], [true, false, 5]);
+  assert.equal(closed.map.height[unknown.anchor.y][unknown.anchor.x], worldMap.HEIGHT[unknown.anchor.y][unknown.anchor.x]);
+  assert.match((await explore('roselieres')).data.message, /cœur de l’île est à toi/);
+  // Le cœur de l'île à soi : les Roselières, voisines de la Lisière, s'explorent ; il faut emporter vivres et bois
+  await ownCore(player);
+  const open = await view();
+  assert.deepEqual([zoneOf(open, 'roselieres').closed, zoneOf(open, 'roselieres').explorable, open.map.coreLeft], [false, true, []]);
   assert.match((await explore('roselieres')).data.message, /20 vivres et 10 bûches/);
   await sql('UPDATE world_stock SET food = 50 WHERE user_id = $1', [player.userId]);
   const charges = first.charges.count;
@@ -1644,7 +1653,8 @@ test('ce qui attend dans les bâtiments paie tout : expédition, établi, bête,
   const near = (a, b, label) => assert.ok(Math.abs(a - b) <= 1, `${label} : ${a} ≈ ${b}`);
   await view();
   // Bosquet III (bois), Potager III (vivres, poules), Ponton II (voyageurs), bâtis depuis deux jours
-  await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'lisiere'), ($1, 'jardins'), ($1, 'crique') ON CONFLICT DO NOTHING`, [id]);
+  await ownCore(player);
+  await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'crique') ON CONFLICT DO NOTHING`, [id]);
   await sql(`INSERT INTO world_buildings (user_id, site, level, built_at) VALUES ($1, 'bosquet', 3, NOW() - INTERVAL '2 days'),
     ($1, 'potager', 3, NOW() - INTERVAL '2 days'), ($1, 'ponton', 2, NOW() - INTERVAL '2 days')`, [id]);
   // Expédition (20 vivres, 10 bûches)
@@ -1678,14 +1688,15 @@ test('ce qui attend dans les bâtiments paie tout : expédition, établi, bête,
   const served = await api('POST', '/play/world/visitor', { id: guest.id }, player);
   assert.equal(served.status, 200);
   near(served.data.world.stock.food, pending.food - 30, 'vivres du voyageur');
-  // La Source (100 écus) : 50 écus en bourse, le reste en attente
-  await sql('UPDATE progress SET coins = 50 WHERE user_id = $1', [id]);
+  // Le Cercle de menhirs, découvert par une expédition revenue (350 écus) : 300 écus en bourse, le reste en attente
+  await sql(`INSERT INTO world_expeditions (user_id, zone, started_at, ends_at) VALUES ($1, 'menhirs', NOW() - INTERVAL '3 hours', NOW() - INTERVAL '1 hour')`, [id]);
+  await sql('UPDATE progress SET coins = 300 WHERE user_id = $1', [id]);
   const before = await coinsOf(player);
   pending = await empty();
-  assert.ok(before < 100 && before + pending.coins >= 100, `${before} + ${pending.coins}`);
-  const bought = await api('POST', '/play/world/zone', { zone: 'source' }, player);
+  assert.ok(before < 350 && before + pending.coins >= 350, `${before} + ${pending.coins}`);
+  const bought = await api('POST', '/play/world/zone', { zone: 'menhirs' }, player);
   assert.equal(bought.status, 200);
-  near(bought.data.coins, before + pending.coins - 100, 'écus après la Source');
+  near(bought.data.coins, before + pending.coins - 350, 'écus après le Cercle de menhirs');
 });
 
 test('une Récolte quittée sans jouer ne compte pas ; Cannelle nourrie, la soupe reste faite même si elle a de nouveau faim', async () => {
@@ -2202,7 +2213,7 @@ test('quêtes de Brume : la quête active se réclame une fois, son objectif att
   assert.equal(start.status, 200);
   assert.deepEqual([start.data.brume.quest.id, start.data.brume.quest.kind, start.data.brume.quest.done], ['pages', 'stars', false]);
   assert.equal(start.data.brume.done, 0);
-  assert.equal(start.data.brume.total, 55);
+  assert.equal(start.data.brume.total, 56);
   // Objectif pas encore atteint ; quête qui n'est pas l'active ; identifiant invalide
   assert.equal((await api('POST', '/play/world/quest', { id: 'pages' }, player)).status, 403);
   assert.equal((await api('POST', '/play/world/quest', { id: 'achat-source' }, player)).status, 409);
@@ -2303,7 +2314,8 @@ test('chaque objectif de la chaîne se lit dans l’état (création, annexe, ex
   };
   await check('lumiere', 'lanterne', () => sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'lanterne', $2, $3)`, [player.userId, X(28), Y(31)]));
   await check('cabane', 'annexe', () => sql(`INSERT INTO world_annexes (user_id, x, y, annex) VALUES ($1, 1, 1, 'champ')`, [player.userId]));
-  await check('etoile', 'expedition', () => sql(`INSERT INTO world_expeditions (user_id, zone, ends_at) VALUES ($1, 'roselieres', NOW() - INTERVAL '1 hour')`, [player.userId]));
+  await check('etoile', 'hauteurs', () => sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'hauteurs')`, [player.userId]));
+  await check('hauteurs', 'expedition', () => sql(`INSERT INTO world_expeditions (user_id, zone, ends_at) VALUES ($1, 'roselieres', NOW() - INTERVAL '1 hour')`, [player.userId]));
   await check('expedition', 'ruine', () => sql(`INSERT INTO world_landmarks (user_id, landmark) VALUES ($1, 'saule')`, [player.userId]));
   await check('ponton-aster', 'bete', () => sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Grenouille"]'::jsonb WHERE user_id = $1`, [player.userId]));
   await check('bete', 'voyageur', () => sql(`INSERT INTO world_visitors (user_id, seed, site, request, leaves_at, satisfied_at) VALUES ($1, 7, 'foyer', '{}', NOW(), NOW())`, [player.userId]));

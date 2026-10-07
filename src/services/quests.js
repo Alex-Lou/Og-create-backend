@@ -84,6 +84,8 @@ const QUESTS = [
         'La Brique et le Feu font un Four. Bâtis l’Atelier : Rivet forgera les outils de tous.'),
     q('etoile', 'III', { kind: 'element', element: 'Étoile' }, 50, 'Écris l’Étoile',
         'Aster veut explorer, mais la nuit, il faut un guide. Écris l’Étoile : elle tracera la route.'),
+    q('hauteurs', 'III', { kind: 'zone', zone: 'hauteurs' }, 60, 'Achète Les Hauteurs',
+        'Des Hauteurs, on voit tout le cœur de l’île… et ce qui dort au-delà, dans la brume. C’est de là-haut qu’on partira.'),
     q('expedition', 'III', { kind: 'expedition', need: 1 }, 60, 'Envoie une expédition',
         'Au-delà de nos quartiers, des terres dorment dans la brume. La boussole, en haut : envoie une expédition.'),
     q('ruine', 'III', { kind: 'landmark', need: 1 }, 60, 'Découvre un lieu des Anciens',
