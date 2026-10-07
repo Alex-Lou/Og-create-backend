@@ -587,6 +587,9 @@ test('le Monde : les bâtiments produisent ressources et écus, encaissés une s
   assert.equal(view.pending, 6);
   assert.equal(view.pendingStock.stone, 9);
   assert.deepEqual(view.sites.find(s => s.id === 'carriere').pending, { coins: 6, stone: 9 });
+  // Bâtie il y a 3 h, réserve de 8 h : pleine dans 5 h ; un bâtiment qui ne produit pas n'en a pas
+  assert.ok(Math.abs(view.sites.find(s => s.id === 'carriere').fullIn - 5 * 3600000) < 60000);
+  assert.equal(view.sites.find(s => s.id === 'foyer').fullIn, null);
   const [first, second] = await Promise.all([
     api('POST', '/play/world/collect', null, player),
     api('POST', '/play/world/collect', null, player)
@@ -1566,11 +1569,15 @@ test('production juste : combler un besoin, poser, déplacer ou ranger une créa
   assert.equal(fed.status, 200);
   assert.deepEqual([fed.data.coins, fed.data.world.stock.food, potager(fed.data.world).pending], [coins + 15, 22 - 10, { coins: 0, food: 0 }]);
   assert.equal(await coinsOf(player), coins + 15);
-  // Nourrie à mi-chemin, encore comblée : son humeur ne change pas, rien n'est encaissé (5 h contente en attente)
+  // Nourrie à mi-chemin, encore comblée : son humeur ne change pas ; ce qui a été produit (5 h contente : 15 vivres,
+  // 10 écus) est encaissé d'abord et compte pour payer le repas. Les fractions du premier repas (22,8 vivres,
+  // 15,2 écus) sont gardées pour la suite (world_stock.carry)
   await since(5);
   await fedAgo(13);
   const again = await fill();
-  assert.deepEqual([again.status, again.data.coins, again.data.world.stock.food, potager(again.data.world).pending], [200, undefined, 2, { coins: 10, food: 15 }]);
+  assert.deepEqual([again.status, again.data.coins, again.data.world.stock.food, potager(again.data.world).pending], [200, coins + 25, 12 + 15 - 10, { coins: 0, food: 0 }]);
+  // De nouveau 5 h contente en attente
+  await since(5);
   // Se distraire : trois Clôtures en réserve, des cases pour elles à 3 cases au plus du Potager
   await sql(`INSERT INTO world_crafts (user_id, craft) SELECT $1, 'cloture' FROM generate_series(1, 3)`, [player.userId]);
   const site = potager(again.data.world);
@@ -1582,18 +1589,76 @@ test('production juste : combler un besoin, poser, déplacer ou ranger une créa
   for (const c of spots.slice(0, 2)) assert.deepEqual(await place(c).then(r => [r.status, r.data.coins]), [200, undefined]);
   // La troisième rend Mélisse heureuse : ses 5 h contente sont encaissées d'abord (15 vivres, 10 écus)
   const glad = await place(spots[2]);
-  assert.deepEqual([glad.data.coins, glad.data.world.stock.food, potager(glad.data.world).pending], [coins + 25, 2 + 15, { coins: 0, food: 0 }]);
+  assert.deepEqual([glad.data.coins, glad.data.world.stock.food, potager(glad.data.world).pending], [coins + 35, 17 + 15, { coins: 0, food: 0 }]);
   // 3 h heureuse : 3 × 3,3 = 9,9 vivres et 3 × 2,2 = 6,6 écus en attente
   await since(3);
   assert.deepEqual(potager(await view()).pending, { coins: 6, food: 9 });
   // Une Clôture déplacée tout près : toujours trois autour, rien n'est encaissé
   const moved = await api('POST', '/play/world/craft/move', { x: spots[0].x, y: spots[0].y, toX: spots[3].x, toY: spots[3].y }, player);
   assert.deepEqual([moved.status, moved.data.coins, potager(moved.data.world).pending], [200, undefined, { coins: 6, food: 9 }]);
-  // Une Clôture rangée : Mélisse n'est plus que contente ; ses heures heureuses sont encaissées d'abord
+  // Une Clôture rangée : Mélisse n'est plus que contente ; ses heures heureuses sont encaissées d'abord, avec les
+  // fractions gardées : 9,9 + 0,8 = 10 vivres, 6,6 + 0,2 = 6 écus
   const stored = await api('POST', '/play/world/craft/store', { x: spots[1].x, y: spots[1].y }, player);
-  assert.deepEqual([stored.status, stored.data.coins, stored.data.world.stock.food, potager(stored.data.world).pending], [200, coins + 31, 17 + 9, { coins: 0, food: 0 }]);
-  assert.equal(await coinsOf(player), coins + 31);
+  assert.deepEqual([stored.status, stored.data.coins, stored.data.world.stock.food, potager(stored.data.world).pending], [200, coins + 41, 32 + 10, { coins: 0, food: 0 }]);
+  assert.equal(await coinsOf(player), coins + 41);
   assert.equal((await api('POST', '/play/world/craft/store', { x: spots[1].x, y: spots[1].y }, player)).status, 404);
+});
+
+test('ramassage sans perte : les fractions sont gardées d’un ramassage au suivant, et ce qui attend paie un chantier', async () => {
+  const player = await newPlayer({ coins: 0 });
+  await api('GET', '/play/world', null, player);
+  await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'colline')`, [player.userId]);
+  await sql(`INSERT INTO world_buildings (user_id, site, level, built_at) VALUES ($1, 'carriere', 1, NOW() - INTERVAL '1 day')`, [player.userId]);
+  // La Fissure (3 pierres, 2 écus par heure) ramassée toutes les 20 minutes : 1 pierre et 0,67 écu à chaque fois.
+  // Les écus ne se perdent plus à l'arrondi : 2 écus en trois ramassages (avant : aucun)
+  const collect = async () => {
+    await sql(`UPDATE world_stock SET collected_at = NOW() - INTERVAL '20 minutes' WHERE user_id = $1`, [player.userId]);
+    return (await api('POST', '/play/world/collect', null, player)).data;
+  };
+  const gained = [];
+  for (let i = 0; i < 3; i++) gained.push((await collect()).gained);
+  assert.deepEqual(gained, [0, 1, 1]);
+  assert.equal(await coinsOf(player), 2);
+  assert.equal((await api('GET', '/play/world', null, player)).data.stock.stone, 3);
+  // La Carrière (palier II) demande 30 pierres et 20 bois : 27 pierres en stock et 3 en attente (une heure) suffisent
+  await sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Marteau"]'::jsonb WHERE user_id = $1`, [player.userId]);
+  await sql(`UPDATE world_stock SET stone = 26, wood = 20, collected_at = NOW() - INTERVAL '1 hour' WHERE user_id = $1`, [player.userId]);
+  const build = () => api('POST', '/play/world/build', { site: 'carriere' }, player);
+  assert.equal((await build()).status, 400);
+  await sql('UPDATE world_stock SET stone = 27 WHERE user_id = $1', [player.userId]);
+  const built = await build();
+  assert.equal(built.status, 200);
+  assert.deepEqual([built.data.built, built.data.world.stock.stone, built.data.world.stock.wood], ['Carrière', 0, 0]);
+});
+
+test('une Récolte quittée sans jouer ne compte pas ; Cannelle nourrie, la soupe reste faite même si elle a de nouveau faim', async () => {
+  const player = await newPlayer({ veteran: false });
+  const claim = id => api('POST', '/play/world/quest', { id }, player);
+  const start = async () => (await api('POST', '/play/world/harvest/start', {}, player)).data;
+  const finish = (run, moves) => api('POST', '/play/world/harvest/finish', { run: run.id, moves }, player);
+  await sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Vent", "Pluie", "Brasier"]'::jsonb WHERE user_id = $1`, [player.userId]);
+  assert.equal((await claim('pages')).status, 200);
+  // Quittée sans un coup : la partie est perdue et ne compte pas pour « Termine une Récolte »
+  const quit = await finish(await start(), []);
+  assert.equal(quit.status, 200);
+  assert.deepEqual([quit.data.world.brume.quest.id, quit.data.world.brume.quest.done], ['recolte', false]);
+  const run = await start();
+  const played = await finish(run, playRun(run, 3).moves);
+  assert.equal(played.data.world.brume.quest.done, true);
+  assert.equal((await claim('recolte')).status, 200);
+  // Cannelle arrive affamée : sa faim d'arrivée ne fait pas la quête ; nourrie, si
+  const hungry = (await api('GET', '/play/world', null, player)).data;
+  assert.deepEqual([hungry.brume.quest.id, hungry.brume.quest.done], ['soupe', false]);
+  await sql('UPDATE world_stock SET food = 10 WHERE user_id = $1', [player.userId]);
+  const fed = await api('POST', '/play/world/villager/need', { villager: 'foyer', need: 'manger' }, player);
+  assert.equal(fed.data.world.brume.quest.done, true);
+  // Un jour et demi passe sans réclamer : Cannelle a de nouveau faim, la quête reste faite
+  await sql(`UPDATE world_needs SET filled_at = filled_at - INTERVAL '36 hours' WHERE user_id = $1`, [player.userId]);
+  await sql(`UPDATE world_quests SET claimed_at = claimed_at - INTERVAL '36 hours' WHERE user_id = $1`, [player.userId]);
+  const later = (await api('GET', '/play/world', null, player)).data;
+  assert.equal(later.villagers.find(v => v.id === 'foyer').needs.find(n => n.id === 'manger').met, false);
+  assert.equal(later.brume.quest.done, true);
+  assert.equal((await claim('soupe')).status, 200);
 });
 
 test('visiteurs : un voyageur débarque au Ponton avec une demande, la comble une fois, repart ; le suivant arrive après', async () => {
@@ -1636,6 +1701,9 @@ test('visiteurs : un voyageur débarque au Ponton avec une demande, la comble un
   const early = await satisfy(second.id);
   assert.equal(early.status, 403);
   assert.match(early.data.message, /Encore 2 Récoltes/);
+  // Une partie quittée sans jouer ne compte pas
+  await sql(`INSERT INTO world_runs (user_id, seed, config, finished_at) VALUES ($1, 1, '{"played":0}', NOW())`, [player.userId]);
+  assert.equal((await view()).visitor.request.have, 0);
   const run = `INSERT INTO world_runs (user_id, seed, config, finished_at) VALUES ($1, 1, '{}', NOW())`;
   await sql(run, [player.userId]);
   await sql(run, [player.userId]);

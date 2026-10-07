@@ -74,11 +74,12 @@ async function placeAnnex(userId, annexId, x, y) {
         if (level < need) return db.rollback({ status: 403, message: `Il faut le palier ${CHAPTER_OF_LEVEL[need - 1]} de ce bâtiment.` });
         if (await cellTaken(userId, x, y, conn)) return db.rollback({ status: 409, message: 'Cette case est déjà occupée.' });
         const { cost, coins: price, finds: spent } = annexes.priceOf(a, copy);
-        if (Object.entries(cost).some(([r, n]) => stock[r] < n)) return db.rollback({ status: 400, message: 'Il te manque des ressources : joue une Récolte.' });
+        // La production en cours est encaissée d'abord : elle compte pour payer
+        const gathered = await gather(userId, conn, stock);
+        if (Object.entries(cost).some(([r, n]) => stock[r] + (gathered.stock[r] || 0) < n)) return db.rollback({ status: 400, message: 'Il te manque des ressources : joue une Récolte.' });
         const have = await findsOf(userId, conn);
         const short = Object.entries(spent).find(([f, n]) => have[f] < n);
         if (short) return db.rollback({ status: 400, message: `Il te faut ${short[1]} ${finds.FIND_BY_ID[short[0]].name.toLowerCase()} : ramasses-en sur les gisements de son climat.` });
-        await gather(userId, conn, stock);
         const coins = await ledger.debit(userId, price, `annexe:${a.id}:${copy + 1}`, conn);
         if (coins === null) return db.rollback({ status: 400, message: `Il te faut ${price} écus.` });
         await spendFinds(userId, spent, conn);

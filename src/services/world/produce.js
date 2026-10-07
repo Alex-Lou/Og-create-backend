@@ -5,7 +5,7 @@ const ledger = require('../ledger');
 const shop = require('../worldShop');
 const annexes = require('../annexes');
 const landmarks = require('../landmarks');
-const { RESOURCES, productionAll } = require('./rules');
+const { RESOURCES, productionAll, cashOf } = require('./rules');
 const {
     itemsOf, needRowsOf, settlersOf, annexesOf, levelsOf, stockOf, zonesOf, foundOf, craftsOf, placedOf, blightsOf
 } = require('./reads');
@@ -40,7 +40,8 @@ async function bonusesFor(userId, conn = db) {
 }
 
 // Encaisse la production des bâtiments (écus au grand livre, ressources au stock) dans la transaction de l'appelant ;
-// chaque heure produite compte avec l'humeur de son moment (prodSteps)
+// chaque heure produite compte avec l'humeur de son moment (prodSteps). Ce qui ne fait pas encore une unité entière
+// reste dans world_stock.carry et s'ajoute au ramassage suivant (cashOf) : rien ne se perd, même ramassé souvent
 async function gather(userId, conn, stock) {
     const now = new Date();
     const sources = await sourcesOf(userId, conn);
@@ -48,13 +49,14 @@ async function gather(userId, conn, stock) {
     const { bonuses, extra } = bonusesAt(sources, now.getTime());
     const steps = prodSteps(island, base, lm, stock.collected_at, now.getTime());
     const made = productionAll(island.levels, builtAt, stock.collected_at, now.getTime(), bonuses, extra, steps);
-    const coins = made.reduce((sum, p) => sum + p.coins, 0);
-    const got = Object.fromEntries(RESOURCES.map(r => [r, made.filter(p => p.resource === r).reduce((sum, p) => sum + p.amount, 0)]));
-    if (!coins && RESOURCES.every(r => !got[r])) return { gained: 0, stock: got, balance: null };
-    await conn.query('UPDATE world_stock SET collected_at = $2, stone = stone + $3, wood = wood + $4, water = water + $5, food = food + $6 WHERE user_id = $1',
-        [userId, now, got.stone, got.wood, got.water, got.food]);
-    const { coins: balance } = await ledger.credit(userId, coins, 'monde', now.toISOString(), conn);
-    return { gained: coins, stock: got, balance };
+    const cash = cashOf(made, stock.carry);
+    const got = cash.stock;
+    if (!cash.made) return { gained: 0, stock: got, balance: null };
+    await conn.query('UPDATE world_stock SET collected_at = $2, carry = $7, stone = stone + $3, wood = wood + $4, water = water + $5, food = food + $6 WHERE user_id = $1',
+        [userId, now, got.stone, got.wood, got.water, got.food, JSON.stringify(cash.carry)]);
+    if (!cash.coins) return { gained: 0, stock: got, balance: null };
+    const { coins: balance } = await ledger.credit(userId, cash.coins, 'monde', now.toISOString(), conn);
+    return { gained: cash.coins, stock: got, balance };
 }
 
 // Avant un changement qui touche l'humeur des habitants (besoin comblé, création posée, déplacée ou rangée, visiteur

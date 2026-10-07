@@ -7,7 +7,8 @@
 // - crafts : créations d'île posées ; craft : une création précise posée ; runs : Récoltes terminées ;
 // - stars : découvertes du Grimoire ; element : un élément écrit (ou l'un de any : une bête du Bestiaire) ;
 // - zone : quartier à soi ; level : palier d'un bâtiment ; annex : annexes posées ; house : maisons posées ;
-// - need : un besoin (what) d'un habitant comblé en ce moment ; wake : un habitant réveillé (amitié > 0) ; heart : un cœur ;
+// - need : un besoin (what) d'un habitant comblé, en ce moment ou depuis l'ouverture de la quête ;
+// - wake : un habitant réveillé (amitié > 0) ; heart : un cœur ;
 // - expedition : expéditions revenues ; landmark : lieux découverts (ou un lieu précis) ; gather : gisements ramassés ;
 // - visitor : voyageurs comblés ; settle : voyageurs installés ; name : le peuple a un nom.
 // chest : la dernière quête des actes donne aussi un coffre de cette rareté (loot.js), à ouvrir une fois réclamée.
@@ -186,8 +187,9 @@ function currentOf(claimed) {
 }
 
 // Ce que l'état fournit (services/world.js) : { crafts, runs, stars, zones: Set, levels: { site: palier },
-// elements: Set, placed: Set (créations posées), annexes, houses, met: Set ('habitant:besoin' comblés), awake: Set,
-// hearts (cœurs du meilleur ami), expeditions, landmarks: Set, gathered, visitors, settled, named }
+// elements: Set, placed: Set (créations posées), annexes, houses, met: Set ('habitant:besoin' comblés en ce moment ou
+// depuis la dernière quête réclamée), awake: Set, hearts (cœurs du meilleur ami), expeditions, landmarks: Set,
+// gathered, visitors, settled, named }
 const HAVE = {
     crafts: (goal, facts) => facts.crafts,
     craft: (goal, facts) => (facts.placed.has(goal.craft) ? 1 : 0),

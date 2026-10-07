@@ -12,12 +12,13 @@ const players = require('../players');
 const anya = require('../anya');
 const { RESOURCES, WORDS, SITES } = require('./rules');
 const {
-    needRowsOf, settlersOf, levelsOf, stockOf, zonesOf, claimedOf, craftsOf, placedOf, balanceOf
+    needRowsOf, settlersOf, levelsOf, stockOf, zonesOf, claimedOf, craftsOf, placedOf, balanceOf, PLAYED
 } = require('./reads');
 const { migrate } = require('./migrate');
 const { grant } = require('./chests');
 // Encaisser avant un changement d'humeur (produce.js, qui lit déjà ce module : chargé seulement à l'appel)
 const gatherBefore = (...args) => require('./produce').gatherBefore(...args);
+const gather = (...args) => require('./produce').gather(...args);
 
 // Un habitant vit sur l'île quand son bâtiment est bâti, dans un quartier à soi
 const livesHere = (id, levels, zones) => (levels[id] || 0) >= 1 && zones.has(map.siteZone(id));
@@ -153,9 +154,9 @@ function sameSteps(a, b) {
         return Object.keys({ ...pa, ...pb }).every(site => (pa[site] || 0) === (pb[site] || 0));
     });
 }
-// Récoltes terminées depuis une date (demande d'un visiteur)
+// Récoltes terminées depuis une date, en jouant au moins un coup (demande d'un visiteur)
 async function runsSince(userId, since, conn = db) {
-    const { rows } = await conn.query('SELECT COUNT(*)::int AS n FROM world_runs WHERE user_id = $1 AND finished_at >= $2', [userId, since]);
+    const { rows } = await conn.query(`SELECT COUNT(*)::int AS n FROM world_runs WHERE user_id = $1 AND finished_at >= $2 AND ${PLAYED}`, [userId, since]);
     return rows[0].n;
 }
 // Visiteur du moment : celui qui est là, ou un nouveau qui débarque (Ponton bâti, quelques heures après le dernier
@@ -271,9 +272,9 @@ async function fillNeeds(userId, targets = null, now = Date.now()) {
         const residents = residentsOf(levels, zones, await settlersOf(userId, conn), presence);
         const moods = moodsOf(residents, levels, zones, placedOf(await craftsOf(userId, conn)), await needRowsOf(userId, conn), presence, now);
         const wanted = targets || Object.entries(moods).flatMap(([villager, m]) => m.needs.filter(n => n.cost).map(n => ({ villager, need: n.id })));
-        // Ce qui a été produit compte avec l'humeur d'avant (encaissé d'abord si elle change) ; le stock le comprend
-        const fed = filled => wanted.reduce((out, { villager, need }) => ({ ...out, [villager]: { ...out[villager], [need]: new Date(now) } }), filled);
-        const coins = await gatherBefore(userId, conn, locked, island => ({ ...island, filled: fed(island.filled) }));
+        // Ce qui a été produit est encaissé d'abord, avec l'humeur d'avant : cela compte pour payer ; le stock le comprend
+        const { balance } = await gather(userId, conn, locked);
+        const coins = balance ?? undefined;
         const stock = await stockOf(userId, conn);
         const spent = Object.fromEntries(RESOURCES.map(r => [r, 0]));
         const filled = [];

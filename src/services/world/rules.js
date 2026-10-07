@@ -188,15 +188,22 @@ function effectsOf(levels, bonuses = NO_BONUS, extra = NO_ANNEX) {
     };
 }
 
+// Unités entières d'une quantité calculée (le 1e-9 absorbe les erreurs de calcul en virgule flottante)
+const whole = v => Math.floor(v + 1e-9);
 // Production d'un bâtiment et de ses annexes depuis leur pose ou la dernière récolte (plafonnée à CAP_HOURS, plus les
-// heures des réserves) : { resource, amount, coins }.
+// heures des réserves) : { resource, amount, coins }, en unités entières (exactProductionOf : sans arrondi).
 // bonus = { prod: part en plus, coins: écus par heure en plus (boutique de l'atelier), cap: heures en plus (réserve) } ;
 // annexList = [{ rate, earn, at }] (annexes.bonusesOf) : ressources et écus par heure en plus, comptés depuis at,
 // avec la même part de production en plus que le bâtiment.
 // steps = [{ at (ms), prod }] dans l'ordre, quand la part en plus change en cours de route (humeur des habitants) :
 // chacune vaut de son heure à la suivante (la première depuis le début) et remplace bonus.prod ; chaque heure produite
 // compte avec la part de son moment (la réserve se remplit pendant les cap premières heures)
-function productionOf(siteId, level, builtAt, collectedAt, now = Date.now(), bonus = { prod: 0, coins: 0 }, annexList = [], steps = null) {
+function productionOf(...args) {
+    const made = exactProductionOf(...args);
+    return made && { resource: made.resource, amount: whole(made.amount), coins: whole(made.coins) };
+}
+// Comme productionOf, sans arrondi (des fractions) : ce que gardent les ramassages (cashOf)
+function exactProductionOf(siteId, level, builtAt, collectedAt, now = Date.now(), bonus = { prod: 0, coins: 0 }, annexList = [], steps = null) {
     const site = SITES[siteId];
     if (!site.produce || !level) return null;
     const cap = CAP_HOURS + (bonus.cap || 0);
@@ -214,11 +221,7 @@ function productionOf(siteId, level, builtAt, collectedAt, now = Date.now(), bon
             amount += h * a.rate;
             coins += h * a.earn;
         }
-        return {
-            resource: site.produce,
-            amount: Math.floor(amount + 1e-9),
-            coins: Math.floor(coins + hours * (bonus.coins || 0) + 1e-9)
-        };
+        return { resource: site.produce, amount, coins: coins + hours * (bonus.coins || 0) };
     }
     let amount = hours * PRODUCE_PER_LEVEL * level;
     let coins = hours * COINS_PER_LEVEL * level;
@@ -228,11 +231,7 @@ function productionOf(siteId, level, builtAt, collectedAt, now = Date.now(), bon
         coins += h * a.earn;
     }
     const boost = 1 + (bonus.prod || 0);
-    return {
-        resource: site.produce,
-        amount: Math.floor(amount * boost + 1e-9),
-        coins: Math.floor(coins * boost + hours * (bonus.coins || 0) + 1e-9)
-    };
+    return { resource: site.produce, amount: amount * boost, coins: coins * boost + hours * (bonus.coins || 0) };
 }
 // Heures de from à from + hours, chacune comptée avec la part en plus de son moment : Σ durée × (1 + part) (steps :
 // comme productionOf)
@@ -246,6 +245,12 @@ function boostedHours(from, hours, steps) {
     });
     return sum;
 }
+// Temps (ms) avant que la réserve d'un bâtiment producteur soit pleine, depuis sa pose ou la dernière récolte (0 :
+// pleine, la production attend le ramassage). capHours : CAP_HOURS et les heures des réserves
+function fullInOf(builtAt, collectedAt, capHours, now = Date.now()) {
+    const start = Math.max(collectedAt ? new Date(collectedAt).getTime() : 0, new Date(builtAt).getTime());
+    return Math.max(0, start + capHours * 3600000 - now);
+}
 // Rendement par heure d'un bâtiment producteur et de ses annexes : { amount, coins }, arrondis au dixième
 function perHourOf(level, prod = 0, coins = 0, annexList = []) {
     const boost = 1 + prod;
@@ -256,19 +261,40 @@ function perHourOf(level, prod = 0, coins = 0, annexList = []) {
 }
 // Production de tous les bâtiments. steps = [{ at (ms), prod: { bâtiment: part } }] : la part en plus de chacun à
 // chaque moment depuis la dernière récolte (people.prodSteps) ; un bâtiment dont la part n'a pas changé compte comme
-// avant, avec bonuses.prod
+// avant, avec bonuses.prod. Chacun : { site, resource, amount, coins, exact: { amount, coins } } (exact : sans arrondi)
 function productionAll(levels, builtAt, collectedAt, now = Date.now(), bonuses = NO_BONUS, extra = NO_ANNEX, steps = null) {
     return Object.keys(SITES)
         .map(id => {
             const own = steps && steps.map(s => ({ at: s.at, prod: s.prod[id] || 0 }));
             const varies = own && own.some(s => s.prod !== own[0].prod);
-            return {
-                site: id,
-                ...productionOf(id, levels[id] || 0, builtAt[id], collectedAt, now,
-                    { prod: bonuses.prod[id] || 0, coins: bonuses.coins[id] || 0, cap: extra.cap[id] || 0 }, extra.site[id] || [], varies ? own : null)
+            const exact = exactProductionOf(id, levels[id] || 0, builtAt[id], collectedAt, now,
+                { prod: bonuses.prod[id] || 0, coins: bonuses.coins[id] || 0, cap: extra.cap[id] || 0 }, extra.site[id] || [], varies ? own : null);
+            return exact && {
+                site: id, resource: exact.resource, amount: whole(exact.amount), coins: whole(exact.coins),
+                exact: { amount: exact.amount, coins: exact.coins }
             };
         })
-        .filter(p => p.resource);
+        .filter(Boolean);
+}
+
+// Ce que vaut la production de tous les bâtiments (productionAll), avec ce qui restait du dernier ramassage (carry :
+// { coins, stone, wood, water, food }, des fractions) : { coins, stock: { ressource: n }, carry }, en unités entières ;
+// carry, ce qui reste à verser au ramassage suivant ; made : un bâtiment a produit quelque chose depuis le dernier
+// ramassage. Rien ne se perd à l'arrondi
+function cashOf(production, carry = {}) {
+    const keys = ['coins', ...RESOURCES];
+    const exact = Object.fromEntries(keys.map(k => [k, Number(carry && carry[k]) || 0]));
+    for (const p of production) {
+        exact.coins += p.exact.coins;
+        exact[p.resource] += p.exact.amount;
+    }
+    const left = v => Math.max(0, Math.round((v - whole(v)) * 1e6) / 1e6);
+    return {
+        coins: whole(exact.coins),
+        stock: Object.fromEntries(RESOURCES.map(r => [r, whole(exact[r])])),
+        carry: Object.fromEntries(keys.map(k => [k, left(exact[k])])),
+        made: production.some(p => p.exact.amount > 0 || p.exact.coins > 0)
+    };
 }
 
 module.exports = {
@@ -276,5 +302,5 @@ module.exports = {
     FIRST_RUN_MOVES, FIRST_RUN_KINDS, RESOURCES, MAP_VERSION, EXPEDITION_COST, OLD_DECO_RATE, DECO_PRICES,
     HARVEST_COIN_EVERY, UNDO_SECONDS, random, CHAPTER_OF_LEVEL, BOOST_BY_LEVEL, ATELIER_MOVES, PRODUCE_PER_LEVEL,
     COINS_PER_LEVEL, WORDS, tier, SITES, BOOSTED, effectOf, keyOf, pendingOf, chargesAt, NO_BONUS, NO_ANNEX, effectsOf,
-    productionOf, boostedHours, perHourOf, productionAll
+    productionOf, boostedHours, fullInOf, perHourOf, productionAll, cashOf
 };

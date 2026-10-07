@@ -3,7 +3,7 @@
 // productionAll) et people (moodTimes, prodSteps, sameSteps)
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { productionOf, boostedHours, productionAll, NO_BONUS, NO_ANNEX } = require('../src/services/world/rules');
+const { productionOf, boostedHours, productionAll, cashOf, fullInOf, NO_BONUS, NO_ANNEX } = require('../src/services/world/rules');
 const { moodTimes, prodSteps, sameSteps } = require('../src/services/world/people');
 const landmarks = require('../src/services/landmarks');
 const map = require('../src/services/worldMap');
@@ -80,6 +80,24 @@ test('productionAll : seul le bâtiment dont la part change est compté morceau 
   assert.deepEqual(made.map(p => [p.site, p.amount, p.coins]), [['carriere', 52, 35], ['potager', 22, 15]]);
   // Sans changement : comme avant
   assert.deepEqual(productionAll(levels, builtAt, new Date(at(10)), T, bonuses, NO_ANNEX, [steps[1]]), productionAll(levels, builtAt, new Date(at(10)), T, bonuses, NO_ANNEX));
+});
+
+test('cashOf : les fractions de chaque ramassage sont gardées pour le suivant ; rien ne se perd', () => {
+  const made = [{ resource: 'stone', exact: { amount: 1.0004, coins: 0.6669 } }, { resource: 'food', exact: { amount: 2.5, coins: 0.5 } }];
+  const first = cashOf(made, {});
+  assert.deepEqual([first.coins, first.stock, first.made], [1, { stone: 1, wood: 0, water: 0, food: 2 }, true]);
+  assert.deepEqual(first.carry, { coins: 0.1669, stone: 0.0004, wood: 0, water: 0, food: 0.5 });
+  // Le ramassage suivant reprend ce qui restait
+  const second = cashOf([{ resource: 'food', exact: { amount: 0.5, coins: 0.8331 } }], first.carry);
+  assert.deepEqual([second.coins, second.stock.food, second.carry.coins, second.carry.food], [1, 1, 0, 0]);
+  // Rien de produit depuis : made est faux (rien à écrire)
+  assert.equal(cashOf([{ resource: 'stone', exact: { amount: 0, coins: 0 } }], first.carry).made, false);
+});
+
+test('fullInOf : la réserve se remplit depuis la pose ou la dernière récolte', () => {
+  assert.equal(fullInOf(new Date(at(3)), new Date(at(5)), 8, T), 5 * H);
+  assert.equal(fullInOf(new Date(at(30)), new Date(at(2)), 12, T), 10 * H);
+  assert.equal(fullInOf(new Date(at(30)), null, 8, T), 0);
 });
 
 test('échéances des besoins : dans la fenêtre, dans l’ordre, sans doublon', () => {
