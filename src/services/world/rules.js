@@ -21,8 +21,8 @@ const FIRST_RUN_MOVES = 4;
 const FIRST_RUN_KINDS = harvest.BASE_KINDS.filter(kind => kind !== 'water');
 const RESOURCES = ['stone', 'wood', 'water', 'food'];
 // 1 : île 14 × 14 ; 2 : île 20 × 20 (worldMapV2.js) ; 3 : la grande île 48 × 48 ; 4 : la très grande île 96 × 96, dont
-// la précédente est le cœur (worldMap.js)
-const MAP_VERSION = 4;
+// la précédente est le cœur (worldMapV4.js) ; 5 : la grande carte 144 × 144, la v4 à l'échelle × 1,5 (worldMap.js)
+const MAP_VERSION = 5;
 // Expédition vers un quartier des terres nouvelles : par heure de voyage, ce qu'elle emporte (et une partie de Récolte)
 const EXPEDITION_COST = { food: 10, wood: 5 };
 // Ancienne règle (v1) : une décoration rapportait 1 écu par heure ; payée une dernière fois à la migration

@@ -12,11 +12,11 @@ const map = require('./worldMap');
 
 const START_HOUR = 21;
 const END_HOUR = 6;
-const LIGHT_REACH = 2;
+const LIGHT_REACH = 3;
 const LIGHTS = new Set(['lanterne', 'brasero']);
 const FENCES = new Set(['cloture', 'muret']);
-// Un égaré marche une case toutes les 3 minutes
-const MS_PER_CELL = 3 * 60 * 1000;
+// Un égaré marche une case toutes les 2 minutes (3 avant la grande carte : les chemins y sont 1,5 fois plus longs)
+const MS_PER_CELL = 2 * 60 * 1000;
 // Une nuit à la fois : de 2 égarés (avant l'acte I fini) à 6
 const countOf = acts => Math.min(6, 2 + Math.floor(acts / 2));
 

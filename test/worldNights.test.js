@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const { startServer, api, sql, newPlayer } = require('./helpers');
 const db = require('../src/config/db');
 const nights = require('../src/services/nights');
+const map = require('../src/services/worldMap');
 const anya = require('../src/services/anya');
 const worldNights = require('../src/services/world/nights');
 const { stockOf } = require('../src/services/world/reads');
@@ -89,8 +90,8 @@ test('une lumière près du Puits change en lucioles ceux qui y vont : aucune pa
   const toWell = p => p.some(c => c.site === 'puits' && nights.fateOf(c, FIRE).end === 'arrive');
   const { start, end } = nightWhere(id, Date.now() + 2 * DAY, toWell);
   await startBefore(id, start);
-  // La lanterne à côté du Puits (59, 57 : 2 × 2 cases)
-  await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'lanterne', 58, 56)`, [id]);
+  // La lanterne au coin de la grande emprise du Puits, à côté de sa petite (2 × 2 cases)
+  await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'lanterne', $2, $3)`, [id, map.SITE_BIG.puits.x, map.SITE_BIG.puits.y]);
   const evening = await view(id, start - HOUR);
   assert.ok(evening.creatures.filter(c => c.site === 'puits').every(c => c.end === 'luciole'));
   assert.equal(evening.panne, null);

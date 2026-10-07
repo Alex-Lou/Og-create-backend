@@ -1,14 +1,21 @@
-// La carte de l'île, la même pour tous : la grande carte (144 × 144, carte v5), dessinée case par case — relief, sol et
-// quartiers. C'est la très grande île v4 (worldMapV4.js, 96 × 96 : le cœur 48 × 48 et les terres nouvelles autour) à
-// l'échelle × 1,5, côtes lissées (islandV5.js, généré par scripts/scaleMap.js). La Grève est ouverte d'office ; les
-// autres quartiers s'achètent (écus + chapitre du Livre), et ceux des terres nouvelles se découvrent d'abord par une
-// expédition. Fonctions pures, sans base de données.
-const island = require('./islandV5');
+// La carte v4 (96 × 96, lot 9), figée : celle d'avant la grande carte (× 1,5, carte v5). Ne plus la modifier : elle sert
+// aux migrations des joueurs (world/migrate.js : toV3 et toV4 la lisent) et à la génération de la carte v5
+// (scripts/scaleMap.js). Le cœur est la grande île 48 × 48 (islandData.js), posée telle quelle en OFFSET ; autour, les
+// terres nouvelles (islandOuter.js). Fonctions pures, sans base de données.
+const heart = require('./islandData');
+const outer = require('./islandOuter');
 
-const SIZE = 144;
-const data = { HEIGHT: island.HEIGHT, GROUND: island.GROUND, REGION: island.REGION, SITES: island.SITES };
-// Une position v4 dans la carte v5 : la case qui reprend la case v4 (world/migrate.js, toV5)
-const fromV4 = v => Math.round(1.5 * v + 0.25);
+const SIZE = 96;
+// Place du cœur (l'île v3) dans la carte : ses coordonnées v3 + OFFSET
+const OFFSET = { x: outer.OX, y: outer.OY };
+// Calques assemblés : '?' dans islandOuter.js = case de terre du cœur
+const compose = (outerLayer, heartLayer) => outerLayer.map((row, y) => [...row].map((c, x) => (c === '?' ? heartLayer[y - OFFSET.y][x - OFFSET.x] : c)).join(''));
+const data = {
+    HEIGHT: compose(outer.HEIGHT, heart.HEIGHT),
+    GROUND: compose(outer.GROUND, heart.GROUND),
+    REGION: compose(outer.REGION, heart.REGION),
+    SITES: Object.fromEntries(Object.entries(heart.SITES).map(([id, p]) => [id, { x: p.x + OFFSET.x, y: p.y + OFFSET.y }]))
+};
 
 // Climats : le cœur est tempéré ; chacun des six autres a sa météo, sa lumière (front) et, plus tard, ses règles
 const CLIMATES = {
@@ -167,7 +174,7 @@ function freeSpots(zoneId, levels = {}) {
 }
 
 module.exports = {
-    SIZE, fromV4, CLIMATES, SITE_PLACES, SITE_BIG, BIG_FROM, ZONES, ZONE_BY_ID, CORE, GRID, ANCHORS, NEIGHBORS,
+    SIZE, OFFSET, CLIMATES, SITE_PLACES, SITE_BIG, BIG_FROM, ZONES, ZONE_BY_ID, CORE, GRID, ANCHORS, NEIGHBORS,
     HEIGHT: data.HEIGHT, GROUND: data.GROUND, REGION: data.REGION,
     isLand, buildable, groundAt, heightAt, zoneAt, siteZone, inSite, footprintOf, inFootprint, freeSpots, veiled
 };
