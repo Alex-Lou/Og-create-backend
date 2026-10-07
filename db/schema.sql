@@ -264,6 +264,9 @@ CREATE TABLE IF NOT EXISTS world_buildings (
 -- map_version : 1 = ancienne île 14 × 14 ; 2 = île 20 × 20 ; 3 = grande île 48 × 48 ; 4 = très grande île 96 × 96 (la
 -- précédente en est le cœur). Le passage se fait une fois par joueur, à sa première visite (services/world.js, migrate).
 ALTER TABLE world_stock ADD COLUMN IF NOT EXISTS map_version SMALLINT NOT NULL DEFAULT 1;
+-- Ce que les bâtiments ont produit sans faire encore une unité entière (écus, pierre, bois, eau, nourriture) : gardé
+-- d'un ramassage au suivant, pour que rien ne se perde à l'arrondi (services/world/produce.js, gather)
+ALTER TABLE world_stock ADD COLUMN IF NOT EXISTS carry JSONB NOT NULL DEFAULT '{}'::jsonb;
 CREATE TABLE IF NOT EXISTS world_zones (
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     zone VARCHAR(20) NOT NULL,

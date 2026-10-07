@@ -24,7 +24,7 @@ const anya = require('./anya');
 const {
     SIZE, CAP_HOURS, REGEN_MS, RUN_TTL_MS, RENAME_LEVEL, GAME_TTL_MS, GAME_SLACK_MS, FIRST_RUN_MOVES, FIRST_RUN_KINDS,
     RESOURCES, DECO_PRICES, HARVEST_COIN_EVERY, UNDO_SECONDS, random, CHAPTER_OF_LEVEL, PRODUCE_PER_LEVEL,
-    COINS_PER_LEVEL, SITES, effectOf, keyOf, pendingOf, chargesAt, effectsOf, productionOf, perHourOf, productionAll
+    COINS_PER_LEVEL, SITES, effectOf, keyOf, pendingOf, chargesAt, effectsOf, productionOf, perHourOf, productionAll, cashOf
 } = require('./world/rules');
 const {
     itemsOf, skinsOf, signsOf, namesOf, avatarOf, friendsOf, needRowsOf, settlersOf, gamesOf, annexesOf, levelsOf, stockOf,
@@ -67,11 +67,17 @@ async function factsOf(userId, owned, stars, conn = db, moods = null) {
     const { levels } = await levelsOf(userId, conn);
     const zones = await zonesOf(userId, conn);
     const placed = placedOf(await craftsOf(userId, conn));
+    const filled = await needRowsOf(userId, conn);
     if (!moods) {
         const presence = await presenceOf(userId, conn);
         const residents = residentsOf(levels, zones, await settlersOf(userId, conn), presence);
-        moods = moodsOf(residents, levels, zones, placed, await needRowsOf(userId, conn), presence);
+        moods = moodsOf(residents, levels, zones, placed, filled, presence);
     }
+    // Un besoin comblé depuis l'ouverture de la quête en cours (la dernière réclamée) reste fait pour elle, même s'il
+    // revient avant qu'on la réclame. La faim de Cannelle à son arrivée (welcome, datée d'avant) ne compte pas
+    const { rows: [last] } = await conn.query('SELECT MAX(claimed_at) AS at FROM world_quests WHERE user_id = $1', [userId]);
+    const fedSince = Object.entries(filled).flatMap(([id, needs]) => Object.entries(needs)
+        .filter(([, at]) => !last.at || new Date(at) >= last.at).map(([need]) => `${id}:${need}`));
     const friends = await friendsOf(userId, conn);
     const best = Math.max(0, ...Object.values(friends).map(f => f.points));
     return {
@@ -79,7 +85,7 @@ async function factsOf(userId, owned, stars, conn = db, moods = null) {
         elements: new Set(owned), zones, levels,
         annexes: await countOf(conn, 'SELECT COUNT(*)::int AS n FROM world_annexes WHERE user_id = $1', [userId]),
         houses: await countOf(conn, 'SELECT COUNT(*)::int AS n FROM world_annexes WHERE user_id = $1 AND annex = $2', [userId, 'maison']),
-        met: new Set(Object.entries(moods).flatMap(([id, m]) => m.needs.filter(n => n.met).map(n => `${id}:${n.id}`))),
+        met: new Set([...Object.entries(moods).flatMap(([id, m]) => m.needs.filter(n => n.met).map(n => `${id}:${n.id}`)), ...fedSince]),
         awake: new Set(Object.entries(friends).filter(([, f]) => f.points > 0).map(([id]) => id)),
         hearts: villagers.heartsOf(best),
         expeditions: await countOf(conn, 'SELECT COUNT(*)::int AS n FROM world_expeditions WHERE user_id = $1 AND ends_at <= NOW()', [userId]),
@@ -211,7 +217,9 @@ async function view(userId, owned, book) {
             next: next ? step(next) : null
         };
     });
-    const pendingStock = Object.fromEntries(RESOURCES.map(r => [r, production.filter(p => p.resource === r).reduce((sum, p) => sum + p.amount, 0)]));
+    // Ce que « Tout ramasser » donnerait maintenant, avec ce qui restait du dernier ramassage (world_stock.carry)
+    const cash = cashOf(production, stock.carry);
+    const pendingStock = cash.stock;
     const claimed = await claimedOf(userId);
     const facts = await factsOf(userId, owned, book.stars ?? 0, db, moods);
     const visiting = await visitorNow(userId);
@@ -261,7 +269,7 @@ async function view(userId, owned, book) {
         harvest: { maxMoves: effects.maxMoves, kinds: effects.kinds, boosts: effects.boosts, coinEvery: HARVEST_COIN_EVERY },
         rates: { produce: PRODUCE_PER_LEVEL, coins: COINS_PER_LEVEL },
         capHours: CAP_HOURS,
-        pending: production.reduce((sum, p) => sum + p.coins, 0),
+        pending: cash.coins,
         pendingStock,
         // Créations d'île : paliers, catalogue, réserve et cases où poser, créations posées
         crafts: craftsView(craftRows, craftCtx(levels, zones, annexRows, craftRows), {
@@ -390,11 +398,12 @@ async function build(userId, owned, siteId, openChapters = new Set()) {
         if (!next) return db.rollback({ status: 409, message: 'Ce chantier est déjà achevé.' });
         if (!openChapters.has(next.chapter)) return db.rollback({ status: 403, message: `Ouvre d’abord le chapitre ${next.chapter} du Grimoire.` });
         if (next.plan && !owned.includes(next.plan)) return db.rollback({ status: 403, message: `Il te faut le plan : découvre « ${next.plan} » dans le Grimoire.` });
-        const missing = Object.entries(next.cost).filter(([r, n]) => stock[r] < n);
+        // Ce que les bâtiments avaient produit est encaissé d'abord : cela compte pour payer (et la production du bâtiment
+        // repart de zéro à l'évolution)
+        const gathered = await gather(userId, conn, stock);
+        const missing = Object.entries(next.cost).filter(([r, n]) => stock[r] + (gathered.stock[r] || 0) < n);
         if (missing.length) return db.rollback({ status: 400, message: 'Il te manque des ressources : joue une Récolte.' });
         const costs = RESOURCES.map(r => next.cost[r] || 0);
-        // Ce que le bâtiment avait produit est encaissé avant l'évolution (sa production repart de zéro)
-        await gather(userId, conn, stock);
         let coins;
         if (next.coins) {
             coins = await ledger.debit(userId, next.coins, `chantier:${siteId}:${level + 1}`, conn);
@@ -438,7 +447,9 @@ function finishRun(userId, runId, moves) {
         const { rows } = await conn.query(
             'SELECT seed, config, created_at FROM world_runs WHERE id = $1 AND user_id = $2 AND finished_at IS NULL FOR UPDATE', [runId, userId]);
         if (!rows.length) return db.rollback({ status: 404, message: 'Cette partie est déjà rendue.' });
-        await conn.query('UPDATE world_runs SET finished_at = NOW() WHERE id = $1', [runId]);
+        // played : les coups joués ; une partie quittée sans jouer ne compte ni pour les quêtes ni pour les visiteurs
+        await conn.query(`UPDATE world_runs SET finished_at = NOW(), config = config || jsonb_build_object('played', $2::int) WHERE id = $1`,
+            [runId, Array.isArray(moves) ? moves.length : 0]);
         const { seed, config, created_at: createdAt } = rows[0];
         const played = Date.now() - new Date(createdAt).getTime() > RUN_TTL_MS
             ? { ok: false, error: 'Partie expirée' }

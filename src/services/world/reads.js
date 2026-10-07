@@ -134,8 +134,10 @@ async function helianeOfUser(userId, conn = db) {
     const starts = quests.actStartsOf(claimed.rows.map(r => ({ quest: r.quest, at: r.claimed_at.getTime() })));
     return loot.helianeOf(starts, bottles.rows.map(r => r.opened_at.getTime()));
 }
+// Récoltes terminées en jouant au moins un coup (une partie rendue avant ce relevé, sans played, compte)
+const PLAYED = `COALESCE((config->>'played')::int, 1) > 0`;
 async function runsOf(userId, conn = db) {
-    const { rows } = await conn.query('SELECT COUNT(*)::int AS n FROM world_runs WHERE user_id = $1 AND finished_at IS NOT NULL', [userId]);
+    const { rows } = await conn.query(`SELECT COUNT(*)::int AS n FROM world_runs WHERE user_id = $1 AND finished_at IS NOT NULL AND ${PLAYED}`, [userId]);
     return rows[0].n;
 }
 // Un nombre lu en base (COUNT)
@@ -178,5 +180,5 @@ async function balanceOf(userId, conn) {
 module.exports = {
     itemsOf, skinsOf, signsOf, namesOf, avatarOf, friendsOf, needRowsOf, settlersOf, gamesOf, annexesOf, levelsOf, stockOf,
     tilesOf, zonesOf, findsOf, spendFinds, depositsOf, blightsOf, foundOf, claimedOf, helianeOfUser, runsOf, countOf,
-    discoveredOf, exploredOf, craftsOf, placedOf, madeOf, addStock, balanceOf
+    discoveredOf, exploredOf, craftsOf, placedOf, madeOf, addStock, balanceOf, PLAYED
 };
