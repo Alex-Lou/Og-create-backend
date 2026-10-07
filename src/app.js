@@ -52,6 +52,7 @@ app.use(express.urlencoded({ extended: true, limit: bodyLimit }));
 
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/auth', require('./routes/passwordReset'));
+app.use('/api/account', require('./routes/account'));
 app.use('/api/progress', gameLimiter, require('./routes/progress'));
 app.use('/api/achievements', gameLimiter, require('./routes/achievements'));
 app.use('/api/coins', gameLimiter, require('./routes/coins'));

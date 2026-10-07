@@ -4,6 +4,7 @@ const express = require('express');
 const accounts = require('../services/accounts');
 const authSession = require('../services/authSession');
 const players = require('../services/players');
+const accountSettings = require('../services/accountSettings');
 const achievementService = require('../services/achievementService');
 const authMiddleware = require('../middleware/auth');
 const { limiter } = require('../middleware/rateLimit');
@@ -99,10 +100,12 @@ router.post('/login', loginLimiter, accountLimiter, async (req, res) => {
     try {
         const user = await accounts.login(email, password);
         if (!user) return res.status(401).json({ message: 'Authentification échouée' });
+        // Un compte en pause est réactivé, une suppression prévue est annulée (back : ce qu'il faut en dire)
+        const back = await accountSettings.welcomeBack(user.id);
         const session = await authSession.issue(res, user);
         await adoptGuest(req, res, user.id);
         log('info', 'Connexion réussie', { userId: user.id });
-        res.status(200).json(session);
+        res.status(200).json({ ...session, ...(back ? { back } : {}) });
     } catch (error) {
         failure(res, 'Erreur lors de la connexion', error);
     }

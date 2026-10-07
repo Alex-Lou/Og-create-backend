@@ -21,6 +21,12 @@ const server = app.listen(PORT, () => {
     console.log('Tout roule! :)');
 });
 
+// Les comptes dont les sept jours de grâce sont passés s'effacent : au démarrage, puis toutes les heures
+const { sweepDeleted } = require('./services/accountSettings');
+const sweep = () => sweepDeleted().catch(error => console.error('Effacement des comptes supprimés :', error.message));
+sweep();
+setInterval(sweep, 3600 * 1000).unref();
+
 process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
     server.close(() => process.exit(1));
