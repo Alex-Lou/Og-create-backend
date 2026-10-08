@@ -22,6 +22,8 @@ const landmarks = require('./landmarks');
 const finds = require('./finds');
 const anya = require('./anya');
 const avatarChoices = require('./avatarChoices');
+const pickups = require('./pickups');
+const beastRules = require('./beasts');
 const {
     SIZE, CAP_HOURS, REGEN_MS, RUN_TTL_MS, RENAME_LEVEL, GAME_TTL_MS, GAME_SLACK_MS, FIRST_RUN_MOVES, FIRST_RUN_KINDS,
     RESOURCES, DECO_PRICES, HARVEST_COIN_EVERY, UNDO_SECONDS, random, CHAPTER_OF_LEVEL, PRODUCE_PER_LEVEL,
@@ -41,7 +43,7 @@ const {
 const { bonusesFor, gather, payWith, collect } = require('./world/produce');
 const { anyaOf, breathRefused, brumeSavoirOf, talkBrume, revealAnya, breatheAnya } = require('./world/anyaBrume');
 const {
-    isKnown, coreMissing, expeditionCost, expeditionOf, startExpedition, findLandmark, craftBonusOf, gatherDeposit
+    isKnown, coreMissing, expeditionCost, expeditionOf, startExpedition, findLandmark, craftBonusOf, gatherDeposit, pickUp
 } = require('./world/lands');
 const {
     craftCtx, stowCrafts, epreuvesOf, craftsView, startCraft, finishCraft, placeCraft, moveCraft, storeCraft, turnCraft
@@ -92,7 +94,12 @@ async function factsOf(userId, owned, stars, conn = db, moods = null) {
         hearts: villagers.heartsOf(best),
         expeditions: await countOf(conn, 'SELECT COUNT(*)::int AS n FROM world_expeditions WHERE user_id = $1 AND ends_at <= NOW()', [userId]),
         landmarks: new Set((await foundOf(userId, conn)).keys()),
-        gathered: await countOf(conn, 'SELECT COUNT(*)::int AS n FROM world_deposits WHERE user_id = $1', [userId]),
+        // (les gisements de climat ; ce que la mer rend sur la Grève compte à part)
+        gathered: await countOf(conn, 'SELECT COUNT(*)::int AS n FROM world_deposits WHERE user_id = $1 AND deposit NOT LIKE $2', [userId, `${pickups.PREFIX}%`]),
+        pickups: await countOf(conn, 'SELECT COUNT(*)::int AS n FROM world_deposits WHERE user_id = $1 AND deposit LIKE $2', [userId, `${pickups.PREFIX}%`]),
+        // Les poules de Cannelle nourries, encore rassasiées (ouvrir la cage les laisse affamées : seul un repas compte)
+        hensFed: await countOf(conn, `SELECT COUNT(*)::int AS n FROM world_beasts WHERE user_id = $1 AND beast = ANY($2)
+            AND fed_at > NOW() - make_interval(secs => $3)`, [userId, beastRules.HENS, beastRules.DAY_MS / 1000]),
         visitors: await countOf(conn, 'SELECT COUNT(*)::int AS n FROM world_visitors WHERE user_id = $1 AND satisfied_at IS NOT NULL', [userId]),
         settled: await countOf(conn, 'SELECT COUNT(*)::int AS n FROM world_visitors WHERE user_id = $1 AND settled_at IS NOT NULL', [userId]),
         named: Boolean((await namesOf(userId, conn)).peuple)
@@ -281,6 +288,10 @@ async function view(userId, owned, book) {
         // grâce aux créations de climat de leur quartier
         deposits: finds.DEPOSITS.filter(d => isKnown(map.ZONE_BY_ID[d.zone], discovered))
             .map(d => ({ id: d.id, zone: d.zone, find: d.find, x: d.x, y: d.y, readyIn: finds.readyIn(gathered.get(d.id), Date.now(), presence.blessed ? anya.BLESSING.regrowMs : finds.REGROW_MS), bonus: craftBonusOf(decor, d.zone) })),
+        // Ce que la mer a rendu sur la Grève (pickups.js) : case, sorte, temps avant qu'il en revienne (ms, 0 : prêt) ; une
+        // case où le joueur a déjà posé une annexe ou une création n'en montre pas
+        pickups: pickups.SPOTS.filter(p => !taken.has(keyOf(p)))
+            .map(p => ({ id: p.id, kind: p.kind, x: p.x, y: p.y, readyIn: finds.readyIn(gathered.get(p.id), Date.now(), pickups.REGROW_MS) })),
         // Expédition en route : vers quel quartier, retour dans combien de temps (ms)
         expedition: going ? { zone: going.zone, endsIn: Math.max(0, new Date(going.ends_at).getTime() - Date.now()) } : null,
         sites,
@@ -742,7 +753,7 @@ module.exports = {
     SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, pendingOf, chargesAt, effectsOf, productionOf,
     view, build, buyZone, buyItem, undoItem, chooseSkin, startRun, finishRun, collect, migrate, claimQuest, board, openChest, openAll,
     placeAnnex, moveAnnex, poseAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople, namePlayer, chooseAvatar, arianeTargets,
-    refundDecorations, startCraft, finishCraft, placeCraft, moveCraft, storeCraft, turnCraft, startExpedition, findLandmark, gatherDeposit,
+    refundDecorations, startCraft, finishCraft, placeCraft, moveCraft, storeCraft, turnCraft, startExpedition, findLandmark, gatherDeposit, pickUp,
     anyaOf, breathRefused, revealAnya, breatheAnya, brumeSavoirOf, talkBrume, startNights, repelCreature, repairSite,
     feedBeast, collectBeasts, openCage
 };

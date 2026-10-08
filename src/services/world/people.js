@@ -32,22 +32,24 @@ function decosNear(tiles, siteId, level, reach) {
 // Identifiant d'un visiteur installé, parmi les habitants : 'v<numéro de sa visite>'
 const SETTLER_ID = /^v\d{1,9}$/;
 const knownResident = id => Object.hasOwn(villagers.VILLAGERS, id) || SETTLER_ID.test(id);
-// La troupe est là dès sa rencontre (bible, § 6.6) : Aster dès le compte, Cannelle après la Récolte du prologue, Rivet
-// après la soupe, les quatre dormeurs (SLEEPERS) dès que leur quartier est à soi ; un joueur d'avant la bible garde
-// aussi chaque habitant dont le bâtiment est bâti. presence : { veteran, done (quêtes faites, quests.doneOf) }
+// La troupe est là dès sa rencontre (bible, § 6.6) : Aster dès le compte ; Cannelle attirée par le feu, Rivet après les
+// poules (v6, § 9 : un compte créé depuis players.V6_SINCE ; avant : Cannelle après la Récolte, Rivet après la soupe,
+// gardés tels quels) ; les quatre dormeurs (SLEEPERS) dès que leur quartier est à soi ; un joueur d'avant la bible
+// garde aussi chaque habitant dont le bâtiment est bâti. presence : { veteran, fresh, done (quêtes faites,
+// quests.doneOf) }
 const SLEEPERS = ['puits', 'bosquet', 'carriere', 'potager'];
 function metOf(id, levels, zones, presence) {
     if (presence.veteran && livesHere(id, levels, zones)) return true;
     if (id === 'ponton') return true;
-    if (id === 'foyer') return presence.done.has('recolte');
-    if (id === 'atelier') return presence.done.has('soupe');
+    if (id === 'foyer') return presence.done.has(presence.fresh ? 'feu' : 'recolte');
+    if (id === 'atelier') return presence.done.has(presence.fresh ? 'poules' : 'soupe');
     return zones.has(map.siteZone(id));
 }
 // Ce qu'il faut pour savoir qui est là : compte d'avant la bible, quêtes faites ; et la Bénédiction d'Anya (le cœur de
 // l'île libéré : l'humeur ne descend plus sous « content »)
 async function presenceOf(userId, conn = db) {
     const blessed = anya.awakeOf(await zonesOf(userId, conn));
-    return { veteran: await players.veteranOf(userId, conn), done: quests.doneOf(await claimedOf(userId, conn)), blessed };
+    return { veteran: await players.veteranOf(userId, conn), fresh: await players.freshOf(userId, conn), done: quests.doneOf(await claimedOf(userId, conn)), blessed };
 }
 // Habitants de l'île : la troupe rencontrée (built : son bâtiment est bâti, dans un quartier à soi), puis les
 // visiteurs installés, qui travaillent au bâtiment de leur métier : [{ id, name, role, loves, likes, site, built, seed? }]

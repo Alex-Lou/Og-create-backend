@@ -61,6 +61,14 @@ async function veteranOf(userId, conn = db) {
     return Boolean(rows[0]?.veteran);
 }
 const isVeteran = async owner => owner.kind === 'user' && veteranOf(owner.id);
+// Le tutoriel de la v6 (bible, § 9 : ramasser, le feu bâti par le joueur, Cannelle attirée par le feu, Rivet après les
+// poules) vaut pour les comptes créés à partir de V6_SINCE, juste après sa mise en ligne. Ne pas la reculer : un compte
+// créé avant a reçu les anciennes règles (le feu allumé d'office), et les lui retirer le ferait reculer.
+const V6_SINCE = new Date('2026-10-08T12:00:00Z');
+async function freshOf(userId, conn = db) {
+    const { rows } = await conn.query('SELECT created_at >= $2 AS fresh FROM users WHERE id = $1', [userId, V6_SINCE]);
+    return Boolean(rows[0]?.fresh);
+}
 
 // Carnet de l'Infini
 async function elements(owner) {
@@ -124,4 +132,4 @@ async function adoptGuest(req, res, userId) {
     );
 }
 
-module.exports = { VETERAN_BEFORE, veteranOf, isVeteran, resolve, createGuest, elements, addElement, getRun, addToRun, takeFreeJoker, adoptGuest };
+module.exports = { VETERAN_BEFORE, veteranOf, isVeteran, V6_SINCE, freshOf, resolve, createGuest, elements, addElement, getRun, addToRun, takeFreeJoker, adoptGuest };

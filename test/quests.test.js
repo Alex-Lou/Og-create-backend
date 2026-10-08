@@ -13,14 +13,14 @@ const ACTS = ['T', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
 const facts = (extra = {}) => ({
   crafts: 0, placed: new Set(), runs: 0, stars: 0, elements: new Set(['Eau', 'Feu', 'Terre', 'Air']), zones: new Set(['coeur']),
   levels: { foyer: 1 }, annexes: 0, houses: 0, met: new Set(), awake: new Set(), hearts: 0, expeditions: 0, landmarks: new Set(),
-  gathered: 0, visitors: 0, settled: 0, named: false, ...extra
+  gathered: 0, pickups: 0, hensFed: 0, visitors: 0, settled: 0, named: false, ...extra
 });
 // Les 21 anciennes quêtes, dans leur ordre d'avant la bible
 const OLD = ['deco', 'recolte', 'source', 'puits', 'lisiere', 'cabane', 'livre5', 'colline', 'mine', 'livre12', 'jardins', 'serre', 'maison',
   'crique', 'ponton', 'livre45', 'hameau', 'deco10', 'phare', 'livre70', 'legendes'];
 
 test('chaque quête désigne un vrai quartier, palier, création, lieu ou habitant, avec un texte et une récompense', () => {
-  assert.equal(QUESTS.length, 56);
+  assert.equal(QUESTS.length, 59);
   assert.equal(new Set(QUESTS.map(q => q.id)).size, QUESTS.length);
   for (const q of QUESTS) {
     assert.match(q.id, /^[a-z0-9-]{1,30}$/);
@@ -97,6 +97,9 @@ test('avancée de chaque objectif, plafonnée', () => {
   check({ kind: 'landmark', need: 1 }, { landmarks: new Set(['saule']) }, 1);
   check({ kind: 'landmark', landmark: 'menhirs' }, { landmarks: new Set(['saule']) }, 0);
   check({ kind: 'gather', need: 1 }, { gathered: 3 }, 1);
+  check({ kind: 'pickup', need: 3 }, { pickups: 2 }, 2, 3);
+  check({ kind: 'hens', need: 1 }, {}, 0);
+  check({ kind: 'hens', need: 1 }, { hensFed: 3 }, 1);
   check({ kind: 'visitor', need: 1 }, { visitors: 1 }, 1);
   check({ kind: 'settle', need: 1 }, { settled: 0 }, 0);
   check({ kind: 'name' }, { named: true }, 1);
@@ -104,7 +107,7 @@ test('avancée de chaque objectif, plafonnée', () => {
 
 test('la quête active est la première pas encore faite ; à la fin, Brume se repose', () => {
   const first = active(new Set(), facts());
-  assert.deepEqual([first.id, first.act, first.step, first.total, first.kind, first.done], ['pages', 'T', 1, 56, 'stars', false]);
+  assert.deepEqual([first.id, first.act, first.step, first.total, first.kind, first.done], ['pages', 'T', 1, 59, 'stars', false]);
   assert.equal(active(new Set(), facts({ stars: 3 })).done, true);
   const ondin = active(new Set(['achat-source']), facts());
   assert.deepEqual([ondin.id, ondin.target], ['eveil-ondin', { villager: 'puits' }]);

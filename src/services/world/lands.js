@@ -6,6 +6,7 @@ const map = require('../worldMap');
 const crafts = require('../crafts');
 const landmarks = require('../landmarks');
 const finds = require('../finds');
+const pickups = require('../pickups');
 const anya = require('../anya');
 const { EXPEDITION_COST, chargesAt, effectsOf } = require('./rules');
 const { levelsOf, stockOf, zonesOf, depositsOf, foundOf, discoveredOf, craftsOf, placedOf } = require('./reads');
@@ -105,4 +106,31 @@ async function gatherDeposit(userId, depositId, now = Date.now()) {
     });
 }
 
-module.exports = { isKnown, coreMissing, expeditionCost, expeditionOf, startExpedition, findLandmark, craftBonusOf, gatherDeposit };
+// Ramasse ce que la mer a rendu sur la Grève (bible, § 9, étape 4), s'il a repoussé : un peu de bois, de nourriture
+// ou de pierre, versé une seule fois (la ligne de stock est verrouillée), gardé comme un gisement (world_deposits).
+// { kind, gives } ou { status, message }
+async function pickUp(userId, spotId, now = Date.now()) {
+    const spot = Object.hasOwn(pickups.SPOT_BY_ID, spotId) ? pickups.SPOT_BY_ID[spotId] : null;
+    if (!spot) return { status: 404, message: 'Il n’y a rien à ramasser ici.' };
+    await migrate(userId);
+    return db.transaction(async conn => {
+        await stockOf(userId, conn, true);
+        if (!(await zonesOf(userId, conn)).has(map.zoneAt(spot.x, spot.y))) return db.rollback({ status: 403, message: 'Achète d’abord ce quartier de l’île.' });
+        // (une annexe ou une création posée sur sa case la cache : rien à ramasser)
+        const { rows: covered } = await conn.query(
+            `SELECT 1 FROM world_annexes WHERE user_id = $1 AND x = $2 AND y = $3
+             UNION ALL SELECT 1 FROM world_crafts WHERE user_id = $1 AND x = $2 AND y = $3 LIMIT 1`, [userId, spot.x, spot.y]);
+        if (covered.length) return db.rollback({ status: 404, message: 'Il n’y a rien à ramasser ici.' });
+        const wait = finds.readyIn((await depositsOf(userId, conn)).get(spot.id), now, pickups.REGROW_MS);
+        if (wait > 0) return db.rollback({ status: 409, message: `La mer en rapportera d’autres : reviens dans ${Math.ceil(wait / 60000)} min.` });
+        const { gives } = pickups.KINDS[spot.kind];
+        await conn.query('UPDATE world_stock SET stone = stone + $2, wood = wood + $3, water = water + $4, food = food + $5 WHERE user_id = $1',
+            [userId, gives.stone || 0, gives.wood || 0, gives.water || 0, gives.food || 0]);
+        await conn.query(
+            `INSERT INTO world_deposits (user_id, deposit, gathered_at) VALUES ($1, $2, $3)
+             ON CONFLICT (user_id, deposit) DO UPDATE SET gathered_at = EXCLUDED.gathered_at`, [userId, spot.id, new Date(now)]);
+        return { kind: spot.kind, gives };
+    });
+}
+
+module.exports = { isKnown, coreMissing, expeditionCost, expeditionOf, startExpedition, findLandmark, craftBonusOf, gatherDeposit, pickUp };
