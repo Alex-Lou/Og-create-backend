@@ -283,6 +283,15 @@ router.post('/world/deposit', withAccount(async (req, res, owner, b) => {
     res.json({ find: done.find, amount: done.amount, world: await worldView(owner, b) });
 }));
 
+// Ce que la mer a rendu sur la Grève : un toucher le ramasse (services/pickups.js)
+router.post('/world/pickup', withAccount(async (req, res, owner, b) => {
+    const id = String(req.body.id || '');
+    if (!/^greve-[a-z]{1,12}-\d$/.test(id)) return res.status(400).json({ message: 'Trouvaille invalide' });
+    const done = await world.pickUp(owner.id, id);
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json({ kind: done.kind, gives: done.gives, world: await worldView(owner, b) });
+}));
+
 // Chantier : niveau suivant, avec son plan (élément du Livre) et ses ressources
 router.post('/world/build', withAccount(async (req, res, owner, b) => {
     const site = String(req.body.site || '');

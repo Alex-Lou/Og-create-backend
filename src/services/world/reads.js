@@ -5,6 +5,7 @@ const quests = require('../quests');
 const loot = require('../loot');
 const signs = require('../signs');
 const finds = require('../finds');
+const { V6_SINCE } = require('../players');
 
 async function itemsOf(userId, conn = db) {
     const { rows } = await conn.query('SELECT item FROM world_items WHERE user_id = $1', [userId]);
@@ -64,15 +65,25 @@ async function annexesOf(userId, conn = db) {
     return rows;
 }
 
+// Paliers des bâtiments. Le feu de camp (le Foyer au palier I) est allumé d'office, sans ligne, pour un compte d'avant
+// la v6 et pour qui a déjà passé sa quête ; un nouveau compte le bâtit (bible, § 9, étape 5 : quête « feu »)
 async function levelsOf(userId, conn = db) {
     const { rows } = await conn.query('SELECT site, level, built_at FROM world_buildings WHERE user_id = $1', [userId]);
-    const levels = { foyer: 1 };
+    const levels = { foyer: 0 };
     const builtAt = {};
     for (const row of rows) {
         levels[row.site] = row.level;
         builtAt[row.site] = row.built_at;
     }
+    if (!levels.foyer && (await fireLitOf(userId, conn))) levels.foyer = 1;
     return { levels, builtAt };
+}
+async function fireLitOf(userId, conn) {
+    const { rows } = await conn.query(
+        `SELECT u.created_at >= $2 AS fresh, ARRAY(SELECT quest FROM world_quests q WHERE q.user_id = u.id) AS claimed
+         FROM users u WHERE u.id = $1`, [userId, V6_SINCE]);
+    if (!rows[0] || !rows[0].fresh) return true;
+    return quests.doneOf(new Set(rows[0].claimed)).has('feu');
 }
 
 // Ligne de stock du joueur (créée à la première visite, avec une réserve pleine ;

@@ -50,7 +50,8 @@ const tier = (name, plan, cost, coins = 0) => ({ name, plan, cost, coins });
 const SITES = {
     foyer: {
         levels: [
-            tier('Feu de camp', null, {}),
+            // (bâti par un nouveau compte, avec ce que la mer a rendu sur la Grève : bible, § 9, étape 5)
+            tier('Feu de camp', null, { wood: 4, stone: 2 }),
             tier('Abri', 'Bois', { wood: 20, stone: 10 }),
             tier('Cabane', 'Cabane', { stone: 40, wood: 30, water: 20 }, 150),
             tier('Maison de l’alchimiste', 'Potion', { stone: 60, wood: 50, water: 30, food: 20 }, 300),

@@ -10,6 +10,8 @@
 // - need : un besoin (what) d'un habitant comblé, en ce moment ou depuis l'ouverture de la quête ;
 // - wake : un habitant réveillé (amitié > 0) ; heart : un cœur ;
 // - expedition : expéditions revenues ; landmark : lieux découverts (ou un lieu précis) ; gather : gisements ramassés ;
+// - pickup : trouvailles de la Grève ramassées (bois flotté, coquillages, galets : services/pickups.js) ;
+// - hens : poules de Cannelle nourries et encore rassasiées ;
 // - visitor : voyageurs comblés ; settle : voyageurs installés ; name : le peuple a un nom.
 // chest : la dernière quête des actes donne aussi un coffre de cette rareté (loot.js), à ouvrir une fois réclamée.
 //
@@ -23,14 +25,24 @@ const BEASTS = ['Poisson', 'Méduse', 'Grenouille', 'Oiseau', 'Tortue', 'Papillo
 
 const q = (id, act, goal, coins, label, say, chest) => ({ id, act, goal, coins, label, say, ...(chest ? { chest } : {}) });
 const QUESTS = [
-    // Prologue : le naufrage de l'Hirondelle (Brume, Aster, Cannelle, Rivet, Ondin)
-    q('pages', 'T', { kind: 'stars', need: 3 }, 25, 'Écris tes trois premières pages',
+    // Prologue : le naufrage de l'Hirondelle (Brume, Aster, Cannelle, Rivet, Ondin). Ses écus, jusqu'à La Source, en
+    // paient le prix (100), pas plus
+    q('pages', 'T', { kind: 'stars', need: 3 }, 20, 'Écris tes trois premières pages',
         'Trois pages, et le Grimoire te fera confiance… Mets deux Souffles dans l’Athanor, lis l’énigme, puis devine.'),
-    q('recolte', 'T', { kind: 'runs', need: 1 }, 25, 'Termine une Récolte',
+    // (v6, § 9, étape 4 : la mer rend ce qu'elle a pris ; trois trouvailles de la Grève ramassées)
+    q('ramasser', 'T', { kind: 'pickup', need: 3 }, 10, 'Ramasse ce que la mer a rendu',
+        'Du bois, là, sur le sable. Ça brûle, le bois, je m’en souviens. Et ces coquillages… vous mangez ça, non ? Ramasse trois choses sur la Grève.'),
+    q('recolte', 'T', { kind: 'runs', need: 1 }, 15, 'Termine une Récolte',
         'La mer rend ce qu’elle a pris. Aster t’attend sur la Grève : relie ce qui se ressemble, vite, avant la marée.'),
-    q('soupe', 'T', { kind: 'need', villager: 'foyer', what: 'manger' }, 25, 'Une soupe pour Cannelle',
+    // (v6, étape 5 : le premier feu, bâti avec ce qu'on a ramassé ; c'est le Foyer au palier I, et il attire Cannelle)
+    q('feu', 'T', { kind: 'level', site: 'foyer', need: 1 }, 15, 'Allume le Feu de camp',
+        'Ceux d’avant faisaient un cercle de pierres, et le bois au milieu. Bâtis le feu de camp : ton bois flotté et tes galets suffiront.'),
+    q('soupe', 'T', { kind: 'need', villager: 'foyer', what: 'manger' }, 15, 'Une soupe pour Cannelle',
         'Cannelle grelotte… Sa bulle dit ce qui lui manque. Donne-lui de quoi manger, depuis sa fiche.'),
-    q('deco', 'T', { kind: 'crafts', need: 1 }, 25, 'Pose ta première création sur l’île',
+    // (v6, étape 8 : les poules de la cuisine du navire, coincées sous les rochers ; nourries, elles pondent)
+    q('poules', 'T', { kind: 'hens', need: 1 }, 10, 'Nourris les poules',
+        'Des caquets, sous les rochers… La cage du navire ! Ouvre-la, puis nourris les poules depuis leur fiche.'),
+    q('deco', 'T', { kind: 'crafts', need: 1 }, 15, 'Pose ta première création sur l’île',
         'Rivet a monté un établi près du feu. Assemble une Clôture, puis pose-la là où l’île brille d’or.'),
     q('achat-source', 'T', { kind: 'zone', zone: 'source' }, 30, 'Achète La Source',
         'J’entends de l’eau, au nord-ouest… et quelqu’un qui ronfle. Achète La Source : je dissiperai la brume.'),
@@ -208,6 +220,8 @@ const HAVE = {
     expedition: (goal, facts) => facts.expeditions,
     landmark: (goal, facts) => (goal.landmark ? (facts.landmarks.has(goal.landmark) ? 1 : 0) : facts.landmarks.size),
     gather: (goal, facts) => facts.gathered,
+    pickup: (goal, facts) => facts.pickups,
+    hens: (goal, facts) => facts.hensFed,
     visitor: (goal, facts) => facts.visitors,
     settle: (goal, facts) => facts.settled,
     name: (goal, facts) => (facts.named ? 1 : 0)
