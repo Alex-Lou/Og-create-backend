@@ -58,7 +58,7 @@ async function cellTaken(userId, x, y, conn) {
     const { rows } = await conn.query('SELECT 1 FROM world_crafts WHERE user_id = $1 AND x = $2 AND y = $3', [userId, x, y]);
     return rows.length > 0 || Boolean(await annexAt(userId, x, y, conn));
 }
-const SPOT_MESSAGE = 'Une annexe se pose sur une case libre du quartier, à deux cases au plus de son bâtiment.';
+const SPOT_MESSAGE = 'Une annexe se pose sur une case libre du quartier de son bâtiment.';
 
 // Pose l'exemplaire suivant d'une annexe : bâtiment construit au palier voulu dans un quartier possédé, case libre
 // autorisée, ressources et écus débités une seule fois (ligne de stock verrouillée : deux poses ne se croisent pas).
