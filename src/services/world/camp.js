@@ -1,6 +1,7 @@
 // Le camp des naufragés sur la Grève (dessins : design/bibliotheque/svg/decor/camp/camp.json) : l'épave de
 // l'Hirondelle, la cuisine de Cannelle, les coins d'Aster et de Rivet (débris, abri, cabanon), quelques objets ; les
-// voyageurs de l'acte IV y plantent leur tente et leur hamac, et le panneau SOS s'en va.
+// voyageurs de l'acte IV y plantent leur tente et leur hamac, et le panneau SOS s'en va. La cage aux poules de Cannelle
+// (decor/camp/poules) y paraît avec elle, coincée sous les rochers ; ouverte, elle reste près du feu.
 // Chaque élément a sa place prévue (PLACES) ; si un objet du joueur l'occupe déjà, l'élément se pose sur la case libre
 // la plus proche : rien du joueur ne bouge, et le camp est toujours complet. Ses cases sont ensuite réservées (on n'y
 // pose ni annexe ni création). Fonctions pures, et campOfUser qui lit dans la base ce qui le décide.
@@ -10,6 +11,7 @@ const finds = require('../finds');
 const quests = require('../quests');
 const { SIZE } = require('./rules');
 const { annexesOf, levelsOf, claimedOf, craftsOf } = require('./reads');
+const { cageOf } = require('./beasts');
 
 const ZONE = 'coeur';
 // Le Foyer à l'Abri (palier II) : Cannelle quitte la cuisine de l'épave, les cabanons peuvent venir
@@ -18,7 +20,7 @@ const ABRI = 2;
 const BIG = Object.fromEntries(Object.keys(map.SITE_BIG).map(id => [id, map.BIG_FROM]));
 
 // Place prévue (coin haut-gauche), taille (2 : 2 × 2 cases, sinon 1), dessin selon l'avancée (null : pas encore, ou
-// plus). at : { acts (actes finis), levels (paliers des bâtiments) }. Un camp sobre, qui libère la Grève : l'épave et
+// plus). at : { acts (actes finis), levels (paliers des bâtiments), cage ('coincee', 'ouverte' ou null) }. Un camp sobre, qui libère la Grève : l'épave et
 // trois objets restent ; le coin d'Aster s'en va quand son Ponton est bâti, celui de Rivet avec son Atelier, la cuisine
 // de Cannelle avec l'Abri ; le SOS, quand les voyageurs arrivent (acte IV) avec leur tente et leur hamac
 const has = (at, act) => at.acts.includes(act);
@@ -38,7 +40,8 @@ const PLACES = [
     { id: 'sos', x: 104, y: 93, art: at => (has(at, 'IV') ? null : 'sos') },
     { id: 'caisses', x: 99, y: 93, art: () => 'caisses' },
     { id: 'filet', x: 104, y: 95, art: () => 'filet' },
-    { id: 'rondins', x: 95, y: 92, art: () => 'rondins' }
+    { id: 'rondins', x: 95, y: 92, art: () => 'rondins' },
+    { id: 'cage', x: 98, y: 94, art: at => (at.cage ? `cage_${at.cage}` : null) }
 ];
 
 // Case où le camp peut se poser : sol constructible de la Grève, hors des grandes emprises, des lieux remarquables et
@@ -65,9 +68,10 @@ function spotOf(place, size, taken) {
 }
 
 // Le camp d'un joueur : [{ id, art, x, y, w, h }] (ce qui se voit maintenant). acts : actes finis ; levels : paliers
-// des bâtiments ; taken : clés (y × SIZE + x) des cases occupées par ses annexes et ses créations posées
-function campOf({ acts = [], levels = {}, taken = new Set() }) {
-    const at = { acts, levels };
+// des bâtiments ; taken : clés (y × SIZE + x) des cases occupées par ses annexes et ses créations posées ; cage : la
+// cage aux poules
+function campOf({ acts = [], levels = {}, taken = new Set(), cage = null }) {
+    const at = { acts, levels, cage };
     const busy = new Set(taken);
     const out = [];
     for (const place of PLACES) {
@@ -93,7 +97,7 @@ async function campOfUser(userId, conn, { levels, annexRows, craftRows } = {}) {
     const craftList = craftRows || await craftsOf(userId, conn);
     const acts = quests.actsDoneOf(quests.doneOf(await claimedOf(userId, conn)));
     const taken = new Set([...annexList, ...craftList.filter(r => r.x !== null && r.x !== undefined)].map(r => r.y * SIZE + r.x));
-    return campOf({ acts, levels: lv, taken });
+    return campOf({ acts, levels: lv, taken, cage: await cageOf(userId, conn) });
 }
 
 module.exports = { PLACES, campOf, cellsOfCamp, campOfUser };
