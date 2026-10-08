@@ -31,9 +31,9 @@ const QUESTS = [
         'Trois pages, et le Grimoire te fera confiance… Mets deux Souffles dans l’Athanor, lis l’énigme, puis devine.'),
     // (v6, § 9, étape 4 : la mer rend ce qu'elle a pris ; trois trouvailles de la Grève ramassées)
     q('ramasser', 'T', { kind: 'pickup', need: 3 }, 10, 'Ramasse ce que la mer a rendu',
-        'Du bois, là, sur le sable. Ça brûle, le bois, je m’en souviens. Et ces coquillages… vous mangez ça, non ? Ramasse trois choses sur la Grève.'),
+        'Du bois, là, sur le sable. Ça brûle, le bois, je m’en souviens. Et ces coquillages… vous mangez ça, non ? Ramasse trois choses au rivage.'),
     q('recolte', 'T', { kind: 'runs', need: 1 }, 15, 'Termine une Récolte',
-        'La mer rend ce qu’elle a pris. Aster t’attend sur la Grève : relie ce qui se ressemble, vite, avant la marée.'),
+        'La mer rend ce qu’elle a pris. Aster t’attend au rivage : relie ce qui se ressemble, vite, avant la marée.'),
     // (v6, étape 5 : le premier feu, bâti avec ce qu'on a ramassé ; c'est le Foyer au palier I, et il attire Cannelle)
     q('feu', 'T', { kind: 'level', site: 'foyer', need: 1 }, 15, 'Allume le Feu de camp',
         'Ceux d’avant faisaient un cercle de pierres, et le bois au milieu. Bâtis le feu de camp : ton bois flotté et tes galets suffiront.'),

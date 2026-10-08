@@ -67,7 +67,7 @@ test('au tutoriel, La Source se découvre en écrivant la Source : sans écus ; 
     const done = ['pages', 'ramasser', 'recolte', 'feu', 'soupe', 'poules', 'deco'];
     await sql(`INSERT INTO world_quests (user_id, quest) SELECT $1, unnest($2::text[])`, [id, done]);
     const first = await view(player);
-    assert.deepEqual([first.brume.quest.id, first.brume.quest.label], ['achat-source', 'Découvre La Source : écris la Source']);
+    assert.deepEqual([first.brume.quest.id, first.brume.quest.label], ['achat-source', 'Découvre La Source : fais-la naître dans l’Athanor']);
     const source = first.map.zones.find(z => z.id === 'source');
     assert.deepEqual([source.price, source.plan, source.planOwned], [0, 'Source', false]);
     // Le ruban mène à la Source, l'Encre de sa page est offerte
@@ -75,7 +75,7 @@ test('au tutoriel, La Source se découvre en écrivant la Source : sans écus ; 
     assert.equal(book.ariane && book.ariane.target, 'Source');
     // Sans l'élément : refusé ; écrit : la brume se lève, sans un écu
     const no = await api('POST', '/play/world/zone', { zone: 'source' }, player);
-    assert.deepEqual([no.status, no.data.message], [403, 'Écris d’abord « Source » dans le Grimoire : la brume se lèvera.']);
+    assert.deepEqual([no.status, no.data.message], [403, 'Fais d’abord naître « Source » dans l’Athanor : la brume se lèvera.']);
     await sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Colline", "Source"]'::jsonb WHERE user_id = $1`, [id]);
     const yes = await api('POST', '/play/world/zone', { zone: 'source' }, player);
     assert.deepEqual([yes.status, yes.data.coins], [200, 0]);

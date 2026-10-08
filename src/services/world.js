@@ -121,8 +121,8 @@ const ZONE_PLANS = { source: 'Source' };
 // Ce que Brume en dit alors
 const ZONE_QUESTS = {
     'achat-source': {
-        label: 'Découvre La Source : écris la Source',
-        say: 'J’entends de l’eau, au nord-ouest… et quelqu’un qui ronfle. Écris la Source dans le Grimoire : la brume se lèvera.'
+        label: 'Découvre La Source : fais-la naître dans l’Athanor',
+        say: 'J’entends de l’eau au nord-ouest, et quelqu’un qui ronfle. Mêle les bons éléments dans l’Athanor : la Source naîtra, la brume se lèvera.'
     }
 };
 async function arianeTargets(userId) {
@@ -469,7 +469,7 @@ async function buyZone(userId, zoneId, openChapters, owned = []) {
     if (zone.chapter && !openChapters.has(zone.chapter)) return { status: 403, message: `Ouvre d’abord le chapitre ${zone.chapter} du Grimoire.` };
     // Au tutoriel, la Source se découvre en écrivant son élément : sans écus
     const plan = ZONE_PLANS[zone.id] && !(await players.islandVeteranOf(userId)) ? ZONE_PLANS[zone.id] : null;
-    if (plan && !owned.includes(plan)) return { status: 403, message: `Écris d’abord « ${plan} » dans le Grimoire : la brume se lèvera.` };
+    if (plan && !owned.includes(plan)) return { status: 403, message: `Fais d’abord naître « ${plan} » dans l’Athanor : la brume se lèvera.` };
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
         const added = await conn.query('INSERT INTO world_zones (user_id, zone) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING zone', [userId, zone.id]);
@@ -497,7 +497,7 @@ async function build(userId, owned, siteId, openChapters = new Set()) {
         const next = site.levels[level];
         if (!next) return db.rollback({ status: 409, message: 'Ce chantier est déjà achevé.' });
         if (!openChapters.has(next.chapter)) return db.rollback({ status: 403, message: `Ouvre d’abord le chapitre ${next.chapter} du Grimoire.` });
-        if (next.plan && !owned.includes(next.plan)) return db.rollback({ status: 403, message: `Il te faut le plan : découvre « ${next.plan} » dans le Grimoire.` });
+        if (next.plan && !owned.includes(next.plan)) return db.rollback({ status: 403, message: `Il te faut d’abord faire naître « ${next.plan} » dans l’Athanor du Grimoire.` });
         // Ce que les bâtiments avaient produit est encaissé d'abord : cela compte pour payer (et la production du bâtiment
         // repart de zéro à l'évolution)
         const gathered = await gather(userId, conn, stock);

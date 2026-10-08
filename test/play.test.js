@@ -1271,11 +1271,11 @@ test('noms : un bâtiment se renomme dès son palier III, un quartier dès qu’
   const name = body => api('POST', '/play/world/name', body, player);
   const start = (await api('GET', '/play/world', null, player)).data;
   const coeur = start.map.zones.find(z => z.id === 'coeur');
-  assert.deepEqual([coeur.name, coeur.baseName, coeur.renamed], ['La Grève', 'La Grève', false]);
+  assert.deepEqual([coeur.name, coeur.baseName, coeur.renamed], ['Brumelune', 'Brumelune', false]);
   // Le quartier de départ, à soi d'office
   const plage = await name({ kind: 'zone', id: 'coeur', name: '  Ma   Plage ' });
   assert.equal(plage.status, 200);
-  assert.deepEqual(['name', 'baseName', 'renamed'].map(k => plage.data.map.zones.find(z => z.id === 'coeur')[k]), ['Ma Plage', 'La Grève', true]);
+  assert.deepEqual(['name', 'baseName', 'renamed'].map(k => plage.data.map.zones.find(z => z.id === 'coeur')[k]), ['Ma Plage', 'Brumelune', true]);
   // Un quartier pas encore acheté : non
   const other = start.map.zones.find(z => z.id !== 'coeur');
   assert.equal((await name({ kind: 'zone', id: other.id, name: 'Ailleurs' })).status, 403);
