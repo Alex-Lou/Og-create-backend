@@ -204,9 +204,9 @@ function currentOf(claimed) {
 // elements: Set, placed: Set (créations posées), annexes, houses, met: Set ('habitant:besoin' comblés en ce moment ou
 // depuis la dernière quête réclamée), awake: Set, hearts (cœurs du meilleur ami), expeditions, landmarks: Set,
 // gathered, visitors, settled, named }
-// Quêtes du tutoriel qui se jouent au Grimoire : la page que marque le ruban a son Encre offerte (le joueur, qui vient
-// de dépenser ses écus pour La Source, n'est jamais bloqué devant une énigme)
-const GUIDED_INK = new Set(['souvenir-ondin']);
+// Quêtes du tutoriel qui passent par le Grimoire : la page que marque le ruban a son Encre offerte (le joueur, qui a
+// peu d'écus, n'est jamais bloqué devant une énigme) : le Brasier du feu de camp, le Puits d'Ondin
+const GUIDED_INK = new Set(['feu', 'souvenir-ondin']);
 
 const HAVE = {
     crafts: (goal, facts) => facts.crafts,

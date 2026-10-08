@@ -142,8 +142,14 @@ function boardWith(claimed, facts, openChapters) {
 // peuple, pour l'étape de civilisation (l'Ex libris du Grimoire)
 async function board(userId, owned, stars, openChapters) {
     const out = boardWith(await claimedOf(userId), await factsOf(userId, owned, stars), openChapters);
-    // Anya : le Grimoire allume sa gemme une fois la Révélation vue
-    return { ...out, people: (await namesOf(userId)).peuple || null, anya: await anyaOf(userId) };
+    // Anya : le Grimoire allume sa gemme une fois la Révélation vue ; le tutoriel passé sur ce compte
+    return { ...out, people: (await namesOf(userId)).peuple || null, anya: await anyaOf(userId), skipped: (await itemsOf(userId)).has(PROLOGUE_SKIP) };
+}
+
+// « Passer le tutoriel » : retenu sur le compte, pour tous ses appareils (une ligne de world_items, sans donnée nouvelle)
+const PROLOGUE_SKIP = 'prologue:passe';
+async function skipPrologue(userId) {
+    await db.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'tutoriel') ON CONFLICT DO NOTHING`, [userId, PROLOGUE_SKIP]);
 }
 
 // Vue de l'île pour le navigateur. book = { describe(noms), openChapters: Set des chapitres ouverts, stars, finished }
@@ -367,7 +373,7 @@ async function view(userId, owned, book) {
         avatar: await avatarOf(userId),
         // Brume, le feu follet : la quête active (ou son dernier mot)
         brume: (() => {
-            const out = boardWith(claimed, facts, book.openChapters);
+            const out = { ...boardWith(claimed, facts, book.openChapters), skipped: items.has(PROLOGUE_SKIP) };
             // Le fil d'Ariane de la quête active : la cible et les pages qui restent (le Grimoire montre la page marquée)
             if (out.quest && !out.quest.done && book.ariane) out.quest.ariane = { target: book.ariane.target, remaining: book.ariane.remaining };
             return out;
@@ -759,6 +765,6 @@ module.exports = {
     view, build, buyZone, buyItem, undoItem, chooseSkin, startRun, finishRun, collect, migrate, claimQuest, board, openChest, openAll,
     placeAnnex, moveAnnex, poseAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople, namePlayer, chooseAvatar, arianeTargets, guidedInkOf,
     refundDecorations, startCraft, finishCraft, placeCraft, moveCraft, storeCraft, turnCraft, startExpedition, findLandmark, gatherDeposit, pickUp,
-    anyaOf, breathRefused, revealAnya, breatheAnya, brumeSavoirOf, talkBrume, startNights, repelCreature, repairSite,
+    anyaOf, breathRefused, revealAnya, breatheAnya, brumeSavoirOf, talkBrume, startNights, repelCreature, repairSite, skipPrologue,
     feedBeast, collectBeasts, openCage
 };

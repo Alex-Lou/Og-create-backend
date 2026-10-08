@@ -467,6 +467,12 @@ router.get('/world/brume', withAccount(async (req, res, owner, b) => {
     res.json(await world.board(owner.id, owned, bookPages.starsOf(b, owned), await chaptersOf(owner, b, owned)));
 }));
 
+// « Passer le tutoriel » : retenu sur le compte → { skipped: true }
+router.post('/world/prologue/skip', withAccount(async (req, res, owner) => {
+    await world.skipPrologue(owner.id);
+    res.json({ skipped: true });
+}));
+
 // Quête de Brume : réclamer la récompense de la quête active
 router.post('/world/quest', withAccount(async (req, res, owner, b) => {
     const id = String(req.body.id || '');
