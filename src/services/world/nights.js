@@ -89,7 +89,8 @@ async function settleNights(userId, conn, stock, now = Date.now()) {
         }
     }
     const kept = blights.filter(b => !spent(b));
-    const repelled = row.repelled.night && nights.boundsOf(row.repelled.night).end > now ? row.repelled : {};
+    // (gardés un jour après leur nuit : le bilan de Brume au matin les compte)
+    const repelled = row.repelled.night && nights.boundsOf(row.repelled.night).end + DAY_MS > now ? row.repelled : {};
     await conn.query('UPDATE world_nights SET seen_until = $2, blights = $3, repelled = $4 WHERE user_id = $1',
         [userId, iso(Math.max(seen, now)), JSON.stringify(kept), JSON.stringify(repelled)]);
 }
@@ -149,23 +150,40 @@ async function repairSite(userId, site, now = Date.now()) {
 // Ce que le front montre : { started: false }, ou { started, first (instant de la première nuit possible), now,
 // night: { id, start, end } (la nuit en cours ou la prochaine), creatures: [{ id, site, path, at, arrives, end, step }]
 // (leur sort avec l'île d'à présent), panne (le bâtiment que la nuit embrumerait, ou null), blight: { site, since,
-// repair: { resource, amount } } | null }
+// repair: { resource, amount } } | null, last : le bilan de la dernière nuit finie (lastOf) }
+// Le bilan de la dernière nuit finie (Brume le dit au matin) : { id, counts: { luciole, barre, camarade, touche,
+// arrive }, panne (le bâtiment qu'elle a embrumé, ou null) }, ou null avant la première nuit
+function lastOf(userId, row, first, { island, defense, helpersAt }, now) {
+    const night = nights.endedBetween(now - 2 * DAY_MS, now).pop();
+    if (!night) return null;
+    const { start, end } = nights.boundsOf(night);
+    if (start < first) return null;
+    const repelled = new Set(row.repelled.night === night ? row.repelled.ids : []);
+    const { fates } = nights.outcomeOf(nights.planOf(userId, night, island), defense, helpersAt(end), repelled);
+    const counts = { luciole: 0, barre: 0, camarade: 0, touche: 0, arrive: 0 };
+    for (const fate of Object.values(fates)) counts[fate.end] += 1;
+    const blight = row.blights.find(b => msOf(b.since) >= start && msOf(b.since) <= end);
+    return { id: night, counts, panne: blight ? blight.site : null };
+}
+
 async function nightsView(userId, conn = db, now = Date.now()) {
     const { rows: [row] } = await conn.query('SELECT started_at, blights, repelled FROM world_nights WHERE user_id = $1', [userId]);
     if (!row) return { started: false };
     const first = msOf(row.started_at) + GRACE_MS;
     const night = nights.nightNear(now);
     const { start, end } = nights.boundsOf(night);
-    const { island, defense, levels, helpersAt } = await islandOf(userId, conn);
+    const seen = await islandOf(userId, conn);
+    const { island, defense, levels, helpersAt } = seen;
     const active = row.blights.find(b => !b.until);
     const blight = active ? { site: active.site, since: msOf(active.since), repair: nights.repairOf(active.site, levels[active.site] || 1) } : null;
-    if (start < first) return { started: true, first, now, night: { id: night, start, end }, creatures: [], panne: null, blight };
+    const last = lastOf(userId, row, first, seen, now);
+    if (start < first) return { started: true, first, now, night: { id: night, start, end }, creatures: [], panne: null, blight, last };
     const plan = nights.planOf(userId, night, island);
     const repelled = new Set(row.repelled.night === night ? row.repelled.ids : []);
     const { fates, panne } = nights.outcomeOf(plan, defense, helpersAt(end), repelled);
     return {
         started: true, first, now, night: { id: night, start, end },
-        creatures: plan.map(c => ({ ...c, ...fates[c.id] })), panne: blight ? null : panne, blight
+        creatures: plan.map(c => ({ ...c, ...fates[c.id] })), panne: blight ? null : panne, blight, last
     };
 }
 

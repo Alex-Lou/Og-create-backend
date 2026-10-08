@@ -22,6 +22,8 @@ const iso = ms => new Date(ms).toISOString();
 const settle = (userId, now) => db.transaction(async conn => worldNights.settleNights(userId, conn, await stockOf(userId, conn, true), now));
 const view = (userId, now) => worldNights.nightsView(userId, db, now);
 const blightsOf = async userId => (await sql('SELECT blights FROM world_nights WHERE user_id = $1', [userId]))[0].blights;
+// Le bilan d'une nuit (ce que Brume dit au matin) : combien de chaque sort
+const countsOf = ({ fates }) => Object.values(fates).reduce((out, f) => ({ ...out, [f.end]: out[f.end] + 1 }), { luciole: 0, barre: 0, camarade: 0, touche: 0, arrive: 0 });
 
 // Une île : la Grève et la Source, le Puits bâti ; sans défense posée ; ses habitants tristes, sans repas depuis un mois
 // (aucun camarade content : un habitant sans ligne de besoins arrive comblé, donc content)
@@ -77,6 +79,8 @@ test('pas de nuit avant que Brume les présente, puis un jour de grâce ; ensuit
   await settle(id, end + HOUR);
   const morning = await view(id, end + HOUR);
   assert.deepEqual(morning.blight, { site: panne.site, since: panne.at, repair: nights.repairOf(panne.site, 1) });
+  // Brume en fait le bilan au matin : le sort de chacun, le bâtiment embrumé
+  assert.deepEqual(morning.last, { id: night, counts: countsOf(nights.outcomeOf(plan, FIRE)), panne: panne.site });
   // Les nuits suivantes n'en embrument pas un second tant qu'il n'est pas réparé
   await settle(id, end + 6 * DAY);
   assert.equal((await blightsOf(id)).length, 1);
@@ -140,6 +144,9 @@ test('d’un toucher, la nuit, on repousse un égaré sur son chemin ; pas le jo
   await settle(id, end + HOUR);
   const morning = await view(id, end + HOUR);
   assert.deepEqual(morning.blight && { site: morning.blight.site, at: morning.blight.since }, expected.panne);
+  // Le bilan du matin compte celui qu'on a repoussé (gardé un jour après la nuit)
+  assert.equal(morning.last.counts.touche, 1);
+  assert.deepEqual(morning.last.counts, countsOf(expected));
   // La route : un égaré mal écrit est refusé ; un bien écrit, à l'heure réelle, ne trouve personne (jour ou grâce)
   assert.equal((await api('POST', '/play/world/nights/repel', { id: 'x' }, player)).status, 400);
   assert.equal((await api('POST', '/play/world/nights/repel', { id: `${night}:0` }, player)).status, 409);
