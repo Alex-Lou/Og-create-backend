@@ -21,6 +21,7 @@ const naming = require('./naming');
 const landmarks = require('./landmarks');
 const finds = require('./finds');
 const anya = require('./anya');
+const avatarChoices = require('./avatarChoices');
 const {
     SIZE, CAP_HOURS, REGEN_MS, RUN_TTL_MS, RENAME_LEVEL, GAME_TTL_MS, GAME_SLACK_MS, FIRST_RUN_MOVES, FIRST_RUN_KINDS,
     RESOURCES, DECO_PRICES, HARVEST_COIN_EVERY, UNDO_SECONDS, random, CHAPTER_OF_LEVEL, PRODUCE_PER_LEVEL,
@@ -655,14 +656,25 @@ async function namePlayer(userId, raw) {
     return { name };
 }
 
-// L'avatar du joueur (bible, § 6.17), choisi sur sa carte d'embarquement au tutoriel : l'un des exemples dessinés par la
-// bibliothèque du front, en attendant son générateur (H9.4). Il peut changer. { look } ou { status, message }
+// L'avatar du joueur (bible, § 6.17), choisi sur sa carte d'embarquement au tutoriel. Il peut changer.
+// - look : l'un des douze exemples dessinés par la bibliothèque du front (le choix d'avant le générateur) ;
+// - choices : un avatar composé (services/avatarChoices.js), vérifié choix par choix : ce qui se gagne ne passe que
+//   s'il est possédé. Il est rangé sous le nom « perso ».
+// { avatar } ou { status, message }
 const LOOK = /^avatar-(0[1-9]|1[0-2])$/;
-async function chooseAvatar(userId, look) {
+async function chooseAvatar(userId, { look, choices } = {}) {
+    if (choices !== undefined) {
+        const done = avatarChoices.cleanChoices(choices, await itemsOf(userId));
+        if (done.status) return done;
+        await db.query(`INSERT INTO world_avatars (user_id, look, choices) VALUES ($1, 'perso', $2)
+            ON CONFLICT (user_id) DO UPDATE SET look = EXCLUDED.look, choices = EXCLUDED.choices, chosen_at = NOW()`,
+        [userId, JSON.stringify(done.choices)]);
+        return { avatar: done.choices };
+    }
     if (typeof look !== 'string' || !LOOK.test(look)) return { status: 400, message: 'Avatar inconnu.' };
-    await db.query(`INSERT INTO world_avatars (user_id, look) VALUES ($1, $2)
-        ON CONFLICT (user_id) DO UPDATE SET look = EXCLUDED.look, chosen_at = NOW()`, [userId, look]);
-    return { look };
+    await db.query(`INSERT INTO world_avatars (user_id, look, choices) VALUES ($1, $2, NULL)
+        ON CONFLICT (user_id) DO UPDATE SET look = EXCLUDED.look, choices = NULL, chosen_at = NOW()`, [userId, look]);
+    return { avatar: look };
 }
 
 // Nom d'un bâtiment (dès son palier III) ou d'un quartier à soi ; un nom vide rend celui d'origine.

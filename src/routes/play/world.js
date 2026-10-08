@@ -161,9 +161,10 @@ router.post('/world/player', withAccount(async (req, res, owner, b) => {
     res.json(await worldView(owner, b));
 }));
 
-// L'avatar du joueur, choisi sur sa carte d'embarquement au tutoriel (bible, § 6.17)
+// L'avatar du joueur, composé sur sa carte d'embarquement au tutoriel (bible, § 6.17) : { choices } (vérifiés un à un,
+// services/avatarChoices.js), ou { look } (l'un des exemples de la bibliothèque)
 router.post('/world/avatar', withAccount(async (req, res, owner, b) => {
-    const done = await world.chooseAvatar(owner.id, req.body.look);
+    const done = await world.chooseAvatar(owner.id, { look: req.body.look, choices: req.body.choices });
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json(await worldView(owner, b));
 }));

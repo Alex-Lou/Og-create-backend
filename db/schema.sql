@@ -392,6 +392,9 @@ CREATE TABLE IF NOT EXISTS world_avatars (
     look VARCHAR(20) NOT NULL,
     chosen_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+-- L'avatar composé sur la carte d'embarquement (services/avatarChoices.js) : ses choix, vérifiés un à un ; look vaut
+-- alors 'perso'. NULL : l'un des exemples de la bibliothèque (look)
+ALTER TABLE world_avatars ADD COLUMN IF NOT EXISTS choices JSONB;
 -- Amitié des habitants (services/villagers.js) : points, dernier jour où l'on a bavardé, dernier jour d'un cadeau
 -- (jours de Paris)
 CREATE TABLE IF NOT EXISTS world_friends (
