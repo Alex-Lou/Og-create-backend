@@ -115,11 +115,22 @@ async function guidedInkOf(userId) {
     const quest = quests.currentOf(await claimedOf(userId));
     return Boolean(quest && quests.GUIDED_INK.has(quest.id));
 }
+// Au tutoriel (une île qui n'est pas d'avant la bible), un quartier du prologue se découvre en écrivant son élément,
+// sans écus (choix de l'auteur : découvrir, pas acheter ; les achats viennent après le prologue)
+const ZONE_PLANS = { source: 'Source' };
+// Ce que Brume en dit alors
+const ZONE_QUESTS = {
+    'achat-source': {
+        label: 'Découvre La Source : fais-la naître dans l’Athanor',
+        say: 'J’entends de l’eau au nord-ouest, et quelqu’un qui ronfle. Mêle les bons éléments dans l’Athanor : la Source naîtra, la brume se lèvera.'
+    }
+};
 async function arianeTargets(userId) {
     const quest = quests.currentOf(await claimedOf(userId));
     const goal = quest && quest.goal;
     if (!goal) return [];
     if (goal.kind === 'element') return goal.any || [goal.element];
+    if (goal.kind === 'zone') return ZONE_PLANS[goal.zone] && !(await players.islandVeteranOf(userId)) ? [ZONE_PLANS[goal.zone]] : [];
     if (goal.kind === 'craft') return crafts.CRAFT_BY_ID[goal.craft].elements;
     if (goal.kind !== 'level') return [];
     const level = (await levelsOf(userId)).levels[goal.site] || 0;
@@ -129,9 +140,10 @@ async function arianeTargets(userId) {
 
 // Le tableau de Brume, avec le chapitre encore fermé qu'attend la quête active (un quartier ou un palier d'un
 // chapitre pas encore ouvert : le joueur doit d'abord écrire des découvertes). openChapters : Set des chapitres ouverts
-function boardWith(claimed, facts, openChapters) {
+function boardWith(claimed, facts, openChapters, tutorial = false) {
     const out = quests.boardOf(claimed, facts);
     const quest = out.quest;
+    if (quest && tutorial && ZONE_QUESTS[quest.id]) Object.assign(quest, ZONE_QUESTS[quest.id]);
     if (!quest || quest.done) return out;
     const { goal } = quests.QUESTS[quest.step - 1];
     const next = goal.kind === 'level' && (facts.levels[goal.site] || 0) === goal.need - 1 ? SITES[goal.site].levels[goal.need - 1] : null;
@@ -142,7 +154,7 @@ function boardWith(claimed, facts, openChapters) {
 // Brume seule (quête active), sans le reste de l'île : le Grimoire la consulte après une découverte ; avec le nom du
 // peuple, pour l'étape de civilisation (l'Ex libris du Grimoire)
 async function board(userId, owned, stars, openChapters) {
-    const out = boardWith(await claimedOf(userId), await factsOf(userId, owned, stars), openChapters);
+    const out = boardWith(await claimedOf(userId), await factsOf(userId, owned, stars), openChapters, !(await players.islandVeteranOf(userId)));
     // Anya : le Grimoire allume sa gemme une fois la Révélation vue ; le tutoriel (un compte d'après la bible, s'il ne
     // l'a pas passé : le jeu le reprend à son étape, sur tout appareil)
     return { ...out, people: (await namesOf(userId)).peuple || null, anya: await anyaOf(userId), ...await tutorialOf(userId) };
@@ -152,10 +164,40 @@ async function board(userId, owned, stars, openChapters) {
 const PROLOGUE_SKIP = 'prologue:passe';
 // Le tutoriel du compte : tutorial (créé depuis la bible : un vétéran garde son jeu tel quel), skipped (passé)
 async function tutorialOf(userId, conn = db) {
-    return { tutorial: !(await players.veteranOf(userId, conn)), skipped: (await itemsOf(userId, conn)).has(PROLOGUE_SKIP) };
+    return { tutorial: !(await players.islandVeteranOf(userId, conn)), skipped: (await itemsOf(userId, conn)).has(PROLOGUE_SKIP) };
 }
 async function skipPrologue(userId) {
     await db.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'tutoriel') ON CONFLICT DO NOTHING`, [userId, PROLOGUE_SKIP]);
+}
+
+// « Recommencer l'île » (choix de l'auteur) : une fois par compte (sinon les récompenses du prologue se rejoueraient),
+// d'un seul tenant. Efface l'île : bâtiments, quêtes, quartiers, créations, annexes, objets posés, réserves et parties
+// de Récolte, bêtes, visiteurs, besoins et amitiés des habitants, expéditions, lieux, trouvailles, gisements, nuits,
+// mini-jeux, enseignes, noms ; les coffres de quêtes, de lieux et de Récolte ; « Passer le tutoriel ». Garde le
+// Grimoire (éléments, pages, coffres de chapitre), les écus, l'avatar, les achats de boutique (articles, skins, styles
+// d'enseigne), les coffres du jour et les bouteilles. L'île suit ensuite les règles d'un compte neuf
+// (players.RESTARTED). { restarted: true }, ou { status, message } si refus
+const ISLAND_TABLES = [
+    'world_game_runs', 'world_games', 'world_craft_runs', 'world_crafts', 'world_annexes', 'world_tiles', 'world_buildings',
+    'world_quests', 'world_zones', 'world_runs', 'world_beasts', 'world_visitors', 'world_needs', 'world_friends',
+    'world_expeditions', 'world_landmarks', 'world_finds', 'world_deposits', 'world_nights', 'world_signs',
+    'world_sign_names', 'world_names'
+];
+async function restartIsland(userId) {
+    return db.transaction(async conn => {
+        // (deux demandes à la fois : la seconde attend la première, puis la voit faite)
+        await conn.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [userId]);
+        const done = await conn.query('SELECT 1 FROM world_items WHERE user_id = $1 AND item = $2', [userId, players.RESTARTED]);
+        if (done.rows.length) return db.rollback({ status: 409, message: 'Ton île a déjà été recommencée une fois.' });
+        for (const table of ISLAND_TABLES) await conn.query(`DELETE FROM ${table} WHERE user_id = $1`, [userId]);
+        await conn.query(`DELETE FROM world_chests WHERE user_id = $1 AND (source LIKE 'quete:%' OR source LIKE 'lieu:%' OR source LIKE 'recolte:%')`, [userId]);
+        await conn.query('DELETE FROM world_items WHERE user_id = $1 AND item = $2', [userId, PROLOGUE_SKIP]);
+        // La réserve repart vide, ses parties de Récolte pleines, sur la carte du moment (rien à faire passer)
+        await conn.query('DELETE FROM world_stock WHERE user_id = $1', [userId]);
+        await conn.query('INSERT INTO world_stock (user_id, charges, collected_at, map_version) VALUES ($1, 3, NOW(), $2)', [userId, MAP_VERSION]);
+        await conn.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'ile')`, [userId, players.RESTARTED]);
+        return { restarted: true };
+    });
 }
 
 // Vue de l'île pour le navigateur. book = { describe(noms), openChapters: Set des chapitres ouverts, stars, finished }
@@ -285,7 +327,9 @@ async function view(userId, owned, book) {
             zones: map.ZONES.map(z => (isKnown(z, discovered) ? {
                 id: z.id, name: named[`zone:${z.id}`] || z.name, baseName: z.name, renamed: Boolean(named[`zone:${z.id}`]),
                 price: z.price, chapter: z.chapter, code: z.code, anchor: map.ANCHORS[z.id], climate: z.climate, known: true,
-                owned: zones.has(z.id), open: !z.chapter || book.openChapters.has(z.chapter)
+                owned: zones.has(z.id), open: !z.chapter || book.openChapters.has(z.chapter),
+                // (au tutoriel, il se découvre en écrivant son élément, sans écus)
+                ...(!presence.veteran && ZONE_PLANS[z.id] ? { price: 0, plan: ZONE_PLANS[z.id], planOwned: have.has(ZONE_PLANS[z.id]) } : {})
             } : {
                 id: z.id, name: null, code: z.code, anchor: map.ANCHORS[z.id], known: false, owned: false, open: false,
                 // closed : le cœur de l'île n'est pas encore à soi (les terres alentour s'ouvrent après)
@@ -379,7 +423,7 @@ async function view(userId, owned, book) {
         avatar: await avatarOf(userId),
         // Brume, le feu follet : la quête active (ou son dernier mot)
         brume: (() => {
-            const out = { ...boardWith(claimed, facts, book.openChapters), tutorial: !presence.veteran, skipped: items.has(PROLOGUE_SKIP) };
+            const out = { ...boardWith(claimed, facts, book.openChapters, !presence.veteran), tutorial: !presence.veteran, skipped: items.has(PROLOGUE_SKIP) };
             // Le fil d'Ariane de la quête active : la cible et les pages qui restent (le Grimoire montre la page marquée)
             if (out.quest && !out.quest.done && book.ariane) out.quest.ariane = { target: book.ariane.target, remaining: book.ariane.remaining };
             return out;
@@ -416,20 +460,23 @@ async function claimQuest(userId, questId, owned, stars) {
 }
 
 // Achat d'un quartier : chapitre ouvert, écus débités une fois (même en double clic) ; { status, message } si refus
-async function buyZone(userId, zoneId, openChapters) {
+async function buyZone(userId, zoneId, openChapters, owned = []) {
     const zone = map.ZONE_BY_ID[zoneId];
     if (!zone || zone.id === 'coeur') return { status: 404, message: 'Quartier inconnu.' };
     await migrate(userId);
     // Inconnu : rien n'en est dit (pas même son chapitre)
     if (!isKnown(zone, await discoveredOf(userId))) return { status: 403, message: 'Envoie d’abord une expédition découvrir ce quartier.' };
     if (zone.chapter && !openChapters.has(zone.chapter)) return { status: 403, message: `Ouvre d’abord le chapitre ${zone.chapter} du Grimoire.` };
+    // Au tutoriel, la Source se découvre en écrivant son élément : sans écus
+    const plan = ZONE_PLANS[zone.id] && !(await players.islandVeteranOf(userId)) ? ZONE_PLANS[zone.id] : null;
+    if (plan && !owned.includes(plan)) return { status: 403, message: `Fais d’abord naître « ${plan} » dans l’Athanor : la brume se lèvera.` };
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
         const added = await conn.query('INSERT INTO world_zones (user_id, zone) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING zone', [userId, zone.id]);
         if (!added.rows.length) return db.rollback({ status: 409, message: 'Ce quartier est déjà à toi.' });
         // Les écus qui attendent dans les bâtiments sont encaissés d'abord : ils comptent pour payer
         await payWith(userId, conn, stock);
-        const coins = await ledger.debit(userId, zone.price, `quartier:${zone.id}`, conn);
+        const coins = plan ? await balanceOf(userId, conn) : await ledger.debit(userId, zone.price, `quartier:${zone.id}`, conn);
         if (coins === null) return db.rollback({ status: 400, message: `Il te faut ${zone.price} écus.` });
         return { bought: zone.name, coins };
     });
@@ -450,7 +497,7 @@ async function build(userId, owned, siteId, openChapters = new Set()) {
         const next = site.levels[level];
         if (!next) return db.rollback({ status: 409, message: 'Ce chantier est déjà achevé.' });
         if (!openChapters.has(next.chapter)) return db.rollback({ status: 403, message: `Ouvre d’abord le chapitre ${next.chapter} du Grimoire.` });
-        if (next.plan && !owned.includes(next.plan)) return db.rollback({ status: 403, message: `Il te faut le plan : découvre « ${next.plan} » dans le Grimoire.` });
+        if (next.plan && !owned.includes(next.plan)) return db.rollback({ status: 403, message: `Il te faut d’abord faire naître « ${next.plan} » dans l’Athanor du Grimoire.` });
         // Ce que les bâtiments avaient produit est encaissé d'abord : cela compte pour payer (et la production du bâtiment
         // repart de zéro à l'évolution)
         const gathered = await gather(userId, conn, stock);
@@ -769,7 +816,7 @@ async function chooseSign(userId, siteId, styleId) {
 module.exports = {
     SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, pendingOf, chargesAt, effectsOf, productionOf,
     view, build, buyZone, buyItem, undoItem, chooseSkin, startRun, finishRun, collect, migrate, claimQuest, board, openChest, openAll,
-    placeAnnex, moveAnnex, poseAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople, namePlayer, chooseAvatar, arianeTargets, guidedInkOf,
+    placeAnnex, moveAnnex, poseAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople, namePlayer, chooseAvatar, arianeTargets, guidedInkOf, restartIsland,
     refundDecorations, startCraft, finishCraft, placeCraft, moveCraft, storeCraft, turnCraft, startExpedition, findLandmark, gatherDeposit, pickUp,
     anyaOf, breathRefused, revealAnya, breatheAnya, brumeSavoirOf, talkBrume, startNights, repelCreature, repairSite, skipPrologue,
     feedBeast, collectBeasts, openCage

@@ -49,7 +49,7 @@ function metOf(id, levels, zones, presence) {
 // l'île libéré : l'humeur ne descend plus sous « content »)
 async function presenceOf(userId, conn = db) {
     const blessed = anya.awakeOf(await zonesOf(userId, conn));
-    return { veteran: await players.veteranOf(userId, conn), fresh: await players.freshOf(userId, conn), done: quests.doneOf(await claimedOf(userId, conn)), blessed };
+    return { veteran: await players.islandVeteranOf(userId, conn), fresh: await players.islandFreshOf(userId, conn), done: quests.doneOf(await claimedOf(userId, conn)), blessed };
 }
 // Habitants de l'île : la troupe rencontrée (built : son bâtiment est bâti, dans un quartier à soi), puis les
 // visiteurs installés, qui travaillent au bâtiment de leur métier : [{ id, name, role, loves, likes, site, built, seed? }]

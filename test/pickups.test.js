@@ -50,7 +50,7 @@ test('un nouveau compte bâtit son feu ; Cannelle ne vient qu’au feu, Rivet qu
   // Le feu de camp naît du Grimoire : le Brasier d'abord (le ruban y mène), puis bois et galets
   assert.equal(first.sites.find(s => s.id === 'foyer').next.plan, 'Brasier');
   const noPlan = await api('POST', '/play/world/build', { site: 'foyer' }, player);
-  assert.deepEqual([noPlan.status, noPlan.data.message], [403, 'Il te faut le plan : découvre « Brasier » dans le Grimoire.']);
+  assert.deepEqual([noPlan.status, noPlan.data.message], [403, 'Il te faut d’abord faire naître « Brasier » dans l’Athanor du Grimoire.']);
   await sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Brasier"]'::jsonb WHERE user_id = $1`, [id]);
   // Sans bois ni pierre : refusé ; plus loin dans la chaîne sans feu (la Récolte faite) : Cannelle n'est pas là
   assert.equal((await api('POST', '/play/world/build', { site: 'foyer' }, player)).status, 400);

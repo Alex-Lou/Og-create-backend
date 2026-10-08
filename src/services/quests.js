@@ -26,14 +26,14 @@ const BEASTS = ['Poisson', 'Méduse', 'Grenouille', 'Oiseau', 'Tortue', 'Papillo
 const q = (id, act, goal, coins, label, say, chest) => ({ id, act, goal, coins, label, say, ...(chest ? { chest } : {}) });
 const QUESTS = [
     // Prologue : le naufrage de l'Hirondelle (Brume, Aster, Cannelle, Rivet, Ondin). Ses écus, jusqu'à La Source, en
-    // paient le prix (100), pas plus
+    // paient le prix (100), pas plus ; au tutoriel, La Source se découvre en écrivant la Source (world.ZONE_PLANS)
     q('pages', 'T', { kind: 'stars', need: 3 }, 20, 'Écris tes trois premières pages',
         'Trois pages, et le Grimoire te fera confiance… Mets deux Souffles dans l’Athanor, lis l’énigme, puis devine.'),
     // (v6, § 9, étape 4 : la mer rend ce qu'elle a pris ; trois trouvailles de la Grève ramassées)
     q('ramasser', 'T', { kind: 'pickup', need: 3 }, 10, 'Ramasse ce que la mer a rendu',
-        'Du bois, là, sur le sable. Ça brûle, le bois, je m’en souviens. Et ces coquillages… vous mangez ça, non ? Ramasse trois choses sur la Grève.'),
+        'Du bois, là, sur le sable. Ça brûle, le bois, je m’en souviens. Et ces coquillages… vous mangez ça, non ? Ramasse trois choses au rivage.'),
     q('recolte', 'T', { kind: 'runs', need: 1 }, 15, 'Termine une Récolte',
-        'La mer rend ce qu’elle a pris. Aster t’attend sur la Grève : relie ce qui se ressemble, vite, avant la marée.'),
+        'La mer rend ce qu’elle a pris. Aster t’attend au rivage : relie ce qui se ressemble, vite, avant la marée.'),
     // (v6, étape 5 : le premier feu, bâti avec ce qu'on a ramassé ; c'est le Foyer au palier I, et il attire Cannelle)
     q('feu', 'T', { kind: 'level', site: 'foyer', need: 1 }, 15, 'Allume le Feu de camp',
         'Ceux d’avant faisaient un cercle de pierres, et le bois au milieu. Bâtis le feu de camp : ton bois flotté et tes galets suffiront.'),
@@ -205,8 +205,8 @@ function currentOf(claimed) {
 // depuis la dernière quête réclamée), awake: Set, hearts (cœurs du meilleur ami), expeditions, landmarks: Set,
 // gathered, visitors, settled, named }
 // Quêtes du tutoriel qui passent par le Grimoire : la page que marque le ruban a son Encre offerte (le joueur, qui a
-// peu d'écus, n'est jamais bloqué devant une énigme) : le Brasier du feu de camp, le Puits d'Ondin
-const GUIDED_INK = new Set(['feu', 'souvenir-ondin']);
+// peu d'écus, n'est jamais bloqué devant une énigme) : le Brasier du feu de camp, la Source, le Puits d'Ondin
+const GUIDED_INK = new Set(['feu', 'achat-source', 'souvenir-ondin']);
 
 const HAVE = {
     crafts: (goal, facts) => facts.crafts,

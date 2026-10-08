@@ -69,6 +69,19 @@ async function freshOf(userId, conn = db) {
     const { rows } = await conn.query('SELECT created_at >= $2 AS fresh FROM users WHERE id = $1', [userId, V6_SINCE]);
     return Boolean(rows[0]?.fresh);
 }
+// Une île recommencée (world.restartIsland, une fois par compte) suit les règles de l'île d'un compte neuf, quel que
+// soit l'âge du compte : tutoriel de la v6, habitants un à un. Le Grimoire, lui, garde les siennes (isVeteran : le
+// chapitre II ouvert d'emblée reste ouvert). Une ligne de world_items, sans donnée nouvelle
+const RESTARTED = 'ile:recommencee';
+const restartedSql = `EXISTS (SELECT 1 FROM world_items i WHERE i.user_id = users.id AND i.item = '${RESTARTED}')`;
+async function islandVeteranOf(userId, conn = db) {
+    const { rows } = await conn.query(`SELECT created_at < $2 AND NOT ${restartedSql} AS veteran FROM users WHERE id = $1`, [userId, VETERAN_BEFORE]);
+    return Boolean(rows[0]?.veteran);
+}
+async function islandFreshOf(userId, conn = db) {
+    const { rows } = await conn.query(`SELECT created_at >= $2 OR ${restartedSql} AS fresh FROM users WHERE id = $1`, [userId, V6_SINCE]);
+    return Boolean(rows[0]?.fresh);
+}
 
 // Carnet de l'Infini
 async function elements(owner) {
@@ -132,4 +145,4 @@ async function adoptGuest(req, res, userId) {
     );
 }
 
-module.exports = { VETERAN_BEFORE, veteranOf, isVeteran, V6_SINCE, freshOf, resolve, createGuest, elements, addElement, getRun, addToRun, takeFreeJoker, adoptGuest };
+module.exports = { VETERAN_BEFORE, veteranOf, isVeteran, V6_SINCE, freshOf, RESTARTED, islandVeteranOf, islandFreshOf, resolve, createGuest, elements, addElement, getRun, addToRun, takeFreeJoker, adoptGuest };
