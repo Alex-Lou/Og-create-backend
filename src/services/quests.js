@@ -25,18 +25,17 @@ const BEASTS = ['Poisson', 'Méduse', 'Grenouille', 'Oiseau', 'Tortue', 'Papillo
 
 const q = (id, act, goal, coins, label, say, chest) => ({ id, act, goal, coins, label, say, ...(chest ? { chest } : {}) });
 const QUESTS = [
-    // Prologue : le naufrage de l'Hirondelle (Brume, Aster, Cannelle, Rivet, Ondin). Ses écus, jusqu'à La Source, en
-    // paient le prix (100), pas plus ; au tutoriel, La Source se découvre en écrivant la Source (world.ZONE_PLANS)
-    q('pages', 'T', { kind: 'stars', need: 3 }, 20, 'Écris tes trois premières pages',
-        'Trois pages, et le Grimoire te fera confiance… Mets deux Souffles dans l’Athanor, lis l’énigme, puis devine.'),
-    // (v6, § 9, étape 4 : la mer rend ce qu'elle a pris ; trois trouvailles de la Grève ramassées)
-    q('ramasser', 'T', { kind: 'pickup', need: 3 }, 10, 'Ramasse ce que la mer a rendu',
-        'Du bois, là, sur le sable. Ça brûle, le bois, je m’en souviens. Et ces coquillages… vous mangez ça, non ? Ramasse trois choses au rivage.'),
-    q('recolte', 'T', { kind: 'runs', need: 1 }, 15, 'Termine une Récolte',
-        'La mer rend ce qu’elle a pris. Aster t’attend au rivage : relie ce qui se ressemble, vite, avant la marée.'),
-    // (v6, étape 5 : le premier feu, bâti avec ce qu'on a ramassé ; c'est le Foyer au palier I, et il attire Cannelle)
+    // Prologue : Brume accompagne une action à la fois jusqu'à la première nuit. Aster ouvre ensuite sa propre leçon
+    // par la Récolte. Les écus, jusqu'à La Source, en paient le prix (100), pas plus.
+    q('pages', 'T', { kind: 'element', element: 'Vent' }, 20, 'Écris ta première page : le Vent',
+        'Le Grimoire s’est ouvert pour toi. Mêle l’Air à l’Air dans l’Athanor : que le Vent chasse la brume du rivage.'),
+    q('ramasser', 'T', { kind: 'pickup', need: 6 }, 10, 'Ramasse les six trouvailles du rivage',
+        'Du bois flotté, des coquillages, des galets. Ramasse les six trouvailles : elles suffiront pour notre premier camp.'),
+    // Le premier feu est réellement bâti avec les trouvailles ; c'est le Foyer au palier I.
     q('feu', 'T', { kind: 'level', site: 'foyer', need: 1 }, 15, 'Allume le Feu de camp',
-        'Ceux d’avant faisaient un cercle de pierres, et le bois au milieu. Bâtis le feu de camp : ton bois flotté et tes galets suffiront.'),
+        'Ceux d’avant faisaient un cercle de pierres, et le bois au milieu. Bâtis le feu ici, sur la Grève : tes trouvailles suffiront.'),
+    q('recolte', 'T', { kind: 'runs', need: 1 }, 15, 'Termine une Récolte avec Aster',
+        'Aster a rejoint le camp au matin. Suis-la au rivage : relie ce qui se ressemble, vite, avant la marée.'),
     q('soupe', 'T', { kind: 'need', villager: 'foyer', what: 'manger' }, 15, 'Une soupe pour Cannelle',
         'Cannelle grelotte… Sa bulle dit ce qui lui manque. Donne-lui de quoi manger, depuis sa fiche.'),
     // (v6, étape 8 : les poules de la cuisine du navire, coincées sous les rochers ; nourries, elles pondent)
@@ -197,6 +196,12 @@ function doneOf(claimed) {
     return new Set(QUESTS.filter((quest, i) => i <= reach || claimed.has(quest.id)).map(quest => quest.id));
 }
 
+// La première nuit est validée côté serveur quand la Récolte d'Aster a été réclamée : le feu a donc été bâti,
+// la nuit jouée et Aster rencontrée. Les anciennes quêtes plus avancées comptent aussi, via doneOf.
+const FIRST_NIGHT_DONE = 'recolte';
+const SHORE_TUTORIAL_MARK = 'tutoriel:plage-v1';
+const firstNightDoneOf = claimed => doneOf(claimed).has(FIRST_NIGHT_DONE);
+
 // La quête active (la première pas encore faite), telle que la chaîne la définit, ou null
 function currentOf(claimed) {
     const done = doneOf(claimed);
@@ -293,4 +298,7 @@ function actStartsOf(rows) {
 // Quand tout est fait
 const RESTED = 'La brume s’est levée sur toute l’île. Merci, alchimiste : elle est de nouveau vivante.';
 
-module.exports = { QUESTS, LEGACY, QUEST_CHESTS, BEASTS, GUIDED_INK, reachOf, doneOf, currentOf, progressOf, active, boardOf, actsDoneOf, actStartsOf };
+module.exports = {
+    QUESTS, LEGACY, QUEST_CHESTS, BEASTS, GUIDED_INK, FIRST_NIGHT_DONE, SHORE_TUTORIAL_MARK,
+    reachOf, doneOf, firstNightDoneOf, currentOf, progressOf, active, boardOf, actsDoneOf, actStartsOf
+};

@@ -2,6 +2,7 @@
 // modules (worldMapV2.js, worldMapV4.js) : chaque passage lit celle qu'il quitte, jamais la carte du moment.
 const db = require('../../config/db');
 const ledger = require('../ledger');
+const quests = require('../quests');
 const v4 = require('../worldMapV4');
 const legacy = require('../worldMapV2');
 const { MAP_VERSION, OLD_DECO_RATE, SITES, pendingOf } = require('./rules');
@@ -17,6 +18,16 @@ function migrate(userId) {
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
         await settleNights(userId, conn, stock);
+        // Marque versionnée et idempotente : elle permet d'auditer les comptes qui ont réellement dépassé la première
+        // nuit. Les comptes déjà avancés, y compris ceux des anciennes chaînes, sont reconnus par doneOf.
+        const tutorial = await conn.query(
+            `SELECT EXISTS (SELECT 1 FROM world_items WHERE user_id = $1 AND item = $2) AS marked,
+                    ARRAY(SELECT quest FROM world_quests WHERE user_id = $1) AS claimed`,
+            [userId, quests.SHORE_TUTORIAL_MARK]);
+        if (!tutorial.rows[0].marked && quests.firstNightDoneOf(new Set(tutorial.rows[0].claimed))) {
+            await conn.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'tutoriel') ON CONFLICT DO NOTHING`,
+                [userId, quests.SHORE_TUTORIAL_MARK]);
+        }
         if (stock.map_version >= MAP_VERSION) return false;
         if (stock.map_version < 2) await toV2(userId, stock, conn);
         if (stock.map_version < 3) await toV3(userId, conn);

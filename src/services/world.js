@@ -187,12 +187,19 @@ async function board(userId, owned, stars, openChapters) {
 
 // « Passer le tutoriel » : retenu sur le compte, pour tous ses appareils (une ligne de world_items, sans donnée nouvelle)
 const PROLOGUE_SKIP = 'prologue:passe';
-// Le tutoriel du compte : tutorial (créé depuis la bible : un vétéran garde son jeu tel quel), skipped (passé)
+// Le tutoriel du compte : un ancien compte dont la première nuit manque est repris par le serveur. Un ancien choix
+// « Passer » ne peut pas masquer cette reprise obligatoire ; il ne vaut qu'une fois la Récolte d'Aster validée.
 async function tutorialOf(userId, conn = db) {
-    return { tutorial: !(await players.islandVeteranOf(userId, conn)), skipped: (await itemsOf(userId, conn)).has(PROLOGUE_SKIP) };
+    const mode = await players.islandModeFor(userId, conn);
+    const items = await itemsOf(userId, conn);
+    return { tutorial: !mode.veteran, skipped: mode.firstNightDone && items.has(PROLOGUE_SKIP) };
 }
 async function skipPrologue(userId) {
+    if (!(await players.islandModeFor(userId)).firstNightDone) {
+        return { status: 409, message: 'Bâtis d’abord le camp et termine la première Récolte avec Aster.' };
+    }
     await db.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'tutoriel') ON CONFLICT DO NOTHING`, [userId, PROLOGUE_SKIP]);
+    return { skipped: true };
 }
 
 // « Recommencer l'île » (choix de l'auteur) : une fois par compte (sinon les récompenses du prologue se rejoueraient),
@@ -221,6 +228,7 @@ async function restartIsland(userId) {
         for (const table of ISLAND_TABLES) await conn.query(`DELETE FROM ${table} WHERE user_id = $1`, [userId]);
         await conn.query(`DELETE FROM world_chests WHERE user_id = $1 AND (source LIKE 'quete:%' OR source LIKE 'lieu:%' OR source LIKE 'recolte:%')`, [userId]);
         await conn.query('DELETE FROM world_items WHERE user_id = $1 AND item = $2', [userId, PROLOGUE_SKIP]);
+        await conn.query('DELETE FROM world_items WHERE user_id = $1 AND item = $2', [userId, quests.SHORE_TUTORIAL_MARK]);
         // Ses chemins tracés s'effacent : l'île repart de ses seuls sentiers
         await conn.query('DELETE FROM world_items WHERE user_id = $1 AND item LIKE $2', [userId, `${paths.PREFIX}%`]);
         // Les étoiles des jeux à grille aussi (choix de l'auteur : un vrai départ ; leurs bonus se regagnent)
@@ -494,7 +502,12 @@ async function view(userId, owned, book) {
         avatar: avatarNow,
         // Brume, le feu follet : la quête active (ou son dernier mot)
         brume: (() => {
-            const out = { ...boardWith(claimed, facts, book.openChapters, !presence.veteran), tutorial: !presence.veteran, skipped: items.has(PROLOGUE_SKIP) };
+            const firstNightDone = quests.firstNightDoneOf(claimed);
+            const out = {
+                ...boardWith(claimed, facts, book.openChapters, !presence.veteran),
+                tutorial: !presence.veteran,
+                skipped: firstNightDone && items.has(PROLOGUE_SKIP)
+            };
             // Le fil d'Ariane de la quête active : la cible et les pages qui restent (le Grimoire montre la page marquée)
             if (out.quest && !out.quest.done && book.ariane) out.quest.ariane = { target: book.ariane.target, remaining: book.ariane.remaining };
             return out;

@@ -2,7 +2,8 @@
 // un joueur d'avant la bible ne recule jamais
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { QUESTS, LEGACY, QUEST_CHESTS, BEASTS, doneOf, progressOf, active, boardOf, actsDoneOf } = require('../src/services/quests');
+const { QUESTS, LEGACY, QUEST_CHESTS, BEASTS, doneOf, firstNightDoneOf, progressOf, active, boardOf, actsDoneOf } = require('../src/services/quests');
+const { islandModeOf } = require('../src/services/players');
 const map = require('../src/services/worldMap');
 const { SITES } = require('../src/services/world');
 const { CRAFT_BY_ID } = require('../src/services/crafts');
@@ -107,8 +108,10 @@ test('avancée de chaque objectif, plafonnée', () => {
 
 test('la quête active est la première pas encore faite ; à la fin, Brume se repose', () => {
   const first = active(new Set(), facts());
-  assert.deepEqual([first.id, first.act, first.step, first.total, first.kind, first.done], ['pages', 'T', 1, 60, 'stars', false]);
-  assert.equal(active(new Set(), facts({ stars: 3 })).done, true);
+  assert.deepEqual(QUESTS.slice(0, 4).map(q => q.id), ['pages', 'ramasser', 'feu', 'recolte']);
+  assert.match(QUESTS.find(q => q.id === 'feu').say, /sur la Grève/);
+  assert.deepEqual([first.id, first.act, first.step, first.total, first.kind, first.done], ['pages', 'T', 1, 60, 'element', false]);
+  assert.equal(active(new Set(), facts({ elements: new Set([...facts().elements, 'Vent']) })).done, true);
   const ondin = active(new Set(['achat-source']), facts());
   assert.deepEqual([ondin.id, ondin.target], ['eveil-ondin', { villager: 'puits' }]);
   const souvenir = active(new Set(['eveil-ondin']), facts());
@@ -145,7 +148,7 @@ test('un joueur d’avant la bible ne recule jamais : ses anciennes quêtes se r
   for (const id of OLD) assert.ok(ids.has(id) || ids.has(LEGACY[id]?.at), id);
   // Une quête placée avant la plus avancée réclamée compte comme faite (sans récompense de plus)
   const veteran = doneOf(new Set(['deco', 'recolte', 'source']));
-  assert.ok(['pages', 'recolte', 'soupe', 'deco', 'achat-source'].every(id => veteran.has(id)));
+  assert.ok(['pages', 'feu', 'recolte', 'soupe', 'deco', 'achat-source'].every(id => veteran.has(id)));
   assert.equal(active(new Set(['deco', 'recolte', 'source']), facts()).id, 'eveil-ondin');
   // Plus loin dans l'ancienne chaîne, jamais plus tôt dans la nouvelle
   let before = -1;
@@ -161,4 +164,20 @@ test('un joueur d’avant la bible ne recule jamais : ses anciennes quêtes se r
   assert.deepEqual(['source', 'mine', 'ponton', 'deco10', 'legendes'].map(id => chests.get(id)), ['rare', 'epique', 'epique', 'legendaire', 'legendaire']);
   for (const id of Object.keys(LEGACY)) assert.ok(!ids.has(id), id);
   assert.deepEqual(['cabane', 'serre'].map(id => chests.get(id)), ['rare', 'epique']);
+});
+
+test('tout compte dont la première nuit est incomplète reprend la séquence de la Grève', () => {
+  const old = '2026-01-01T00:00:00Z';
+  const recent = '2026-12-01T00:00:00Z';
+  assert.equal(firstNightDoneOf(new Set()), false);
+  assert.equal(firstNightDoneOf(new Set(['feu'])), false);
+  assert.equal(firstNightDoneOf(new Set(['recolte'])), true);
+  // Une ancienne quête située après la Récolte confirme aussi que le joueur a dépassé cette étape.
+  assert.equal(firstNightDoneOf(new Set(['source'])), true);
+  assert.deepEqual(islandModeOf({ createdAt: old, claimed: [] }), { firstNightDone: false, veteran: false, fresh: true });
+  assert.deepEqual(islandModeOf({ createdAt: old, claimed: ['feu'] }), { firstNightDone: false, veteran: false, fresh: true });
+  assert.deepEqual(islandModeOf({ createdAt: old, claimed: ['recolte'] }), { firstNightDone: true, veteran: true, fresh: false });
+  assert.deepEqual(islandModeOf({ createdAt: old, marked: true }), { firstNightDone: true, veteran: true, fresh: false });
+  assert.deepEqual(islandModeOf({ createdAt: recent, claimed: ['recolte'] }), { firstNightDone: true, veteran: false, fresh: true });
+  assert.deepEqual(islandModeOf({ createdAt: old, restarted: true, claimed: [] }), { firstNightDone: false, veteran: false, fresh: true });
 });
