@@ -25,6 +25,7 @@ test('ramasser sur la Grève : une fois, puis la mer en rapporte ; cases inconnu
   const both = await Promise.all([1, 2].map(() => pick(player, 'greve-galet-2')));
   assert.deepEqual(both.map(r => r.status).sort(), [200, 409]);
   assert.equal((await view(player)).stock.stone, 2);
+  assert.ok((await view(player)).pickups.every(p => p.zone === 'coeur'));
   // Trois heures plus tard, la mer en a rapporté
   await sql(`UPDATE world_deposits SET gathered_at = gathered_at - INTERVAL '3 hours' WHERE user_id = $1`, [id]);
   assert.equal((await view(player)).pickups.find(p => p.id === 'greve-galet-2').readyIn, 0);
