@@ -46,6 +46,7 @@ const {
     craftCtx, stowCrafts, epreuvesOf, craftsView, startCraft, finishCraft, placeCraft, moveCraft, storeCraft
 } = require('./world/creations');
 const { annexSpotOk, annexSpots, annexesView, placeAnnex, moveAnnex } = require('./world/annexPlots');
+const { campOfUser, cellsOfCamp } = require('./world/camp');
 const { startNights, repelCreature, repairSite, nightsView } = require('./world/nights');
 const { feedBeast, collectBeasts, beastsView } = require('./world/beasts');
 
@@ -160,7 +161,10 @@ async function view(userId, owned, book) {
     const { bonuses, extra } = withLandmarks(withMoods(shopBonuses, annexes.bonusesOf(annexRows), moods), lmBonuses);
     const effects = effectsOf(levels, bonuses, extra);
     const charges = chargesAt(stock, effects.maxCharges, Date.now(), effects.regenMs);
-    const taken = new Set([...annexCells, ...decor.map(keyOf)]);
+    // Le camp des naufragés sur la Grève (world/camp.js) : ses cases sont réservées (ni annexe ni création)
+    const camp = await campOfUser(userId, db, { levels, annexRows, craftRows });
+    const campCells = cellsOfCamp(camp);
+    const taken = new Set([...annexCells, ...decor.map(keyOf), ...campCells]);
     const have = new Set(owned);
     const plans = Object.values(SITES).flatMap(s => s.levels.map(l => l.plan)).filter(Boolean);
     const known = book.describe(plans);
@@ -287,7 +291,7 @@ async function view(userId, owned, book) {
         pending: cash.coins,
         pendingStock,
         // Créations d'île : paliers, catalogue, réserve et cases où poser, créations posées
-        crafts: craftsView(craftRows, craftCtx(levels, zones, annexRows, craftRows), {
+        crafts: craftsView(craftRows, craftCtx(levels, zones, annexRows, craftRows, null, campCells), {
             owned: have, stock: paidStock, open: crafts.tiersOpen(book.finished || new Set(), epreuves, book.stars ?? 0), epreuves, stars: book.stars ?? 0, have: stockFinds
         }, id => sites.find(site => site.id === id)?.name || id),
         // Habitants (la troupe rencontrée, les visiteurs installés) : prénom, goûts, amitié, déjà vus ou gâtés
@@ -338,6 +342,8 @@ async function view(userId, owned, book) {
             styles: signs.STYLES.map(st => ({ id: st.id, name: st.name, price: st.price, text: st.text, owned: !st.price || signed.owned.has(st.id) }))
         },
         annexes: annexRows.filter(r => annexes.ANNEX_BY_ID[r.annex]).map(r => ({ x: r.x, y: r.y, annex: r.annex, site: annexes.ANNEX_BY_ID[r.annex].site })),
+        // Le camp des naufragés : [{ id, art (dessin de camp.json), x, y, w, h }]
+        camp,
         // Le nom du peuple (bible, § 6.11), une fois choisi ; le nom du joueur (§ 9, étape 2) et son avatar (§ 6.17)
         people: named.peuple || null,
         player: named.joueur || null,
