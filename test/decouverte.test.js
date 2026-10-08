@@ -40,9 +40,10 @@ test('« Recommencer l’île » : une fois, confirmé en toutes lettres ; l’�
     assert.equal((await restart(player)).status, 409);
 
     const after = await view(player);
-    // L'île : vide, Aster seul, le feu à bâtir, la Grève seule à soi, la réserve vide
+    // L'île : vide, personne encore (Brume seule : Aster débarque à la fin du tutoriel), le feu à bâtir, la Grève
+    // seule à soi, la réserve vide
     assert.equal(after.sites.find(s => s.id === 'foyer').level, 0);
-    assert.deepEqual(after.villagers.map(v => v.id), ['ponton']);
+    assert.deepEqual(after.villagers.map(v => v.id), []);
     assert.deepEqual(after.map.zones.filter(z => z.owned).map(z => z.id), ['coeur']);
     assert.deepEqual([after.stock.wood, after.stock.stone], [0, 0]);
     for (const table of ['world_quests', 'world_crafts', 'world_buildings']) assert.equal(await count(table, id), 0, table);

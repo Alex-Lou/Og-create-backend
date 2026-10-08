@@ -2308,9 +2308,9 @@ test('le prologue d’un nouveau compte : la troupe arrive à sa rencontre, Ondi
   assert.deepEqual((await api('GET', '/play/book', null, player)).data.chapters.slice(0, 2).map(c => [c.need, c.open]), [[0, true], [3, false]]);
   const veteran = await newPlayer();
   assert.deepEqual((await api('GET', '/play/book', null, veteran)).data.chapters[1].open, true);
-  // Au compte : Aster seule, au camp ; Cannelle n'est pas encore rencontrée
+  // Au compte : Brume seule (Aster débarque à la fin du tutoriel) ; Cannelle n'est pas encore rencontrée
   const first = await view();
-  assert.deepEqual(first.villagers.map(v => [v.id, v.built, v.asleep]), [['ponton', false, false]]);
+  assert.deepEqual(first.villagers.map(v => [v.id, v.built, v.asleep]), []);
   assert.equal((await talk('foyer')).status, 403);
   assert.equal(first.brume.quest.id, 'pages');
   await write(['Vent', 'Pluie', 'Brasier']);
@@ -2383,6 +2383,10 @@ test('le prologue d’un nouveau compte : la troupe arrive à sa rencontre, Ondi
   // (puis le premier chemin, du Puits au Feu : l'île neuve n'a que son sentier)
   assert.deepEqual([who(built.data.world, 'puits').built, built.data.world.brume.quest.id], [true, 'chemin']);
   assert.equal(await coinsOf(player), 100 + 30 + 10 + 20 + 40);
+  // Aster débarque à la fin du tutoriel, le premier chemin réclamé
+  assert.equal(who(built.data.world, 'ponton'), undefined);
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'chemin')`, [player.userId]);
+  assert.deepEqual(who(await view(), 'ponton').built, false);
 });
 
 test('chaque objectif de la chaîne se lit dans l’état (création, annexe, expédition, lieu, bête, voyageur, cœur, trouvaille, maison, nom)', async () => {
