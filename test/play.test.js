@@ -1123,9 +1123,9 @@ test('le Monde : la Récolte se joue contre une partie de la réserve, rejouée 
   for (let i = 0; i < 3; i++) runs.push((await api('POST', '/play/world/harvest/start', {}, player)).data);
   assert.equal((await api('POST', '/play/world/harvest/start', {}, player)).status, 409);
   assert.ok(Number.isInteger(runs[0].seed));
-  // La toute première Récolte est généreuse (bible, § 9) : pas d'eau, 4 coups de plus ; les suivantes sont normales
-  assert.deepEqual([runs[0].kinds, runs[0].maxMoves], [['stone', 'wood', 'food'], 19]);
-  assert.deepEqual([runs[1].kinds.length, runs[1].maxMoves], [4, 15]);
+  // La toute première Récolte n'a pas d'eau (bible, § 9) ; les deux premières sont courtes (8 coups), puis normales
+  assert.deepEqual([runs[0].kinds, runs[0].maxMoves], [['stone', 'wood', 'food'], 8]);
+  assert.deepEqual([runs[1].kinds.length, runs[1].maxMoves, runs[2].maxMoves], [4, 8, 15]);
 
   // Partie jouée : le gain est celui que le serveur recalcule ; la rendre deux fois ne paie qu'une fois
   const { moves, expected } = playRun(runs[0], 6);
@@ -1592,8 +1592,8 @@ test('besoins des habitants : manger, travailler, se distraire ; l’humeur chan
   const worn = await view();
   assert.equal(who(worn, 'atelier').moodEffect, '−2 coups par Récolte');
   assert.equal(worn.harvest.maxMoves, forge.harvest.maxMoves - 2);
-  // Une Récolte déjà jouée : celle-ci n'est pas la première (généreuse)
-  await sql(`INSERT INTO world_runs (user_id, seed, config, finished_at) VALUES ($1, 1, '{}', NOW())`, [player.userId]);
+  // Deux Récoltes déjà jouées : celle-ci n'est plus une des premières (courtes)
+  await sql(`INSERT INTO world_runs (user_id, seed, config, finished_at) VALUES ($1, 1, '{}', NOW()), ($1, 2, '{}', NOW())`, [player.userId]);
   const run = await api('POST', '/play/world/harvest/start', {}, player);
   assert.equal(run.data.maxMoves, worn.harvest.maxMoves);
   const tooled = await fill('atelier', 'outils');
@@ -1893,6 +1893,8 @@ test('mini-jeux : au palier III, trois parties en réserve, gestes rejoués par 
   assert.deepEqual(view.games.map(g => [g.id, g.site, g.open, g.plays, g.max]), [['peche', 'ponton', false, 3, 3], ['filon', 'carriere', false, 3, 3], ['cueillette', 'bosquet', false, 3, 3]]);
   assert.equal((await start('peche')).status, 403);
   await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'ponton', 3), ($1, 'carriere', 5)`, [player.userId]);
+  // (deux parties déjà jouées de chaque jeu : celles-ci ont leur durée normale ; les premières sont courtes, plus bas)
+  await sql(`INSERT INTO world_game_runs (user_id, game, seed, level, finished_at) SELECT $1, g, 1, 3, NOW() FROM unnest(ARRAY['peche', 'peche', 'filon', 'filon']) AS g`, [player.userId]);
   // Pêche : le premier poisson sous l'hameçon (la partie est datée d'une minute : les gestes ne viennent pas du futur)
   const begun = await start('peche');
   assert.equal(begun.status, 200);

@@ -44,6 +44,12 @@ test('les rejeux disent quand chaque prise arrive (mêmes vecteurs que le jeu)',
   const game = harvest.create(5, harvest.BASE_KINDS);
   assert.ok(game.board);
   assert.deepEqual(harvest.replay(5, harvest.BASE_KINDS, [], 15).totals, []);
+  // Les deux premières parties sont courtes : moins de coups, moins de temps
+  assert.deepEqual([minigames.limitOf('filon', true), minigames.limitOf('cueillette', true), minigames.limitOf('peche', true), minigames.limitOf('filon')], [12, 20000, 25000, 26]);
+  assert.equal(minigames.replay('filon', 1234, Array(13).fill(0), true).ok, false);
+  assert.ok(minigames.fishingOf(9, 25000).every(f => f.t0 < 23500));
+  assert.ok(minigames.pickingOf(9, 20000).every(e => e.until <= 20000));
+  assert.ok(minigames.fishingOf(9).length > minigames.fishingOf(9, 25000).length);
 });
 
 let server;
@@ -92,6 +98,8 @@ function playUntil(run, need, count) {
 
 test('Récolte : le niveau 1 d’abord ; ses étoiles et leur bonus, une fois ; le suivant s’ouvre ; « Recommencer » efface', async () => {
   const player = await newPlayer();
+  // (deux Récoltes déjà jouées : celle-ci a ses 15 coups)
+  await sql(`INSERT INTO world_runs (user_id, seed, config, finished_at) VALUES ($1, 1, '{}', NOW()), ($1, 2, '{}', NOW())`, [player.userId]);
   const start = level => api('POST', '/play/world/harvest/start', level ? { level } : {}, player);
   const finish = (run, moves) => api('POST', '/play/world/harvest/finish', { run: run.id, moves }, player);
   const view = (await api('GET', '/play/world', null, player)).data;
@@ -131,23 +139,34 @@ test('Filon : le niveau et le palier ensemble ; le bonus dans le plafond de la p
   const broken = Array(wall.hard.length).fill(false);
   const taps = [];
   let found = 0;
-  while (found < 2 && taps.length < minigames.VEIN.strokes) {
+  // (la première partie est courte : ses coups)
+  const limit = begun.data.run.limit;
+  assert.deepEqual([begun.data.run.short, limit], [true, minigames.SHORT.filon]);
+  while (found < 2 && taps.length < limit) {
     const gems = wall.gems.map((g, i) => (g && !broken[i] ? i : -1)).filter(i => i >= 0);
     const near = i => Math.min(...gems.map(j => Math.abs((i % 6) - (j % 6)) + Math.abs(Math.floor(i / 6) - Math.floor(j / 6))));
     const next = wall.hard.map((_, i) => i).filter(i => !broken[i] && minigames.reachable(broken, i)).sort((a, b) => near(a) - near(b))[0];
-    for (let k = 0; k < wall.hard[next] && taps.length < minigames.VEIN.strokes; k++) taps.push(next);
+    for (let k = 0; k < wall.hard[next] && taps.length < limit; k++) taps.push(next);
     broken[next] = true;
     if (wall.gems[next]) found++;
   }
   const done = await api('POST', '/play/world/game/finish', { run: id, input: taps }, player);
   assert.equal(done.status, 200);
-  const played = minigames.replay('filon', seed, taps);
-  const want = levels.outcomeOf('filon', 1, played, minigames.VEIN.strokes).stars;
+  const played = minigames.replay('filon', seed, taps, true);
+  const want = levels.outcomeOf('filon', 1, played, limit).stars;
   assert.equal(done.data.level.stars, want);
   const room = minigames.CAP - done.data.earned;
   assert.equal(done.data.level.bonus, Math.min(levels.bonusOf(0, want), room));
   assert.ok(done.data.earned + done.data.level.bonus <= minigames.CAP);
   assert.equal(await coinsOf(player), done.data.earned + done.data.level.bonus);
+  // Les deux premières parties sont courtes, la troisième normale ; trop de coups pour une partie courte : refusée
+  const second = await api('POST', '/play/world/game/start', { game: 'filon' }, player);
+  assert.deepEqual([second.data.run.short, second.data.run.limit], [true, 12]);
+  const tooMany = Array.from({ length: 13 }, () => 0);
+  assert.equal((await api('POST', '/play/world/game/finish', { run: second.data.run.id, input: tooMany }, player)).status, 400);
+  await sql('UPDATE world_games SET plays = 3 WHERE user_id = $1', [player.userId]);
+  const third = await api('POST', '/play/world/game/start', { game: 'filon' }, player);
+  assert.deepEqual([third.data.run.short, third.data.run.limit], [false, minigames.VEIN.strokes]);
   // La Pêche n'a pas de niveaux
   await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'ponton', 3)`, [player.userId]);
   const fishing = await api('POST', '/play/world/game/start', { game: 'peche' }, player);

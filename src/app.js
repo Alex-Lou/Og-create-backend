@@ -47,6 +47,8 @@ app.use('/api', (req, res, next) => {
 });
 
 const bodyLimit = process.env.REQUEST_BODY_SIZE_LIMIT || '10kb';
+// (les réponses JSON partent compressées : middleware/compress.js)
+app.use('/api', require('./middleware/compress').compressJson);
 app.use(express.json({ limit: bodyLimit, strict: true }));
 app.use(express.urlencoded({ extended: true, limit: bodyLimit }));
 

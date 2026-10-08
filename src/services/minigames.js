@@ -47,11 +47,12 @@ const FISH = {
     botte: { value: 0, weight: 14, speed: [0.1, 0.14] }
 };
 // Les poissons de la partie : couloir, sorte, sens, vitesse (largeurs par seconde), instant d'entrée (ms)
-function fishingOf(seed) {
+// (duration : celle de la partie, plus courte pour les premières : SHORT)
+function fishingOf(seed, duration = FISHING.duration) {
     const r = rng(seed);
     const fish = [];
     let t = 400;
-    while (t < FISHING.duration - 1500) {
+    while (t < duration - 1500) {
         const kind = draw(r, FISH);
         const [a, b] = FISH[kind].speed;
         const dir = r() < 0.5 ? 1 : -1;
@@ -80,9 +81,9 @@ function catchAt(fish, caught, t, lane) {
     return best;
 }
 // taps : [[t (ms depuis le début), couloir]] dans l'ordre ; un toucher pendant que la ligne est à l'eau ne compte pas
-function replayFishing(seed, taps) {
+function replayFishing(seed, taps, duration = FISHING.duration) {
     if (taps.length > FISHING.maxTaps) return fail('trop de lancers');
-    const fish = fishingOf(seed);
+    const fish = fishingOf(seed, duration);
     const caught = new Set();
     const catches = [];
     let free = 0;
@@ -90,7 +91,7 @@ function replayFishing(seed, taps) {
     for (const tap of taps) {
         if (!Array.isArray(tap) || tap.length !== 2) return fail('lancer invalide');
         const [t, lane] = tap;
-        if (!isInt(t) || !isInt(lane) || t < last || t > FISHING.duration || lane < 0 || lane >= FISHING.lanes) return fail('lancer invalide');
+        if (!isInt(t) || !isInt(lane) || t < last || t > duration || lane < 0 || lane >= FISHING.lanes) return fail('lancer invalide');
         last = t;
         if (t < free) continue;
         free = t + FISHING.busy;
@@ -158,8 +159,8 @@ function glintOf(gems, i) {
     return AROUND.filter(([dx, dy]) => inWall(x + dx, y + dy) && gems[(y + dy) * VEIN.cols + x + dx]).length;
 }
 // taps : [bloc frappé] dans l'ordre, un coup de pioche chacun (VEIN.strokes au plus)
-function replayVein(seed, taps) {
-    if (taps.length > VEIN.strokes) return fail('trop de coups');
+function replayVein(seed, taps, limit = VEIN.strokes) {
+    if (taps.length > limit) return fail('trop de coups');
     const { hard, gems } = veinOf(seed);
     const left = hard.slice();
     const broken = Array(hard.length).fill(false);
@@ -192,19 +193,19 @@ const BERRIES = {
     guepes: { value: 0, weight: 6, life: [1500, 2200] }
 };
 // Ce qui mûrit pendant la partie : buisson, sorte, de at à until (ms) ; un buisson ne porte qu'une chose à la fois
-function pickingOf(seed) {
+function pickingOf(seed, duration = PICKING.duration) {
     const r = rng(seed);
     const n = PICKING.cols * PICKING.rows;
     const free = Array(n).fill(0);
     const events = [];
     let t = 500;
-    while (t < PICKING.duration - 800) {
+    while (t < duration - 800) {
         const cell = Math.floor(r() * n);
         const kind = draw(r, BERRIES);
         const [a, b] = BERRIES[kind].life;
         const life = Math.round(a + (b - a) * r());
         const at = Math.max(Math.round(t), free[cell]);
-        if (at + life <= PICKING.duration) {
+        if (at + life <= duration) {
             events.push({ id: events.length, cell, kind, at, until: at + life });
             free[cell] = at + life + PICKING.gap;
         }
@@ -217,9 +218,9 @@ function ripeAt(events, picked, t, cell) {
     return events.find(e => e.cell === cell && !picked.has(e.id) && t >= e.at && t <= e.until) || null;
 }
 // picks : [[t (ms), buisson]] dans l'ordre. Un buisson vide fait perdre un instant, les guêpes davantage
-function replayPicking(seed, picks) {
+function replayPicking(seed, picks, duration = PICKING.duration) {
     if (picks.length > PICKING.maxPicks) return fail('trop de gestes');
-    const events = pickingOf(seed);
+    const events = pickingOf(seed, duration);
     const picked = new Set();
     const got = [];
     // (l'instant de chaque cueillette, guêpes à part : l'objectif du niveau)
@@ -229,7 +230,7 @@ function replayPicking(seed, picks) {
     for (const pick of picks) {
         if (!Array.isArray(pick) || pick.length !== 2) return fail('geste invalide');
         const [t, cell] = pick;
-        if (!isInt(t) || !isInt(cell) || t < last || t > PICKING.duration || cell < 0 || cell >= PICKING.cols * PICKING.rows) return fail('geste invalide');
+        if (!isInt(t) || !isInt(cell) || t < last || t > duration || cell < 0 || cell >= PICKING.cols * PICKING.rows) return fail('geste invalide');
         last = t;
         if (t < stunned) continue;
         const e = ripeAt(events, picked, t, cell);
@@ -247,11 +248,19 @@ function replayPicking(seed, picks) {
 
 /* ---------- Commun ---------- */
 const REPLAY = { peche: replayFishing, filon: replayVein, cueillette: replayPicking };
+// Les premières parties de chaque jeu (SHORT_RUNS) sont courtes, pour apprendre sans s'épuiser (choix de l'auteur,
+// 8 oct.) : la durée de la Pêche et de la Cueillette (ms), les coups de pioche du Filon
+const SHORT_RUNS = 2;
+const SHORT = { peche: 25000, cueillette: 20000, filon: 12 };
+const LIMIT = { peche: FISHING.duration, cueillette: PICKING.duration, filon: VEIN.strokes };
+// La durée (ou les coups) d'une partie
+const limitOf = (game, short = false) => (short ? SHORT[game] : LIMIT[game]);
 // Rejoue une partie : { ok, raw (valeur brute), detail (prises, dans l'ordre), last (instant du dernier geste) }
-function replay(game, seed, input) {
+// (short : une des premières parties, plus courte)
+function replay(game, seed, input, short = false) {
     if (!REPLAY[game]) return fail('jeu inconnu');
     if (!Array.isArray(input)) return fail('partie invalide');
-    return REPLAY[game](seed, input);
+    return REPLAY[game](seed, input, limitOf(game, short));
 }
 // Multiplicateur du palier du bâtiment (III : ×1, puis +0,2 par palier) et écus gagnés, plafonnés
 const multOf = level => Math.round((1 + 0.2 * Math.max(0, level - GAME_LEVEL)) * 10) / 10;
@@ -259,5 +268,5 @@ const earnedOf = (raw, level) => Math.min(Math.round(raw * multOf(level)), Math.
 
 module.exports = {
     GAME_LEVEL, PLAYS, PLAY_REGEN_MS, CAP, GAMES, FISHING, FISH, VEIN, GEMS, PICKING, BERRIES,
-    rng, fishingOf, fishX, catchAt, veinOf, reachable, glintOf, pickingOf, ripeAt, replay, multOf, earnedOf
+    SHORT_RUNS, SHORT, limitOf, rng, fishingOf, fishX, catchAt, veinOf, reachable, glintOf, pickingOf, ripeAt, replay, multOf, earnedOf
 };

@@ -1,5 +1,6 @@
 // Accès PostgreSQL : requêtes simples (query) et transactions (transaction).
 const { Pool } = require('pg');
+const { AsyncLocalStorage } = require('node:async_hooks');
 require('dotenv').config();
 
 // Journal des requêtes : ERROR par défaut (seules les erreurs), INFO ou DEBUG à la demande
@@ -21,7 +22,32 @@ pool.on('error', error => {
     console.error('Erreur inattendue sur le client PostgreSQL', error);
 });
 
+// Lectures mémorisées le temps d'un calcul (cached(fn), la vue de l'île) : une même lecture (SELECT, ni FOR UPDATE ni
+// FOR SHARE, mêmes paramètres) n'est envoyée qu'une fois ; toute écriture vide la mémoire. La base est distante (Neon) :
+// chaque requête coûte un aller-retour. Les transactions (conn.query) n'y passent jamais
+const reads = new AsyncLocalStorage();
+const READ = /^\s*SELECT\b/i;
+const LOCK = /\bFOR\s+(UPDATE|SHARE)\b/i;
+function cached(fn) {
+    return reads.run(new Map(), fn);
+}
+
 async function query(text, params) {
+    const memo = reads.getStore();
+    if (memo) {
+        if (!READ.test(text) || LOCK.test(text)) memo.clear();
+        else {
+            const key = `${text}\u0000${JSON.stringify(params || [])}`;
+            if (!memo.has(key)) memo.set(key, run(text, params).catch(error => { memo.delete(key); throw error; }));
+            const result = await memo.get(key);
+            // (une copie : celui qui lit peut trier ou modifier ses lignes)
+            return { ...result, rows: structuredClone(result.rows) };
+        }
+    }
+    return run(text, params);
+}
+
+async function run(text, params) {
     if (LOG_LEVEL === 'DEBUG') console.log('Requête SQL :', text, params || '');
     else if (LOG_LEVEL === 'INFO') console.log(`Exécution ${text.trim().split(' ')[0]}${params ? ` avec ${params.length} paramètres` : ''}`);
     try {
@@ -64,4 +90,4 @@ async function transaction(fn) {
     }
 }
 
-module.exports = { query, transaction, rollback, pool };
+module.exports = { query, cached, transaction, rollback, pool };
