@@ -2349,12 +2349,14 @@ test('le prologue d’un nouveau compte : la troupe arrive à sa rencontre, Ondi
   const hen = await api('POST', '/play/world/beast/feed', { beast: 'poule-rousse' }, player);
   assert.deepEqual([hen.status, hen.data.world.brume.quest.done], [200, true]);
   assert.equal((await claim('poules')).status, 200);
-  // Rivet est là ; la Clôture posée, 100 écus : La Source
+  // Rivet est là ; la Clôture posée, La Source se découvre en écrivant la Source (sans écus)
   assert.deepEqual(who(await view(), 'atelier').built, false);
   await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'cloture', $2, $3)`, [player.userId, X(31), Y(35)]);
   assert.equal((await claim('deco')).status, 200);
   assert.equal(await coinsOf(player), 100);
+  await write(['Colline', 'Source']);
   assert.equal((await api('POST', '/play/world/zone', { zone: 'source' }, player)).status, 200);
+  assert.equal(await coinsOf(player), 100);
   assert.equal((await claim('achat-source')).status, 200);
   // Ondin dort à La Source : on le réveille en lui parlant
   const sleeping = await view();
@@ -2374,7 +2376,7 @@ test('le prologue d’un nouveau compte : la troupe arrive à sa rencontre, Ondi
   assert.deepEqual(built.data.world.chests.pending.map(c => c.source), ['chapitre:II', 'chapitre:III', 'quete:puits-ondin']);
   assert.deepEqual(who(built.data.world, 'foyer').needs.map(n => n.id), ['manger', 'deco']);
   assert.deepEqual([who(built.data.world, 'puits').built, built.data.world.brume.quest.id], [true, 'lisiere']);
-  assert.equal(await coinsOf(player), 30 + 10 + 20 + 40);
+  assert.equal(await coinsOf(player), 100 + 30 + 10 + 20 + 40);
 });
 
 test('chaque objectif de la chaîne se lit dans l’état (création, annexe, expédition, lieu, bête, voyageur, cœur, trouvaille, maison, nom)', async () => {

@@ -227,7 +227,8 @@ router.post('/world/annex/pose', withAccount(async (req, res, owner, b) => {
 router.post('/world/zone', withAccount(async (req, res, owner, b) => {
     const zone = String(req.body.zone || '');
     if (!/^[a-z]{1,20}$/.test(zone)) return res.status(400).json({ message: 'Quartier invalide' });
-    const done = await world.buyZone(owner.id, zone, await chaptersOf(owner, b, await players.elements(owner)));
+    const owned = await players.elements(owner);
+    const done = await world.buyZone(owner.id, zone, await chaptersOf(owner, b, owned), owned);
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ bought: done.bought, coins: done.coins, world: await worldView(owner, b) });
 }));
@@ -471,6 +472,14 @@ router.get('/world/brume', withAccount(async (req, res, owner, b) => {
 router.post('/world/prologue/skip', withAccount(async (req, res, owner) => {
     await world.skipPrologue(owner.id);
     res.json({ skipped: true });
+}));
+
+// « Recommencer l'île », une fois par compte : le joueur l'écrit en toutes lettres (RECOMMENCER) → { restarted: true }
+router.post('/world/restart', withAccount(async (req, res, owner) => {
+    if (req.body.confirm !== 'RECOMMENCER') return res.status(400).json({ message: 'Écris RECOMMENCER pour confirmer.' });
+    const done = await world.restartIsland(owner.id);
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json(done);
 }));
 
 // Quête de Brume : réclamer la récompense de la quête active

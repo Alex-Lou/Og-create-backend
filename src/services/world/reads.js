@@ -5,7 +5,7 @@ const quests = require('../quests');
 const loot = require('../loot');
 const signs = require('../signs');
 const finds = require('../finds');
-const { V6_SINCE } = require('../players');
+const { V6_SINCE, RESTARTED } = require('../players');
 
 async function itemsOf(userId, conn = db) {
     const { rows } = await conn.query('SELECT item FROM world_items WHERE user_id = $1', [userId]);
@@ -80,8 +80,9 @@ async function levelsOf(userId, conn = db) {
 }
 async function fireLitOf(userId, conn) {
     const { rows } = await conn.query(
-        `SELECT u.created_at >= $2 AS fresh, ARRAY(SELECT quest FROM world_quests q WHERE q.user_id = u.id) AS claimed
-         FROM users u WHERE u.id = $1`, [userId, V6_SINCE]);
+        `SELECT u.created_at >= $2 OR EXISTS (SELECT 1 FROM world_items i WHERE i.user_id = u.id AND i.item = $3) AS fresh,
+                ARRAY(SELECT quest FROM world_quests q WHERE q.user_id = u.id) AS claimed
+         FROM users u WHERE u.id = $1`, [userId, V6_SINCE, RESTARTED]);
     if (!rows[0] || !rows[0].fresh) return true;
     return quests.doneOf(new Set(rows[0].claimed)).has('feu');
 }
