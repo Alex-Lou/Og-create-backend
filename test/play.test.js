@@ -1719,7 +1719,8 @@ test('ce qui attend dans les bâtiments paie tout : expédition, établi, bête,
   const made = await api('POST', '/play/world/craft/finish', { run: run.id, layout: solveCraft(run) }, player);
   assert.equal(made.status, 200);
   near(made.data.world.stock.wood, pending.wood - 8, 'bûches de la Clôture');
-  // Une poule (2 vivres)
+  // Une poule (2 vivres) : la cage de Cannelle ouverte (ses poules affamées)
+  await sql(`INSERT INTO world_beasts (user_id, beast, fed_at, collected_at) VALUES ($1, 'poule-rousse', NOW() - INTERVAL '2 days', NOW())`, [player.userId]);
   pending = await empty();
   const hen = await api('POST', '/play/world/beast/feed', { beast: 'poule-rousse' }, player);
   assert.equal(hen.status, 200);

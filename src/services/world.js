@@ -48,7 +48,7 @@ const {
 const { annexSpotOk, annexSpots, annexesView, placeAnnex, moveAnnex, poseAnnex } = require('./world/annexPlots');
 const { campOfUser, cellsOfCamp } = require('./world/camp');
 const { startNights, repelCreature, repairSite, nightsView } = require('./world/nights');
-const { feedBeast, collectBeasts, beastsView } = require('./world/beasts');
+const { feedBeast, collectBeasts, beastsView, openCage } = require('./world/beasts');
 
 // Un habitant arrive comblé (Cannelle, pendant le prologue, affamée : hungryOf) : la première vue de l'île après son
 // arrivée inscrit l'heure de ses besoins (ou de celui qui apparaît, travailler avec l'Atelier), une seule fois
@@ -732,5 +732,5 @@ module.exports = {
     placeAnnex, moveAnnex, poseAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople, namePlayer, chooseAvatar, arianeTargets,
     refundDecorations, startCraft, finishCraft, placeCraft, moveCraft, storeCraft, turnCraft, startExpedition, findLandmark, gatherDeposit,
     anyaOf, breathRefused, revealAnya, breatheAnya, brumeSavoirOf, talkBrume, startNights, repelCreature, repairSite,
-    feedBeast, collectBeasts
+    feedBeast, collectBeasts, openCage
 };

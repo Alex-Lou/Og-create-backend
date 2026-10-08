@@ -1,15 +1,19 @@
 // Les bêtes de ferme (HISTOIRE.md du dépôt front, § 6.16, v6 ; réglage « petit plus » choisi par l'auteur le 6 octobre
 // 2026) : règles pures, sans base. On nourrit une bête depuis sa fiche (2 vivres) ; nourrie, elle est contente un jour
-// et remplit sa bulle de nourriture, que l'on ramasse. La bulle garde un jour au plus. Les bêtes sont celles que le
-// Potager montre selon son palier (world/village.js du front) ; les variantes du Bestiaire restent des décors.
+// et remplit sa bulle de nourriture, que l'on ramasse. La bulle garde un jour au plus. Les poules sont celles de
+// Cannelle (bible, § 6.16 et étape 8 : sauvées dans leur cage, elles vivent au camp, près du feu) : là dès la cage
+// ouverte, sans attendre le Potager ; Madame ne pond pas (« Elle juge. »). Les autres bêtes sont celles que le Potager
+// montre selon son palier (world/village.js du front) ; les variantes du Bestiaire restent des décors.
 const HOUR_MS = 3600 * 1000;
 const CONTENT_HOURS = 24;
 const DAY_MS = CONTENT_HOURS * HOUR_MS;
 const FEED_COST = { food: 2 };
-// L'espèce est celle du front ; level : le palier du Potager où elle arrive ; daily : vivres donnés par jour, contente
+// L'espèce est celle du front ; level : le palier du Potager où elle arrive (les poules de Cannelle, camp : à la cage
+// ouverte) ; daily : vivres donnés par jour, contente (identifiants des poules gardés : rien ne se perd)
 const BEASTS = [
-    { id: 'poule-rousse', species: 'hen', name: 'La poule rousse', level: 1, daily: 4 },
-    { id: 'poule-noire', species: 'hen', name: 'La poule noire', level: 1, daily: 4 },
+    { id: 'poule-rousse', species: 'hen', name: 'Paprika', camp: true, daily: 4 },
+    { id: 'poule-blanche', species: 'hen', name: 'Brioche', camp: true, daily: 4 },
+    { id: 'poule-noire', species: 'hen', name: 'Madame', camp: true, daily: 0 },
     { id: 'vache', species: 'cow', name: 'La vache', level: 3, daily: 8 },
     { id: 'mouton', species: 'sheep', name: 'Le mouton', level: 4, daily: 4 },
     { id: 'brebis', species: 'sheep', name: 'La brebis', level: 4, daily: 4 },
@@ -17,14 +21,17 @@ const BEASTS = [
     { id: 'chevre', species: 'goat', name: 'La chèvre', level: 6, daily: 6 }
 ];
 const BEAST_BY_ID = Object.fromEntries(BEASTS.map(b => [b.id, b]));
-// Les bêtes du Potager à son palier
-const beastsOf = level => BEASTS.filter(b => level >= b.level);
+// Les poules de Cannelle
+const HENS = BEASTS.filter(b => b.camp).map(b => b.id);
+// Les bêtes de l'île : les poules si la cage est ouverte (freed), puis celles du Potager à son palier
+const beastsOf = (level, freed = false) => BEASTS.filter(b => (b.camp ? freed : level >= b.level));
 const ms = t => new Date(t).getTime();
 
 // Ce que contient la bulle d'une bête (row : { fed_at, collected_at }) : { amount, collectedAt }. Elle se remplit tant
 // que la bête est contente, une unité à la fois ; collectedAt : jusqu'où c'est compté (la part d'une unité en cours
 // reste due). Pleine (un jour), elle ne se remplit plus
 function readyOf(beast, row, now) {
+    if (!beast.daily) return { amount: 0, collectedAt: ms(row.collected_at) };
     const per = DAY_MS / beast.daily;
     const from = ms(row.collected_at);
     const to = Math.min(now, ms(row.fed_at) + DAY_MS);
@@ -48,4 +55,4 @@ function feedOf(beast, row, now) {
     return { amount, row: { fed_at: now, collected_at: content ? collectedAt : now } };
 }
 
-module.exports = { CONTENT_HOURS, FEED_COST, BEASTS, BEAST_BY_ID, beastsOf, readyOf, stateOf, feedOf };
+module.exports = { CONTENT_HOURS, DAY_MS, FEED_COST, BEASTS, BEAST_BY_ID, HENS, beastsOf, readyOf, stateOf, feedOf };
