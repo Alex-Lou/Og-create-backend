@@ -52,6 +52,8 @@ const {
 const { annexSpotOk, annexSpots, annexesView, placeAnnex, moveAnnex, poseAnnex } = require('./world/annexPlots');
 const { campOfUser, cellsOfCamp } = require('./world/camp');
 const paths = require('./world/paths');
+const gridLevels = require('./levels');
+const stars = require('./world/stars');
 const { startNights, repelCreature, repairSite, nightsView } = require('./world/nights');
 const { feedBeast, collectBeasts, beastsView, openCage } = require('./world/beasts');
 
@@ -204,6 +206,8 @@ async function restartIsland(userId) {
         await conn.query('DELETE FROM world_items WHERE user_id = $1 AND item = $2', [userId, PROLOGUE_SKIP]);
         // Ses chemins tracés s'effacent : l'île repart de ses seuls sentiers
         await conn.query('DELETE FROM world_items WHERE user_id = $1 AND item LIKE $2', [userId, `${paths.PREFIX}%`]);
+        // Les étoiles des jeux à grille aussi (choix de l'auteur : un vrai départ ; leurs bonus se regagnent)
+        await conn.query('DELETE FROM world_items WHERE user_id = $1 AND item LIKE $2', [userId, `${stars.PREFIX}%`]);
         await conn.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'ile') ON CONFLICT DO NOTHING`, [userId, paths.MARK]);
         // La réserve repart vide, ses parties de Récolte pleines, sur la carte du moment (rien à faire passer)
         await conn.query('DELETE FROM world_stock WHERE user_id = $1', [userId]);
@@ -450,6 +454,9 @@ async function view(userId, owned, book) {
         needs: {
             kinds: Object.fromEntries(Object.entries(villagers.NEEDS).map(([id, n]) => [id, { label: n.label, ...(n.hours ? { hours: n.hours, cost: n.cost } : { decos: n.decos, reach: n.reach }) }]))
         },
+        // Les jeux à grille (services/levels.js) : les étoiles de chacun de leurs 30 niveaux (0 à 3), d'où se déduisent
+        // les niveaux et saisons ouverts
+        stages: await stars.starsOf(userId, db),
         // Mini-jeux des bâtiments : ouverts au palier III, parties en réserve, multiplicateur d'écus du palier
         games: Object.entries(minigames.GAMES).map(([id, game]) => {
             const level = levels[game.site] || 0;
@@ -568,9 +575,21 @@ async function build(userId, owned, siteId, openChapters = new Set()) {
     });
 }
 
-// Nouvelle partie de Récolte : une partie de la réserve, une graine, la configuration figée de l'île
-function startRun(userId) {
+// Le niveau d'une partie d'un jeu à grille (services/levels.js) : celui demandé s'il est ouvert, sinon le plus haut
+// ouvert. { level } ou { status, message }
+async function levelFor(userId, game, asked, conn) {
+    const mine = (await stars.starsOf(userId, conn))[game];
+    if (asked === null || asked === undefined) return { level: gridLevels.openOf(mine).max };
+    if (!gridLevels.playable(mine, asked)) return { status: 403, message: 'Ce niveau n’est pas encore ouvert : gagne une étoile au précédent.' };
+    return { level: asked };
+}
+
+// Nouvelle partie de Récolte : une partie de la réserve, une graine, la configuration figée de l'île ; son niveau
+// (asked : celui demandé, sinon le plus haut ouvert) et son objectif
+function startRun(userId, asked = null) {
     return db.transaction(async conn => {
+        const chosen = await levelFor(userId, 'recolte', asked, conn);
+        if (chosen.status) return db.rollback(chosen);
         const stock = await stockOf(userId, conn, true);
         const { levels } = await levelsOf(userId, conn);
         const { bonuses, extra } = await bonusesFor(userId, conn);
@@ -587,8 +606,8 @@ function startRun(userId) {
         // départ est toujours plus ancien (undoItem)
         const { rows } = await conn.query(
             'INSERT INTO world_runs (user_id, seed, config, created_at) VALUES ($1, $2, $3, clock_timestamp()) RETURNING id',
-            [userId, seed, JSON.stringify({ kinds, maxMoves, boosts })]);
-        return { run: { id: Number(rows[0].id), seed, kinds, maxMoves, boosts } };
+            [userId, seed, JSON.stringify({ kinds, maxMoves, boosts, lvl: chosen.level })]);
+        return { run: { id: Number(rows[0].id), seed, kinds, maxMoves, boosts, level: chosen.level, goal: gridLevels.goalOf('recolte', chosen.level) } };
     });
 }
 
@@ -612,17 +631,31 @@ function finishRun(userId, runId, moves) {
         // Et des écus : 1 par tranche de 10 ressources gagnées, versés une seule fois pour cette partie
         const earned = Math.floor((g.stone + g.wood + g.water + g.food) / HARVEST_COIN_EVERY);
         if (earned > 0) await ledger.credit(userId, earned, 'recolte', runId, conn);
+        // Le niveau : ses étoiles (la marge de coups quand l'objectif est rempli), leur bonus la première fois
+        const level = config.lvl ? await levelDone(userId, 'recolte', config.lvl, played, config.maxMoves, Infinity, conn) : null;
         // Parfois un coffre (sûr avec une grande chaîne)
         const rarity = loot.harvestChest(moves.length, Math.max(0, ...moves.map(path => path.length)), random);
         const chest = rarity ? await grant(userId, `recolte:${runId}`, rarity, conn) : null;
-        // coins : le solde (écus de la partie et du coffre compris)
-        return { gains: g, earned, coins: await balanceOf(userId, conn), chest };
+        // coins : le solde (écus de la partie, du bonus et du coffre compris)
+        return { gains: g, earned, coins: await balanceOf(userId, conn), chest, level };
     });
 }
 
-// Nouvelle partie d'un mini-jeu (bâtiment au palier III ou plus) : une partie de sa réserve, une graine. { run } ou
-// { status, message }
-async function startGame(userId, gameId) {
+// Ce qu'a donné une partie d'un niveau : ses étoiles, inscrites, et leur bonus (au plus room écus). { level, goal,
+// stars (celles de la partie), best (le meilleur du niveau), bonus }
+async function levelDone(userId, game, n, played, limit, room, conn) {
+    const outcome = gridLevels.outcomeOf(game, n, played, limit);
+    const won = await stars.award(userId, game, n, outcome.stars, room, conn);
+    return { level: n, goal: gridLevels.goalOf(game, n), stars: outcome.stars, best: won.stars, bonus: won.bonus };
+}
+// Le niveau et le palier d'une partie de mini-jeu, rangés ensemble dans world_game_runs.level (niveau × 10 + palier ;
+// niveau 0 : la Pêche, ou une partie d'avant les niveaux), sans donnée nouvelle
+const RUN_LEVEL = 10;
+const LIMITS = { filon: minigames.VEIN.strokes, cueillette: minigames.PICKING.duration };
+
+// Nouvelle partie d'un mini-jeu (bâtiment au palier III ou plus) : une partie de sa réserve, une graine ; pour un jeu
+// à grille, son niveau (asked, sinon le plus haut ouvert). { run } ou { status, message }
+async function startGame(userId, gameId, asked = null) {
     const game = minigames.GAMES[gameId];
     if (!game) return { status: 404, message: 'Mini-jeu inconnu.' };
     await migrate(userId);
@@ -633,11 +666,16 @@ async function startGame(userId, gameId) {
         const now = Date.now();
         const plays = playsOf((await gamesOf(userId, conn))[gameId], now);
         if (plays.count < 1) return db.rollback({ status: 409, message: 'Plus de partie en réserve : la prochaine revient bientôt.' });
+        const grid = gridLevels.GAMES.includes(gameId);
+        const chosen = grid ? await levelFor(userId, gameId, asked, conn) : { level: 0 };
+        if (chosen.status) return db.rollback(chosen);
         await conn.query(`INSERT INTO world_games (user_id, game, plays, plays_at) VALUES ($1, $2, $3, $4)
             ON CONFLICT (user_id, game) DO UPDATE SET plays = EXCLUDED.plays, plays_at = EXCLUDED.plays_at`, [userId, gameId, plays.count - 1, new Date(plays.since)]);
         const seed = crypto.randomInt(1, 2147483647);
-        const { rows } = await conn.query('INSERT INTO world_game_runs (user_id, game, seed, level) VALUES ($1, $2, $3, $4) RETURNING id', [userId, gameId, seed, level]);
-        return { run: { id: Number(rows[0].id), game: gameId, seed, level } };
+        const { rows } = await conn.query('INSERT INTO world_game_runs (user_id, game, seed, level) VALUES ($1, $2, $3, $4) RETURNING id',
+            [userId, gameId, seed, chosen.level * RUN_LEVEL + level]);
+        // level : le palier du bâtiment (le multiplicateur) ; stage et goal : le niveau du jeu et son objectif
+        return { run: { id: Number(rows[0].id), game: gameId, seed, level, ...(grid ? { stage: chosen.level, goal: gridLevels.goalOf(gameId, chosen.level) } : {}) } };
     });
 }
 
@@ -649,7 +687,9 @@ function finishGame(userId, runId, input) {
             'SELECT game, seed, level, created_at FROM world_game_runs WHERE id = $1 AND user_id = $2 AND finished_at IS NULL FOR UPDATE', [runId, userId]);
         if (!rows.length) return db.rollback({ status: 404, message: 'Cette partie est déjà rendue.' });
         await conn.query('UPDATE world_game_runs SET finished_at = NOW() WHERE id = $1', [runId]);
-        const { game, seed, level, created_at: createdAt } = rows[0];
+        const { game, seed, created_at: createdAt } = rows[0];
+        const level = rows[0].level % RUN_LEVEL;
+        const stage = Math.floor(rows[0].level / RUN_LEVEL);
         const elapsed = Date.now() - new Date(createdAt).getTime();
         if (elapsed > GAME_TTL_MS) return { status: 400, message: 'Partie refusée : partie expirée.' };
         const played = minigames.replay(game, seed, input);
@@ -657,7 +697,10 @@ function finishGame(userId, runId, input) {
         if (played.last > elapsed + GAME_SLACK_MS) return { status: 400, message: 'Partie refusée : partie trop rapide.' };
         const earned = minigames.earnedOf(played.raw, level);
         if (earned > 0) await ledger.credit(userId, earned, `jeu:${game}`, runId, conn);
-        return { earned, raw: played.raw, detail: played.detail, coins: await balanceOf(userId, conn) };
+        // Le niveau : ses étoiles, et leur bonus la première fois, dans le plafond de la partie
+        const cap = Math.round(minigames.CAP * minigames.multOf(level));
+        const done = stage ? await levelDone(userId, game, stage, played, LIMITS[game], cap - earned, conn) : null;
+        return { earned, raw: played.raw, detail: played.detail, coins: await balanceOf(userId, conn), level: done };
     });
 }
 

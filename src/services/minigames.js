@@ -164,15 +164,22 @@ function replayVein(seed, taps) {
     const left = hard.slice();
     const broken = Array(hard.length).fill(false);
     const found = [];
+    // (le coup où chaque pierre est trouvée : l'objectif du niveau)
+    const at = [];
+    let strokes = 0;
     for (const i of taps) {
         if (!isInt(i) || i < 0 || i >= hard.length || broken[i] || !reachable(broken, i)) return fail('coup invalide');
         left[i]--;
+        strokes++;
         if (left[i] === 0) {
             broken[i] = true;
-            if (gems[i]) found.push(gems[i]);
+            if (gems[i]) {
+                found.push(gems[i]);
+                at.push(strokes);
+            }
         }
     }
-    return { ok: true, raw: sum(found, GEMS), detail: found, last: 0 };
+    return { ok: true, raw: sum(found, GEMS), detail: found, last: 0, at };
 }
 
 /* ---------- Cueillette : seize buissons, des baies mûres un instant ---------- */
@@ -215,6 +222,8 @@ function replayPicking(seed, picks) {
     const events = pickingOf(seed);
     const picked = new Set();
     const got = [];
+    // (l'instant de chaque cueillette, guêpes à part : l'objectif du niveau)
+    const at = [];
     let stunned = 0;
     let last = 0;
     for (const pick of picks) {
@@ -231,8 +240,9 @@ function replayPicking(seed, picks) {
         picked.add(e.id);
         if (e.kind === 'guepes') stunned = t + PICKING.stun;
         got.push(e.kind);
+        if (e.kind !== 'guepes') at.push(t);
     }
-    return { ok: true, raw: sum(got, BERRIES), detail: got, last };
+    return { ok: true, raw: sum(got, BERRIES), detail: got, last, at };
 }
 
 /* ---------- Commun ---------- */
