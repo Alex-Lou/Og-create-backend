@@ -427,6 +427,12 @@ CREATE TABLE IF NOT EXISTS world_crafts (
 );
 CREATE INDEX IF NOT EXISTS idx_world_crafts_user ON world_crafts (user_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_world_crafts_cell ON world_crafts (user_id, x, y) WHERE x IS NOT NULL;
+-- Pose (lot Pose) : une annexe ou une création posée en miroir (flip) ; la couleur choisie d'une annexe dessinée en
+-- variantes (look : n° de variante ; vide : celle de son rang parmi les mêmes annexes, comme avant). Rien ne change
+-- pour ce qui est déjà posé
+ALTER TABLE world_annexes ADD COLUMN IF NOT EXISTS flip BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE world_annexes ADD COLUMN IF NOT EXISTS look SMALLINT CHECK (look >= 0);
+ALTER TABLE world_crafts ADD COLUMN IF NOT EXISTS flip BOOLEAN NOT NULL DEFAULT FALSE;
 -- Assemblages en cours (puzzle d'une création) : graine des pièces, rendus une seule fois
 CREATE TABLE IF NOT EXISTS world_craft_runs (
     id SERIAL PRIMARY KEY,

@@ -42,16 +42,16 @@ function annexesView(siteId, rows) {
         const built = rows.filter(r => r.annex === a.id).length;
         const max = annexes.maxOf(a);
         return {
-            id: a.id, name: a.name, kind: a.kind, max, built, effect: annexes.effectText(a, words, CAP_HOURS), gain: a.effect,
+            id: a.id, name: a.name, kind: a.kind, max, built, looks: annexes.looksOf(a), effect: annexes.effectText(a, words, CAP_HOURS), gain: a.effect,
             levels: Array.from({ length: max }, (_, k) => annexes.levelFor(a, k)),
             next: built < max ? { level: annexes.levelFor(a, built), ...annexes.priceOf(a, built) } : null
         };
     });
 }
 
-// Annexe posée sur cette case (ligne verrouillée), ou null
+// Annexe posée sur cette case (ligne verrouillée : { annex, flip, look }), ou null
 async function annexAt(userId, x, y, conn) {
-    const { rows } = await conn.query('SELECT annex FROM world_annexes WHERE user_id = $1 AND x = $2 AND y = $3 FOR UPDATE', [userId, x, y]);
+    const { rows } = await conn.query('SELECT annex, flip, look FROM world_annexes WHERE user_id = $1 AND x = $2 AND y = $3 FOR UPDATE', [userId, x, y]);
     return rows[0] || null;
 }
 // Case déjà prise par une création d'île ou une annexe
@@ -60,15 +60,20 @@ async function cellTaken(userId, x, y, conn) {
     return rows.length > 0 || Boolean(await annexAt(userId, x, y, conn));
 }
 const SPOT_MESSAGE = 'Une annexe se pose sur une case libre du quartier de son bâtiment.';
+// Couleur demandée (look : n° de variante, ou null : celle de son rang) : une de celles dessinées pour cette annexe
+const lookOk = (a, look) => look === null || (Number.isInteger(look) && look >= 0 && look < annexes.looksOf(a));
+const LOOK_MESSAGE = 'Cette couleur n’existe pas pour cette annexe.';
 const CAMP_MESSAGE = 'Cette case est au camp des naufragés.';
 
 // Pose l'exemplaire suivant d'une annexe : bâtiment construit au palier voulu dans un quartier possédé, case libre
 // autorisée, ressources et écus débités une seule fois (ligne de stock verrouillée : deux poses ne se croisent pas).
-// La production en cours est encaissée d'abord (l'annexe produit à partir de sa pose). { status, message } si refus
-async function placeAnnex(userId, annexId, x, y) {
+// La production en cours est encaissée d'abord (l'annexe produit à partir de sa pose). pose : { flip, look } (miroir,
+// couleur choisie). { status, message } si refus
+async function placeAnnex(userId, annexId, x, y, { flip = false, look = null } = {}) {
     const a = annexes.ANNEX_BY_ID[annexId];
     if (!a) return { status: 404, message: 'Annexe inconnue.' };
     if (!annexSpotOk(a.site, x, y)) return { status: 400, message: SPOT_MESSAGE };
+    if (!lookOk(a, look)) return { status: 400, message: LOOK_MESSAGE };
     await migrate(userId);
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
@@ -93,7 +98,7 @@ async function placeAnnex(userId, annexId, x, y) {
         await spendFinds(userId, spent, conn);
         await conn.query('UPDATE world_stock SET stone = stone - $2, wood = wood - $3, water = water - $4, food = food - $5 WHERE user_id = $1',
             [userId, ...RESOURCES.map(r => cost[r] || 0)]);
-        await conn.query('INSERT INTO world_annexes (user_id, x, y, annex) VALUES ($1, $2, $3, $4)', [userId, x, y, a.id]);
+        await conn.query('INSERT INTO world_annexes (user_id, x, y, annex, flip, look) VALUES ($1, $2, $3, $4, $5, $6)', [userId, x, y, a.id, flip, look]);
         return { built: a.name, coins };
     });
 }
@@ -115,4 +120,19 @@ async function moveAnnex(userId, x, y, toX, toY) {
     });
 }
 
-module.exports = { annexSpotOk, annexSpots, annexesView, annexAt, cellTaken, SPOT_MESSAGE, placeAnnex, moveAnnex };
+// Pivote une annexe posée (flip) ou change sa couleur (look) ; ce qui n'est pas donné reste. Sa production continue.
+// {} ou { status, message }
+async function poseAnnex(userId, x, y, { flip, look }) {
+    await migrate(userId);
+    return db.transaction(async conn => {
+        const found = await annexAt(userId, x, y, conn);
+        if (!found) return db.rollback({ status: 404, message: 'Aucune annexe sur cette case.' });
+        const a = annexes.ANNEX_BY_ID[found.annex];
+        if (look !== undefined && (!a || !lookOk(a, look))) return db.rollback({ status: 400, message: LOOK_MESSAGE });
+        await conn.query('UPDATE world_annexes SET flip = $4, look = $5 WHERE user_id = $1 AND x = $2 AND y = $3',
+            [userId, x, y, flip === undefined ? found.flip : flip, look === undefined ? found.look : look]);
+        return {};
+    });
+}
+
+module.exports = { annexSpotOk, annexSpots, annexesView, annexAt, cellTaken, SPOT_MESSAGE, placeAnnex, moveAnnex, poseAnnex };
