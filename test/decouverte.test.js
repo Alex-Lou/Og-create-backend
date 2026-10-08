@@ -1,4 +1,5 @@
-// La découverte (choix de l'auteur) : « Recommencer l'île », une fois par compte, efface l'île et garde le Grimoire ;
+// La découverte (choix de l'auteur) : « Recommencer l'île » (autant qu'on veut pendant le développement ; une fois avec
+// ISLAND_RESTART_ONCE=1) efface l'île et garde le Grimoire ;
 // l'île recommencée suit les règles d'un compte neuf (habitants un à un) ; au tutoriel, La Source se découvre en
 // écrivant la Source, sans écus
 const test = require('node:test');
@@ -58,6 +59,10 @@ test('« Recommencer l’île » : une fois, confirmé en toutes lettres ; l’�
     // Les habitants arrivent un à un : Cannelle au feu, plus à la Récolte
     await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'pages'), ($1, 'ramasser'), ($1, 'recolte')`, [id]);
     assert.equal((await view(player)).villagers.some(v => v.id === 'foyer'), false);
+    // Pendant le développement, on recommence autant qu'on veut (pas deux fois coup sur coup)
+    await sql(`UPDATE world_items SET bought_at = NOW() - INTERVAL '1 minute' WHERE user_id = $1 AND item = 'ile:recommencee'`, [id]);
+    assert.equal((await restart(player)).status, 200);
+    assert.equal((await restart(player)).status, 409);
 });
 
 test('au tutoriel, La Source se découvre en écrivant la Source : sans écus ; un compte d’avant la bible l’achète', async () => {

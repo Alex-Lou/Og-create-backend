@@ -1,5 +1,6 @@
 // Le Monde : l'île du joueur (services/world.js), compte requis.
 const express = require('express');
+const db = require('../../config/db');
 const book = require('../../services/recipeBook');
 const players = require('../../services/players');
 const world = require('../../services/world');
@@ -35,8 +36,12 @@ router.use('/world', (req, res, next) => {
 const chaptersOf = async (owner, b, owned) => bookPages.openChapters(b, owned, await players.isVeteran(owner));
 
 // Vue de l'île. Les décorations de l'ancienne règle sont remboursées au premier passage (lot 8) : refund { count,
-// coins } accompagne alors la vue, une fois
-async function worldView(owner, b) {
+// coins } accompagne alors la vue, une fois. Ses lectures sont mémorisées le temps de la calculer (db.cached : une même
+// lecture ne part qu'une fois vers la base distante)
+function worldView(owner, b) {
+    return db.cached(() => worldViewNow(owner, b));
+}
+async function worldViewNow(owner, b) {
     const owned = await players.elements(owner);
     const refund = await world.refundDecorations(owner.id, element => decoPrice(b, element));
     const view = await world.view(owner.id, owned, {

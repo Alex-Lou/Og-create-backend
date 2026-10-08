@@ -26,7 +26,7 @@ const pickups = require('./pickups');
 const players = require('./players');
 const beastRules = require('./beasts');
 const {
-    SIZE, CAP_HOURS, REGEN_MS, RUN_TTL_MS, RENAME_LEVEL, GAME_TTL_MS, GAME_SLACK_MS, FIRST_RUN_MOVES, FIRST_RUN_KINDS,
+    SIZE, CAP_HOURS, REGEN_MS, RUN_TTL_MS, RENAME_LEVEL, GAME_TTL_MS, GAME_SLACK_MS, SHORT_RUNS, SHORT_MOVES, FIRST_RUN_KINDS,
     RESOURCES, DECO_PRICES, HARVEST_COIN_EVERY, UNDO_SECONDS, random, CHAPTER_OF_LEVEL, PRODUCE_PER_LEVEL,
     COINS_PER_LEVEL, SITES, MAP_VERSION, effectOf, keyOf, pendingOf, chargesAt, effectsOf, productionOf, fullInOf, perHourOf, productionAll, cashOf
 } = require('./world/rules');
@@ -72,10 +72,27 @@ const playsOf = (row, now) => chargesAt({ charges: row ? row.plays : minigames.P
 // Ce que lisent les objectifs des quêtes (quests.HAVE) : owned = éléments du Grimoire ; stars = ses découvertes.
 // moods : besoins des habitants déjà calculés (la vue de l'île), sinon calculés ici
 async function factsOf(userId, owned, stars, conn = db, moods = null) {
-    const { levels } = await levelsOf(userId, conn);
-    const zones = await zonesOf(userId, conn);
-    const placed = placedOf(await craftsOf(userId, conn));
-    const filled = await needRowsOf(userId, conn);
+    // (lectures indépendantes, ensemble ; dans une transaction, elles passent l'une après l'autre sur sa connexion)
+    const count = (sql, params) => countOf(conn, sql, params);
+    const [{ levels }, zones, craftRows, filled, lastRows, friends, runs, annexCount, houses, expeditions, found, gathered, pickupCount, hensFed,
+        visitors, settled, names] = await Promise.all([
+        levelsOf(userId, conn), zonesOf(userId, conn), craftsOf(userId, conn), needRowsOf(userId, conn),
+        conn.query('SELECT MAX(claimed_at) AS at FROM world_quests WHERE user_id = $1', [userId]), friendsOf(userId, conn), runsOf(userId, conn),
+        count('SELECT COUNT(*)::int AS n FROM world_annexes WHERE user_id = $1', [userId]),
+        count('SELECT COUNT(*)::int AS n FROM world_annexes WHERE user_id = $1 AND annex = $2', [userId, 'maison']),
+        count('SELECT COUNT(*)::int AS n FROM world_expeditions WHERE user_id = $1 AND ends_at <= NOW()', [userId]),
+        foundOf(userId, conn),
+        // (les gisements de climat ; ce que la mer rend sur la Grève compte à part)
+        count('SELECT COUNT(*)::int AS n FROM world_deposits WHERE user_id = $1 AND deposit NOT LIKE $2', [userId, `${pickups.PREFIX}%`]),
+        count('SELECT COUNT(*)::int AS n FROM world_deposits WHERE user_id = $1 AND deposit LIKE $2', [userId, `${pickups.PREFIX}%`]),
+        // Les poules de Cannelle nourries, encore rassasiées (ouvrir la cage les laisse affamées : seul un repas compte)
+        count(`SELECT COUNT(*)::int AS n FROM world_beasts WHERE user_id = $1 AND beast = ANY($2)
+            AND fed_at > NOW() - make_interval(secs => $3)`, [userId, beastRules.HENS, beastRules.DAY_MS / 1000]),
+        count('SELECT COUNT(*)::int AS n FROM world_visitors WHERE user_id = $1 AND satisfied_at IS NOT NULL', [userId]),
+        count('SELECT COUNT(*)::int AS n FROM world_visitors WHERE user_id = $1 AND settled_at IS NOT NULL', [userId]),
+        namesOf(userId, conn)
+    ]);
+    const placed = placedOf(craftRows);
     if (!moods) {
         const presence = await presenceOf(userId, conn);
         const residents = residentsOf(levels, zones, await settlersOf(userId, conn), presence);
@@ -83,30 +100,26 @@ async function factsOf(userId, owned, stars, conn = db, moods = null) {
     }
     // Un besoin comblé depuis l'ouverture de la quête en cours (la dernière réclamée) reste fait pour elle, même s'il
     // revient avant qu'on la réclame. La faim de Cannelle à son arrivée (welcome, datée d'avant) ne compte pas
-    const { rows: [last] } = await conn.query('SELECT MAX(claimed_at) AS at FROM world_quests WHERE user_id = $1', [userId]);
+    const [last] = lastRows.rows;
     const fedSince = Object.entries(filled).flatMap(([id, needs]) => Object.entries(needs)
         .filter(([, at]) => !last.at || new Date(at) >= last.at).map(([need]) => `${id}:${need}`));
-    const friends = await friendsOf(userId, conn);
     const best = Math.max(0, ...Object.values(friends).map(f => f.points));
     return {
-        crafts: placed.length, placed: new Set(placed.map(t => t.craft)), runs: await runsOf(userId, conn), stars,
+        crafts: placed.length, placed: new Set(placed.map(t => t.craft)), runs, stars,
         elements: new Set(owned), zones, levels,
-        annexes: await countOf(conn, 'SELECT COUNT(*)::int AS n FROM world_annexes WHERE user_id = $1', [userId]),
-        houses: await countOf(conn, 'SELECT COUNT(*)::int AS n FROM world_annexes WHERE user_id = $1 AND annex = $2', [userId, 'maison']),
+        annexes: annexCount,
+        houses,
         met: new Set([...Object.entries(moods).flatMap(([id, m]) => m.needs.filter(n => n.met).map(n => `${id}:${n.id}`)), ...fedSince]),
         awake: new Set(Object.entries(friends).filter(([, f]) => f.points > 0).map(([id]) => id)),
         hearts: villagers.heartsOf(best),
-        expeditions: await countOf(conn, 'SELECT COUNT(*)::int AS n FROM world_expeditions WHERE user_id = $1 AND ends_at <= NOW()', [userId]),
-        landmarks: new Set((await foundOf(userId, conn)).keys()),
-        // (les gisements de climat ; ce que la mer rend sur la Grève compte à part)
-        gathered: await countOf(conn, 'SELECT COUNT(*)::int AS n FROM world_deposits WHERE user_id = $1 AND deposit NOT LIKE $2', [userId, `${pickups.PREFIX}%`]),
-        pickups: await countOf(conn, 'SELECT COUNT(*)::int AS n FROM world_deposits WHERE user_id = $1 AND deposit LIKE $2', [userId, `${pickups.PREFIX}%`]),
-        // Les poules de Cannelle nourries, encore rassasiées (ouvrir la cage les laisse affamées : seul un repas compte)
-        hensFed: await countOf(conn, `SELECT COUNT(*)::int AS n FROM world_beasts WHERE user_id = $1 AND beast = ANY($2)
-            AND fed_at > NOW() - make_interval(secs => $3)`, [userId, beastRules.HENS, beastRules.DAY_MS / 1000]),
-        visitors: await countOf(conn, 'SELECT COUNT(*)::int AS n FROM world_visitors WHERE user_id = $1 AND satisfied_at IS NOT NULL', [userId]),
-        settled: await countOf(conn, 'SELECT COUNT(*)::int AS n FROM world_visitors WHERE user_id = $1 AND settled_at IS NOT NULL', [userId]),
-        named: Boolean((await namesOf(userId, conn)).peuple),
+        expeditions,
+        landmarks: new Set(found.keys()),
+        gathered,
+        pickups: pickupCount,
+        hensFed,
+        visitors,
+        settled,
+        named: Boolean(names.peuple),
         // Les bâtiments reliés par un chemin (« puits-foyer »), quand ils sont bâtis
         links: await linksOf(userId, levels, conn)
     };
@@ -199,8 +212,12 @@ async function restartIsland(userId) {
     return db.transaction(async conn => {
         // (deux demandes à la fois : la seconde attend la première, puis la voit faite)
         await conn.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [userId]);
-        const done = await conn.query('SELECT 1 FROM world_items WHERE user_id = $1 AND item = $2', [userId, players.RESTARTED]);
-        if (done.rows.length) return db.rollback({ status: 409, message: 'Ton île a déjà été recommencée une fois.' });
+        // Pendant le développement, autant de fois qu'on veut (choix de l'auteur, 8 oct.) ; ISLAND_RESTART_ONCE=1 remet la
+        // règle d'une seule fois. Deux demandes coup sur coup (un double toucher) : une seule recommence
+        const done = await conn.query(`SELECT bought_at > NOW() - INTERVAL '10 seconds' AS fresh FROM world_items WHERE user_id = $1 AND item = $2`, [userId, players.RESTARTED]);
+        if (done.rows.length && (process.env.ISLAND_RESTART_ONCE === '1' || done.rows[0].fresh)) {
+            return db.rollback({ status: 409, message: process.env.ISLAND_RESTART_ONCE === '1' ? 'Ton île a déjà été recommencée une fois.' : 'Ton île vient d’être recommencée.' });
+        }
         for (const table of ISLAND_TABLES) await conn.query(`DELETE FROM ${table} WHERE user_id = $1`, [userId]);
         await conn.query(`DELETE FROM world_chests WHERE user_id = $1 AND (source LIKE 'quete:%' OR source LIKE 'lieu:%' OR source LIKE 'recolte:%')`, [userId]);
         await conn.query('DELETE FROM world_items WHERE user_id = $1 AND item = $2', [userId, PROLOGUE_SKIP]);
@@ -212,7 +229,7 @@ async function restartIsland(userId) {
         // La réserve repart vide, ses parties de Récolte pleines, sur la carte du moment (rien à faire passer)
         await conn.query('DELETE FROM world_stock WHERE user_id = $1', [userId]);
         await conn.query('INSERT INTO world_stock (user_id, charges, collected_at, map_version) VALUES ($1, 3, NOW(), $2)', [userId, MAP_VERSION]);
-        await conn.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'ile')`, [userId, players.RESTARTED]);
+        await conn.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'ile') ON CONFLICT (user_id, item) DO UPDATE SET bought_at = NOW()`, [userId, players.RESTARTED]);
         return { restarted: true };
     });
 }
@@ -250,17 +267,12 @@ async function layPaths(userId, lay, erase) {
 // Vue de l'île pour le navigateur. book = { describe(noms), openChapters: Set des chapitres ouverts, stars, finished }
 async function view(userId, owned, book) {
     await migrate(userId);
-    const { levels, builtAt } = await levelsOf(userId);
-    const items = await itemsOf(userId);
-    const skins = await skinsOf(userId);
-    const signed = await signsOf(userId);
-    const played = await gamesOf(userId);
-    const friends = await friendsOf(userId);
-    const named = await namesOf(userId);
-    const annexRows = await annexesOf(userId);
+    // (lectures indépendantes, ensemble : la base est distante, chaque requête coûte un aller-retour)
+    const [{ levels, builtAt }, items, skins, signed, played, friends, named, annexRows, stock, zones] = await Promise.all([
+        levelsOf(userId), itemsOf(userId), skinsOf(userId), signsOf(userId), gamesOf(userId), friendsOf(userId), namesOf(userId),
+        annexesOf(userId), stockOf(userId), zonesOf(userId)
+    ]);
     const shopBonuses = shop.bonusesOf(items);
-    const stock = await stockOf(userId);
-    const zones = await zonesOf(userId);
     const annexCells = new Set(annexRows.map(keyOf));
     const craftRows = await stowCrafts(userId, await craftsOf(userId), levels, zones, annexRows);
     const decor = placedOf(craftRows);
@@ -344,14 +356,15 @@ async function view(userId, owned, book) {
     const pendingStock = cash.stock;
     // Ce qui paie une création : les réserves et ce qui attend (encaissé d'abord à l'assemblage)
     const paidStock = { ...stock, ...Object.fromEntries(RESOURCES.map(r => [r, stock[r] + pendingStock[r]])) };
-    const claimed = await claimedOf(userId);
-    const facts = await factsOf(userId, owned, book.stars ?? 0, db, moods);
-    const visiting = await visitorNow(userId);
-    const epreuves = await epreuvesOf(userId);
-    const discovered = await discoveredOf(userId);
-    const going = await expeditionOf(userId);
-    const stockFinds = await findsOf(userId);
-    const gathered = await depositsOf(userId);
+    const [claimed, facts, visiting, epreuves, discovered, going, stockFinds, gathered] = await Promise.all([
+        claimedOf(userId), factsOf(userId, owned, book.stars ?? 0, db, moods), visitorNow(userId), epreuvesOf(userId),
+        discoveredOf(userId), expeditionOf(userId), findsOf(userId), depositsOf(userId)
+    ]);
+    // (et ce que la vue montre plus bas, lu en même temps)
+    const [stagesNow, avatarNow, savoirNow, openedNow, helianeNow, anyaNow, nightsNow, beastsNow] = await Promise.all([
+        stars.starsOf(userId, db), avatarOf(userId), brumeSavoirOf(userId), openedOf(userId, Date.now()), helianeOfUser(userId),
+        anyaOf(userId), nightsView(userId), beastsView(userId)
+    ]);
     const hidden = map.ZONES.filter(z => !isKnown(z, discovered)).map(z => z.code).sort();
     const veil = map.veiled(new Set(hidden), roads.rows);
     // Les terres alentour restent fermées tant que le cœur de l'île n'est pas à soi : ce qui en manque, par noms
@@ -456,7 +469,7 @@ async function view(userId, owned, book) {
         },
         // Les jeux à grille (services/levels.js) : les étoiles de chacun de leurs 30 niveaux (0 à 3), d'où se déduisent
         // les niveaux et saisons ouverts
-        stages: await stars.starsOf(userId, db),
+        stages: stagesNow,
         // Mini-jeux des bâtiments : ouverts au palier III, parties en réserve, multiplicateur d'écus du palier
         games: Object.entries(minigames.GAMES).map(([id, game]) => {
             const level = levels[game.site] || 0;
@@ -478,7 +491,7 @@ async function view(userId, owned, book) {
         // Le nom du peuple (bible, § 6.11), une fois choisi ; le nom du joueur (§ 9, étape 2) et son avatar (§ 6.17)
         people: named.peuple || null,
         player: named.joueur || null,
-        avatar: await avatarOf(userId),
+        avatar: avatarNow,
         // Brume, le feu follet : la quête active (ou son dernier mot)
         brume: (() => {
             const out = { ...boardWith(claimed, facts, book.openChapters, !presence.veteran), tutorial: !presence.veteran, skipped: items.has(PROLOGUE_SKIP) };
@@ -487,18 +500,18 @@ async function view(userId, owned, book) {
             return out;
         })(),
         // Le Savoir de Brume, une fois le Phare allumé : { open, talked }
-        brumeSavoir: await brumeSavoirOf(userId),
+        brumeSavoir: savoirNow,
         // Coffres : en attente, du jour, bouteille à la mer
-        chests: chestsView(await openedOf(userId, Date.now()), book.openChapters, claimed, found),
+        chests: chestsView(openedNow, book.openChapters, claimed, found),
         // Les mots d'Héliane déjà lus (la Chronique) et l'acte dont le mot attend la prochaine bouteille
-        heliane: await helianeOfUser(userId),
+        heliane: helianeNow,
         // Anya : ses traces, son éveil, la Révélation vue, son Souffle du jour
-        anya: await anyaOf(userId),
+        anya: anyaNow,
         // Les nuits de créatures (v6, § 6.15) : présentées ou non, la nuit en cours ou la prochaine, ses égarés et leur
         // sort, le bâtiment embrumé et le prix de sa réparation
-        nights: await nightsView(userId),
+        nights: nightsNow,
         // Les bêtes de ferme (v6, § 6.16) : le prix d'un repas, et pour chacune, contente ou non, sa bulle
-        beasts: await beastsView(userId)
+        beasts: beastsNow
     };
 }
 
@@ -598,10 +611,11 @@ function startRun(userId, asked = null) {
         if (charges.count < 1) return db.rollback({ status: 409, message: 'Plus de partie en réserve : la prochaine revient bientôt.' });
         await conn.query('UPDATE world_stock SET charges = $2, charges_at = $3 WHERE user_id = $1', [userId, charges.count - 1, new Date(charges.since)]);
         const seed = crypto.randomInt(1, 2147483647);
-        const first = !(await conn.query('SELECT 1 FROM world_runs WHERE user_id = $1 LIMIT 1', [userId])).rows.length;
+        const before = (await conn.query('SELECT 1 FROM world_runs WHERE user_id = $1 LIMIT $2', [userId, SHORT_RUNS])).rows.length;
         const { boosts } = effects;
-        const kinds = first ? FIRST_RUN_KINDS : effects.kinds;
-        const maxMoves = effects.maxMoves + (first ? FIRST_RUN_MOVES : 0);
+        const kinds = before === 0 ? FIRST_RUN_KINDS : effects.kinds;
+        // (les premières parties sont courtes)
+        const maxMoves = before < SHORT_RUNS ? SHORT_MOVES : effects.maxMoves;
         // Heure prise après le verrou de la réserve (et non au début de la transaction) : un achat passé avant ce
         // départ est toujours plus ancien (undoItem)
         const { rows } = await conn.query(
@@ -651,7 +665,12 @@ async function levelDone(userId, game, n, played, limit, room, conn) {
 // Le niveau et le palier d'une partie de mini-jeu, rangés ensemble dans world_game_runs.level (niveau × 10 + palier ;
 // niveau 0 : la Pêche, ou une partie d'avant les niveaux), sans donnée nouvelle
 const RUN_LEVEL = 10;
-const LIMITS = { filon: minigames.VEIN.strokes, cueillette: minigames.PICKING.duration };
+// Une des premières parties de ce jeu (courte) ? Celles d'avant elle (before : son id, ou null pour la prochaine)
+async function shortGame(userId, game, before, conn) {
+    const { rows } = await conn.query(`SELECT 1 FROM world_game_runs WHERE user_id = $1 AND game = $2${before ? ' AND id < $4' : ''} LIMIT $3`,
+        before ? [userId, game, minigames.SHORT_RUNS, before] : [userId, game, minigames.SHORT_RUNS]);
+    return rows.length < minigames.SHORT_RUNS;
+}
 
 // Nouvelle partie d'un mini-jeu (bâtiment au palier III ou plus) : une partie de sa réserve, une graine ; pour un jeu
 // à grille, son niveau (asked, sinon le plus haut ouvert). { run } ou { status, message }
@@ -672,10 +691,12 @@ async function startGame(userId, gameId, asked = null) {
         await conn.query(`INSERT INTO world_games (user_id, game, plays, plays_at) VALUES ($1, $2, $3, $4)
             ON CONFLICT (user_id, game) DO UPDATE SET plays = EXCLUDED.plays, plays_at = EXCLUDED.plays_at`, [userId, gameId, plays.count - 1, new Date(plays.since)]);
         const seed = crypto.randomInt(1, 2147483647);
+        const short = await shortGame(userId, gameId, null, conn);
         const { rows } = await conn.query('INSERT INTO world_game_runs (user_id, game, seed, level) VALUES ($1, $2, $3, $4) RETURNING id',
             [userId, gameId, seed, chosen.level * RUN_LEVEL + level]);
         // level : le palier du bâtiment (le multiplicateur) ; stage et goal : le niveau du jeu et son objectif
-        return { run: { id: Number(rows[0].id), game: gameId, seed, level, ...(grid ? { stage: chosen.level, goal: gridLevels.goalOf(gameId, chosen.level) } : {}) } };
+        // limit : la durée (ms) ou les coups de la partie (les premières sont courtes)
+        return { run: { id: Number(rows[0].id), game: gameId, seed, level, short, limit: minigames.limitOf(gameId, short), ...(grid ? { stage: chosen.level, goal: gridLevels.goalOf(gameId, chosen.level) } : {}) } };
     });
 }
 
@@ -692,14 +713,15 @@ function finishGame(userId, runId, input) {
         const stage = Math.floor(rows[0].level / RUN_LEVEL);
         const elapsed = Date.now() - new Date(createdAt).getTime();
         if (elapsed > GAME_TTL_MS) return { status: 400, message: 'Partie refusée : partie expirée.' };
-        const played = minigames.replay(game, seed, input);
+        const short = await shortGame(userId, game, runId, conn);
+        const played = minigames.replay(game, seed, input, short);
         if (!played.ok) return { status: 400, message: `Partie refusée : ${played.error}.` };
         if (played.last > elapsed + GAME_SLACK_MS) return { status: 400, message: 'Partie refusée : partie trop rapide.' };
         const earned = minigames.earnedOf(played.raw, level);
         if (earned > 0) await ledger.credit(userId, earned, `jeu:${game}`, runId, conn);
         // Le niveau : ses étoiles, et leur bonus la première fois, dans le plafond de la partie
         const cap = Math.round(minigames.CAP * minigames.multOf(level));
-        const done = stage ? await levelDone(userId, game, stage, played, LIMITS[game], cap - earned, conn) : null;
+        const done = stage ? await levelDone(userId, game, stage, played, minigames.limitOf(game, short), cap - earned, conn) : null;
         return { earned, raw: played.raw, detail: played.detail, coins: await balanceOf(userId, conn), level: done };
     });
 }

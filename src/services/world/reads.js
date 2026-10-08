@@ -91,12 +91,16 @@ async function fireLitOf(userId, conn) {
 // la dernière récolte d'écus de la v1 est reprise pour ne pas la payer deux fois). Une île qui naît ainsi part de ses
 // seuls sentiers (world/paths.js : la marque « ile:sentiers »)
 async function stockOf(userId, conn = db, lock = false) {
+    const read = () => conn.query(`SELECT * FROM world_stock WHERE user_id = $1${lock ? ' FOR UPDATE' : ''}`, [userId]);
+    // (la ligne existe presque toujours : on ne tente de la créer que si elle manque)
+    const first = await read();
+    if (first.rows.length) return first.rows[0];
     const born = await conn.query(
         `INSERT INTO world_stock (user_id, charges, collected_at)
          SELECT $1, 3, (SELECT world_collected_at FROM progress WHERE user_id = $1)
          ON CONFLICT (user_id) DO NOTHING RETURNING user_id`, [userId]);
     if (born.rows.length) await conn.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, 'ile:sentiers', 'ile') ON CONFLICT DO NOTHING`, [userId]);
-    const { rows } = await conn.query(`SELECT * FROM world_stock WHERE user_id = $1${lock ? ' FOR UPDATE' : ''}`, [userId]);
+    const { rows } = await read();
     return rows[0];
 }
 

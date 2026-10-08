@@ -15,9 +15,11 @@ const GAME_TTL_MS = 15 * 60 * 1000; // une partie de mini-jeu non rendue après 
 const GAME_SLACK_MS = 3000; // tolérance d'horloge : un geste ne peut dater de plus tard que la partie elle-même
 const CRAFT_TTL_MS = 30 * 60 * 1000; // un assemblage non rendu après 30 min est perdu (rien n'est encore payé)
 const MOVES = 15;
-// Première Récolte du joueur (le tutoriel de la bible, § 9, étape 2) : un plateau généreux, sans l'eau (le Puits n'est
-// pas encore là) et avec des coups en plus ; la configuration est figée dans la partie, le rejeu la suit
-const FIRST_RUN_MOVES = 4;
+// Première Récolte du joueur (le tutoriel de la bible, § 9, étape 2) : un plateau sans l'eau (le Puits n'est pas
+// encore là) ; la configuration est figée dans la partie, le rejeu la suit. Les premières Récoltes (SHORT_RUNS, comme les mini-jeux) sont courtes : quelques coups, pour apprendre sans s'épuiser
+// (choix de l'auteur, 8 oct. ; elles valaient 4 coups de plus)
+const SHORT_RUNS = 2;
+const SHORT_MOVES = 8;
 const FIRST_RUN_KINDS = harvest.BASE_KINDS.filter(kind => kind !== 'water');
 const RESOURCES = ['stone', 'wood', 'water', 'food'];
 // 1 : île 14 × 14 ; 2 : île 20 × 20 (worldMapV2.js) ; 3 : la grande île 48 × 48 ; 4 : la très grande île 96 × 96, dont
@@ -301,7 +303,7 @@ function cashOf(production, carry = {}) {
 
 module.exports = {
     SIZE, CAP_HOURS, REGEN_MS, RUN_TTL_MS, RENAME_LEVEL, GAME_TTL_MS, GAME_SLACK_MS, CRAFT_TTL_MS, MOVES,
-    FIRST_RUN_MOVES, FIRST_RUN_KINDS, RESOURCES, MAP_VERSION, EXPEDITION_COST, OLD_DECO_RATE, DECO_PRICES,
+    SHORT_RUNS, SHORT_MOVES, FIRST_RUN_KINDS, RESOURCES, MAP_VERSION, EXPEDITION_COST, OLD_DECO_RATE, DECO_PRICES,
     HARVEST_COIN_EVERY, UNDO_SECONDS, random, CHAPTER_OF_LEVEL, BOOST_BY_LEVEL, ATELIER_MOVES, PRODUCE_PER_LEVEL,
     COINS_PER_LEVEL, WORDS, tier, SITES, BOOSTED, effectOf, keyOf, pendingOf, chargesAt, NO_BONUS, NO_ANNEX, effectsOf,
     productionOf, boostedHours, fullInOf, perHourOf, productionAll, cashOf
