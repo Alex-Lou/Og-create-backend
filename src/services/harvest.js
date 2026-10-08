@@ -114,13 +114,16 @@ function replay(seed, kinds, moves, maxMoves, boosts = {}) {
     if (!Array.isArray(moves) || moves.length > maxMoves) return { ok: false, error: 'Trop de coups' };
     const game = create(seed, kinds);
     const gains = { stone: 0, wood: 0, water: 0, food: 0 };
+    // (le total des ressources après chaque coup : l'objectif du niveau, game/levels.js)
+    const totals = [];
     for (const path of moves) {
         if (!chainOk(game.board, path)) return { ok: false, error: 'Coup impossible' };
         const kind = play(game, path);
         const { resource, amount } = gainOf(kind, path.length, boosts);
         gains[resource] += amount;
+        totals.push((totals.length ? totals[totals.length - 1] : 0) + amount);
     }
-    return { ok: true, gains };
+    return { ok: true, gains, totals };
 }
 
 module.exports = { SIZE, MIN_CHAIN, BASE_KINDS, YIELD, rng, hasChain, create, chainOk, gainOf, play, replay };

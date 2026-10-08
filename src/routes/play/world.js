@@ -313,8 +313,13 @@ router.post('/world/build', withAccount(async (req, res, owner, b) => {
 }));
 
 // Récolte : une partie de la réserve contre une graine ; les coups reviennent à la fin et le serveur les rejoue
+// (level : le niveau demandé, sinon le plus haut ouvert)
+const stageOf = body => (body && body.level !== undefined && body.level !== null ? Number(body.level) : null);
+const stageOk = level => level === null || (Number.isInteger(level) && level >= 1 && level <= 30);
 router.post('/world/harvest/start', withAccount(async (req, res, owner) => {
-    const started = await world.startRun(owner.id);
+    const level = stageOf(req.body);
+    if (!stageOk(level)) return res.status(400).json({ message: 'Niveau invalide' });
+    const started = await world.startRun(owner.id, level);
     if (started.status) return res.status(started.status).json({ message: started.message });
     res.json(started.run);
 }));
@@ -324,14 +329,15 @@ router.post('/world/harvest/finish', withAccount(async (req, res, owner, b) => {
     if (!Number.isSafeInteger(run) || run <= 0 || !Array.isArray(req.body.moves)) return res.status(400).json({ message: 'Partie invalide' });
     const done = await world.finishRun(owner.id, run, req.body.moves);
     if (done.status) return res.status(done.status).json({ message: done.message });
-    res.json({ gains: done.gains, earned: done.earned, coins: done.coins, chest: done.chest, world: await worldView(owner, b) });
+    res.json({ gains: done.gains, earned: done.earned, coins: done.coins, chest: done.chest, level: done.level, world: await worldView(owner, b) });
 }));
 
 // Mini-jeux des bâtiments (dès le palier III) : une partie (graine), puis les gestes du joueur, rejoués par le serveur
 router.post('/world/game/start', withAccount(async (req, res, owner, b) => {
     const game = String(req.body.game || '');
-    if (!/^[a-z]{1,20}$/.test(game)) return res.status(400).json({ message: 'Mini-jeu invalide' });
-    const started = await world.startGame(owner.id, game);
+    const level = stageOf(req.body);
+    if (!/^[a-z]{1,20}$/.test(game) || !stageOk(level)) return res.status(400).json({ message: 'Mini-jeu invalide' });
+    const started = await world.startGame(owner.id, game, level);
     if (started.status) return res.status(started.status).json({ message: started.message });
     res.json({ run: started.run, world: await worldView(owner, b) });
 }));
@@ -340,7 +346,7 @@ router.post('/world/game/finish', withAccount(async (req, res, owner, b) => {
     if (!Number.isSafeInteger(run) || run <= 0 || !Array.isArray(req.body.input)) return res.status(400).json({ message: 'Partie invalide' });
     const done = await world.finishGame(owner.id, run, req.body.input);
     if (done.status) return res.status(done.status).json({ message: done.message });
-    res.json({ earned: done.earned, raw: done.raw, detail: done.detail, coins: done.coins, world: await worldView(owner, b) });
+    res.json({ earned: done.earned, raw: done.raw, detail: done.detail, coins: done.coins, level: done.level, world: await worldView(owner, b) });
 }));
 
 // Habitants : leur parler, leur offrir des ressources (chacun une fois par jour) ; les cœurs gagnés sont récompensés

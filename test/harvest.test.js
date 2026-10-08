@@ -23,7 +23,7 @@ test('la Récolte : même graine, même plateau, mêmes chutes', () => {
 
 test('la Récolte : le serveur rejoue les coups et calcule seul le gain', () => {
   // Pierre doublée par la Carrière
-  assert.deepEqual(h.replay(SEED, h.BASE_KINDS, MOVES, 15, { stone: 2 }), { ok: true, gains: { stone: 6, wood: 0, water: 3, food: 6 } });
+  assert.deepEqual(h.replay(SEED, h.BASE_KINDS, MOVES, 15, { stone: 2 }), { ok: true, gains: { stone: 6, wood: 0, water: 3, food: 6 }, totals: [3, 6, 9, 15] });
   // Trop de coups, chaîne trop courte, cases non voisines, tuiles différentes : refusé
   assert.equal(h.replay(SEED, h.BASE_KINDS, MOVES, 3).ok, false);
   assert.equal(h.replay(SEED, h.BASE_KINDS, [[[0, 0], [1, 1]]], 15).ok, false);
