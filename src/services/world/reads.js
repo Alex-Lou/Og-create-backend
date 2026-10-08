@@ -88,12 +88,14 @@ async function fireLitOf(userId, conn) {
 }
 
 // Ligne de stock du joueur (créée à la première visite, avec une réserve pleine ;
-// la dernière récolte d'écus de la v1 est reprise pour ne pas la payer deux fois)
+// la dernière récolte d'écus de la v1 est reprise pour ne pas la payer deux fois). Une île qui naît ainsi part de ses
+// seuls sentiers (world/paths.js : la marque « ile:sentiers »)
 async function stockOf(userId, conn = db, lock = false) {
-    await conn.query(
+    const born = await conn.query(
         `INSERT INTO world_stock (user_id, charges, collected_at)
          SELECT $1, 3, (SELECT world_collected_at FROM progress WHERE user_id = $1)
-         ON CONFLICT (user_id) DO NOTHING`, [userId]);
+         ON CONFLICT (user_id) DO NOTHING RETURNING user_id`, [userId]);
+    if (born.rows.length) await conn.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, 'ile:sentiers', 'ile') ON CONFLICT DO NOTHING`, [userId]);
     const { rows } = await conn.query(`SELECT * FROM world_stock WHERE user_id = $1${lock ? ' FOR UPDATE' : ''}`, [userId]);
     return rows[0];
 }

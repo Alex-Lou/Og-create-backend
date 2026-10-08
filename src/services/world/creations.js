@@ -12,12 +12,13 @@ const { migrate } = require('./migrate');
 const { livesHere } = require('./people');
 const { campOfUser, cellsOfCamp } = require('./camp');
 const { gatherBefore, payWith } = require('./produce');
+const { roadsOf } = require('./paths');
 
 // Contexte des règles de pose (crafts.spotBlock) : sol, case libre (sur l'île, hors chantier, quartier à soi, ni annexe,
 // ni autre création, ni lieu remarquable, ni gisement), emprise d'un bâtiment bâti, créations posées (sauf skip : celle qu'on déplace)
 // (cells : les cases libres, calculées une fois pour toutes les créations)
-// (blocked : cases réservées en plus, celles du camp des naufragés)
-function craftCtx(levels, zones, annexRows, rows, skip = null, blocked = new Set()) {
+// (blocked : cases réservées en plus, celles du camp des naufragés ; ground : le sol du joueur, ses chemins compris)
+function craftCtx(levels, zones, annexRows, rows, skip = null, blocked = new Set(), ground = map.groundAt) {
     const others = placedOf(rows).filter(r => r.id !== skip);
     const busy = new Set([...annexRows.map(keyOf), ...others.map(keyOf), ...blocked]);
     const open = new Uint8Array(SIZE * SIZE);
@@ -30,7 +31,7 @@ function craftCtx(levels, zones, annexRows, rows, skip = null, blocked = new Set
         }
     }
     return {
-        ground: map.groundAt,
+        ground,
         climate: (x, y) => map.ZONE_BY_ID[map.zoneAt(x, y)]?.climate,
         free: (x, y) => Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < SIZE && y < SIZE && open[y * SIZE + x] === 1,
         site: id => (livesHere(id, levels, zones) ? map.footprintOf(id, levels[id]) : null),
@@ -165,7 +166,8 @@ async function placeCraft(userId, craftId, x, y, flip = false) {
         const { levels } = await levelsOf(userId, conn);
         const annexRows = await annexesOf(userId, conn);
         const campCells = cellsOfCamp(await campOfUser(userId, conn, { levels, annexRows, craftRows: rows }));
-        const block = crafts.spotBlock(c, x, y, craftCtx(levels, await zonesOf(userId, conn), annexRows, rows, null, campCells));
+        const { ground } = await roadsOf(userId, conn);
+        const block = crafts.spotBlock(c, x, y, craftCtx(levels, await zonesOf(userId, conn), annexRows, rows, null, campCells, ground));
         if (block) return db.rollback({ status: 400, message: block });
         await conn.query('UPDATE world_crafts SET flip = $2 WHERE id = $1', [row.id, flip]);
         return setSpot(userId, conn, stock, row, x, y);
@@ -183,7 +185,8 @@ async function moveCraft(userId, x, y, toX, toY) {
         const { levels } = await levelsOf(userId, conn);
         const annexRows = await annexesOf(userId, conn);
         const campCells = cellsOfCamp(await campOfUser(userId, conn, { levels, annexRows, craftRows: rows }));
-        const block = crafts.spotBlock(crafts.CRAFT_BY_ID[row.craft], toX, toY, craftCtx(levels, await zonesOf(userId, conn), annexRows, rows, row.id, campCells));
+        const { ground } = await roadsOf(userId, conn);
+        const block = crafts.spotBlock(crafts.CRAFT_BY_ID[row.craft], toX, toY, craftCtx(levels, await zonesOf(userId, conn), annexRows, rows, row.id, campCells, ground));
         if (block) return db.rollback({ status: 400, message: block });
         // Une création posée près d'elle (règle « près de ») doit la garder à portée
         const needed = crafts.leaveBlock(row, toX, toY, placedOf(rows));

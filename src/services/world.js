@@ -51,6 +51,7 @@ const {
 } = require('./world/creations');
 const { annexSpotOk, annexSpots, annexesView, placeAnnex, moveAnnex, poseAnnex } = require('./world/annexPlots');
 const { campOfUser, cellsOfCamp } = require('./world/camp');
+const paths = require('./world/paths');
 const { startNights, repelCreature, repairSite, nightsView } = require('./world/nights');
 const { feedBeast, collectBeasts, beastsView, openCage } = require('./world/beasts');
 
@@ -103,8 +104,17 @@ async function factsOf(userId, owned, stars, conn = db, moods = null) {
             AND fed_at > NOW() - make_interval(secs => $3)`, [userId, beastRules.HENS, beastRules.DAY_MS / 1000]),
         visitors: await countOf(conn, 'SELECT COUNT(*)::int AS n FROM world_visitors WHERE user_id = $1 AND satisfied_at IS NOT NULL', [userId]),
         settled: await countOf(conn, 'SELECT COUNT(*)::int AS n FROM world_visitors WHERE user_id = $1 AND settled_at IS NOT NULL', [userId]),
-        named: Boolean((await namesOf(userId, conn)).peuple)
+        named: Boolean((await namesOf(userId, conn)).peuple),
+        // Les bâtiments reliés par un chemin (« puits-foyer »), quand ils sont bâtis
+        links: await linksOf(userId, levels, conn)
     };
+}
+// Paires de bâtiments bâtis que relie un chemin (world/paths.js) : Set de « a-b » (pour la quête du premier chemin)
+const LINKS = [['puits', 'foyer']];
+async function linksOf(userId, levels, conn = db) {
+    const { ground } = await paths.roadsOf(userId, conn);
+    return new Set(LINKS.filter(([a, b]) => levels[a] && levels[b] && paths.linked(ground, map.footprintOf(a, levels[a]), map.footprintOf(b, levels[b])))
+        .map(pair => pair.join('-')));
 }
 
 // Les cibles du fil d'Ariane (bible, § 6.1 à 6.3) : ce que demande la quête active. L'élément à écrire (ou l'une des
@@ -192,11 +202,44 @@ async function restartIsland(userId) {
         for (const table of ISLAND_TABLES) await conn.query(`DELETE FROM ${table} WHERE user_id = $1`, [userId]);
         await conn.query(`DELETE FROM world_chests WHERE user_id = $1 AND (source LIKE 'quete:%' OR source LIKE 'lieu:%' OR source LIKE 'recolte:%')`, [userId]);
         await conn.query('DELETE FROM world_items WHERE user_id = $1 AND item = $2', [userId, PROLOGUE_SKIP]);
+        // Ses chemins tracés s'effacent : l'île repart de ses seuls sentiers
+        await conn.query('DELETE FROM world_items WHERE user_id = $1 AND item LIKE $2', [userId, `${paths.PREFIX}%`]);
+        await conn.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'ile') ON CONFLICT DO NOTHING`, [userId, paths.MARK]);
         // La réserve repart vide, ses parties de Récolte pleines, sur la carte du moment (rien à faire passer)
         await conn.query('DELETE FROM world_stock WHERE user_id = $1', [userId]);
         await conn.query('INSERT INTO world_stock (user_id, charges, collected_at, map_version) VALUES ($1, 3, NOW(), $2)', [userId, MAP_VERSION]);
         await conn.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'ile')`, [userId, players.RESTARTED]);
         return { restarted: true };
+    });
+}
+
+// Trace et efface des chemins (world/paths.js) : une pierre la case, les premières offertes ; une case effacée rend
+// sa pierre. lay, erase : [[x, y]]. {} ou { status, message }
+async function layPaths(userId, lay, erase) {
+    await migrate(userId);
+    return db.transaction(async conn => {
+        const { stock } = await payWith(userId, conn, await stockOf(userId, conn, true));
+        const roads = await paths.roadsOf(userId, conn);
+        const { levels } = await levelsOf(userId, conn);
+        const annexRows = await annexesOf(userId, conn);
+        const craftRows = await craftsOf(userId, conn);
+        const placed = placedOf(craftRows);
+        const camp = cellsOfCamp(await campOfUser(userId, conn, { levels, annexRows, craftRows }));
+        const plan = paths.planOf(lay, erase, roads.laid, stock, {
+            fresh: roads.fresh, ground: roads.ground, zones: await zonesOf(userId, conn),
+            taken: new Set([...annexRows.map(keyOf), ...placed.map(keyOf), ...camp]),
+            placedNeedingPath: placed.filter(r => crafts.CRAFT_BY_ID[r.craft]?.place.path).map(r => ({ x: r.x, y: r.y, name: crafts.CRAFT_BY_ID[r.craft].name }))
+        });
+        if (plan.status) return db.rollback(plan);
+        if (plan.remove.length) {
+            await conn.query('DELETE FROM world_items WHERE user_id = $1 AND item = ANY($2)', [userId, plan.remove.map(c => `${paths.PREFIX}${c.x}:${c.y}`)]);
+        }
+        if (plan.add.length) {
+            await conn.query(`INSERT INTO world_items (user_id, item, source) SELECT $1, unnest($2::text[]), unnest($3::text[])`,
+                [userId, plan.add.map(c => `${paths.PREFIX}${c.x}:${c.y}`), plan.add.map(c => (c.free ? 'offert' : 'chemin'))]);
+        }
+        if (plan.stone) await conn.query('UPDATE world_stock SET stone = stone - $2 WHERE user_id = $1', [userId, plan.stone]);
+        return { laid: plan.add.length, erased: plan.remove.length };
     });
 }
 
@@ -231,7 +274,9 @@ async function view(userId, owned, book) {
     // Le camp des naufragés sur la Grève (world/camp.js) : ses cases sont réservées (ni annexe ni création)
     const camp = await campOfUser(userId, db, { levels, annexRows, craftRows });
     const campCells = cellsOfCamp(camp);
-    const taken = new Set([...annexCells, ...decor.map(keyOf), ...campCells]);
+    // Le sol du joueur : ses chemins (world/paths.js) ; une case de chemin en plus de la carte est prise
+    const roads = await paths.roadsOf(userId, db);
+    const taken = new Set([...annexCells, ...decor.map(keyOf), ...campCells, ...roads.added]);
     const have = new Set(owned);
     const plans = Object.values(SITES).flatMap(s => s.levels.map(l => l.plan)).filter(Boolean);
     const known = book.describe(plans);
@@ -304,7 +349,7 @@ async function view(userId, owned, book) {
     const stockFinds = await findsOf(userId);
     const gathered = await depositsOf(userId);
     const hidden = map.ZONES.filter(z => !isKnown(z, discovered)).map(z => z.code).sort();
-    const veil = map.veiled(new Set(hidden));
+    const veil = map.veiled(new Set(hidden), roads.rows);
     // Les terres alentour restent fermées tant que le cœur de l'île n'est pas à soi : ce qui en manque, par noms
     const coreLeft = coreMissing(zones);
     const closedLands = coreLeft.length > 0;
@@ -313,9 +358,9 @@ async function view(userId, owned, book) {
         map: {
             // Calques de la grande carte (relief, sol, quartiers : voir islandV5.js) ; grid : index des quartiers. Les
             // quartiers encore inconnus n'y montrent que leur côte et leur relief (worldMap.veiled). key : ce qui les
-            // décide (la carte et ce qui reste voilé) ; un navigateur qui a déjà ces calques ne les reçoit plus
-            // (routes/play/world.js, X-Map-Key)
-            key: `${MAP_VERSION}:${hidden.join('')}`,
+            // décide (la carte, ce qui reste voilé, les chemins du joueur) ; un navigateur qui a déjà ces calques ne les
+            // reçoit plus (routes/play/world.js, X-Map-Key)
+            key: `${MAP_VERSION}:${hidden.join('')}:${roads.key}`,
             grid: map.GRID,
             height: veil.height,
             ground: veil.ground,
@@ -364,7 +409,13 @@ async function view(userId, owned, book) {
         pending: cash.coins,
         pendingStock,
         // Créations d'île : paliers, catalogue, réserve et cases où poser, créations posées
-        crafts: craftsView(craftRows, craftCtx(levels, zones, annexRows, craftRows, null, campCells), {
+        // Les chemins : ceux que le joueur a tracés ([x, y, offerte] : seuls ceux-là s'effacent), ce que coûte une case, ce
+        // qui reste offert
+        roads: {
+            laid: roads.laid.map(c => [c.x, c.y, c.free ? 1 : 0]), stone: 1, free: Math.max(0, paths.FREE - roads.laid.filter(c => c.free).length),
+            max: paths.MAX_CELLS
+        },
+        crafts: craftsView(craftRows, craftCtx(levels, zones, annexRows, craftRows, null, campCells, roads.ground), {
             owned: have, stock: paidStock, open: crafts.tiersOpen(book.finished || new Set(), epreuves, book.stars ?? 0), epreuves, stars: book.stars ?? 0, have: stockFinds
         }, id => sites.find(site => site.id === id)?.name || id),
         // Habitants (la troupe rencontrée, les visiteurs installés) : prénom, goûts, amitié, déjà vus ou gâtés
@@ -818,6 +869,6 @@ module.exports = {
     view, build, buyZone, buyItem, undoItem, chooseSkin, startRun, finishRun, collect, migrate, claimQuest, board, openChest, openAll,
     placeAnnex, moveAnnex, poseAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople, namePlayer, chooseAvatar, arianeTargets, guidedInkOf, restartIsland,
     refundDecorations, startCraft, finishCraft, placeCraft, moveCraft, storeCraft, turnCraft, startExpedition, findLandmark, gatherDeposit, pickUp,
-    anyaOf, breathRefused, revealAnya, breatheAnya, brumeSavoirOf, talkBrume, startNights, repelCreature, repairSite, skipPrologue,
+    anyaOf, breathRefused, revealAnya, breatheAnya, brumeSavoirOf, talkBrume, startNights, repelCreature, repairSite, skipPrologue, layPaths,
     feedBeast, collectBeasts, openCage
 };

@@ -102,6 +102,15 @@ router.post('/world/craft/store', withAccount(async (req, res, owner, b) => {
     await craftDone(res, owner, b, await world.storeCraft(owner.id, x, y));
 }));
 
+// Chemins : tracer et effacer des cases ([[x, y]] : world/paths.js)
+router.post('/world/paths', withAccount(async (req, res, owner, b) => {
+    const { lay = [], erase = [] } = req.body || {};
+    if (!Array.isArray(lay) || !Array.isArray(erase)) return res.status(400).json({ message: 'Tracé invalide' });
+    const done = await world.layPaths(owner.id, lay, erase);
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json({ laid: done.laid, erased: done.erased, world: await worldView(owner, b) });
+}));
+
 router.post('/world/collect', withAccount(async (req, res, owner, b) => {
     const { gained, stock, coins } = await world.collect(owner.id);
     res.json({ gained, stock, coins, world: await worldView(owner, b) });

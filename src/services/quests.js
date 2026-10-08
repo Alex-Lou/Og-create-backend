@@ -52,7 +52,10 @@ const QUESTS = [
         'Sa baguette ne trouve plus rien. Le Grimoire s’en souvient pour lui : la Boue, la Brique, puis le Puits.'),
     q('puits-ondin', 'T', { kind: 'level', site: 'puits', need: 1 }, 40, 'Construis le Puits',
         'Ondin sent l’eau sous ses pieds. Creuse le Puits avec la pierre de la Récolte : l’eau ne manquera plus.', 'rare'),
-    // Acte I : la Vie et la lumière (Sylve)
+    // Acte I : la Vie et la lumière (Sylve). D'abord le premier chemin (choix de l'auteur, 8 oct. : l'île neuve n'a que
+    // son sentier ; ses cases offertes le paient)
+    q('chemin', 'I', { kind: 'link', from: 'puits', to: 'foyer' }, 15, 'Relie le Puits au Feu',
+        'Ondin porte l’eau à travers l’herbe mouillée… Trace un chemin du Puits jusqu’au Feu : les premières pierres sont offertes.'),
     q('lisiere', 'I', { kind: 'zone', zone: 'lisiere' }, 50, 'Achète La Lisière',
         'Le bois flotté s’épuise. À l’ouest, des arbres dorment sous la brume… et quelqu’un avec eux. Achète La Lisière.'),
     q('eveil-sylve', 'I', { kind: 'wake', villager: 'bosquet' }, 10, 'Réveille Sylve',
@@ -203,7 +206,7 @@ function currentOf(claimed) {
 // Ce que l'état fournit (services/world.js) : { crafts, runs, stars, zones: Set, levels: { site: palier },
 // elements: Set, placed: Set (créations posées), annexes, houses, met: Set ('habitant:besoin' comblés en ce moment ou
 // depuis la dernière quête réclamée), awake: Set, hearts (cœurs du meilleur ami), expeditions, landmarks: Set,
-// gathered, visitors, settled, named }
+// gathered, visitors, settled, named, links: Set ('puits-foyer' : bâtiments reliés par un chemin) }
 // Quêtes du tutoriel qui passent par le Grimoire : la page que marque le ruban a son Encre offerte (le joueur, qui a
 // peu d'écus, n'est jamais bloqué devant une énigme) : le Brasier du feu de camp, la Source, le Puits d'Ondin
 const GUIDED_INK = new Set(['feu', 'achat-source', 'souvenir-ondin']);
@@ -228,7 +231,8 @@ const HAVE = {
     hens: (goal, facts) => facts.hensFed,
     visitor: (goal, facts) => facts.visitors,
     settle: (goal, facts) => facts.settled,
-    name: (goal, facts) => (facts.named ? 1 : 0)
+    name: (goal, facts) => (facts.named ? 1 : 0),
+    link: (goal, facts) => (facts.links && facts.links.has(`${goal.from}-${goal.to}`) ? 1 : 0)
 };
 
 // Avancée d'un objectif : { have, need } (have plafonné à need)
@@ -246,8 +250,9 @@ function active(claimed, facts) {
     if (step < 0) return null;
     const quest = QUESTS[step];
     const { have, need } = progressOf(quest.goal, facts);
-    const { site, zone, villager, landmark, element, craft } = quest.goal;
-    const target = site ? { site } : zone ? { zone } : villager ? { villager } : landmark ? { landmark } : null;
+    const { site, zone, villager, landmark, element, craft, from } = quest.goal;
+    // (un chemin à tracer : Brume attend au bâtiment d'où il part)
+    const target = site ? { site } : zone ? { zone } : villager ? { villager } : landmark ? { landmark } : from ? { site: from } : null;
     return {
         id: quest.id, act: quest.act, step: step + 1, total: QUESTS.length, say: quest.say, label: quest.label, kind: quest.goal.kind,
         coins: quest.coins, chest: quest.chest || null, have, need, done: have >= need, target,

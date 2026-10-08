@@ -11,6 +11,7 @@ const { annexesOf, levelsOf, stockOf, zonesOf, findsOf, spendFinds } = require('
 const { migrate } = require('./migrate');
 const { gather } = require('./produce');
 const { campOfUser, cellsOfCamp } = require('./camp');
+const { roadsOf } = require('./paths');
 
 // Case où une annexe de ce bâtiment peut se poser (sans compter ce qui l'occupe) : sol constructible du quartier du
 // bâtiment, n'importe où dans ce quartier, hors des grandes emprises des chantiers et des lieux remarquables
@@ -55,9 +56,11 @@ async function annexAt(userId, x, y, conn) {
     return rows[0] || null;
 }
 // Case déjà prise par une création d'île ou une annexe
+// (une création, une autre annexe, ou un chemin en plus de la carte : world/paths.js)
 async function cellTaken(userId, x, y, conn) {
     const { rows } = await conn.query('SELECT 1 FROM world_crafts WHERE user_id = $1 AND x = $2 AND y = $3', [userId, x, y]);
-    return rows.length > 0 || Boolean(await annexAt(userId, x, y, conn));
+    if (rows.length > 0 || (await roadsOf(userId, conn)).added.has(y * SIZE + x)) return true;
+    return Boolean(await annexAt(userId, x, y, conn));
 }
 const SPOT_MESSAGE = 'Une annexe se pose sur une case libre du quartier de son bâtiment.';
 // Couleur demandée (look : n° de variante, ou null : celle de son rang) : une de celles dessinées pour cette annexe

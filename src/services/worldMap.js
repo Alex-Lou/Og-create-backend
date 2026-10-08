@@ -144,11 +144,12 @@ const NEIGHBORS = (() => {
 })();
 
 // Calques vus par un joueur : les quartiers encore inconnus (hidden : lettres de leurs quartiers) gardent leur côte et
-// leur relief, qu'on devine sous la brume, mais pas leur sol ('u' : inconnu ; ni climat, ni ce qu'il cache)
-function veiled(hidden) {
-    if (!hidden.size) return { height: data.HEIGHT, ground: data.GROUND };
+// leur relief, qu'on devine sous la brume, mais pas leur sol ('u' : inconnu ; ni climat, ni ce qu'il cache). ground :
+// le sol du joueur (ses chemins : world/paths.js), la carte par défaut
+function veiled(hidden, ground = data.GROUND) {
+    if (!hidden.size) return { height: data.HEIGHT, ground };
     const mask = (layer, fill) => layer.map((row, y) => [...row].map((c, x) => (hidden.has(data.REGION[y][x]) ? fill : c)).join(''));
-    return { height: data.HEIGHT, ground: mask(data.GROUND, 'u') };
+    return { height: data.HEIGHT, ground: mask(ground, 'u') };
 }
 
 // Cases libres d'un quartier pour y poser des décorations, de la plus proche de son panneau à la plus lointaine

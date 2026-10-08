@@ -12,6 +12,7 @@ const quests = require('../quests');
 const { SIZE } = require('./rules');
 const { annexesOf, levelsOf, claimedOf, craftsOf } = require('./reads');
 const { cageOf } = require('./beasts');
+const { roadsOf } = require('./paths');
 
 const ZONE = 'coeur';
 // Le Foyer à l'Abri (palier II) : Cannelle quitte la cuisine de l'épave, les cabanons peuvent venir
@@ -97,6 +98,8 @@ async function campOfUser(userId, conn, { levels, annexRows, craftRows } = {}) {
     const craftList = craftRows || await craftsOf(userId, conn);
     const acts = quests.actsDoneOf(quests.doneOf(await claimedOf(userId, conn)));
     const taken = new Set([...annexList, ...craftList.filter(r => r.x !== null && r.x !== undefined)].map(r => r.y * SIZE + r.x));
+    // (les chemins tracés, et le sentier d'une île neuve)
+    for (const k of (await roadsOf(userId, conn)).added) taken.add(k);
     return campOf({ acts, levels: lv, taken, cage: await cageOf(userId, conn) });
 }
 
