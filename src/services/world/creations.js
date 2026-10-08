@@ -87,7 +87,7 @@ function craftsView(rows, ctx, { owned, stock, open, epreuves, stars = 0, have }
                 spots: made[c.id] ? craftSpots(c, ctx) : []
             };
         }),
-        placed: placed.map(r => ({ x: r.x, y: r.y, craft: r.craft, ...keepsOf(r) }))
+        placed: placed.map(r => ({ x: r.x, y: r.y, craft: r.craft, flip: r.flip, ...keepsOf(r) }))
     };
 }
 
@@ -151,8 +151,9 @@ async function setSpot(userId, conn, stock, row, x, y) {
     return coins !== undefined ? { coins } : {};
 }
 
-// Pose une création de la réserve sur une case permise par sa règle. { coins? } ou { status, message }
-async function placeCraft(userId, craftId, x, y) {
+// Pose une création de la réserve sur une case permise par sa règle, en miroir ou non (flip). { coins? } ou
+// { status, message }
+async function placeCraft(userId, craftId, x, y, flip = false) {
     if (!Object.hasOwn(crafts.CRAFT_BY_ID, craftId)) return { status: 404, message: 'Création inconnue.' };
     const c = crafts.CRAFT_BY_ID[craftId];
     await migrate(userId);
@@ -166,6 +167,7 @@ async function placeCraft(userId, craftId, x, y) {
         const campCells = cellsOfCamp(await campOfUser(userId, conn, { levels, annexRows, craftRows: rows }));
         const block = crafts.spotBlock(c, x, y, craftCtx(levels, await zonesOf(userId, conn), annexRows, rows, null, campCells));
         if (block) return db.rollback({ status: 400, message: block });
+        await conn.query('UPDATE world_crafts SET flip = $2 WHERE id = $1', [row.id, flip]);
         return setSpot(userId, conn, stock, row, x, y);
     });
 }
@@ -204,7 +206,14 @@ async function storeCraft(userId, x, y) {
     });
 }
 
+// Pivote une création posée (miroir) : rien d'autre ne change. {} ou { status, message }
+async function turnCraft(userId, x, y, flip) {
+    await migrate(userId);
+    const { rowCount } = await db.query('UPDATE world_crafts SET flip = $4 WHERE user_id = $1 AND x = $2 AND y = $3', [userId, x, y, flip]);
+    return rowCount ? {} : { status: 404, message: 'Aucune création sur cette case.' };
+}
+
 module.exports = {
     craftCtx, craftSpots, stowCrafts, epreuvesOf, craftsView, startCraft, finishCraft, placeCraft, moveCraft,
-    storeCraft
+    storeCraft, turnCraft
 };

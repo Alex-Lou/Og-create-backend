@@ -504,14 +504,14 @@ test('créations d’île : assembler (pièces vérifiées), payer à la réussi
   assert.equal((await place('cloture', X(24), Y(33))).status, 400);
   const placed = await place('cloture', X(31), Y(35));
   assert.equal(placed.status, 200);
-  assert.deepEqual(placed.data.world.crafts.placed, [{ x: X(31), y: Y(35), craft: 'cloture' }]);
+  assert.deepEqual(placed.data.world.crafts.placed, [{ x: X(31), y: Y(35), craft: 'cloture', flip: false }]);
   assert.equal((await place('cloture', X(32), Y(35))).status, 409);
   // Posée, elle garde ses cases (pour la déplacer), sans la sienne
   const fenceSpots = cat(placed.data.world, 'cloture').spots;
   assert.ok(fenceSpots.some(sp => sp.x === X(32) && sp.y === Y(35)) && !fenceSpots.some(sp => sp.x === X(31) && sp.y === Y(35)));
   // Déplacée gratuitement, puis rangée dans la réserve
   const moved = await api('POST', '/play/world/craft/move', { x: X(31), y: Y(35), toX: X(32), toY: Y(35) }, player);
-  assert.deepEqual(moved.data.world.crafts.placed, [{ x: X(32), y: Y(35), craft: 'cloture' }]);
+  assert.deepEqual(moved.data.world.crafts.placed, [{ x: X(32), y: Y(35), craft: 'cloture', flip: false }]);
   const stored = await api('POST', '/play/world/craft/store', { x: X(32), y: Y(35) }, player);
   assert.deepEqual(stored.data.world.crafts.placed, []);
   assert.equal(cat(stored.data.world, 'cloture').reserve, 1);
@@ -535,9 +535,9 @@ test('créations d’île : assembler (pièces vérifiées), payer à la réussi
   const far = s => Math.max(Math.abs(s.x - bench.x), Math.abs(s.y - bench.y));
   const guarded = await view();
   assert.deepEqual(guarded.crafts.placed.find(c => c.craft === 'lanterne'), {
-    ...lamp, craft: 'lanterne', keeps: [{ ...bench, reach: 3 }], keepText: '« Banc » a besoin de « Lanterne » à 3 cases au plus : déplace ou range d’abord « Banc ».'
+    ...lamp, craft: 'lanterne', flip: false, keeps: [{ ...bench, reach: 3 }], keepText: '« Banc » a besoin de « Lanterne » à 3 cases au plus : déplace ou range d’abord « Banc ».'
   });
-  assert.deepEqual(guarded.crafts.placed.find(c => c.craft === 'banc'), { ...bench, craft: 'banc' });
+  assert.deepEqual(guarded.crafts.placed.find(c => c.craft === 'banc'), { ...bench, craft: 'banc', flip: false });
   const lampSpots = cat(guarded, 'lanterne').spots;
   const away = lampSpots.find(s => far(s) > 3);
   const close = lampSpots.find(s => far(s) <= 3);
@@ -2007,7 +2007,7 @@ test('annexes : posées autour du bâtiment au palier voulu, payées une fois, d
   assert.equal(done.status, 200);
   assert.equal(done.data.built, 'Champ');
   assert.equal(done.data.coins, 900);
-  assert.deepEqual(done.data.world.annexes, [{ x: a.x, y: a.y, annex: 'champ', site: 'potager' }]);
+  assert.deepEqual(done.data.world.annexes, [{ x: a.x, y: a.y, annex: 'champ', site: 'potager', flip: false, look: null }]);
   assert.equal(done.data.world.stock.wood, 480);
   assert.equal(potagerOf(done.data.world).annexes.find(x => x.id === 'champ').built, 1);
   assert.ok(!potagerOf(done.data.world).spots.some(s => s.x === a.x && s.y === a.y));

@@ -109,4 +109,9 @@ function effectText(a, words, capHours) {
 // libres d'une annexe sont proposées de la plus proche à la plus lointaine)
 const reachOf = (x, y, at) => Math.max(at.x - x, 0, x - (at.x + 2), at.y - y, 0, y - (at.y + 2));
 
-module.exports = { ANNEXES, ANNEX_BY_ID, maxOf, levelFor, priceOf, bonusesOf, regenWith, effectText, reachOf };
+// Couleurs au choix : les variantes que la bibliothèque du front a dessinées (decor.json, variante_jeu) : le blé, les
+// carottes ou les citrouilles d'un champ, les toits d'une maison… Une seule pour les autres
+const LOOKS = { champ: 3, filon: 3, coupe: 3, citerne: 3, vivier: 3, maison: 4 };
+const looksOf = a => LOOKS[a.id] || 1;
+
+module.exports = { ANNEXES, ANNEX_BY_ID, maxOf, levelFor, priceOf, bonusesOf, regenWith, effectText, reachOf, looksOf };

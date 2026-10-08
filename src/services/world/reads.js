@@ -57,9 +57,9 @@ async function gamesOf(userId, conn = db) {
     const { rows } = await conn.query('SELECT game, plays, plays_at FROM world_games WHERE user_id = $1', [userId]);
     return Object.fromEntries(rows.map(r => [r.game, r]));
 }
-// Annexes posées : [{ x, y, annex, built_at }]
+// Annexes posées : [{ x, y, annex, built_at, flip, look }] (flip : en miroir ; look : couleur choisie, ou null)
 async function annexesOf(userId, conn = db) {
-    const { rows } = await conn.query('SELECT x, y, annex, built_at FROM world_annexes WHERE user_id = $1 ORDER BY built_at, y, x', [userId]);
+    const { rows } = await conn.query('SELECT x, y, annex, built_at, flip, look FROM world_annexes WHERE user_id = $1 ORDER BY built_at, y, x', [userId]);
     return rows;
 }
 
@@ -157,9 +157,9 @@ async function exploredOf(userId, conn = db, now = Date.now()) {
     return rows.map(r => r.zone);
 }
 
-// Créations d'île (lot 8) : [{ id, craft, x, y }] (x, y vides : en réserve)
+// Créations d'île (lot 8) : [{ id, craft, x, y, flip }] (x, y vides : en réserve ; flip : posée en miroir)
 async function craftsOf(userId, conn = db) {
-    const { rows } = await conn.query('SELECT id, craft, x, y FROM world_crafts WHERE user_id = $1 ORDER BY id', [userId]);
+    const { rows } = await conn.query('SELECT id, craft, x, y, flip FROM world_crafts WHERE user_id = $1 ORDER BY id', [userId]);
     return rows;
 }
 const placedOf = rows => rows.filter(r => r.x !== null);

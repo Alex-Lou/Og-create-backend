@@ -81,8 +81,15 @@ router.post('/world/craft/finish', withAccount(async (req, res, owner, b) => {
 router.post('/world/craft/place', withAccount(async (req, res, owner, b) => {
     const craft = craftId(req.body);
     const x = Number(req.body.x), y = Number(req.body.y);
-    if (!/^[a-z]{1,20}$/.test(craft) || !cellOk(x, y)) return res.status(400).json({ message: 'Pose invalide' });
-    await craftDone(res, owner, b, await world.placeCraft(owner.id, craft, x, y));
+    const { flip = false } = req.body;
+    if (!/^[a-z]{1,20}$/.test(craft) || !cellOk(x, y) || typeof flip !== 'boolean') return res.status(400).json({ message: 'Pose invalide' });
+    await craftDone(res, owner, b, await world.placeCraft(owner.id, craft, x, y, flip));
+}));
+// Création posée : pivoter (miroir)
+router.post('/world/craft/turn', withAccount(async (req, res, owner, b) => {
+    const x = Number(req.body.x), y = Number(req.body.y);
+    if (!cellOk(x, y) || typeof req.body.flip !== 'boolean') return res.status(400).json({ message: 'Pose invalide' });
+    await craftDone(res, owner, b, await world.turnCraft(owner.id, x, y, req.body.flip));
 }));
 router.post('/world/craft/move', withAccount(async (req, res, owner, b) => {
     const [x, y, toX, toY] = ['x', 'y', 'toX', 'toY'].map(k => Number(req.body[k]));
@@ -178,11 +185,20 @@ router.post('/world/sign', withAccount(async (req, res, owner, b) => {
 
 // Annexe d'un bâtiment : pose de l'exemplaire suivant sur une case libre autour de lui
 const cellOk = (...values) => values.every(v => Number.isInteger(v) && v >= 0 && v < world.SIZE);
+// Miroir et couleur d'une annexe (pose, ou changement après coup) : flip booléen, look n° de variante (null : celle de
+// son rang) ; absents : inchangés. null si la demande est mal formée
+function poseOf(body) {
+    const { flip, look } = body;
+    if (flip !== undefined && typeof flip !== 'boolean') return null;
+    if (look !== undefined && look !== null && !(Number.isInteger(look) && look >= 0 && look < 10)) return null;
+    return { flip, look };
+}
 router.post('/world/annex', withAccount(async (req, res, owner, b) => {
     const annex = String(req.body.annex || '');
     const x = Number(req.body.x), y = Number(req.body.y);
-    if (!/^[a-z]{1,20}$/.test(annex) || !cellOk(x, y)) return res.status(400).json({ message: 'Annexe invalide' });
-    const done = await world.placeAnnex(owner.id, annex, x, y);
+    const pose = poseOf(req.body);
+    if (!/^[a-z]{1,20}$/.test(annex) || !cellOk(x, y) || !pose) return res.status(400).json({ message: 'Annexe invalide' });
+    const done = await world.placeAnnex(owner.id, annex, x, y, { flip: pose.flip ?? false, look: pose.look ?? null });
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ built: done.built, coins: done.coins, world: await worldView(owner, b) });
 }));
@@ -192,6 +208,16 @@ router.post('/world/annex/move', withAccount(async (req, res, owner, b) => {
     const [x, y, toX, toY] = ['x', 'y', 'toX', 'toY'].map(k => Number(req.body[k]));
     if (!cellOk(x, y, toX, toY)) return res.status(400).json({ message: 'Case invalide' });
     const done = await world.moveAnnex(owner.id, x, y, toX, toY);
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json(await worldView(owner, b));
+}));
+
+// Annexe : pivoter (miroir) ou changer de couleur, sans rien payer
+router.post('/world/annex/pose', withAccount(async (req, res, owner, b) => {
+    const x = Number(req.body.x), y = Number(req.body.y);
+    const pose = poseOf(req.body);
+    if (!cellOk(x, y) || !pose || (pose.flip === undefined && pose.look === undefined)) return res.status(400).json({ message: 'Pose invalide' });
+    const done = await world.poseAnnex(owner.id, x, y, pose);
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json(await worldView(owner, b));
 }));
