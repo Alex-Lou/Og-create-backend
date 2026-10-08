@@ -5,7 +5,7 @@ const quests = require('../quests');
 const loot = require('../loot');
 const signs = require('../signs');
 const finds = require('../finds');
-const { V6_SINCE, RESTARTED } = require('../players');
+const players = require('../players');
 
 async function itemsOf(userId, conn = db) {
     const { rows } = await conn.query('SELECT item FROM world_items WHERE user_id = $1', [userId]);
@@ -79,12 +79,10 @@ async function levelsOf(userId, conn = db) {
     return { levels, builtAt };
 }
 async function fireLitOf(userId, conn) {
-    const { rows } = await conn.query(
-        `SELECT u.created_at >= $2 OR EXISTS (SELECT 1 FROM world_items i WHERE i.user_id = u.id AND i.item = $3) AS fresh,
-                ARRAY(SELECT quest FROM world_quests q WHERE q.user_id = u.id) AS claimed
-         FROM users u WHERE u.id = $1`, [userId, V6_SINCE, RESTARTED]);
-    if (!rows[0] || !rows[0].fresh) return true;
-    return quests.doneOf(new Set(rows[0].claimed)).has('feu');
+    const mode = await players.islandModeFor(userId, conn);
+    if (!mode.fresh) return true;
+    const { rows } = await conn.query('SELECT quest FROM world_quests WHERE user_id = $1', [userId]);
+    return quests.doneOf(new Set(rows.map(row => row.quest))).has('feu');
 }
 
 // Ligne de stock du joueur (créée à la première visite, avec une réserve pleine ;

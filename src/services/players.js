@@ -4,6 +4,7 @@ const db = require('../config/db');
 const { newToken, isToken, digest } = require('../utils/crypto');
 const { verifyAccess, readCookie } = require('./authSession');
 const { BASE_ELEMENTS } = require('./recipeBook');
+const quests = require('./quests');
 
 const GUEST_COOKIE = 'oc_guest';
 const GUEST_DAYS = 30;
@@ -73,15 +74,29 @@ async function freshOf(userId, conn = db) {
 // soit l'âge du compte : tutoriel de la v6, habitants un à un. Le Grimoire, lui, garde les siennes (isVeteran : le
 // chapitre II ouvert d'emblée reste ouvert). Une ligne de world_items, sans donnée nouvelle
 const RESTARTED = 'ile:recommencee';
-const restartedSql = `EXISTS (SELECT 1 FROM world_items i WHERE i.user_id = users.id AND i.item = '${RESTARTED}')`;
-async function islandVeteranOf(userId, conn = db) {
-    const { rows } = await conn.query(`SELECT created_at < $2 AND NOT ${restartedSql} AS veteran FROM users WHERE id = $1`, [userId, VETERAN_BEFORE]);
-    return Boolean(rows[0]?.veteran);
+// Une première nuit inachevée prime sur l'âge du compte : même un ancien compte reprend la séquence de la Grève.
+// Dès qu'elle est validée, il retrouve exactement ses règles historiques. Fonction pure exportée pour verrouiller la
+// matrice ancien/nouveau/recommencé/incomplet sans dépendre d'une base de test.
+function islandModeOf({ createdAt, restarted = false, claimed = [] }) {
+    const firstNightDone = quests.firstNightDoneOf(new Set(claimed));
+    const born = new Date(createdAt).getTime();
+    return {
+        firstNightDone,
+        veteran: born < VETERAN_BEFORE.getTime() && !restarted && firstNightDone,
+        fresh: born >= V6_SINCE.getTime() || restarted || !firstNightDone
+    };
 }
-async function islandFreshOf(userId, conn = db) {
-    const { rows } = await conn.query(`SELECT created_at >= $2 OR ${restartedSql} AS fresh FROM users WHERE id = $1`, [userId, V6_SINCE]);
-    return Boolean(rows[0]?.fresh);
+async function islandModeFor(userId, conn = db) {
+    const { rows } = await conn.query(
+        `SELECT u.created_at,
+                EXISTS (SELECT 1 FROM world_items i WHERE i.user_id = u.id AND i.item = $2) AS restarted,
+                ARRAY(SELECT quest FROM world_quests q WHERE q.user_id = u.id) AS claimed
+         FROM users u WHERE u.id = $1`, [userId, RESTARTED]);
+    return rows[0] ? islandModeOf({ createdAt: rows[0].created_at, restarted: rows[0].restarted, claimed: rows[0].claimed })
+        : { firstNightDone: false, veteran: false, fresh: true };
 }
+const islandVeteranOf = (userId, conn = db) => islandModeFor(userId, conn).then(mode => mode.veteran);
+const islandFreshOf = (userId, conn = db) => islandModeFor(userId, conn).then(mode => mode.fresh);
 
 // Carnet de l'Infini
 async function elements(owner) {
@@ -145,4 +160,8 @@ async function adoptGuest(req, res, userId) {
     );
 }
 
-module.exports = { VETERAN_BEFORE, veteranOf, isVeteran, V6_SINCE, freshOf, RESTARTED, islandVeteranOf, islandFreshOf, resolve, createGuest, elements, addElement, getRun, addToRun, takeFreeJoker, adoptGuest };
+module.exports = {
+    VETERAN_BEFORE, veteranOf, isVeteran, V6_SINCE, freshOf, RESTARTED,
+    islandModeOf, islandModeFor, islandVeteranOf, islandFreshOf,
+    resolve, createGuest, elements, addElement, getRun, addToRun, takeFreeJoker, adoptGuest
+};

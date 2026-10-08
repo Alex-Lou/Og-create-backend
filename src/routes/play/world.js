@@ -490,8 +490,9 @@ router.get('/world/brume', withAccount(async (req, res, owner, b) => {
 
 // « Passer le tutoriel » : retenu sur le compte → { skipped: true }
 router.post('/world/prologue/skip', withAccount(async (req, res, owner) => {
-    await world.skipPrologue(owner.id);
-    res.json({ skipped: true });
+    const done = await world.skipPrologue(owner.id);
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json(done);
 }));
 
 // « Recommencer l'île », une fois par compte : le joueur l'écrit en toutes lettres (RECOMMENCER) → { restarted: true }

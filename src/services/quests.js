@@ -196,6 +196,12 @@ function doneOf(claimed) {
     return new Set(QUESTS.filter((quest, i) => i <= reach || claimed.has(quest.id)).map(quest => quest.id));
 }
 
+// La première nuit est validée côté serveur quand la Récolte d'Aster a été réclamée : le feu a donc été bâti,
+// la nuit jouée et Aster rencontrée. Les anciennes quêtes plus avancées comptent aussi, via doneOf.
+const FIRST_NIGHT_DONE = 'recolte';
+const SHORE_TUTORIAL_MARK = 'tutoriel:plage-v1';
+const firstNightDoneOf = claimed => doneOf(claimed).has(FIRST_NIGHT_DONE);
+
 // La quête active (la première pas encore faite), telle que la chaîne la définit, ou null
 function currentOf(claimed) {
     const done = doneOf(claimed);
@@ -292,4 +298,7 @@ function actStartsOf(rows) {
 // Quand tout est fait
 const RESTED = 'La brume s’est levée sur toute l’île. Merci, alchimiste : elle est de nouveau vivante.';
 
-module.exports = { QUESTS, LEGACY, QUEST_CHESTS, BEASTS, GUIDED_INK, reachOf, doneOf, currentOf, progressOf, active, boardOf, actsDoneOf, actStartsOf };
+module.exports = {
+    QUESTS, LEGACY, QUEST_CHESTS, BEASTS, GUIDED_INK, FIRST_NIGHT_DONE, SHORE_TUTORIAL_MARK,
+    reachOf, doneOf, firstNightDoneOf, currentOf, progressOf, active, boardOf, actsDoneOf, actStartsOf
+};
