@@ -40,7 +40,7 @@ test('« Recommencer l’île » : une fois, confirmé en toutes lettres ; l’�
     assert.equal((await restart(player)).status, 409);
 
     const after = await view(player);
-    // L'île : vide, personne encore (Brume seule : Aster débarque à la fin du tutoriel), le feu à bâtir, la Grève
+    // L'île : vide, personne encore, le feu à bâtir, la Grève
     // seule à soi, la réserve vide
     assert.equal(after.sites.find(s => s.id === 'foyer').level, 0);
     assert.deepEqual(after.villagers.map(v => v.id), []);
@@ -57,9 +57,11 @@ test('« Recommencer l’île » : une fois, confirmé en toutes lettres ; l’�
     assert.deepEqual(chests, ['chapitre:I']);
     const items = (await sql('SELECT item FROM world_items WHERE user_id = $1 ORDER BY item', [id])).map(r => r.item);
     assert.deepEqual(items, ['banc', 'ile:recommencee', 'ile:sentiers']);
-    // Les habitants arrivent un à un : Cannelle au feu, plus à la Récolte
-    await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'pages'), ($1, 'ramasser'), ($1, 'recolte')`, [id]);
-    assert.equal((await view(player)).villagers.some(v => v.id === 'foyer'), false);
+    // Les habitants arrivent un à un : Aster après le feu, Cannelle après la Récolte.
+    await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'pages'), ($1, 'ramasser'), ($1, 'feu')`, [id]);
+    assert.deepEqual((await view(player)).villagers.map(v => v.id), ['ponton']);
+    await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'recolte')`, [id]);
+    assert.equal((await view(player)).villagers.some(v => v.id === 'foyer'), true);
     // Pendant le développement, on recommence autant qu'on veut (pas deux fois coup sur coup)
     await sql(`UPDATE world_items SET bought_at = NOW() - INTERVAL '1 minute' WHERE user_id = $1 AND item = 'ile:recommencee'`, [id]);
     assert.equal((await restart(player)).status, 200);
@@ -70,7 +72,7 @@ test('au tutoriel, La Source se découvre en écrivant la Source : sans écus ; 
     const player = await newPlayer({ veteran: false });
     const id = player.userId;
     await view(player);
-    const done = ['pages', 'ramasser', 'recolte', 'feu', 'soupe', 'poules', 'deco'];
+    const done = ['pages', 'ramasser', 'feu', 'recolte', 'soupe', 'poules', 'deco'];
     await sql(`INSERT INTO world_quests (user_id, quest) SELECT $1, unnest($2::text[])`, [id, done]);
     const first = await view(player);
     assert.deepEqual([first.brume.quest.id, first.brume.quest.label], ['achat-source', 'Découvre La Source : fais-la naître dans l’Athanor']);

@@ -61,8 +61,8 @@ async function veteranOf(userId, conn = db) {
     return Boolean(rows[0]?.veteran);
 }
 const isVeteran = async owner => owner.kind === 'user' && veteranOf(owner.id);
-// Le tutoriel de la v6 (bible, § 9 : ramasser, le feu bâti par le joueur, Cannelle attirée par le feu, Rivet après les
-// poules) vaut pour les comptes créés à partir de V6_SINCE, juste après sa mise en ligne. Ne pas la reculer : un compte
+// Le tutoriel de l'île neuve (bible, § 9 : ramasser, bâtir le feu, accueillir Aster, puis les autres compagnons) vaut
+// pour les comptes créés à partir de V6_SINCE. Ne pas la reculer : un compte
 // créé avant a reçu les anciennes règles (le feu allumé d'office), et les lui retirer le ferait reculer.
 const V6_SINCE = new Date('2026-10-08T12:00:00Z');
 async function freshOf(userId, conn = db) {

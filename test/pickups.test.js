@@ -1,5 +1,5 @@
-// Le tutoriel de la v6 (bible du dépôt front, § 9) : ce que la mer rend sur la Grève, le feu de camp bâti par un
-// nouveau compte ; un compte d'avant la v6 garde ses règles (le feu allumé d'office, Cannelle après la Récolte, Rivet
+// Le tutoriel de l'île neuve (bible du dépôt front, § 9) : la Grève, le feu bâti avec Brume, puis Aster et sa Récolte ;
+// un compte d'avant la v6 garde ses règles (le feu allumé d'office, Cannelle après la Récolte, Rivet
 // après la soupe) et ne recule jamais
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -41,7 +41,7 @@ test('ramasser sur la Grève : une fois, puis la mer en rapporte ; cases inconnu
   assert.deepEqual([trouvaille.id, trouvaille.done], ['trouvaille', false]);
 });
 
-test('un nouveau compte bâtit son feu ; Cannelle ne vient qu’au feu, Rivet qu’aux poules', async () => {
+test('un nouveau compte bâtit son feu ; Aster vient au matin, Cannelle après sa Récolte, Rivet après les poules', async () => {
   const player = await newPlayer({ veteran: false });
   const id = player.userId;
   const first = await view(player);
@@ -52,16 +52,17 @@ test('un nouveau compte bâtit son feu ; Cannelle ne vient qu’au feu, Rivet qu
   const noPlan = await api('POST', '/play/world/build', { site: 'foyer' }, player);
   assert.deepEqual([noPlan.status, noPlan.data.message], [403, 'Il te faut d’abord faire naître « Brasier » dans l’Athanor du Grimoire.']);
   await sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Brasier"]'::jsonb WHERE user_id = $1`, [id]);
-  // Sans bois ni pierre : refusé ; plus loin dans la chaîne sans feu (la Récolte faite) : Cannelle n'est pas là
+  // Sans bois ni pierre : refusé ; Brume reste seule pendant la construction du camp.
   assert.equal((await api('POST', '/play/world/build', { site: 'foyer' }, player)).status, 400);
-  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'recolte')`, [id]);
-  // (Brume seule : Aster débarque à la fin du tutoriel)
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'pages'), ($1, 'ramasser')`, [id]);
   assert.deepEqual([met(await view(player)), (await view(player)).brume.quest.id], [[], 'feu']);
   assert.equal((await api('POST', '/play/world/beasts/cage', {}, player)).status, 403);
-  // Le feu réclamé : Cannelle ; la soupe seule n'amène plus Rivet (les poules, si)
-  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'feu'), ($1, 'soupe')`, [id]);
+  // Le feu réclamé : Aster, puis sa Récolte fait venir Cannelle. La soupe seule n'amène plus Rivet.
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'feu')`, [id]);
+  assert.deepEqual(met(await view(player)), ['ponton']);
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'recolte'), ($1, 'soupe')`, [id]);
   const after = await view(player);
-  assert.deepEqual([foyerOf(after), met(after).includes('foyer'), met(after).includes('atelier')], [1, true, false]);
+  assert.deepEqual([met(after).includes('ponton'), met(after).includes('foyer'), met(after).includes('atelier')], [true, true, false]);
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'poules')`, [id]);
   assert.equal(met(await view(player)).includes('atelier'), true);
 });
@@ -76,11 +77,10 @@ test('un compte d’avant la v6 ne recule jamais : feu allumé, Cannelle après 
   // Au milieu du prologue (les pages réclamées) : la Grève s'offre aussi, rien n'est perdu
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'pages')`, [id]);
   assert.equal((await view(player)).brume.quest.id, 'ramasser');
-  // La Récolte réclamée : Cannelle est là, le feu compte comme fait (palier I, sans ligne)
+  // La Récolte réclamée : Cannelle est là, le feu antérieur compte comme fait (palier I, sans ligne)
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'ramasser'), ($1, 'recolte')`, [id]);
   const cannelle = await view(player);
-  assert.deepEqual([met(cannelle).includes('foyer'), cannelle.brume.quest.id, cannelle.brume.quest.done], [true, 'feu', true]);
-  assert.equal((await api('POST', '/play/world/quest', { id: 'feu' }, player)).status, 200);
+  assert.deepEqual([met(cannelle).includes('foyer'), cannelle.brume.quest.id], [true, 'soupe']);
   // La soupe réclamée : Rivet, sans attendre les poules
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'soupe')`, [id]);
   const rivet = await view(player);

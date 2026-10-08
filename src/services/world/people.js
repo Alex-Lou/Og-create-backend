@@ -32,17 +32,17 @@ function decosNear(tiles, siteId, level, reach) {
 // Identifiant d'un visiteur installé, parmi les habitants : 'v<numéro de sa visite>'
 const SETTLER_ID = /^v\d{1,9}$/;
 const knownResident = id => Object.hasOwn(villagers.VILLAGERS, id) || SETTLER_ID.test(id);
-// La troupe est là dès sa rencontre (bible, § 6.6), un personnage à la fois : Cannelle attirée par le feu, Rivet après
-// les poules, Aster à la fin du tutoriel, le premier chemin tracé (choix de l'auteur, 8 oct. : Brume seule au début ;
-// v6, § 9 : un compte créé depuis players.V6_SINCE, ou une île recommencée ; avant : Aster dès le compte, Cannelle
-// après la Récolte, Rivet après la soupe, gardés tels quels) ; les quatre dormeurs (SLEEPERS) dès que leur quartier
+// La troupe est là dès sa rencontre (bible, § 6.6), un personnage à la fois. Pour une île neuve, Aster arrive après le
+// feu et ouvre la Récolte ; Cannelle attend que cette leçon soit terminée, puis Rivet arrive après les poules. Avant la
+// v6 : Aster dès le compte, Cannelle après la Récolte, Rivet après la soupe, gardés tels quels. Les quatre dormeurs
+// (SLEEPERS) apparaissent dès que leur quartier
 // est à soi ; un joueur d'avant la bible garde aussi chaque habitant dont le bâtiment est bâti. presence : { veteran,
 // fresh, done (quêtes faites, quests.doneOf) }
 const SLEEPERS = ['puits', 'bosquet', 'carriere', 'potager'];
 function metOf(id, levels, zones, presence) {
     if (presence.veteran && livesHere(id, levels, zones)) return true;
-    if (id === 'ponton') return !presence.fresh || presence.done.has('chemin');
-    if (id === 'foyer') return presence.done.has(presence.fresh ? 'feu' : 'recolte');
+    if (id === 'ponton') return !presence.fresh || presence.done.has('feu');
+    if (id === 'foyer') return presence.done.has('recolte');
     if (id === 'atelier') return presence.done.has(presence.fresh ? 'poules' : 'soupe');
     return zones.has(map.siteZone(id));
 }
