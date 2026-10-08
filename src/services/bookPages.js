@@ -152,7 +152,7 @@ function arianeOf(b, owned, targets) {
 // veteran : compte d'avant la bible (le chapitre II lui reste ouvert d'emblée) ; ariane : le fil d'Ariane (arianeOf)
 // ou null ; inked : pages où l'Encre a déjà servi (compte), dont l'ingrédient révélé est rendu. La page marquée
 // s'ajoute aux pages ouvertes de son chapitre, même scellé ; elle ne dit rien de plus qu'une autre page
-function view(b, owned, misses = {}, letters = {}, veteran = false, ariane = null, inked = new Set()) {
+function view(b, owned, misses = {}, letters = {}, veteran = false, ariane = null, inked = new Set(), guided = false) {
     const have = new Set(owned);
     const within = recipesWithin(b, have);
     const slots = slotsFor(b, owned);
@@ -206,6 +206,8 @@ function view(b, owned, misses = {}, letters = {}, veteran = false, ariane = nul
                     tray: trayOf(b, owned, id, parts, rules.decoys),
                     misses: misses[id] || 0,
                     freeInkAfter: rules.freeInkAfter,
+                    // Le tutoriel guide jusqu'au bout : la page marquée a son Encre offerte (world.guidedInkOf)
+                    ...(guided && name === marked ? { guidedInk: true } : {}),
                     // L'Encre a déjà servi ici : l'ingrédient qu'elle révèle
                     ...(inked.has(id) ? { ink: telling(parts) } : {}),
                     hangman: hangman.state(name, letters[id], hangman.maxMisses(chapter.id), rules.letter, info.emoji)

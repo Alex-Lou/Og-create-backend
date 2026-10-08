@@ -109,6 +109,11 @@ async function factsOf(userId, owned, stars, conn = db, moods = null) {
 // Les cibles du fil d'Ariane (bible, § 6.1 à 6.3) : ce que demande la quête active. L'élément à écrire (ou l'une des
 // bêtes), le plan du prochain palier du bâtiment demandé (une invention), les savoir-faire de la création demandée ;
 // [] sinon. bookPages.arianeOf en tire le chemin le plus court
+// Le tutoriel guide jusqu'au bout (quests.GUIDED_INK) : la page que marque le ruban a son Encre offerte
+async function guidedInkOf(userId) {
+    const quest = quests.currentOf(await claimedOf(userId));
+    return Boolean(quest && quests.GUIDED_INK.has(quest.id));
+}
 async function arianeTargets(userId) {
     const quest = quests.currentOf(await claimedOf(userId));
     const goal = quest && quest.goal;
@@ -752,7 +757,7 @@ async function chooseSign(userId, siteId, styleId) {
 module.exports = {
     SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, pendingOf, chargesAt, effectsOf, productionOf,
     view, build, buyZone, buyItem, undoItem, chooseSkin, startRun, finishRun, collect, migrate, claimQuest, board, openChest, openAll,
-    placeAnnex, moveAnnex, poseAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople, namePlayer, chooseAvatar, arianeTargets,
+    placeAnnex, moveAnnex, poseAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople, namePlayer, chooseAvatar, arianeTargets, guidedInkOf,
     refundDecorations, startCraft, finishCraft, placeCraft, moveCraft, storeCraft, turnCraft, startExpedition, findLandmark, gatherDeposit, pickUp,
     anyaOf, breathRefused, revealAnya, breatheAnya, brumeSavoirOf, talkBrume, startNights, repelCreature, repairSite,
     feedBeast, collectBeasts, openCage
