@@ -28,10 +28,11 @@ async function namesOf(userId, conn = db) {
     const { rows } = await conn.query('SELECT target, name FROM world_names WHERE user_id = $1', [userId]);
     return Object.fromEntries(rows.map(r => [r.target, r.name]));
 }
-// L'avatar du joueur (son exemple de la bibliothèque), ou null s'il n'en a pas encore choisi
+// L'avatar du joueur : ses choix s'il l'a composé (un objet), sinon son exemple de la bibliothèque (« avatar-03 »), ou
+// null s'il n'en a pas encore choisi
 async function avatarOf(userId, conn = db) {
-    const { rows } = await conn.query('SELECT look FROM world_avatars WHERE user_id = $1', [userId]);
-    return rows[0]?.look || null;
+    const { rows } = await conn.query('SELECT look, choices FROM world_avatars WHERE user_id = $1', [userId]);
+    return rows[0] ? rows[0].choices || rows[0].look : null;
 }
 // Amitié des habitants : { habitant: { points, talked, gifted } } (jours 'AAAA-MM-JJ', heure de Paris)
 async function friendsOf(userId, conn = db) {

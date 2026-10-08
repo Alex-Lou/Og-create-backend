@@ -27,12 +27,14 @@ async function profileOf(userId) {
     const [{ rows }, named, avatar] = await Promise.all([
         db.query('SELECT new_email FROM email_changes WHERE user_id = $1 AND expires_at > NOW()', [userId]),
         db.query(`SELECT name FROM world_names WHERE user_id = $1 AND target = 'joueur'`, [userId]),
-        db.query('SELECT look FROM world_avatars WHERE user_id = $1', [userId])
+        db.query('SELECT look, choices FROM world_avatars WHERE user_id = $1', [userId])
     ]);
-    // Le nom et l'avatar du joueur sur son île (Grimoire, carte d'embarquement) : modifiables par /play/world/player et /avatar
+    // Le nom et l'avatar du joueur sur son île (Grimoire, carte d'embarquement) : modifiables par /play/world/player et
+    // /avatar. look : ses choix s'il l'a composé (un objet), sinon son exemple de la bibliothèque
+    const chosen = avatar.rows[0];
     return {
         name: named.rows[0]?.name || null,
-        look: avatar.rows[0]?.look || null,
+        look: chosen ? chosen.choices || chosen.look : null,
         email: accounts.isProvisional(user.email) ? null : user.email,
         username: user.username,
         createdAt: user.created_at,
