@@ -47,6 +47,11 @@ test('un nouveau compte bâtit son feu ; Cannelle ne vient qu’au feu, Rivet qu
   const first = await view(player);
   assert.equal(foyerOf(first), 0);
   assert.deepEqual(first.sites.find(s => s.id === 'foyer').next.cost, { wood: 4, stone: 2 });
+  // Le feu de camp naît du Grimoire : le Brasier d'abord (le ruban y mène), puis bois et galets
+  assert.equal(first.sites.find(s => s.id === 'foyer').next.plan, 'Brasier');
+  const noPlan = await api('POST', '/play/world/build', { site: 'foyer' }, player);
+  assert.deepEqual([noPlan.status, noPlan.data.message], [403, 'Il te faut le plan : découvre « Brasier » dans le Grimoire.']);
+  await sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Brasier"]'::jsonb WHERE user_id = $1`, [id]);
   // Sans bois ni pierre : refusé ; plus loin dans la chaîne sans feu (la Récolte faite) : Cannelle n'est pas là
   assert.equal((await api('POST', '/play/world/build', { site: 'foyer' }, player)).status, 400);
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'recolte')`, [id]);
@@ -104,4 +109,20 @@ test('au Grimoire, pendant la quête d’Ondin : la page que marque le ruban a s
   // La quête suivante (bâtir le Puits) : plus d'Encre offerte d'office
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'souvenir-ondin')`, [id]);
   assert.equal((await pages()).some(p => p.guidedInk), false);
+});
+
+test('« Passer le tutoriel » se retient sur le compte : Brume le dit, sur l’île comme au Grimoire', async () => {
+  const player = await newPlayer({ veteran: false });
+  const brume = async () => (await api('GET', '/play/world/brume', null, player)).data;
+  assert.deepEqual([(await brume()).tutorial, (await brume()).skipped], [true, false]);
+  const veteran = await newPlayer();
+  assert.equal((await api('GET', '/play/world/brume', null, veteran)).data.tutorial, false);
+  assert.equal((await view(veteran)).brume.tutorial, false);
+  assert.equal((await api('POST', '/play/world/prologue/skip', {}, { cookies: {} })).status, 401);
+  const both = await Promise.all([1, 2].map(() => api('POST', '/play/world/prologue/skip', {}, player)));
+  assert.deepEqual(both.map(r => r.status), [200, 200]);
+  assert.equal((await brume()).skipped, true);
+  assert.equal((await view(player)).brume.skipped, true);
+  // (une ligne de world_items, que la boutique ignore)
+  assert.ok((await view(player)).sites.every(s => s.shop.every(item => item.id !== 'prologue:passe')));
 });
