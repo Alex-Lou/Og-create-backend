@@ -5,6 +5,7 @@ const net = require('node:net');
 const path = require('node:path');
 const { Client } = require('pg');
 const crypto = require('node:crypto');
+const { SHORE_TUTORIAL_MARK } = require('../src/services/quests');
 
 // Mots de passe de test tirés au hasard à chaque exécution : aucun secret écrit en dur dans le dépôt
 const randomPassword = () => crypto.randomBytes(18).toString('base64url');
@@ -107,6 +108,9 @@ async function newPlayer({ coins = 0, veteran = true } = {}) {
   const { data } = await api('POST', '/auth/register', { email, password: player.password }, player);
   player.userId = data.userId;
   await sql('UPDATE users SET created_at = $2 WHERE id = $1', [player.userId, veteran ? '2026-01-01T00:00:00Z' : '2030-01-01T00:00:00Z']);
+  // Par défaut, un « vétéran » de test a réellement dépassé la première nuit. Le marqueur explicite évite de lui
+  // injecter une quête métier et laisse les tests d'anciens comptes incomplets utiliser veteran: false puis antidater.
+  if (veteran) await sql(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'tutoriel')`, [player.userId, SHORE_TUTORIAL_MARK]);
   await api('POST', '/progress/save', { discoveredElements: ['Eau', 'Feu', 'Terre', 'Air'], discoveredCategories: [] }, player);
   if (coins) await sql('UPDATE progress SET coins = $1 WHERE user_id = $2', [coins, player.userId]);
   return player;

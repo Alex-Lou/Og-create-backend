@@ -77,8 +77,8 @@ const RESTARTED = 'ile:recommencee';
 // Une première nuit inachevée prime sur l'âge du compte : même un ancien compte reprend la séquence de la Grève.
 // Dès qu'elle est validée, il retrouve exactement ses règles historiques. Fonction pure exportée pour verrouiller la
 // matrice ancien/nouveau/recommencé/incomplet sans dépendre d'une base de test.
-function islandModeOf({ createdAt, restarted = false, claimed = [] }) {
-    const firstNightDone = quests.firstNightDoneOf(new Set(claimed));
+function islandModeOf({ createdAt, restarted = false, claimed = [], marked = false }) {
+    const firstNightDone = marked || quests.firstNightDoneOf(new Set(claimed));
     const born = new Date(createdAt).getTime();
     return {
         firstNightDone,
@@ -90,9 +90,15 @@ async function islandModeFor(userId, conn = db) {
     const { rows } = await conn.query(
         `SELECT u.created_at,
                 EXISTS (SELECT 1 FROM world_items i WHERE i.user_id = u.id AND i.item = $2) AS restarted,
+                EXISTS (SELECT 1 FROM world_items i WHERE i.user_id = u.id AND i.item = $3) AS marked,
                 ARRAY(SELECT quest FROM world_quests q WHERE q.user_id = u.id) AS claimed
-         FROM users u WHERE u.id = $1`, [userId, RESTARTED]);
-    return rows[0] ? islandModeOf({ createdAt: rows[0].created_at, restarted: rows[0].restarted, claimed: rows[0].claimed })
+         FROM users u WHERE u.id = $1`, [userId, RESTARTED, quests.SHORE_TUTORIAL_MARK]);
+    return rows[0] ? islandModeOf({
+        createdAt: rows[0].created_at,
+        restarted: rows[0].restarted,
+        claimed: rows[0].claimed,
+        marked: rows[0].marked
+    })
         : { firstNightDone: false, veteran: false, fresh: true };
 }
 const islandVeteranOf = (userId, conn = db) => islandModeFor(userId, conn).then(mode => mode.veteran);

@@ -177,6 +177,7 @@ test('tout compte dont la première nuit est incomplète reprend la séquence de
   assert.deepEqual(islandModeOf({ createdAt: old, claimed: [] }), { firstNightDone: false, veteran: false, fresh: true });
   assert.deepEqual(islandModeOf({ createdAt: old, claimed: ['feu'] }), { firstNightDone: false, veteran: false, fresh: true });
   assert.deepEqual(islandModeOf({ createdAt: old, claimed: ['recolte'] }), { firstNightDone: true, veteran: true, fresh: false });
+  assert.deepEqual(islandModeOf({ createdAt: old, marked: true }), { firstNightDone: true, veteran: true, fresh: false });
   assert.deepEqual(islandModeOf({ createdAt: recent, claimed: ['recolte'] }), { firstNightDone: true, veteran: false, fresh: true });
   assert.deepEqual(islandModeOf({ createdAt: old, restarted: true, claimed: [] }), { firstNightDone: false, veteran: false, fresh: true });
 });

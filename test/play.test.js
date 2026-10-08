@@ -2356,6 +2356,7 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Aster ouvre s
   assert.equal(who(caged.data.world, 'atelier'), undefined);
   // (la soupe a tout mangé : des coquillages ramassés sur la Grève font le repas des poules)
   assert.equal((await api('POST', '/play/world/beast/feed', { beast: 'poule-rousse' }, player)).status, 400);
+  await sql(`UPDATE world_deposits SET gathered_at = gathered_at - INTERVAL '3 hours' WHERE user_id = $1 AND deposit = 'greve-coquillage-1'`, [player.userId]);
   assert.deepEqual((await pick('greve-coquillage-1')).data.gives, { food: 2 });
   const hen = await api('POST', '/play/world/beast/feed', { beast: 'poule-rousse' }, player);
   assert.deepEqual([hen.status, hen.data.world.brume.quest.done], [200, true]);

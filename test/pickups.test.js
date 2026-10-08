@@ -67,17 +67,17 @@ test('un nouveau compte bâtit son feu ; Aster vient au matin, Cannelle après s
   assert.equal(met(await view(player)).includes('atelier'), true);
 });
 
-test('un compte d’avant la v6 ne recule jamais : feu allumé, Cannelle après la Récolte, Rivet après la soupe', async () => {
+test('un ancien compte incomplet reprend sur la Grève, puis retrouve ses règles dès la première nuit validée', async () => {
   const player = await newPlayer({ veteran: false });
   const id = player.userId;
   // Créé juste avant la v6 (après la bible : pas un vétéran)
   await sql('UPDATE users SET created_at = $2 WHERE id = $1', [id, new Date(V6_SINCE.getTime() - 60000)]);
   const first = await view(player);
-  assert.deepEqual([foyerOf(first), met(first)], [1, ['ponton']]);
+  assert.deepEqual([foyerOf(first), met(first), first.brume.quest.id], [0, [], 'pages']);
   // Au milieu du prologue (les pages réclamées) : la Grève s'offre aussi, rien n'est perdu
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'pages')`, [id]);
   assert.equal((await view(player)).brume.quest.id, 'ramasser');
-  // La Récolte réclamée : Cannelle est là, le feu antérieur compte comme fait (palier I, sans ligne)
+  // La Récolte réclamée valide la reprise : les anciennes règles redeviennent actives sans perdre l'avancée.
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'ramasser'), ($1, 'recolte')`, [id]);
   const cannelle = await view(player);
   assert.deepEqual([met(cannelle).includes('foyer'), cannelle.brume.quest.id], [true, 'soupe']);
@@ -112,7 +112,7 @@ test('au Grimoire, pendant la quête d’Ondin : la page que marque le ruban a s
   assert.equal((await pages()).some(p => p.guidedInk), false);
 });
 
-test('« Passer le tutoriel » se retient sur le compte : Brume le dit, sur l’île comme au Grimoire', async () => {
+test('la première nuit ne se passe pas ; ensuite le choix se retient sur le compte', async () => {
   const player = await newPlayer({ veteran: false });
   const brume = async () => (await api('GET', '/play/world/brume', null, player)).data;
   assert.deepEqual([(await brume()).tutorial, (await brume()).skipped], [true, false]);
@@ -120,6 +120,8 @@ test('« Passer le tutoriel » se retient sur le compte : Brume le dit, sur l’
   assert.equal((await api('GET', '/play/world/brume', null, veteran)).data.tutorial, false);
   assert.equal((await view(veteran)).brume.tutorial, false);
   assert.equal((await api('POST', '/play/world/prologue/skip', {}, { cookies: {} })).status, 401);
+  assert.equal((await api('POST', '/play/world/prologue/skip', {}, player)).status, 409);
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'recolte')`, [player.userId]);
   const both = await Promise.all([1, 2].map(() => api('POST', '/play/world/prologue/skip', {}, player)));
   assert.deepEqual(both.map(r => r.status), [200, 200]);
   assert.equal((await brume()).skipped, true);
