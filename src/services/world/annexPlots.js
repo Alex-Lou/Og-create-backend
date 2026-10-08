@@ -12,22 +12,27 @@ const { migrate } = require('./migrate');
 const { gather } = require('./produce');
 
 // Case où une annexe de ce bâtiment peut se poser (sans compter ce qui l'occupe) : sol constructible du quartier du
-// bâtiment, hors des grandes emprises des chantiers et des lieux remarquables, à annexes.REACH cases au plus de la sienne
+// bâtiment, n'importe où dans ce quartier, hors des grandes emprises des chantiers et des lieux remarquables
 function annexSpotOk(siteId, x, y) {
     const at = map.SITE_BIG[siteId];
     return Boolean(at) && Number.isInteger(x) && Number.isInteger(y) && map.buildable(x, y) && !map.inSite(x, y) && !landmarks.isLandmark(x, y)
-        && map.zoneAt(x, y) === map.siteZone(siteId) && annexes.reachOf(x, y, at) <= annexes.REACH;
+        && map.zoneAt(x, y) === map.siteZone(siteId);
+}
+// Cases où une annexe de chaque bâtiment peut se poser, des plus proches de lui aux plus lointaines (une fois pour
+// toutes : la carte ne change pas)
+const SPOTS = new Map();
+function spotsOf(siteId) {
+    if (!SPOTS.has(siteId)) {
+        const at = map.SITE_BIG[siteId];
+        const spots = [];
+        for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) if (annexSpotOk(siteId, x, y)) spots.push({ x, y, d: annexes.reachOf(x, y, at) });
+        SPOTS.set(siteId, spots.sort((a, b) => a.d - b.d || a.y - b.y || a.x - b.x).map(({ x, y }) => ({ x, y })));
+    }
+    return SPOTS.get(siteId);
 }
 // Cases libres où poser une annexe de ce bâtiment (taken : clés des cases occupées), des plus proches aux plus lointaines
 function annexSpots(siteId, taken) {
-    const at = map.SITE_BIG[siteId];
-    const spots = [];
-    for (let y = at.y - annexes.REACH; y <= at.y + 2 + annexes.REACH; y++) {
-        for (let x = at.x - annexes.REACH; x <= at.x + 2 + annexes.REACH; x++) {
-            if (annexSpotOk(siteId, x, y) && !taken.has(y * SIZE + x)) spots.push({ x, y, d: annexes.reachOf(x, y, at) });
-        }
-    }
-    return spots.sort((a, b) => a.d - b.d || a.y - b.y || a.x - b.x).map(({ x, y }) => ({ x, y }));
+    return spotsOf(siteId).filter(({ x, y }) => !taken.has(y * SIZE + x));
 }
 // Ce que la fiche d'un bâtiment montre de ses annexes : posées, prochain exemplaire (palier, prix), effet
 function annexesView(siteId, rows) {
@@ -53,7 +58,7 @@ async function cellTaken(userId, x, y, conn) {
     const { rows } = await conn.query('SELECT 1 FROM world_crafts WHERE user_id = $1 AND x = $2 AND y = $3', [userId, x, y]);
     return rows.length > 0 || Boolean(await annexAt(userId, x, y, conn));
 }
-const SPOT_MESSAGE = 'Une annexe se pose sur une case libre du quartier, à deux cases au plus de son bâtiment.';
+const SPOT_MESSAGE = 'Une annexe se pose sur une case libre du quartier de son bâtiment.';
 
 // Pose l'exemplaire suivant d'une annexe : bâtiment construit au palier voulu dans un quartier possédé, case libre
 // autorisée, ressources et écus débités une seule fois (ligne de stock verrouillée : deux poses ne se croisent pas).

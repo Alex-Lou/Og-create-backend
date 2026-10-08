@@ -44,12 +44,15 @@ test('quatre maisons au Foyer (paliers II à V), leur coût double ; chacune log
   assert.deepEqual([extra.charges, extra.moves, extra.regenCut, extra.site, extra.cap], [0, 0, 0, {}, {}]);
 });
 
-test('la petite annexe d’un bâtiment qui produit se pose 3 fois (paliers II, III, V), son coût double', () => {
+test('la petite annexe d’un bâtiment qui produit se pose 6 fois (paliers II, III, V, VI, VII, VII), son coût double', () => {
   const champ = annexes.ANNEX_BY_ID.champ;
-  assert.equal(annexes.maxOf(champ), 3);
-  assert.deepEqual([0, 1, 2].map(k => annexes.levelFor(champ, k)), [2, 3, 5]);
+  assert.equal(annexes.maxOf(champ), 6);
+  assert.deepEqual([0, 1, 2, 3, 4, 5].map(k => annexes.levelFor(champ, k)), [2, 3, 5, 6, 7, 7]);
   assert.deepEqual(annexes.priceOf(champ, 0), { cost: { wood: 20, water: 20 }, coins: 100, finds: {} });
   assert.deepEqual(annexes.priceOf(champ, 2), { cost: { wood: 80, water: 80 }, coins: 600, finds: {} });
+  assert.deepEqual(annexes.priceOf(champ, 3), { cost: { wood: 160, water: 160 }, coins: 1200, finds: {} });
+  assert.deepEqual(annexes.priceOf(champ, 5), { cost: { wood: 640, water: 640 }, coins: 3000, finds: {} });
+  ['filon', 'coupe', 'citerne', 'vivier'].forEach(id => assert.equal(annexes.maxOf(annexes.ANNEX_BY_ID[id]), 6, id));
   // Foyer et Atelier : un seul exemplaire
   assert.equal(annexes.maxOf(annexes.ANNEX_BY_ID.jardin), 1);
   assert.equal(annexes.maxOf(annexes.ANNEX_BY_ID.charbon), 1);
@@ -79,24 +82,31 @@ test('les annexes ajoutent production, heures gardées, parties, coups, et une p
   assert.deepEqual(boosted, { resource: 'food', amount: Math.floor((48 + 6) * 1.5), coins: Math.floor((32 + 4) * 1.5) });
 });
 
-test('une annexe se pose dans le quartier de son bâtiment, à deux cases au plus, hors des emprises', () => {
+test('une annexe se pose n’importe où dans le quartier de son bâtiment, hors des emprises', () => {
   const at = map.SITE_BIG.potager;
   // Juste à côté de l'emprise 3 × 3 : oui si le sol s'y prête ; dans l'emprise : jamais
   assert.equal(world.annexSpotOk('potager', at.x + 1, at.y + 1), false);
   const ring = [];
   for (let y = at.y - 2; y <= at.y + 4; y++) for (let x = at.x - 2; x <= at.x + 4; x++) if (world.annexSpotOk('potager', x, y)) ring.push({ x, y });
   assert.ok(ring.length >= 10, `cases autour du Potager : ${ring.length}`);
-  for (const c of ring) {
-    assert.equal(map.zoneAt(c.x, c.y), map.siteZone('potager'));
-    assert.ok(annexes.reachOf(c.x, c.y, at) <= annexes.REACH);
+  for (const c of ring) assert.equal(map.zoneAt(c.x, c.y), map.siteZone('potager'));
+  // Loin du bâtiment mais dans son quartier : oui ; dans un autre quartier : non
+  let far = null, other = null;
+  for (let y = 0; y < map.SIZE; y++) {
+    for (let x = 0; x < map.SIZE; x++) {
+      if (!map.buildable(x, y) || map.inSite(x, y)) continue;
+      if (!far && map.zoneAt(x, y) === 'jardins' && annexes.reachOf(x, y, at) > 8) far = { x, y };
+      if (!other && map.zoneAt(x, y) === 'coeur') other = { x, y };
+    }
   }
-  // Trois cases plus loin : non
-  assert.equal(world.annexSpotOk('potager', at.x + 5, at.y), false);
+  assert.ok(far && other);
+  assert.equal(world.annexSpotOk('potager', far.x, far.y), true);
+  assert.equal(world.annexSpotOk('potager', other.x, other.y), false);
   assert.equal(world.annexSpotOk('nulle-part', at.x, at.y), false);
-  // Chaque bâtiment a la place de toutes ses annexes (5 exemplaires pour ceux qui produisent)
+  // Chaque bâtiment a la place de toutes ses annexes (6 exemplaires de la petite, réserve, grande, climat)
   for (const site of Object.keys(world.SITES)) {
     let n = 0;
     for (let y = 0; y < map.SIZE; y++) for (let x = 0; x < map.SIZE; x++) if (world.annexSpotOk(site, x, y)) n++;
-    assert.ok(n >= 12, `${site} : ${n} cases`);
+    assert.ok(n >= 20, `${site} : ${n} cases`);
   }
 });

@@ -1987,7 +1987,7 @@ test('annexes : posées autour du bâtiment au palier voulu, payées une fois, d
   // Palier I : pas encore de cases ; le catalogue annonce le Champ au palier II, trois exemplaires (II, III, V)
   assert.deepEqual(potagerOf(first).spots, []);
   const champ = potagerOf(first).annexes.find(a => a.id === 'champ');
-  assert.deepEqual([champ.max, champ.built, champ.levels, champ.next.level, champ.next.coins], [3, 0, [2, 3, 5], 2, 100]);
+  assert.deepEqual([champ.max, champ.built, champ.levels, champ.next.level, champ.next.coins], [6, 0, [2, 3, 5, 6, 7, 7], 2, 100]);
   assert.equal(champ.effect, '+3 vivres et +2 écus par heure');
   assert.equal(potagerOf(first).annexes.find(a => a.id === 'grenier').effect, 'Garde 12 h de production au lieu de 8');
   await sql(`UPDATE world_buildings SET level = 2 WHERE user_id = $1 AND site = 'potager'`, [player.userId]);

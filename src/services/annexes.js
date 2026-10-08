@@ -1,7 +1,7 @@
-// Annexes : constructions que le joueur pose lui-même autour d'un bâtiment, sur une case libre du quartier du
-// bâtiment, à REACH cases au plus de sa grande emprise (3 × 3). Trois par bâtiment :
-// - une petite annexe au palier II (jusqu'à 3 exemplaires pour les bâtiments qui produisent, ouverts aux paliers
-//   II, III et V ; le coût double à chaque exemplaire) ;
+// Annexes : constructions que le joueur pose lui-même pour un bâtiment, sur une case libre du quartier du bâtiment
+// (n'importe où dans ce quartier). Trois par bâtiment :
+// - une petite annexe au palier II (jusqu'à 6 exemplaires pour les bâtiments qui produisent, ouverts aux paliers
+//   II, III, V, VI, VII et VII ; le coût en ressources double à chaque exemplaire) ;
 // - une réserve au palier IV ;
 // - une grande annexe au palier VI.
 // Le Foyer a aussi ses maisons (lot 7d) : jusqu'à 4, ouvertes aux paliers II à V, chacune loge un visiteur qui reste.
@@ -11,9 +11,8 @@
 // charges, regenCut, moves : réserve, retour d'une partie, coups de Récolte (comme la boutique) ; house : un logement.
 // Fonctions pures, sans base de données.
 
-const REACH = 4;
-const SMALL_LEVELS = [2, 3, 5]; // palier du bâtiment qui ouvre chaque exemplaire d'une petite annexe
-const SMALL_COINS = [100, 250, 600];
+const SMALL_LEVELS = [2, 3, 5, 6, 7, 7]; // palier du bâtiment qui ouvre chaque exemplaire d'une petite annexe
+const SMALL_COINS = [100, 250, 600, 1200, 2000, 3000];
 const KIND_LEVEL = { reserve: 4, grand: 6, climate: 3 };
 const KIND_COINS = { reserve: 400, grand: 1200, climate: 500 };
 const HOUSE_LEVELS = [2, 3, 4, 5]; // palier du Foyer qui ouvre chaque maison
@@ -61,7 +60,7 @@ const ANNEXES = [
 ];
 const ANNEX_BY_ID = Object.fromEntries(ANNEXES.map(a => [a.id, a]));
 
-// Exemplaires possibles : 4 maisons, 3 pour la petite annexe d'un bâtiment qui produit (rate), sinon 1
+// Exemplaires possibles : 4 maisons, 6 pour la petite annexe d'un bâtiment qui produit (rate), sinon 1
 const maxOf = a => (a.kind === 'house' ? HOUSE_LEVELS.length : a.kind === 'small' && a.effect.rate ? SMALL_LEVELS.length : 1);
 // Palier du bâtiment qui ouvre l'exemplaire n° copy (0, 1, 2…)
 const levelFor = (a, copy) => (a.kind === 'house' ? HOUSE_LEVELS[copy] : a.kind === 'small' ? SMALL_LEVELS[copy] : KIND_LEVEL[a.kind]);
@@ -106,7 +105,8 @@ function effectText(a, words, capHours) {
     return '';
 }
 
-// Distance (en cases, diagonales comprises) entre une case et la grande emprise 3 × 3 dont le coin est at
+// Distance (en cases, diagonales comprises) entre une case et la grande emprise 3 × 3 dont le coin est at (les cases
+// libres d'une annexe sont proposées de la plus proche à la plus lointaine)
 const reachOf = (x, y, at) => Math.max(at.x - x, 0, x - (at.x + 2), at.y - y, 0, y - (at.y + 2));
 
-module.exports = { REACH, ANNEXES, ANNEX_BY_ID, maxOf, levelFor, priceOf, bonusesOf, regenWith, effectText, reachOf };
+module.exports = { ANNEXES, ANNEX_BY_ID, maxOf, levelFor, priceOf, bonusesOf, regenWith, effectText, reachOf };
