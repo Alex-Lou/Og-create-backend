@@ -114,7 +114,10 @@ test('au Grimoire, pendant la quête d’Ondin : la page que marque le ruban a s
 test('« Passer le tutoriel » se retient sur le compte : Brume le dit, sur l’île comme au Grimoire', async () => {
   const player = await newPlayer({ veteran: false });
   const brume = async () => (await api('GET', '/play/world/brume', null, player)).data;
-  assert.equal((await brume()).skipped, false);
+  assert.deepEqual([(await brume()).tutorial, (await brume()).skipped], [true, false]);
+  const veteran = await newPlayer();
+  assert.equal((await api('GET', '/play/world/brume', null, veteran)).data.tutorial, false);
+  assert.equal((await view(veteran)).brume.tutorial, false);
   assert.equal((await api('POST', '/play/world/prologue/skip', {}, { cookies: {} })).status, 401);
   const both = await Promise.all([1, 2].map(() => api('POST', '/play/world/prologue/skip', {}, player)));
   assert.deepEqual(both.map(r => r.status), [200, 200]);

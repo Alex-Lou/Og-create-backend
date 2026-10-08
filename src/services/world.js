@@ -23,6 +23,7 @@ const finds = require('./finds');
 const anya = require('./anya');
 const avatarChoices = require('./avatarChoices');
 const pickups = require('./pickups');
+const players = require('./players');
 const beastRules = require('./beasts');
 const {
     SIZE, CAP_HOURS, REGEN_MS, RUN_TTL_MS, RENAME_LEVEL, GAME_TTL_MS, GAME_SLACK_MS, FIRST_RUN_MOVES, FIRST_RUN_KINDS,
@@ -142,12 +143,17 @@ function boardWith(claimed, facts, openChapters) {
 // peuple, pour l'étape de civilisation (l'Ex libris du Grimoire)
 async function board(userId, owned, stars, openChapters) {
     const out = boardWith(await claimedOf(userId), await factsOf(userId, owned, stars), openChapters);
-    // Anya : le Grimoire allume sa gemme une fois la Révélation vue ; le tutoriel passé sur ce compte
-    return { ...out, people: (await namesOf(userId)).peuple || null, anya: await anyaOf(userId), skipped: (await itemsOf(userId)).has(PROLOGUE_SKIP) };
+    // Anya : le Grimoire allume sa gemme une fois la Révélation vue ; le tutoriel (un compte d'après la bible, s'il ne
+    // l'a pas passé : le jeu le reprend à son étape, sur tout appareil)
+    return { ...out, people: (await namesOf(userId)).peuple || null, anya: await anyaOf(userId), ...await tutorialOf(userId) };
 }
 
 // « Passer le tutoriel » : retenu sur le compte, pour tous ses appareils (une ligne de world_items, sans donnée nouvelle)
 const PROLOGUE_SKIP = 'prologue:passe';
+// Le tutoriel du compte : tutorial (créé depuis la bible : un vétéran garde son jeu tel quel), skipped (passé)
+async function tutorialOf(userId, conn = db) {
+    return { tutorial: !(await players.veteranOf(userId, conn)), skipped: (await itemsOf(userId, conn)).has(PROLOGUE_SKIP) };
+}
 async function skipPrologue(userId) {
     await db.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'tutoriel') ON CONFLICT DO NOTHING`, [userId, PROLOGUE_SKIP]);
 }
@@ -373,7 +379,7 @@ async function view(userId, owned, book) {
         avatar: await avatarOf(userId),
         // Brume, le feu follet : la quête active (ou son dernier mot)
         brume: (() => {
-            const out = { ...boardWith(claimed, facts, book.openChapters), skipped: items.has(PROLOGUE_SKIP) };
+            const out = { ...boardWith(claimed, facts, book.openChapters), tutorial: !presence.veteran, skipped: items.has(PROLOGUE_SKIP) };
             // Le fil d'Ariane de la quête active : la cible et les pages qui restent (le Grimoire montre la page marquée)
             if (out.quest && !out.quest.done && book.ariane) out.quest.ariane = { target: book.ariane.target, remaining: book.ariane.remaining };
             return out;
