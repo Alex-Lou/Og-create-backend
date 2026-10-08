@@ -10,6 +10,7 @@ const { SIZE, CAP_HOURS, RESOURCES, CHAPTER_OF_LEVEL, WORDS, SITES } = require('
 const { annexesOf, levelsOf, stockOf, zonesOf, findsOf, spendFinds } = require('./reads');
 const { migrate } = require('./migrate');
 const { gather } = require('./produce');
+const { campOfUser, cellsOfCamp } = require('./camp');
 
 // Case où une annexe de ce bâtiment peut se poser (sans compter ce qui l'occupe) : sol constructible du quartier du
 // bâtiment, n'importe où dans ce quartier, hors des grandes emprises des chantiers et des lieux remarquables
@@ -59,6 +60,7 @@ async function cellTaken(userId, x, y, conn) {
     return rows.length > 0 || Boolean(await annexAt(userId, x, y, conn));
 }
 const SPOT_MESSAGE = 'Une annexe se pose sur une case libre du quartier de son bâtiment.';
+const CAMP_MESSAGE = 'Cette case est au camp des naufragés.';
 
 // Pose l'exemplaire suivant d'une annexe : bâtiment construit au palier voulu dans un quartier possédé, case libre
 // autorisée, ressources et écus débités une seule fois (ligne de stock verrouillée : deux poses ne se croisent pas).
@@ -78,6 +80,7 @@ async function placeAnnex(userId, annexId, x, y) {
         const need = annexes.levelFor(a, copy);
         if (level < need) return db.rollback({ status: 403, message: `Il faut le palier ${CHAPTER_OF_LEVEL[need - 1]} de ce bâtiment.` });
         if (await cellTaken(userId, x, y, conn)) return db.rollback({ status: 409, message: 'Cette case est déjà occupée.' });
+        if (cellsOfCamp(await campOfUser(userId, conn, { levels })).has(y * SIZE + x)) return db.rollback({ status: 409, message: CAMP_MESSAGE });
         const { cost, coins: price, finds: spent } = annexes.priceOf(a, copy);
         // La production en cours est encaissée d'abord : elle compte pour payer
         const gathered = await gather(userId, conn, stock);
@@ -106,6 +109,7 @@ async function moveAnnex(userId, x, y, toX, toY) {
         if (!a || !annexSpotOk(a.site, toX, toY)) return db.rollback({ status: 400, message: SPOT_MESSAGE });
         if (x === toX && y === toY) return {};
         if (await cellTaken(userId, toX, toY, conn)) return db.rollback({ status: 409, message: 'Cette case est déjà occupée.' });
+        if (cellsOfCamp(await campOfUser(userId, conn)).has(toY * SIZE + toX)) return db.rollback({ status: 409, message: CAMP_MESSAGE });
         await conn.query('UPDATE world_annexes SET x = $4, y = $5 WHERE user_id = $1 AND x = $2 AND y = $3', [userId, x, y, toX, toY]);
         return {};
     });

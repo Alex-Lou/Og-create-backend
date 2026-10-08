@@ -10,14 +10,16 @@ const { SIZE, CRAFT_TTL_MS, keyOf } = require('./rules');
 const { annexesOf, levelsOf, stockOf, zonesOf, findsOf, spendFinds, craftsOf, placedOf, madeOf } = require('./reads');
 const { migrate } = require('./migrate');
 const { livesHere } = require('./people');
+const { campOfUser, cellsOfCamp } = require('./camp');
 const { gatherBefore, payWith } = require('./produce');
 
 // Contexte des règles de pose (crafts.spotBlock) : sol, case libre (sur l'île, hors chantier, quartier à soi, ni annexe,
 // ni autre création, ni lieu remarquable, ni gisement), emprise d'un bâtiment bâti, créations posées (sauf skip : celle qu'on déplace)
 // (cells : les cases libres, calculées une fois pour toutes les créations)
-function craftCtx(levels, zones, annexRows, rows, skip = null) {
+// (blocked : cases réservées en plus, celles du camp des naufragés)
+function craftCtx(levels, zones, annexRows, rows, skip = null, blocked = new Set()) {
     const others = placedOf(rows).filter(r => r.id !== skip);
-    const busy = new Set([...annexRows.map(keyOf), ...others.map(keyOf)]);
+    const busy = new Set([...annexRows.map(keyOf), ...others.map(keyOf), ...blocked]);
     const open = new Uint8Array(SIZE * SIZE);
     const cells = [];
     for (let y = 0; y < SIZE; y++) {
@@ -160,7 +162,9 @@ async function placeCraft(userId, craftId, x, y) {
         const row = rows.find(r => r.craft === craftId && r.x === null);
         if (!row) return db.rollback({ status: 409, message: `Pas de « ${c.name} » en réserve : fabrique d’abord cette création.` });
         const { levels } = await levelsOf(userId, conn);
-        const block = crafts.spotBlock(c, x, y, craftCtx(levels, await zonesOf(userId, conn), await annexesOf(userId, conn), rows));
+        const annexRows = await annexesOf(userId, conn);
+        const campCells = cellsOfCamp(await campOfUser(userId, conn, { levels, annexRows, craftRows: rows }));
+        const block = crafts.spotBlock(c, x, y, craftCtx(levels, await zonesOf(userId, conn), annexRows, rows, null, campCells));
         if (block) return db.rollback({ status: 400, message: block });
         return setSpot(userId, conn, stock, row, x, y);
     });
@@ -175,7 +179,9 @@ async function moveCraft(userId, x, y, toX, toY) {
         const row = rows.find(r => r.x === x && r.y === y);
         if (!row) return db.rollback({ status: 404, message: 'Aucune création sur cette case.' });
         const { levels } = await levelsOf(userId, conn);
-        const block = crafts.spotBlock(crafts.CRAFT_BY_ID[row.craft], toX, toY, craftCtx(levels, await zonesOf(userId, conn), await annexesOf(userId, conn), rows, row.id));
+        const annexRows = await annexesOf(userId, conn);
+        const campCells = cellsOfCamp(await campOfUser(userId, conn, { levels, annexRows, craftRows: rows }));
+        const block = crafts.spotBlock(crafts.CRAFT_BY_ID[row.craft], toX, toY, craftCtx(levels, await zonesOf(userId, conn), annexRows, rows, row.id, campCells));
         if (block) return db.rollback({ status: 400, message: block });
         // Une création posée près d'elle (règle « près de ») doit la garder à portée
         const needed = crafts.leaveBlock(row, toX, toY, placedOf(rows));
