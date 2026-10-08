@@ -467,6 +467,9 @@ function solveCraft(run) {
 test('créations d’île : assembler (pièces vérifiées), payer à la réussite, poser selon la règle, déplacer, ranger', async () => {
   const player = await newPlayer();
   const view = async () => (await api('GET', '/play/world', null, player)).data;
+  // (une île d'avant les sentiers : les routes de la carte, où se posent la Lanterne et les autres)
+  await view();
+  await sql(`DELETE FROM world_items WHERE user_id = $1 AND item = 'ile:sentiers'`, [player.userId]);
   const start = craft => api('POST', '/play/world/craft/start', { craft }, player);
   const finish = (run, layout) => api('POST', '/play/world/craft/finish', { run, layout }, player);
   const place = (craft, x, y) => api('POST', '/play/world/craft/place', { craft, x, y }, player);
@@ -2264,7 +2267,7 @@ test('quêtes de Brume : la quête active se réclame une fois, son objectif att
   assert.equal(start.status, 200);
   assert.deepEqual([start.data.brume.quest.id, start.data.brume.quest.kind, start.data.brume.quest.done], ['pages', 'stars', false]);
   assert.equal(start.data.brume.done, 0);
-  assert.equal(start.data.brume.total, 59);
+  assert.equal(start.data.brume.total, 60);
   // Objectif pas encore atteint ; quête qui n'est pas l'active ; identifiant invalide
   assert.equal((await api('POST', '/play/world/quest', { id: 'pages' }, player)).status, 403);
   assert.equal((await api('POST', '/play/world/quest', { id: 'achat-source' }, player)).status, 409);
@@ -2375,7 +2378,8 @@ test('le prologue d’un nouveau compte : la troupe arrive à sa rencontre, Ondi
   // Six découvertes : les chapitres II et III ont leur coffre ; la fin du prologue, le sien
   assert.deepEqual(built.data.world.chests.pending.map(c => c.source), ['chapitre:II', 'chapitre:III', 'quete:puits-ondin']);
   assert.deepEqual(who(built.data.world, 'foyer').needs.map(n => n.id), ['manger', 'deco']);
-  assert.deepEqual([who(built.data.world, 'puits').built, built.data.world.brume.quest.id], [true, 'lisiere']);
+  // (puis le premier chemin, du Puits au Feu : l'île neuve n'a que son sentier)
+  assert.deepEqual([who(built.data.world, 'puits').built, built.data.world.brume.quest.id], [true, 'chemin']);
   assert.equal(await coinsOf(player), 100 + 30 + 10 + 20 + 40);
 });
 

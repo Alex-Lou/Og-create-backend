@@ -54,7 +54,7 @@ test('« Recommencer l’île » : une fois, confirmé en toutes lettres ; l’�
     const chests = (await sql('SELECT source FROM world_chests WHERE user_id = $1 ORDER BY source', [id])).map(r => r.source);
     assert.deepEqual(chests, ['chapitre:I']);
     const items = (await sql('SELECT item FROM world_items WHERE user_id = $1 ORDER BY item', [id])).map(r => r.item);
-    assert.deepEqual(items, ['banc', 'ile:recommencee']);
+    assert.deepEqual(items, ['banc', 'ile:recommencee', 'ile:sentiers']);
     // Les habitants arrivent un à un : Cannelle au feu, plus à la Récolte
     await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'pages'), ($1, 'ramasser'), ($1, 'recolte')`, [id]);
     assert.equal((await view(player)).villagers.some(v => v.id === 'foyer'), false);
