@@ -82,3 +82,26 @@ test('un compte d’avant la v6 ne recule jamais : feu allumé, Cannelle après 
   // Le feu bâti ensuite (Abri) passe au palier II comme avant
   assert.equal(foyerOf(rivet), 1);
 });
+
+test('au Grimoire, pendant la quête d’Ondin : la page que marque le ruban a son Encre offerte, elle seule', async () => {
+  const player = await newPlayer({ veteran: false });
+  const id = player.userId;
+  await sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Vent", "Pluie", "Brasier"]'::jsonb WHERE user_id = $1`, [id]);
+  const pages = async () => (await api('GET', '/play/book', null, player)).data.chapters.flatMap(c => c.pages);
+  const ink = page => api('POST', '/play/ink', { page }, player);
+  // Réveiller Ondin réclamé : la quête active écrit le Puits
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'eveil-ondin')`, [id]);
+  const guided = await pages();
+  const marked = guided.find(p => p.marked);
+  assert.ok(marked, 'une page marquée');
+  assert.deepEqual(guided.filter(p => p.guidedInk).map(p => p.id), [marked.id]);
+  // Sans un écu : une autre page se paie (refusée), la page marquée est offerte
+  const other = guided.find(p => p.status === 'reach' && !p.marked);
+  if (other) assert.equal((await ink(other.id)).status, 400);
+  const free = await ink(marked.id);
+  assert.deepEqual([free.status, free.data.free], [200, true]);
+  assert.ok(free.data.ingredient);
+  // La quête suivante (bâtir le Puits) : plus d'Encre offerte d'office
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'souvenir-ondin')`, [id]);
+  assert.equal((await pages()).some(p => p.guidedInk), false);
+});
