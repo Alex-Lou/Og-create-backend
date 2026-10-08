@@ -55,7 +55,8 @@ test('un nouveau compte bâtit son feu ; Cannelle ne vient qu’au feu, Rivet qu
   // Sans bois ni pierre : refusé ; plus loin dans la chaîne sans feu (la Récolte faite) : Cannelle n'est pas là
   assert.equal((await api('POST', '/play/world/build', { site: 'foyer' }, player)).status, 400);
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'recolte')`, [id]);
-  assert.deepEqual([met(await view(player)), (await view(player)).brume.quest.id], [['ponton'], 'feu']);
+  // (Brume seule : Aster débarque à la fin du tutoriel)
+  assert.deepEqual([met(await view(player)), (await view(player)).brume.quest.id], [[], 'feu']);
   assert.equal((await api('POST', '/play/world/beasts/cage', {}, player)).status, 403);
   // Le feu réclamé : Cannelle ; la soupe seule n'amène plus Rivet (les poules, si)
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'feu'), ($1, 'soupe')`, [id]);
