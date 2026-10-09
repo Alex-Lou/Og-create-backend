@@ -38,6 +38,7 @@ Toutes les FK `user_id` pointent vers `users(id)` avec **`ON DELETE CASCADE`**. 
 
 | Table (`schema.sql`) | Rôle | PK | Colonnes et contraintes notables |
 |---|---|---|---|
+| `world_site_places` (2026-10-09) | place d'un bâtiment déplacé par le joueur | `(user_id, site)` | `x`, `y` (coin de la grande emprise 3 × 3), `moved_at` ; FK `users` ON DELETE CASCADE ; effacée par « Recommencer l'île » ; sans ligne : la carte, ou l'île à la plage (`world_items` « ile:plage ») — `services/world/places.js` |
 | `users` (`:15-26`) | comptes | `id` SERIAL | `email` VARCHAR(255) **UNIQUE** (sensible à la casse) ; `username` UNIQUE ; `password_hash` ; `created_at` (fixe les règles du joueur) ; `suspended_at`, `delete_at` |
 | `email_changes` (`:30-35`) | nouvelle adresse en attente (1 h) | `user_id` | `new_email` ; `token_hash` CHAR(64) UNIQUE ; `expires_at` |
 | `auth_sessions` (`:47-57`) | jetons de rafraîchissement (empreintes) | `id` BIGSERIAL | `family` UUID ; `token_hash` UNIQUE ; `expires_at`, `revoked_at`, `created_at` ; index `family` et `user_id` |
