@@ -84,6 +84,7 @@ une variable à 0 rend le défaut, pas 0.
 | lien de nouvelle adresse | 15 min | 10 | IP | — | `account.js:17` |
 | mot de passe oublié / reset | 15 min | 5 / 10 | IP | — | `routes/passwordReset.js:15` |
 | contact | 60 min | 5 | IP | — | `routes/contact.js:13` |
+| erreurs du jeu | 1 min | 10 | IP | — | `routes/clientErrors.js` |
 | progress, timer | 1 min | 120 | `req.user.id` | — | `progress.js:9`, `timer.js:9` |
 | `addressLimiter` (`/api/play`) | 1 min | 600 | IP | `PLAY_ADDRESS_RATE_LIMIT` | `play/shared.js:26` |
 | `playLimiter` | 1 min | 120 | `u:<id>`, sinon `g:<oc_guest ou IP>` | — | `shared.js:19-24` |

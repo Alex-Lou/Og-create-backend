@@ -222,6 +222,7 @@ Corps du 429 : `{ message }` si l'option `message` est donnée, sinon le `handle
 | Route | Accès | Corps → réponse | Erreurs | Front |
 |---|---|---|---|---|
 | `POST /contact/send` (`R/contact.js:18`) | public, 5/h/IP | `{ email, message }` : email coupé, `/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/`, ≤ 255 ; message coupé, 1 à 5000 caractères → `{ message }` ; HTML échappé dans le mail | 400, 429, 500 | `Settings/ContactModal/ContactModal.vue:66` (appel `http` direct) |
+| `POST /client-errors` (`R/clientErrors.js`, 2026-10-09) | public, 10/min/IP, en-tête du jeu | `{ kind: 'error'\|'rejection'\|'vue', message, source?, stack?, info?, mode?, version? }` ; nettoyé et borné (`S/clientErrors.js`) → 204 ; écrit au journal | 400, 403, 429 | `src/utils/errorReport.js` |
 
 ### 4.7 Jeu : cœur (`P/index.js`)
 
