@@ -526,4 +526,12 @@ router.post('/world/quest', withAccount(async (req, res, owner, b) => {
     res.json({ gained: done.gained, coins: done.coins, world: await worldView(owner, b) });
 }));
 
+// Dormir, la première nuit (tutoriel, étape « nuit ») : sans écus ni coffre ; au matin, Aster arrive et sa Récolte
+// s'ouvre. { slept, world }
+router.post('/world/sleep', withAccount(async (req, res, owner, b) => {
+    const done = await world.sleep(owner.id);
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json({ slept: true, world: await worldView(owner, b) });
+}));
+
 module.exports = router;

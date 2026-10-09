@@ -57,8 +57,11 @@ test('un nouveau compte bâtit son feu ; Aster vient au matin, Cannelle après s
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'pages'), ($1, 'ramasser')`, [id]);
   assert.deepEqual([met(await view(player)), (await view(player)).brume.quest.id], [[], 'feu']);
   assert.equal((await api('POST', '/play/world/beasts/cage', {}, player)).status, 403);
-  // Le feu réclamé : Aster, puis sa Récolte fait venir Cannelle. La soupe seule n'amène plus Rivet.
+  // Le feu réclamé : personne encore ; la première nuit passée : Aster, puis sa Récolte fait venir Cannelle. La
+  // soupe seule n'amène plus Rivet.
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'feu')`, [id]);
+  assert.deepEqual(met(await view(player)), []);
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'nuit')`, [id]);
   assert.deepEqual(met(await view(player)), ['ponton']);
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'recolte'), ($1, 'soupe')`, [id]);
   const after = await view(player);

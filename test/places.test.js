@@ -74,15 +74,18 @@ test.describe('île', () => {
     assert.deepEqual([foyer.x, foyer.y, foyer.hidden], [99, 93, false]);
     assert.deepEqual(start.sites.filter(s => !s.hidden).map(s => s.id), ['foyer']);
     assert.deepEqual(start.camp.map(c => c.id), ['hirondelle']);
-    // Le suivi des quêtes montre tout le tutoriel : douze étapes, de la première page au premier chemin
-    assert.deepEqual([start.brume.steps.length, start.brume.steps[0].id, start.brume.steps.at(-1).id], [12, 'pages', 'chemin']);
+    // Le suivi des quêtes montre tout le tutoriel : treize étapes, de la première page au premier chemin
+    assert.deepEqual([start.brume.steps.length, start.brume.steps[0].id, start.brume.steps.at(-1).id], [13, 'pages', 'chemin']);
     assert.ok(start.brume.steps.every(st => st.label && st.done === false));
-    // Le feu fait : Aster arrive, son Ponton et son camp avec elle
+    // Le feu fait : personne encore (la première nuit se passe seul) ; la nuit passée : Aster arrive, son Ponton et
+    // son camp avec elle
     await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'pages'), ($1, 'ramasser'), ($1, 'feu')`, [player.userId]);
+    assert.deepEqual((await view()).villagers.map(v => v.id), []);
+    await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'nuit')`, [player.userId]);
     const after = await view();
     assert.deepEqual(after.sites.filter(s => !s.hidden).map(s => s.id).sort(), ['foyer', 'ponton']);
     assert.ok(after.camp.some(c => c.id === 'aster') && !after.camp.some(c => c.id === 'cannelle'));
-    assert.deepEqual(after.brume.steps.filter(st => st.done).map(st => st.id), ['pages', 'ramasser', 'feu']);
+    assert.deepEqual(after.brume.steps.filter(st => st.done).map(st => st.id), ['pages', 'ramasser', 'feu', 'nuit']);
     // Un compte d'avant la bible voit tout, comme avant
     const old = await newPlayer();
     const oldView = (await api('GET', '/play/world', null, old)).data;

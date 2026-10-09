@@ -549,6 +549,19 @@ async function claimQuest(userId, questId, owned, stars) {
     });
 }
 
+// Dormir, la première nuit (choix de l'auteur, 9 oct.) : seule l'étape « nuit » du tutoriel se passe ainsi, sans écus
+// ni coffre. La nuit est marquée comme faite ; au matin, Aster rejoint le camp (world/people.js) et sa Récolte s'ouvre.
+async function sleep(userId) {
+    await migrate(userId);
+    return db.transaction(async conn => {
+        const quest = quests.currentOf(await claimedOf(userId, conn));
+        if (!quest || quest.id !== 'nuit') return db.rollback({ status: 409, message: 'Ce n’est pas le moment de dormir.' });
+        const added = await conn.query('INSERT INTO world_quests (user_id, quest) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING quest', [userId, 'nuit']);
+        if (!added.rows.length) return db.rollback({ status: 409, message: 'Tu as déjà dormi.' });
+        return { slept: true };
+    });
+}
+
 // Achat d'un quartier : chapitre ouvert, écus débités une fois (même en double clic) ; { status, message } si refus
 async function buyZone(userId, zoneId, openChapters, owned = []) {
     const zone = map.ZONE_BY_ID[zoneId];
@@ -963,7 +976,7 @@ async function chooseSign(userId, siteId, styleId) {
 
 module.exports = {
     SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, pendingOf, chargesAt, effectsOf, productionOf,
-    view, build, buyZone, buyItem, undoItem, harvestCap, chooseSkin, startRun, finishRun, collect, migrate, claimQuest, board, openChest, openAll,
+    view, build, buyZone, buyItem, undoItem, harvestCap, chooseSkin, startRun, finishRun, collect, migrate, claimQuest, sleep, board, openChest, openAll,
     placeAnnex, moveAnnex, poseAnnex, annexSpotOk, siteSpots, moveSite, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople, namePlayer, chooseAvatar, arianeTargets, guidedInkOf, restartIsland,
     refundDecorations, startCraft, finishCraft, placeCraft, moveCraft, storeCraft, turnCraft, startExpedition, findLandmark, gatherDeposit, pickUp,
     anyaOf, breathRefused, revealAnya, breatheAnya, brumeSavoirOf, talkBrume, startNights, repelCreature, repairSite, skipPrologue, layPaths,

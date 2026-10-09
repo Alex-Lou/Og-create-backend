@@ -34,6 +34,10 @@ const QUESTS = [
     // Le premier feu est réellement bâti avec les trouvailles ; c'est le Foyer au palier I.
     q('feu', 'T', { kind: 'level', site: 'foyer', need: 1 }, 15, 'Allume le Feu de camp',
         'Ceux d’avant faisaient un cercle de pierres, et le bois au milieu. Bâtis le feu ici, sur la plage de Brumelune : tes trouvailles suffiront.'),
+    // La première nuit (choix de l'auteur, 9 oct.) : seul avec Brume, sans personne d'autre, avant l'arrivée d'Aster au
+    // matin. Une étape de respiration, sans écus : on explore, puis on dort (world.sleep).
+    q('nuit', 'T', { kind: 'sleep', site: 'foyer' }, 0, 'Passe ta première nuit',
+        'Le feu tient. La nuit tombe sur Brumelune, qui ne s’éveille que pour toi. Explore à ta guise… puis dors : demain, nous ne serons plus seuls.'),
     q('recolte', 'T', { kind: 'runs', need: 1 }, 15, 'Termine une Récolte avec Aster',
         'Aster a rejoint le camp au matin. Suis-la au rivage : relie ce qui se ressemble, vite, avant la marée.'),
     q('soupe', 'T', { kind: 'need', villager: 'foyer', what: 'manger' }, 15, 'Une soupe pour Cannelle',
@@ -236,6 +240,8 @@ const HAVE = {
     hens: (goal, facts) => facts.hensFed,
     visitor: (goal, facts) => facts.visitors,
     settle: (goal, facts) => facts.settled,
+    // Dormir n'est pas un objectif à compter : la première nuit se passe par world.sleep, jamais par une réclamation
+    sleep: () => 0,
     name: (goal, facts) => (facts.named ? 1 : 0),
     link: (goal, facts) => (facts.links && facts.links.has(`${goal.from}-${goal.to}`) ? 1 : 0)
 };

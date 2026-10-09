@@ -58,8 +58,10 @@ test('« Recommencer l’île » : confirmé en toutes lettres ; tout repart de 
     const items = (await sql('SELECT item FROM world_items WHERE user_id = $1 ORDER BY item', [id])).map(r => r.item);
     // (l'île recommencée part de ses sentiers, son Feu sur la plage : world/places.js)
     assert.deepEqual(items, ['ile:plage', 'ile:recommencee', 'ile:sentiers']);
-    // Les habitants arrivent un à un : Aster après le feu, Cannelle après la Récolte.
+    // Les habitants arrivent un à un : personne pendant la première nuit, Aster au matin, Cannelle après la Récolte.
     await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'pages'), ($1, 'ramasser'), ($1, 'feu')`, [id]);
+    assert.deepEqual((await view(player)).villagers.map(v => v.id), []);
+    await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'nuit')`, [id]);
     assert.deepEqual((await view(player)).villagers.map(v => v.id), ['ponton']);
     await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'recolte')`, [id]);
     assert.equal((await view(player)).villagers.some(v => v.id === 'foyer'), true);
@@ -69,11 +71,31 @@ test('« Recommencer l’île » : confirmé en toutes lettres ; tout repart de 
     assert.equal((await restart(player)).status, 409);
 });
 
+test('dormir : la première nuit se passe seul, sans écus ; Aster n’arrive qu’au matin', async () => {
+    const player = await newPlayer({ veteran: false });
+    const id = player.userId;
+    const view = async () => (await api('GET', '/play/world', null, player)).data;
+    // Avant le feu : pas encore l'heure de dormir
+    assert.equal((await api('POST', '/play/world/sleep', {}, player)).status, 409);
+    await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'pages'), ($1, 'ramasser'), ($1, 'feu')`, [id]);
+    const before = await view();
+    assert.deepEqual([before.brume.quest.id, before.villagers.map(v => v.id)], ['nuit', []]);
+    // La nuit passée : la Récolte d'Aster s'ouvre, Aster rejoint le camp ; rien ne se gagne en dormant
+    const slept = await api('POST', '/play/world/sleep', {}, player);
+    assert.equal(slept.status, 200);
+    assert.equal(slept.data.slept, true);
+    assert.deepEqual([slept.data.world.brume.quest.id, slept.data.world.villagers.map(v => v.id)], ['recolte', ['ponton']]);
+    const coins = (await sql('SELECT coins FROM progress WHERE user_id = $1', [id]))[0].coins;
+    assert.equal(coins, 0);
+    // Dormir deux fois : refusé
+    assert.equal((await api('POST', '/play/world/sleep', {}, player)).status, 409);
+});
+
 test('au tutoriel, La Source se découvre en écrivant la Source : sans écus ; un compte d’avant la bible l’achète', async () => {
     const player = await newPlayer({ veteran: false });
     const id = player.userId;
     await view(player);
-    const done = ['pages', 'ramasser', 'feu', 'recolte', 'soupe', 'poules', 'deco'];
+    const done = ['pages', 'ramasser', 'feu', 'nuit', 'recolte', 'soupe', 'poules', 'deco'];
     await sql(`INSERT INTO world_quests (user_id, quest) SELECT $1, unnest($2::text[])`, [id, done]);
     const first = await view(player);
     assert.deepEqual([first.brume.quest.id, first.brume.quest.label], ['achat-source', 'Découvre La Source : fais-la naître dans l’Athanor']);

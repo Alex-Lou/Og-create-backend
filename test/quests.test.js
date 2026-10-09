@@ -21,14 +21,15 @@ const OLD = ['deco', 'recolte', 'source', 'puits', 'lisiere', 'cabane', 'livre5'
   'crique', 'ponton', 'livre45', 'hameau', 'deco10', 'phare', 'livre70', 'legendes'];
 
 test('chaque quête désigne un vrai quartier, palier, création, lieu ou habitant, avec un texte et une récompense', () => {
-  assert.equal(QUESTS.length, 60);
+  assert.equal(QUESTS.length, 61);
   assert.equal(new Set(QUESTS.map(q => q.id)).size, QUESTS.length);
   for (const q of QUESTS) {
     assert.match(q.id, /^[a-z0-9-]{1,30}$/);
     assert.ok(ACTS.includes(q.act), q.id);
     // Une bulle de Brume : 140 caractères au plus (bible, § 7.4)
     assert.ok(q.say.length > 20 && q.say.length <= 140 && q.label.length > 5, q.id);
-    assert.ok(Number.isInteger(q.coins) && q.coins > 0, q.id);
+    // La nuit se passe sans rien gagner : la seule étape du tutoriel sans récompense
+    assert.ok(Number.isInteger(q.coins) && (q.goal.kind === 'sleep' ? q.coins === 0 : q.coins > 0), q.id);
     const { goal } = q;
     if (goal.kind === 'zone') {
       assert.ok(map.ZONE_BY_ID[goal.zone], q.id);
@@ -108,9 +109,9 @@ test('avancée de chaque objectif, plafonnée', () => {
 
 test('la quête active est la première pas encore faite ; à la fin, Brume se repose', () => {
   const first = active(new Set(), facts());
-  assert.deepEqual(QUESTS.slice(0, 4).map(q => q.id), ['pages', 'ramasser', 'feu', 'recolte']);
+  assert.deepEqual(QUESTS.slice(0, 5).map(q => q.id), ['pages', 'ramasser', 'feu', 'nuit', 'recolte']);
   assert.match(QUESTS.find(q => q.id === 'feu').say, /sur la plage de Brumelune/);
-  assert.deepEqual([first.id, first.act, first.step, first.total, first.kind, first.done], ['pages', 'T', 1, 60, 'element', false]);
+  assert.deepEqual([first.id, first.act, first.step, first.total, first.kind, first.done], ['pages', 'T', 1, 61, 'element', false]);
   assert.equal(active(new Set(), facts({ elements: new Set([...facts().elements, 'Vent']) })).done, true);
   const ondin = active(new Set(['achat-source']), facts());
   assert.deepEqual([ondin.id, ondin.target], ['eveil-ondin', { villager: 'puits' }]);

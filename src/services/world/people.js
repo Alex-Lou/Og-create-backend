@@ -42,7 +42,7 @@ const knownResident = id => Object.hasOwn(villagers.VILLAGERS, id) || SETTLER_ID
 const SLEEPERS = ['puits', 'bosquet', 'carriere', 'potager'];
 function metOf(id, levels, zones, presence) {
     if (presence.veteran && livesHere(id, levels, zones)) return true;
-    if (id === 'ponton') return !presence.fresh || presence.done.has('feu');
+    if (id === 'ponton') return !presence.fresh || presence.done.has('nuit');
     if (id === 'foyer') return presence.done.has('recolte');
     if (id === 'atelier') return presence.done.has(presence.fresh ? 'poules' : 'soupe');
     return zones.has(map.siteZone(id));
