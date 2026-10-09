@@ -311,7 +311,7 @@ Coordonnées : entiers de 0 à 143 (`W:202`, `S/worldMap.js:8`).
 | `/world/chests/all` | 479 | — | `{ chests, coins, world }` | 409 | `WV/chests.js:67` |
 | `GET /world/brume` | 486 | — | `{ quest, done, total, acts, rested, people, anya, tutorial, skipped }` (`S/world.js:181-185`, `S/quests.js:278`) | 401, 402 | `App/story.js:323`, `App/account.js:79`, `App/achievements.js:51` |
 | `/world/prologue/skip` | 492 | — | `{ skipped:true }` | 409 (première nuit non faite) | `App/story.js:409` |
-| `/world/restart` | 499 | `confirm === 'RECOMMENCER'` | `{ restarted:true }` | 400, 409 | `AccountModal.vue:277` |
+| `/world/restart` | 499 | `confirm === 'RECOMMENCER'` | `{ restarted:true }` : tout est effacé sauf le compte (`DATABASE.md` § 6, D-009) | 400, 409 | `AccountModal.vue:277` |
 | `/world/quest` | 507 | `id` /^[a-z0-9-]{1,30}$/ | `{ gained, coins, world }` | 400, 403, 409 | front `src/world/view/draw/brume.js:170` |
 
 ---
@@ -387,6 +387,7 @@ Coordonnées : entiers de 0 à 143 (`W:202`, `S/worldMap.js:8`).
 |---|---|---|
 | Chapitre II du Grimoire ouvert d'emblée (`/play/book`, chapitres de `/world/zone`, `/build`, `/chest`) | `isVeteran` (date du compte seule) | `S/bookPages.js:34`, `P/book.js:24`, `W:36` |
 | `brume.tutorial` = `!veteran` (vue et `GET /world/brume`) | île vétérane | `S/world.js:195,508` |
+| `brume.steps` (vue de l'île seulement) : `[{ id, label, done }]`, les 12 étapes du tutoriel (de `pages` à `chemin`), si `tutorial && !skipped` et la quête active en fait partie | sinon absent | `S/quests.js` `tutorialStepsOf` |
 | Quartier à plan : `price:0`, `plan`, `planOwned` ; achat refusé sans le plan | île non vétérane | `S/world.js:402,555` |
 | Feu du Foyer allumé d'office (`levels.foyer = 1`) | île non `fresh` | `S/world/reads.js:78-86` |
 | Habitants présents ou affamés (Ponton, Foyer, prologue) | `veteran` / `fresh` | `S/world/people.js:43-44,68,74` |

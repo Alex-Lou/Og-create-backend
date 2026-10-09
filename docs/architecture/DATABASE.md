@@ -187,25 +187,17 @@ avec `db/README.md`.
 | Liens | nouvelle demande, ou usage | `password_resets` du compte ; `email_changes` consommé | `services/passwordReset.js:22`, `:41` ; `accountSettings.js:104` |
 | Fin d'Épreuve | `POST /play/timer/finish` | la ligne `play_runs` | `trial.js:97-100` |
 
-**« Recommencer l'île »** (`world.js:212-243`), une transaction qui verrouille `users` :
+**« Recommencer l'île »** (`world.js`, `restartIsland`), une transaction qui verrouille `users`. Depuis le
+2026-10-09 (choix de l'auteur, `DECISIONS.md` D-009), **tout s'efface sauf le compte** :
 
-- **efface** les 22 tables de `ISLAND_TABLES` :
-  - parties : `world_game_runs`, `world_games`, `world_craft_runs`, `world_runs` ;
-  - constructions : `world_crafts`, `world_annexes`, `world_tiles`, `world_buildings` ;
-  - progression : `world_quests`, `world_zones`, `world_expeditions`, `world_landmarks`, `world_finds`,
-    `world_deposits`, `world_nights` ;
-  - habitants : `world_beasts`, `world_visitors`, `world_needs`, `world_friends` ;
-  - noms : `world_signs`, `world_sign_names`, `world_names` (y compris le nom du joueur, `target = 'joueur'`) ;
-- **efface aussi** :
-  - les coffres `quete:`, `lieu:` et `recolte:` ;
-  - les `world_items` `prologue:passe`, `tutoriel:plage-v1`, `chemin:%` et `etoile:%` ;
-- **recrée** `world_stock` : réserve vide, 3 parties, carte actuelle ;
-- **ajoute** `ile:sentiers` et `ile:recommencee` ;
-- **garde** :
-  - `progress` (Grimoire, écus) et `coin_ledger` ;
-  - les achats et butins de `world_items`, `world_skins`, `world_sign_styles`, `world_avatars` ;
-  - les coffres `jour:`, `bouteille:` et `chapitre:` ;
-  - `book_*`.
+- **efface**, pour le joueur, les 32 tables de `PLAYER_TABLES` : toutes les `world_*` (y compris `world_items`,
+  `world_chests`, `world_skins`, `world_sign_styles`, `world_avatars`, `world_site_places`, `world_stock`),
+  `coin_ledger`, `user_items`, `book_tries` ; et `book_letters`, `play_runs` (clé `owner = 'u:<id>'`) ;
+- **remet à zéro** `progress` : Grimoire aux quatre Souffles, succès vides, Épreuve par défaut, `coins = 0`,
+  `user_customization` et `world_collected_at` à `NULL` ;
+- **recrée** `world_stock` (réserve vide, 3 parties, carte actuelle) et les marques `ile:sentiers`, `ile:plage`,
+  `ile:recommencee` (l'île suit le tutoriel, « à la plage ») ;
+- **garde** : `users`, `auth_sessions`, `password_resets`, `email_changes` (adresse, mot de passe, sessions).
 - Fréquence : à volonté, avec un refus si la précédente date de moins de 10 s ; `ISLAND_RESTART_ONCE=1` limite à une
   fois (`:222-226`).
 
