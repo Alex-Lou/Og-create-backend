@@ -109,7 +109,7 @@ test('avancée de chaque objectif, plafonnée', () => {
 test('la quête active est la première pas encore faite ; à la fin, Brume se repose', () => {
   const first = active(new Set(), facts());
   assert.deepEqual(QUESTS.slice(0, 4).map(q => q.id), ['pages', 'ramasser', 'feu', 'recolte']);
-  assert.match(QUESTS.find(q => q.id === 'feu').say, /sur la Grève/);
+  assert.match(QUESTS.find(q => q.id === 'feu').say, /sur la plage de Brumelune/);
   assert.deepEqual([first.id, first.act, first.step, first.total, first.kind, first.done], ['pages', 'T', 1, 60, 'element', false]);
   assert.equal(active(new Set(), facts({ elements: new Set([...facts().elements, 'Vent']) })).done, true);
   const ondin = active(new Set(['achat-source']), facts());
@@ -166,7 +166,7 @@ test('un joueur d’avant la bible ne recule jamais : ses anciennes quêtes se r
   assert.deepEqual(['cabane', 'serre'].map(id => chests.get(id)), ['rare', 'epique']);
 });
 
-test('tout compte dont la première nuit est incomplète reprend la séquence de la Grève', () => {
+test('tout compte dont la première nuit est incomplète reprend la séquence de la plage de Brumelune', () => {
   const old = '2026-01-01T00:00:00Z';
   const recent = '2026-12-01T00:00:00Z';
   assert.equal(firstNightDoneOf(new Set()), false);

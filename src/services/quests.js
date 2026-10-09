@@ -10,7 +10,7 @@
 // - need : un besoin (what) d'un habitant comblé, en ce moment ou depuis l'ouverture de la quête ;
 // - wake : un habitant réveillé (amitié > 0) ; heart : un cœur ;
 // - expedition : expéditions revenues ; landmark : lieux découverts (ou un lieu précis) ; gather : gisements ramassés ;
-// - pickup : trouvailles de la Grève ramassées (bois flotté, coquillages, galets : services/pickups.js) ;
+// - pickup : trouvailles de la plage de Brumelune ramassées (bois flotté, coquillages, galets : services/pickups.js) ;
 // - hens : poules de Cannelle nourries et encore rassasiées ;
 // - visitor : voyageurs comblés ; settle : voyageurs installés ; name : le peuple a un nom.
 // chest : la dernière quête des actes donne aussi un coffre de cette rareté (loot.js), à ouvrir une fois réclamée.
@@ -33,7 +33,7 @@ const QUESTS = [
         'Du bois flotté, des coquillages, des galets. Ramasse les six trouvailles : elles suffiront pour notre premier camp.'),
     // Le premier feu est réellement bâti avec les trouvailles ; c'est le Foyer au palier I.
     q('feu', 'T', { kind: 'level', site: 'foyer', need: 1 }, 15, 'Allume le Feu de camp',
-        'Ceux d’avant faisaient un cercle de pierres, et le bois au milieu. Bâtis le feu ici, sur la Grève : tes trouvailles suffiront.'),
+        'Ceux d’avant faisaient un cercle de pierres, et le bois au milieu. Bâtis le feu ici, sur la plage de Brumelune : tes trouvailles suffiront.'),
     q('recolte', 'T', { kind: 'runs', need: 1 }, 15, 'Termine une Récolte avec Aster',
         'Aster a rejoint le camp au matin. Suis-la au rivage : relie ce qui se ressemble, vite, avant la marée.'),
     q('soupe', 'T', { kind: 'need', villager: 'foyer', what: 'manger' }, 15, 'Une soupe pour Cannelle',

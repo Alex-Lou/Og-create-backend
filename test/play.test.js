@@ -2314,7 +2314,7 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Aster ouvre s
   assert.equal(first.brume.quest.id, 'pages');
   await write(['Vent']);
   assert.equal((await claim('pages')).status, 200);
-  // La Grève : ce que la mer a rendu (v6, étape 4) ; pas de feu encore, le Foyer est à bâtir
+  // La plage de Brumelune : ce que la mer a rendu (v6, étape 4) ; pas de feu encore, le Foyer est à bâtir
   const shore = await view();
   assert.deepEqual(shore.pickups.map(p => [p.id, p.kind, p.readyIn]).slice(0, 3), [['greve-bois-1', 'bois', 0], ['greve-coquillage-1', 'coquillage', 0], ['greve-galet-1', 'galet', 0]]);
   assert.deepEqual([shore.sites.find(s => s.id === 'foyer').level, shore.brume.quest.id], [0, 'ramasser']);
@@ -2354,7 +2354,7 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Aster ouvre s
   const caged = await api('POST', '/play/world/beasts/cage', {}, player);
   assert.deepEqual([caged.status, caged.data.world.brume.quest.id, caged.data.world.brume.quest.done], [200, 'poules', false]);
   assert.equal(who(caged.data.world, 'atelier'), undefined);
-  // (la soupe a tout mangé : des coquillages ramassés sur la Grève font le repas des poules)
+  // (la soupe a tout mangé : des coquillages ramassés sur la plage font le repas des poules)
   assert.equal((await api('POST', '/play/world/beast/feed', { beast: 'poule-rousse' }, player)).status, 400);
   await sql(`UPDATE world_deposits SET gathered_at = gathered_at - INTERVAL '3 hours' WHERE user_id = $1 AND deposit = 'greve-coquillage-1'`, [player.userId]);
   assert.deepEqual((await pick('greve-coquillage-1')).data.gives, { food: 2 });

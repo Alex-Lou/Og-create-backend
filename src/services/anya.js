@@ -5,7 +5,7 @@
 const crypto = require('node:crypto');
 const map = require('./worldMap');
 
-// Les neuf quartiers du cœur (la Grève est toujours à soi ; les terres lointaines et les îlots ne comptent pas)
+// Les neuf quartiers du cœur (Brumelune est toujours à soi ; les terres lointaines et les îlots ne comptent pas)
 const CORE = ['source', 'lisiere', 'colline', 'jardins', 'est', 'hauteurs', 'crique', 'foret', 'hameau'];
 // Les douze terres lointaines : elles portaient les traces avant la v6
 const LANDS = map.ZONES.filter(zone => zone.trip).map(zone => zone.id);

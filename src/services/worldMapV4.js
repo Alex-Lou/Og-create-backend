@@ -26,7 +26,7 @@ const CLIMATES = {
 // sont ceux du cœur (mêmes identifiants : les achats des joueurs restent valables) ; les douze des terres nouvelles ont
 // en plus trip : la durée (heures) de l'expédition qui les découvre
 const ZONES = [
-    { id: 'coeur', name: 'La Grève', price: 0, chapter: null, code: 'a' },
+    { id: 'coeur', name: 'Brumelune', price: 0, chapter: null, code: 'a' },
     { id: 'source', name: 'La Source', price: 100, chapter: 'I', code: 'b' },
     { id: 'lisiere', name: 'La Lisière', price: 150, chapter: 'I', code: 'c' },
     { id: 'colline', name: 'La Colline', price: 250, chapter: 'II', code: 'd' },

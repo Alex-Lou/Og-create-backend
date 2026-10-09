@@ -1,4 +1,4 @@
-// Le Monde : l'île du joueur, sur une carte commune (worldMap.js) : la Grève ouverte d'office, onze quartiers à acheter
+// Le Monde : l'île du joueur, sur une carte commune (worldMap.js) : Brumelune ouverte d'office, onze quartiers à acheter
 // (écus + chapitre du Livre). Les chantiers se construisent puis évoluent avec un plan découvert dans le Livre et des
 // ressources tirées de la Récolte. Les bâtiments de production rapportent ressources et écus, avec leurs annexes
 // (annexes.js : champs, filons, viviers… posés autour d'eux) ; les décorations s'achètent et embellissent, sans rien
@@ -82,7 +82,7 @@ async function factsOf(userId, owned, stars, conn = db, moods = null) {
         count('SELECT COUNT(*)::int AS n FROM world_annexes WHERE user_id = $1 AND annex = $2', [userId, 'maison']),
         count('SELECT COUNT(*)::int AS n FROM world_expeditions WHERE user_id = $1 AND ends_at <= NOW()', [userId]),
         foundOf(userId, conn),
-        // (les gisements de climat ; ce que la mer rend sur la Grève compte à part)
+        // (les gisements de climat ; ce que la mer rend sur la plage de Brumelune compte à part)
         count('SELECT COUNT(*)::int AS n FROM world_deposits WHERE user_id = $1 AND deposit NOT LIKE $2', [userId, `${pickups.PREFIX}%`]),
         count('SELECT COUNT(*)::int AS n FROM world_deposits WHERE user_id = $1 AND deposit LIKE $2', [userId, `${pickups.PREFIX}%`]),
         // Les poules de Cannelle nourries, encore rassasiées (ouvrir la cage les laisse affamées : seul un repas compte)
@@ -295,7 +295,7 @@ async function view(userId, owned, book) {
     const { bonuses, extra } = withLandmarks(withMoods(shopBonuses, annexes.bonusesOf(annexRows), moods), lmBonuses);
     const effects = effectsOf(levels, bonuses, extra);
     const charges = chargesAt(stock, effects.maxCharges, Date.now(), effects.regenMs);
-    // Le camp des naufragés sur la Grève (world/camp.js) : ses cases sont réservées (ni annexe ni création)
+    // Le camp des naufragés sur la plage de Brumelune (world/camp.js) : ses cases sont réservées (ni annexe ni création)
     const camp = await campOfUser(userId, db, { levels, annexRows, craftRows });
     const campCells = cellsOfCamp(camp);
     // Le sol du joueur : ses chemins (world/paths.js) ; une case de chemin en plus de la carte est prise
@@ -419,7 +419,7 @@ async function view(userId, owned, book) {
         // grâce aux créations de climat de leur quartier
         deposits: finds.DEPOSITS.filter(d => isKnown(map.ZONE_BY_ID[d.zone], discovered))
             .map(d => ({ id: d.id, zone: d.zone, find: d.find, x: d.x, y: d.y, readyIn: finds.readyIn(gathered.get(d.id), Date.now(), presence.blessed ? anya.BLESSING.regrowMs : finds.REGROW_MS), bonus: craftBonusOf(decor, d.zone) })),
-        // Ce que la mer a rendu sur la Grève (pickups.js) : case, sorte, quartier, temps avant qu'il en revienne (ms, 0 : prêt) ; une
+        // Ce que la mer a rendu sur la plage de Brumelune (pickups.js) : case, sorte, quartier, temps avant qu'il en revienne (ms, 0 : prêt) ; une
         // case où le joueur a déjà posé une annexe ou une création n'en montre pas
         pickups: pickups.SPOTS.filter(p => !taken.has(keyOf(p)))
             .map(p => ({ id: p.id, kind: p.kind, zone: map.zoneAt(p.x, p.y), x: p.x, y: p.y, readyIn: finds.readyIn(gathered.get(p.id), Date.now(), pickups.REGROW_MS) })),

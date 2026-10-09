@@ -74,7 +74,7 @@ async function freshOf(userId, conn = db) {
 // soit l'âge du compte : tutoriel de la v6, habitants un à un. Le Grimoire, lui, garde les siennes (isVeteran : le
 // chapitre II ouvert d'emblée reste ouvert). Une ligne de world_items, sans donnée nouvelle
 const RESTARTED = 'ile:recommencee';
-// Une première nuit inachevée prime sur l'âge du compte : même un ancien compte reprend la séquence de la Grève.
+// Une première nuit inachevée prime sur l'âge du compte : même un ancien compte reprend la séquence de la plage.
 // Dès qu'elle est validée, il retrouve exactement ses règles historiques. Fonction pure exportée pour verrouiller la
 // matrice ancien/nouveau/recommencé/incomplet sans dépendre d'une base de test.
 function islandModeOf({ createdAt, restarted = false, claimed = [], marked = false }) {

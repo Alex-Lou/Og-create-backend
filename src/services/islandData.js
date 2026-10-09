@@ -2,7 +2,7 @@
 // HEIGHT : relief de la case (0 à 3), espace = mer.
 // GROUND : sol — ~ mer, s sable, d dune, g herbe, m prairie, f forêt, t arbre, r roche, w eau douce,
 //          p chemin, k pont sur la rivière, b pont sur la mer. On ne pose une décoration que sur g, s ou m.
-// REGION : quartier — a Grève, b Source, c Lisière, d Colline, e Jardins, f Faubourg, g Hauteurs, h Crique,
+// REGION : quartier — a Brumelune, b Source, c Lisière, d Colline, e Jardins, f Faubourg, g Hauteurs, h Crique,
 //          i Grande Forêt, j Hameau, k Îlot aux Mouettes, l Île des Légendes ; . = hors île.
 // SITES : coin haut-gauche de l'emprise 3 × 3 de chaque bâtiment (palier IV et plus).
 
