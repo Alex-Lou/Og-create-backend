@@ -27,7 +27,7 @@ const q = (id, act, goal, coins, label, say, chest) => ({ id, act, goal, coins, 
 const QUESTS = [
     // Prologue : Brume accompagne une action à la fois jusqu'à la première nuit. Aster ouvre ensuite sa propre leçon
     // par la Récolte. Les écus, jusqu'à La Source, en paient le prix (100), pas plus.
-    q('pages', 'T', { kind: 'element', element: 'Vent' }, 20, 'Écris ta première page : le Vent',
+    q('pages', 'T', { kind: 'element', element: 'Vent' }, 20, 'Découvre ta première recette : le Vent',
         'Le Grimoire s’est ouvert pour toi. Mêle l’Air à l’Air dans l’Athanor : que le Vent chasse la brume du rivage.'),
     q('ramasser', 'T', { kind: 'pickup', need: 6 }, 10, 'Ramasse les six trouvailles du rivage',
         'Du bois flotté, des coquillages, des galets. Ramasse les six trouvailles : elles suffiront pour notre premier camp.'),
