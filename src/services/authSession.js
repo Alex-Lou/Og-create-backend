@@ -43,25 +43,48 @@ function readCookie(req, name) {
     return null;
 }
 
-function signAccess(user) {
-    return jwt.sign({ typ: 'access', username: user.username }, process.env.JWT_SECRET, {
+// Le jeton d'accès porte sa famille de session (sid) : il ne vaut que tant que cette session existe (checkAccess)
+function signAccess(user, family) {
+    return jwt.sign({ typ: 'access', username: user.username, sid: family }, process.env.JWT_SECRET, {
         algorithm: 'HS256',
         subject: String(user.id),
         expiresIn: ACCESS_SECONDS
     });
 }
 
-// Vérifie le jeton d'accès du cookie ; renvoie { id, username } ou null
+// Vérifie la signature et l'expiration du jeton d'accès du cookie, sans la base ; renvoie { id, username, sid, iat }
+// ou null. Suffit pour nommer un joueur (clé de limite de requêtes), pas pour lui ouvrir une route : checkAccess
 function verifyAccess(req) {
     const token = readCookie(req, ACCESS_COOKIE);
     if (!token) return null;
     try {
         const payload = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
         if (payload.typ !== 'access' || !payload.sub) return null;
-        return { id: Number(payload.sub), username: payload.username };
+        return { id: Number(payload.sub), username: payload.username, sid: payload.sid, iat: payload.iat };
     } catch {
         return null;
     }
+}
+
+// Jetons d'avant le sid : acceptés seulement s'ils datent d'avant le démarrage de ce processus (ils expirent seuls
+// en 15 min au plus). Personne n'en signe plus : un jeton sans sid plus récent n'est pas valable.
+const STARTED_AT = Math.floor(Date.now() / 1000);
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Jeton d'accès valable ET session toujours ouverte : une déconnexion, un changement de mot de passe, une pause ou une
+// suppression du compte (qui ferment les sessions) le coupent tout de suite, sans attendre ses 15 min.
+// { id, username } ou null
+async function checkAccess(req) {
+    const user = verifyAccess(req);
+    if (!user) return null;
+    if (user.sid === undefined) return user.iat < STARTED_AT ? { id: user.id, username: user.username } : null;
+    if (typeof user.sid !== 'string' || !UUID.test(user.sid)) return null;
+    const { rows } = await db.query(
+        `SELECT 1 FROM auth_sessions
+         WHERE family = $1 AND user_id = $2 AND revoked_at IS NULL AND expires_at > NOW() LIMIT 1`,
+        [user.sid, user.id]
+    );
+    return rows.length ? { id: user.id, username: user.username } : null;
 }
 
 // Ouvre une session (ou continue une famille existante) et pose les deux cookies
@@ -72,7 +95,7 @@ async function issue(res, user, family = crypto.randomUUID(), client = db) {
          VALUES ($1, $2, $3, NOW() + make_interval(days => $4))`,
         [user.id, family, digest(refresh), REFRESH_DAYS]
     );
-    res.cookie(ACCESS_COOKIE, signAccess(user), cookieOptions('/api', ACCESS_SECONDS * 1000));
+    res.cookie(ACCESS_COOKIE, signAccess(user, family), cookieOptions('/api', ACCESS_SECONDS * 1000));
     res.cookie(REFRESH_COOKIE, refresh, cookieOptions('/api/auth', REFRESH_DAYS * 24 * 3600 * 1000));
     return { userId: user.id, username: user.username };
 }
@@ -127,4 +150,4 @@ async function revokeAll(userId, client = db) {
     await client.query('DELETE FROM auth_sessions WHERE user_id = $1', [userId]);
 }
 
-module.exports = { issue, rotate, revoke, revokeAll, verifyAccess, readCookie };
+module.exports = { issue, rotate, revoke, revokeAll, verifyAccess, checkAccess, readCookie };

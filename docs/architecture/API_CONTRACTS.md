@@ -46,7 +46,7 @@ Toute affirmation renvoie à `fichier:ligne`. Une déduction non vérifiée port
 
 | Cookie | Contenu | Path | Durée | Attributs | Réf. |
 |---|---|---|---|---|---|
-| `oc_access` | JWT HS256 `{ typ:'access', username, sub }` | `/api` | 15 min | httpOnly, SameSite=Strict, Secure en prod | `S/authSession.js:11,16,19-27,46-52,75` |
+| `oc_access` | JWT HS256 `{ typ:'access', username, sid, sub }` (`sid` = famille de session, lot R4) | `/api` | 15 min, et tant que sa session existe | httpOnly, SameSite=Strict, Secure en prod | `S/authSession.js` (`signAccess`, `checkAccess`) |
 | `oc_refresh` | Jeton opaque 64 hex, changé à chaque usage, empreinte SHA-256 en base | `/api/auth` | 30 j | idem | `S/authSession.js:12,17,69-76,86-111` |
 | `oc_guest` | Jeton opaque 64 hex (carnet invité) | `/api` | 30 j | idem | `S/players.js:9-20,45-47` |
 
@@ -70,7 +70,7 @@ Toute affirmation renvoie à `fichier:ligne`. Une déduction non vérifiée port
 | Niveau | Garde | Refus | Réf. |
 |---|---|---|---|
 | public | aucune | — | — |
-| session | `authMiddleware` (cookie `oc_access` valide) | 401 `{ message:'Session expirée ou absente', code:'TOKEN_EXPIRED' }` | `src/middleware/auth.js:6-14` |
+| session | `authMiddleware` (cookie `oc_access` valide **et** session ouverte : `checkAccess`) | 401 `{ message:'Session expirée ou absente', code:'TOKEN_EXPIRED' }` | `src/middleware/auth.js` |
 | joueur | `withPlayer` : compte, sinon carnet invité (`oc_guest`) | 401 `{ message:'Aucune partie', code:'NO_PLAYER' }` ; exception → 500 `{ message:'Le serveur de jeu ne répond pas, réessaie.' }` | `P/shared.js:29-43`, `S/players.js:28-38` |
 | compte | `withAccount` = joueur + `kind === 'user'` | invité : 402 `{ message:'Ton île t’attend…', code:'ACCOUNT' }` ; sans joueur : 401 `NO_PLAYER` | `P/shared.js:46-49` |
 
@@ -78,7 +78,10 @@ Refus « compte » sans `code` :
 - aides payantes (`pay`, `payOnce`) : 402 `{ message:'Les aides payantes demandent un compte.' }` ; solde insuffisant : 400 (`P/shared.js:52-64`) ;
 - `letter/retry` : 402 (`P/book.js:83`).
 
-Note : sous `/play`, un cookie d'accès expiré donne 401 `NO_PLAYER` et non `TOKEN_EXPIRED`, car `resolve` retombe sur l'invité (`S/players.js:28-38`).
+Note : sous `/play`, un cookie d'accès expiré **ou dont la session est fermée** (déconnexion, mot de passe changé,
+pause, suppression) donne 401 `NO_PLAYER` et non `TOKEN_EXPIRED`, car `resolve` retombe sur l'invité
+(`S/players.js:28-38`). Réaction du front inchangée : 401 avec indice de session → un `POST /auth/refresh` → échec →
+session oubliée et rechargement (`http.js:73-90`).
 
 ---
 

@@ -112,19 +112,28 @@ une variable à 0 rend le défaut, pas 0.
 
 | Cookie | Contenu | Durée | Chemin | Réf. |
 |---|---|---|---|---|
-| `oc_access` | JWT HS256 `{ typ: 'access', username }`, `sub` = id | 15 min | `/api` | `:11`, `:46-52`, `:75` |
+| `oc_access` | JWT HS256 `{ typ: 'access', username, sid }`, `sub` = id, `sid` = famille de session | 15 min | `/api` | `signAccess`, `issue` |
 | `oc_refresh` | 32 octets aléatoires ; en base, empreinte SHA-256 seulement | 30 j | `/api/auth` | `:12`, `:68-77` |
 | `oc_guest` | jeton invité, haché de même | 30 j | `/api` | `players.js:9-10`, `:47` |
 
 - **Drapeaux** : `httpOnly`, `SameSite=Strict`, `Secure` si `NODE_ENV=production` (`authSession.js:19-27`).
-- **Pas d'en-tête `Authorization`** : `middleware/auth.js:6-13` lit le cookie ; sinon 401 `TOKEN_EXPIRED`.
+- **Pas d'en-tête `Authorization`** : `middleware/auth.js` lit le cookie ; sinon 401 `TOKEN_EXPIRED`.
+- **Deux lectures du jeton d'accès** (lot R4, 2026-10-09) :
+  - `verifyAccess` (synchrone, sans base) : signature, expiration, `typ`. Sert seulement à nommer le joueur (clé
+    des limites `play/shared.js`, refus de `/auth/provisional` si déjà connecté).
+  - `checkAccess` (une requête indexée sur `auth_sessions.family`) : en plus, la session `sid` doit exister, à ce
+    compte, non révoquée, non expirée. Utilisé par `authMiddleware` et `players.resolve` : **toute route qui ouvre
+    un accès**.
+  - Jeton sans `sid` (émis avant la mise à jour) : accepté seulement si son `iat` précède le démarrage du processus ;
+    il expire seul en 15 min au plus. Aucune déconnexion forcée au déploiement.
 - **Rotation** (`rotate`, `:86-111`), dans une transaction `FOR UPDATE OF s` :
   - session expirée ou inconnue → 401 ;
   - remplacée depuis moins de `AUTH_RACE_SECONDS` (10 s, `:14`) → 409 `REFRESH_RACE` ;
   - remplacée depuis plus longtemps → toute la famille est supprimée, cookies effacés (vol probable) ;
   - sinon `revoked_at` est posé et un nouveau jeton est émis dans la même famille.
 - **Révocation** : la déconnexion supprime la famille (`:114-123`) ; mot de passe, pause et suppression appellent
-  `revokeAll` (`:126`). Un JWT d'accès déjà émis reste valable jusqu'à 15 min : pas de liste de révocation.
+  `revokeAll`. Depuis le lot R4, le jeton d'accès déjà émis tombe **immédiatement** avec sa session (`checkAccess`).
+  Une rotation garde la famille : l'ancien jeton d'accès de la même session reste valable jusqu'à son expiration.
 
 **Comptes** (`services/accounts.js`, `routes/auth.js`)
 
@@ -253,8 +262,10 @@ Toucher un moteur, c'est toucher les deux côtés et les deux suites de tests (`
 ## 8. Tests
 
 - **Lancement** : `npm test` (`node --test test/*.test.js`), un processus par fichier, en parallèle.
-- **Volume** : 30 fichiers, 216 `test(…)`. 14 fichiers démarrent le vrai serveur sur une base ; 16 sont purs.
-- **Référence (mesure du lead, 2026-10-09)** : 216 / 216 sur un Postgres 16 temporaire et isolé.
+- **Volume** : 31 fichiers, 228 tests. 14 fichiers démarrent le vrai serveur sur une base ; 17 sont purs
+  (`jwt.test.js` ajouté au lot R1).
+- **Référence (2026-10-09)** : 216 / 216 avant les lots ; 228 / 228 après R1 et R4, sur un Postgres 16 temporaire et
+  isolé.
 - **Variables** : `DATABASE_URL` (ou `DB_*`), `JWT_SECRET` (secret de test public de la CI) ; base passée par
   `npm run db:setup`.
 - **`test/helpers.js`** :

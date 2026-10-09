@@ -2,7 +2,7 @@
 // le navigateur ne peut jamais écrire lui-même son carnet.
 const db = require('../config/db');
 const { newToken, isToken, digest } = require('../utils/crypto');
-const { verifyAccess, readCookie } = require('./authSession');
+const { checkAccess, readCookie } = require('./authSession');
 const { BASE_ELEMENTS } = require('./recipeBook');
 const quests = require('./quests');
 
@@ -26,7 +26,8 @@ function readGuestToken(req) {
 
 // { kind: 'user'|'guest', id, key } ou null
 async function resolve(req) {
-    const user = verifyAccess(req);
+    // Session fermée (déconnexion, mot de passe changé, pause, suppression) : traitée comme un jeton expiré
+    const user = await checkAccess(req);
     if (user) return { kind: 'user', id: user.id, key: `u:${user.id}` };
     const token = readGuestToken(req);
     if (!token) return null;
