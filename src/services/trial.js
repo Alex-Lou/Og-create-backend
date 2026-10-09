@@ -105,7 +105,9 @@ async function finish(owner) {
          FROM coin_ledger WHERE user_id = $1 AND reason = 'timer-record' AND split_part(ref, ':', 1) = $2`,
         [owner.id, level]);
     if (score <= best) return { score, credited: false, coins: await ledger.balance(owner.id) };
-    return { score, ...(await ledger.credit(owner.id, score * RECORD_BONUS, 'timer-record', `${level}:${score}`)) };
+    // Le bonus paie ce que le record gagne (l'écart avec l'ancien), pas le score entier : sinon monter d'un point à la
+    // fois repayait tout le score à chaque partie
+    return { score, ...(await ledger.credit(owner.id, (score - best) * RECORD_BONUS, 'timer-record', `${level}:${score}`)) };
 }
 
 module.exports = { question, start, addTime, judge, finish };
