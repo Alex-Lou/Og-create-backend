@@ -250,6 +250,30 @@ test('l’Épreuve : le bonus de record vient du score compté par le serveur', 
   assert.equal((await api('POST', '/coins/claim/timer-record', { level: q.level, score: 9 }, player)).status, 404);
 });
 
+test('l’Épreuve : un nouveau record paie l’écart avec l’ancien, pas tout le score', async () => {
+  const q = await oneStepQuestion();
+  const player = await newPlayer();
+  const owner = `u:${player.userId}`;
+  // Une partie de 3 (la question réussie, puis le score porté à 3 par la base), puis une de 4
+  const play = async score => {
+    await api('POST', '/play/run', { mode: 'timer', questionId: q.id, launch: true }, player);
+    await api('POST', '/play/combine', { mode: 'timer', ingredients: q.ingredients }, player);
+    await sql(`UPDATE play_runs SET solved_ids = $2::jsonb WHERE owner = $1 AND mode = 'timer'`, [owner, JSON.stringify(Array.from({ length: score }, (_, k) => k + 1))]);
+    return (await api('POST', '/play/timer/finish', {}, player)).data;
+  };
+  const first = await play(3);
+  assert.equal(first.score, 3);
+  assert.equal(await coinsOf(player), q.points + 3 * 5);
+  const second = await play(4);
+  assert.equal(second.score, 4);
+  // + 1 × 5 (et non 4 × 5) ; la question, déjà payée, ne repaie rien
+  assert.equal(await coinsOf(player), q.points + 3 * 5 + 1 * 5);
+  // Égaler le record ne paie rien
+  await play(4);
+  assert.equal(await coinsOf(player), q.points + 20);
+  assert.equal((await api('GET', '/timer/load-progress', null, player)).data.bestScores[q.level], 4);
+});
+
 // Progression de l'Épreuve (lot R2) : le navigateur annonce, le serveur ne garde que ce qu'il a lui-même jugé et payé
 const sendProgress = (player, level, category, ids, unlock = []) => api('POST', '/timer/update-timer-progress',
   { timerProgress: { completedQuestions: { [level]: { [category]: ids } }, unlockedCategories: { [level]: unlock } } }, player);
@@ -728,6 +752,28 @@ test('le Monde : la boutique d’un atelier vend outils, objets et skins, une se
   await sql(`UPDATE world_stock SET collected_at = NOW() - INTERVAL '3 hours' WHERE user_id = $1`, [player.userId]);
   const view = (await api('GET', '/play/world', null, player)).data;
   assert.deepEqual(view.sites.find(s => s.id === 'carriere').pending, { coins: 7, stone: 10 });
+});
+
+test('le Monde : un article de production ne vaut que pour la suite ; l’acheter puis l’annuler ne rapporte rien de plus', async () => {
+  const player = await newPlayer({ coins: 0 });
+  const buy = item => api('POST', '/play/world/item', { item }, player);
+  await api('GET', '/play/world', null, player);
+  await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'colline')`, [player.userId]);
+  await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'carriere', 1)`, [player.userId]);
+  // Trois heures de Carrière en attente : 3 pierres et 2 écus par heure, sans la pioche (+20 %)
+  await sql(`UPDATE world_buildings SET built_at = NOW() - INTERVAL '5 hours' WHERE user_id = $1`, [player.userId]);
+  await sql(`UPDATE world_stock SET collected_at = NOW() - INTERVAL '3 hours', stone = 0, carry = '{}' WHERE user_id = $1`, [player.userId]);
+  await sql('UPDATE progress SET coins = 600 WHERE user_id = $1', [player.userId]);
+  const bought = await buy('pioche');
+  assert.equal(bought.status, 200);
+  // Encaissé au prix d'avant : 9 pierres et 6 écus (avec le bonus appliqué à l'attente : 10 et 7)
+  assert.equal(bought.data.coins, 600 - 80 + 6);
+  assert.equal((await sql('SELECT stone FROM world_stock WHERE user_id = $1', [player.userId]))[0].stone, 9);
+  // Annulé aussitôt : remboursé, sans gain gonflé
+  const undone = await api('POST', '/play/world/item/undo', { item: 'pioche' }, player);
+  assert.equal(undone.status, 200);
+  assert.equal(undone.data.coins, 600 + 6);
+  assert.equal((await sql('SELECT stone FROM world_stock WHERE user_id = $1', [player.userId]))[0].stone, 9);
 });
 
 test('le Monde : un article de la Récolte qui a servi ne se rend plus ; un skin dont l’achat s’annule n’est plus porté', async () => {

@@ -35,7 +35,13 @@ app.use(cors({
 }));
 
 // Limites globales (par adresse) ; les routes de jeu ont en plus leurs limites par joueur
-const tooMany = (req, res) => res.status(429).json({ error: 'Trop de requêtes', retryAfter: Math.ceil(req.rateLimit.resetTime / 1000 / 60) });
+// retryAfter : les minutes à attendre (resetTime est la date de fin de la fenêtre) ; message : ce que le jeu affiche
+// (utils/errors.js lit message)
+const tooMany = (req, res) => {
+    const reset = req.rateLimit && req.rateLimit.resetTime ? new Date(req.rateLimit.resetTime).getTime() : Date.now();
+    const minutes = Math.max(1, Math.ceil((reset - Date.now()) / 60000));
+    res.status(429).json({ error: 'Trop de requêtes', message: `Trop de requêtes, réessaie dans ${minutes} min.`, retryAfter: minutes });
+};
 const globalLimiter = limiter({ minutes: Number(process.env.RATE_LIMIT_WINDOW_MINUTES) || 15, max: Number(process.env.RATE_LIMIT_MAX_REQUESTS) || 1000, handler: tooMany });
 const gameLimiter = limiter({ minutes: 1, max: Number(process.env.GAME_RATE_LIMIT_MAX_REQUESTS) || 200, handler: tooMany });
 app.use(globalLimiter);
