@@ -130,6 +130,15 @@ test('le Livre : difficulté par chapitre (pages ouvertes, profondeur, plateau, 
   // Le plateau ne bouge pas d'un chargement à l'autre
   assert.deepEqual(view(b, BASE).chapters[0].pages.map(p => p.tray), one.pages.map(p => p.tray));
 
+  // La page marquée pendant le tutoriel : sans leurre, on ne mélange que ses vrais ingrédients (Feu et Feu pour le
+  // Brasier, jamais un leurre « Air »)
+  const brasier = { target: 'Phéno3', next: 'Phéno3', remaining: 1 };
+  const markedGuided = view(b, BASE, {}, {}, false, brasier, new Set(), true).chapters[0].pages.find(p => p.marked);
+  assert.deepEqual(markedGuided.tray, ['Feu']);
+  const markedFree = view(b, BASE, {}, {}, false, brasier, new Set(), false).chapters[0].pages.find(p => p.marked);
+  assert.equal(markedFree.tray.length, 1 + DIFFICULTY.I.decoys);
+  assert.ok(markedFree.tray.includes('Feu'));
+
   // Profondeur : avec Phéno0 en main, l'élément à deux mélanges passe après ceux à un mélange
   const later = view(b, [...BASE, 'Phéno0']).chapters[0];
   assert.ok(!later.pages.some(p => p.id === pageId('Profond')));

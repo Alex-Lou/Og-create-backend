@@ -203,7 +203,10 @@ function view(b, owned, misses = {}, letters = {}, veteran = false, ariane = nul
                     id, status: 'reach', family: info.family, letters: [...name].length, clue, groups, ...(name === marked ? { marked: true } : {}),
                     ...(info.riddle ? { riddle: info.riddle } : {}),
                     ...(rules.letter ? { first: [...name][0] } : {}),
-                    tray: trayOf(b, owned, id, parts, rules.decoys),
+                    // La page que marque le fil d'Ariane pendant le tutoriel : ses seuls vrais ingrédients, sans leurre
+                    // (choix de l'auteur, 9 oct. : un leurre menait à mélanger « Air et Feu » pour le Brasier, qui naît de
+                    // Feu et Feu)
+                    tray: trayOf(b, owned, id, parts, name === marked && guided ? 0 : rules.decoys),
                     misses: misses[id] || 0,
                     freeInkAfter: rules.freeInkAfter,
                     // Le tutoriel guide jusqu'au bout : la page marquée a son Encre offerte (world.guidedInkOf)
