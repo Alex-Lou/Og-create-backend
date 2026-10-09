@@ -770,9 +770,11 @@ async function buyItem(userId, itemId) {
         const { levels } = await levelsOf(userId, conn);
         if (!(await zonesOf(userId, conn)).has(map.siteZone(item.site)) || !(levels[item.site] || 0)) return db.rollback({ status: 403, message: 'Bâtis d’abord ce bâtiment.' });
         if (levels[item.site] < item.minLevel) return db.rollback({ status: 403, message: `Il faut le palier ${CHAPTER_OF_LEVEL[item.minLevel - 1]} de ce bâtiment.` });
+        // La production en attente est encaissée AVANT que l'article existe : son bonus ne vaut que pour la suite (sinon
+        // il s'appliquait à toute la production accumulée, et acheter puis annuler la gonflait sans rien payer)
+        await gather(userId, conn, stock);
         const added = await conn.query('INSERT INTO world_items (user_id, item) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING item', [userId, item.id]);
         if (!added.rows.length) return db.rollback({ status: 409, message: 'Tu l’as déjà.' });
-        await gather(userId, conn, stock);
         const coins = await ledger.debit(userId, item.price, `boutique:${item.id}`, conn);
         if (coins === null) return db.rollback({ status: 400, message: `Il te faut ${item.price} écus.` });
         // Un skin acheté est porté tout de suite
