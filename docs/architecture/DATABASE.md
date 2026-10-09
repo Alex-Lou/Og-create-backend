@@ -235,7 +235,8 @@ S'y ajoutent les index implicites des PK et des UNIQUE. Toutes les tables de l'�
 
 **Requêtes sans index adapté** (hypothèse : coût faible tant que les tables restent petites)
 
-- `LOWER(email)`, dans `claim`, la nouvelle adresse et le mot de passe oublié : pas d'index fonctionnel.
+- `LOWER(email)` (inscription, connexion, signature, nouvelle adresse, mot de passe oublié) : pas d'index
+  fonctionnel, donc lecture complète de `users` à chaque connexion. Index non unique `LOWER(email)` à décider.
 - `delete_at` (balayage horaire) et `play_runs.updated_at` : pas d'index.
 
 **Vue de l'île**
@@ -255,12 +256,19 @@ un verrou exclusif bref sur sa table : un déploiement pendant le jeu peut atten
 **Adresses e-mail et casse**
 
 - `users.email` est UNIQUE mais sensible à la casse (`schema.sql:17`).
-- `register` et `login` comparent exactement (`accounts.js:28`, `:39`) ; `claim`, `requestEmailChange`,
-  `confirmEmailChange` et `passwordReset.request` utilisent `LOWER()`.
-- Conséquences :
-  - `A@x.fr` et `a@x.fr` peuvent coexister ;
-  - la connexion dépend de la casse saisie ;
-  - le mot de passe oublié prend la première ligne trouvée parmi les variantes (`services/passwordReset.js:15-19`).
+- Depuis le lot R3 (2026-10-09), **toutes** les comparaisons applicatives utilisent `LOWER()` : `register`, `login`,
+  `claim`, `requestEmailChange`, `confirmEmailChange`, `passwordReset.request`. Une nouvelle variante de casse ne peut
+  plus être créée par l'application.
+- Restent possibles :
+  - des doublons de casse **créés avant** le lot R3 (non vérifié en production : lecture interdite). `login` essaie
+    d'abord l'adresse exacte, sinon chaque variante, du plus ancien au plus récent ;
+  - deux inscriptions **simultanées** de variantes différentes (`A@x.fr` / `a@x.fr`) : la contrainte, sensible à la
+    casse, ne les départage pas. Seul un index unique sur `LOWER(email)` le fermerait : migration à décider
+    (échouerait si des doublons existent déjà ; les compter d'abord, en lecture seule) ;
+  - le mot de passe oublié prend la première ligne trouvée parmi d'éventuelles variantes
+    (`services/passwordReset.js:15-19`).
+- `username` VARCHAR(100) : le nom tiré coupe le début de l'adresse à 95 caractères (`accounts.js`, lot R3) ; avant,
+  une partie locale de plus de 95 caractères donnait 500.
 
 **Défauts et colonnes périmés**
 

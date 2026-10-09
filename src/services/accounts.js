@@ -19,13 +19,14 @@ function passwordProblem(password) {
     return null;
 }
 
-// Nom affiché : début de l'adresse et quatre chiffres
-const usernameFor = email => `${email.split('@')[0]}_${Math.floor(Math.random() * 9000) + 1000}`;
+// Nom affiché : début de l'adresse (95 caractères au plus : users.username en tient 100) et quatre chiffres
+const usernameFor = email => `${email.split('@')[0].slice(0, 95)}_${Math.floor(Math.random() * 9000) + 1000}`;
 
-// Nouveau compte ; null si l'adresse (ou le nom tiré) est déjà prise
+// Nouveau compte ; null si l'adresse (sans tenir compte des majuscules, comme partout ailleurs) ou le nom tiré est
+// déjà pris
 async function register(email, password) {
     const username = usernameFor(email);
-    const taken = await db.query('SELECT 1 FROM users WHERE email = $1 OR username = $2', [email, username]);
+    const taken = await db.query('SELECT 1 FROM users WHERE LOWER(email) = LOWER($1) OR username = $2', [email, username]);
     if (taken.rows.length) return null;
     const { rows } = await db.query(
         'INSERT INTO users (email, password_hash, username, created_at) VALUES ($1, $2, $3, NOW()) RETURNING id, email, username',
@@ -33,13 +34,22 @@ async function register(email, password) {
     return rows[0];
 }
 
-// Compte dont l'adresse et le mot de passe correspondent, ou null.
+// Compte dont l'adresse (sans tenir compte des majuscules) et le mot de passe correspondent, ou null.
 // Même travail (bcrypt) que l'adresse existe ou non : la durée ne trahit pas les comptes.
+// Des comptes créés avant cette règle peuvent ne différer que par les majuscules : l'adresse exacte est seule essayée
+// si elle existe ; sinon chacun, du plus ancien au plus récent.
 async function login(email, password) {
-    const { rows } = await db.query('SELECT * FROM users WHERE email = $1', [email]);
-    const user = rows[0];
-    const valid = await bcrypt.compare(String(password), user ? user.password_hash : DUMMY_HASH);
-    return user && valid ? user : null;
+    const { rows } = await db.query(
+        'SELECT * FROM users WHERE LOWER(email) = LOWER($1) ORDER BY (email = $1) DESC, id', [email]);
+    const candidates = rows[0]?.email === email ? [rows[0]] : rows;
+    if (!candidates.length) {
+        await bcrypt.compare(String(password), DUMMY_HASH);
+        return null;
+    }
+    for (const user of candidates) {
+        if (await bcrypt.compare(String(password), user.password_hash)) return user;
+    }
+    return null;
 }
 
 async function setPassword(userId, password, conn = db) {

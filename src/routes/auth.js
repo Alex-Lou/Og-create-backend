@@ -13,7 +13,8 @@ const { failure } = require('../utils/failure');
 
 const router = express.Router();
 
-const isEmail = email => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+// Une adresse : du texte, 255 caractères au plus (la colonne users.email), une forme a@b.c (même règle que routes/account.js)
+const isEmail = email => typeof email === 'string' && email.length <= 255 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
 // Limites par adresse IP : essais de connexion (échecs compris) et créations de compte
 const TOO_MANY = 'Trop de tentatives, réessaie dans quelques minutes.';
@@ -42,7 +43,8 @@ async function adoptGuest(req, res, userId) {
 router.post('/register', registerLimiter, async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ message: 'Email et mot de passe requis' });
-    if (!isEmail(email)) return res.status(400).json({ message: 'Format d\'email invalide' });
+    // L'adresse réservée aux comptes provisoires ne s'inscrit pas : le compte serait pris pour provisoire, puis effacé
+    if (!isEmail(email) || accounts.isProvisional(email)) return res.status(400).json({ message: 'Format d\'email invalide' });
     const problem = accounts.passwordProblem(password);
     if (problem) return res.status(400).json({ message: problem });
     try {
@@ -53,6 +55,8 @@ router.post('/register', registerLimiter, async (req, res) => {
         log('info', 'Inscription réussie', { userId: session.userId });
         res.status(201).json({ message: 'Utilisateur créé avec succès', ...session });
     } catch (error) {
+        // Deux inscriptions en même temps avec la même adresse : la seconde bute sur l'unicité (comme /claim)
+        if (error.code === '23505') return res.status(400).json({ message: 'Email ou username déjà utilisé' });
         failure(res, 'Erreur lors de l\'inscription', error);
     }
 });
@@ -77,7 +81,7 @@ router.post('/provisional', registerLimiter, async (req, res) => {
 router.post('/claim', registerLimiter, authMiddleware, async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ message: 'Email et mot de passe requis' });
-    if (!isEmail(email) || email.length > 255 || accounts.isProvisional(email)) return res.status(400).json({ message: 'Format d\'email invalide' });
+    if (!isEmail(email) || accounts.isProvisional(email)) return res.status(400).json({ message: 'Format d\'email invalide' });
     const problem = accounts.passwordProblem(password);
     if (problem) return res.status(400).json({ message: problem });
     try {
@@ -96,7 +100,7 @@ router.post('/claim', registerLimiter, authMiddleware, async (req, res) => {
 
 router.post('/login', loginLimiter, accountLimiter, async (req, res) => {
     const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ message: 'Email et mot de passe requis' });
+    if (!email || !password || typeof email !== 'string') return res.status(400).json({ message: 'Email et mot de passe requis' });
     try {
         const user = await accounts.login(email, password);
         if (!user) return res.status(401).json({ message: 'Authentification échouée' });

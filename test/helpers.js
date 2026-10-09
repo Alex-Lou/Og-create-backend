@@ -128,8 +128,13 @@ async function whileHeld(hold, request) {
     let done = false;
     const pending = request().finally(() => { done = true; });
     for (let i = 0; ; i++) {
+      // Dans une transaction, pg_stat_activity est figé à sa première lecture : sans ce rafraîchissement, une connexion
+      // ouverte par le serveur après coup (pool froid) n'y apparaît jamais et l'attente n'est pas vue
+      await tx.query('SELECT pg_stat_clear_snapshot()');
       if ((await tx.query('SELECT 1 FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))', [pid])).rows.length) break;
       if (done || i === 200) {
+        // Lâcher les verrous avant d'attendre la requête : sinon elle les attendrait, et nous elle (blocage du test)
+        await tx.query('ROLLBACK').catch(() => {});
         await pending.catch(() => {});
         throw new Error(done ? 'la requête a fini sans attendre la transaction' : 'la requête n’a jamais attendu la transaction');
       }

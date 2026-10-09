@@ -262,10 +262,13 @@ Toucher un moteur, c'est toucher les deux côtés et les deux suites de tests (`
 ## 8. Tests
 
 - **Lancement** : `npm test` (`node --test test/*.test.js`), un processus par fichier, en parallèle.
-- **Volume** : 31 fichiers, 228 tests. 14 fichiers démarrent le vrai serveur sur une base ; 17 sont purs
-  (`jwt.test.js` ajouté au lot R1).
-- **Référence (2026-10-09)** : 216 / 216 avant les lots ; 228 / 228 après R1 et R4, sur un Postgres 16 temporaire et
-  isolé.
+- **Volume** : 33 fichiers, 232 tests. 16 fichiers démarrent le vrai serveur sur une base ; 17 sont purs
+  (`jwt.test.js` au lot R1 ; `emails.test.js`, `emailsDoubles.test.js` au lot R3).
+- **Référence (2026-10-09)** : 216 / 216 avant les lots ; 232 / 232 après R1, R4 et R3, sur un Postgres 16
+  temporaire et isolé.
+- **`whileHeld`** (`test/helpers.js`) : rafraîchit `pg_stat_activity` à chaque tour (`pg_stat_clear_snapshot()`),
+  sinon une connexion ouverte après la première lecture restait invisible et le test se bloquait ; en cas d'échec, la
+  transaction est annulée avant d'attendre la requête (plus d'interblocage). Corrigé au lot R3.
 - **Variables** : `DATABASE_URL` (ou `DB_*`), `JWT_SECRET` (secret de test public de la CI) ; base passée par
   `npm run db:setup`.
 - **`test/helpers.js`** :
@@ -319,12 +322,14 @@ code). À traiter comme une migration de données.
 - `TRUST_PROXY_HOPS` vaut 1 alors que `app.js:9-10` décrit deux sauts (hébergeur + relais du site). Trop bas,
   `req.ip` devient celle du relais et tous les joueurs partagent les limites par IP, dont 20 invités par heure
   (hypothèse).
-- `POST /auth/register` :
-  - accepte une adresse `@provisoire.invalid` : le compte serait traité comme provisoire, puis balayé ;
-  - ne borne pas la longueur à 255 (débordement → 500) ;
-  - une course sur la même adresse donne 500 (code 23505 non traité, contrairement à `/claim`).
-- Casse des adresses : `register` et `login` comparent exactement (`accounts.js:28,39`) ; `claim`, la nouvelle
-  adresse et le mot de passe oublié utilisent `LOWER()` (voir DATABASE.md § 8).
+- `POST /auth/register` et `/auth/login` — **corrigés (lot R3, 2026-10-09)** :
+  - adresse : texte, ≤ 255, forme `a@b.c` (`isEmail` de `routes/auth.js`, même règle que `routes/account.js`) ;
+    `@provisoire.invalid` refusée à l'inscription ; login refuse un `email` non textuel (400, plus de 500) ;
+  - course sur la même adresse : 23505 → 400 « Email ou username déjà utilisé » (comme `/claim`) ;
+  - casse : inscription et connexion par `LOWER()` comme le reste ; doublons anciens gérés (DATABASE.md § 8) ;
+  - nom tiré borné à 95 + 5 caractères (`username` VARCHAR(100)) : une longue adresse ne donne plus 500.
+  - Reste : nom tiré déjà pris (1 chance sur 9000 par préfixe) → message « Email ou username déjà utilisé »
+    trompeur ; pas d'index sur `LOWER(email)`.
 - Mot de passe oublié : `sendMail` attendu sans délai maximal (`services/passwordReset.js:27`). La durée de la
   réponse diffère selon que le compte existe (hypothèse : fuite par la durée).
 - `timer_progress.completedQuestions` vient du navigateur. La fusion est superficielle au niveau de la difficulté
