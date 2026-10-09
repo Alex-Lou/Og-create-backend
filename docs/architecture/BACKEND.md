@@ -273,16 +273,15 @@ Toucher un moteur, c'est toucher les deux côtés et les deux suites de tests (`
 
 ## 9. Dette technique et points d'attention
 
-**Secret JWT au démarrage** (`utils/jwt.js:14-49`, appelé à `server.js:8`, après dotenv à `server.js:3`)
+**Secret JWT au démarrage** (`utils/jwt.js`, appelé à `server.js:8`, après dotenv à `server.js:3`) — **corrigé
+(lot R1, 2026-10-09)**
 
-- `.env` présent sans `JWT_SECRET` ou avec moins de 32 caractères : le nouveau secret est écrit dans le fichier,
-  mais `process.env` n'est pas mis à jour.
-  - Ce processus signe avec un secret absent (erreur de `jsonwebtoken`, donc 500 à la connexion : hypothèse) ou
-    avec la valeur courte.
-  - `bookPages` se rabat sur la clé constante `og-create-book` (`bookPages.js:37`).
-  - Tout rentre dans l'ordre au redémarrage suivant.
-- Un secret de 32 à 63 caractères dans `.env` passe : dotenv l'a déjà chargé, donc la règle « 64 » (`:30`) n'est
-  jamais atteinte.
+- Règle unique : 32 caractères au moins (`MIN_LENGTH`), que le secret vienne de l'environnement ou du `.env`.
+- Environnement valable → rien à faire. Sinon `.env` requis (sinon échec franc au démarrage) : son secret est repris
+  s'il est valable, sinon un nouveau (128 hex) y est écrit. Dans les deux cas `process.env.JWT_SECRET` est renseigné
+  pour le processus en cours.
+- Avant le correctif : le secret généré n'était écrit que dans le fichier, les connexions échouaient jusqu'au
+  redémarrage (reproduit : `register` en 500 ; après correctif : 201). Tests : `test/jwt.test.js` (7 cas).
 
 **Le même secret fait les identifiants de pages** (`bookPages.js:37-42`). Le changer change tous les `page_id` :
 `book_tries`, `book_letters` et les références `encre` de `coin_ledger` ne correspondraient plus à rien (déduit du
@@ -334,7 +333,7 @@ code). À traiter comme une migration de données.
 | front `PASSATION.md` § 1 | « 6 300 lignes côté serveur » | 10 411 lignes dans `src/` |
 | front `PASSATION.md` § 5 | `world.js` « ≈ 650 lignes » | 952 |
 | front `PASSATION.md` § 5 | `worldMap.js` 96 × 96 ; migration v1 → v4 | 144 × 144 (`worldMap.js:1`), `MAP_VERSION = 5` (`world/rules.js:27`), v1 → v5 (`migrate.js:1`) ; le 144 est déjà corrigé par `ETAT_DES_LIEUX.md` § 8 |
-| `db/README.md` | `JWT_SECRET` : « 64 dans `.env` » ; `jwt.js` « génère le secret » | 32 suffisent ; le secret généré ne sert qu'au démarrage suivant (§ 9) |
+| `db/README.md` | `JWT_SECRET` : « 64 dans `.env` » | Corrigé au lot R1 : 32 partout, secret généré utilisé tout de suite (§ 9) |
 | `db/README.md` | `EMAIL_PASSWORD` : « formulaire de contact » | sert aussi au mot de passe oublié et à la nouvelle adresse |
 | commentaires `world.js:205`, `players.js:73` | recommencer l'île « une fois par compte » | à volonté sauf `ISLAND_RESTART_ONCE=1` (`world.js:222-226`) ; `ETAT_DES_LIEUX.md` § 4 dit juste |
 | `ETAT_DES_LIEUX.md` | « 215 tests côté serveur » | 216 (chiffre daté) |

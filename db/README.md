@@ -40,7 +40,7 @@ npm run db:setup          # schéma + seed, rejouable (Node, sans psql)
 
 Celles dont le reste du serveur a besoin :
 
-- `JWT_SECRET` (obligatoire : au moins 32 caractères via l’environnement, 64 dans `.env`)
+- `JWT_SECRET` (obligatoire : au moins 32 caractères, via l’environnement ou `.env`)
 - `PORT`
 - `NODE_ENV`
 - `CORS_ORIGIN`
