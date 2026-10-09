@@ -1218,6 +1218,30 @@ function playRun(run, count) {
   return { moves, expected: h.replay(run.seed, run.kinds, moves, run.maxMoves, run.boosts).gains };
 }
 
+test('le Monde : les écus d’une Récolte sont plafonnés comme les mini-jeux (60 × le palier le plus haut) ; pas ses ressources', async () => {
+  const { harvestCap } = require('../src/services/world');
+  assert.deepEqual([harvestCap({}), harvestCap({ foyer: 1 }), harvestCap({ foyer: 3 }), harvestCap({ foyer: 2, carriere: 5 }), harvestCap({ carriere: 7 })], [60, 60, 60, 84, 108]);
+  const player = await newPlayer();
+  await api('GET', '/play/world', null, player);
+  // (deux Récoltes déjà jouées : celle-ci est normale)
+  await sql(`INSERT INTO world_runs (user_id, seed, config, finished_at) VALUES ($1, 1, '{}', NOW()), ($1, 2, '{}', NOW())`, [player.userId]);
+  const run = (await api('POST', '/play/world/harvest/start', {}, player)).data;
+  // Une partie qui rapporterait des centaines d'écus (multiplicateurs gonflés en base)
+  const boosts = { stone: 100, wood: 100, water: 100, food: 100 };
+  await sql(`UPDATE world_runs SET config = config || $2::jsonb WHERE id = $1`, [run.id, JSON.stringify({ boosts })]);
+  const { moves, expected } = playRun({ ...run, boosts }, 6);
+  const total = Object.values(expected).reduce((sum, n) => sum + n, 0);
+  assert.ok(total / 10 > 60, String(total));
+  const done = await api('POST', '/play/world/harvest/finish', { run: run.id, moves }, player);
+  assert.equal(done.status, 200);
+  assert.deepEqual(done.data.gains, expected);
+  assert.equal(done.data.earned, 60);
+  // Le bonus d'étoiles du niveau tient dans le même plafond : déjà atteint, il ne paie rien
+  assert.equal(done.data.level.bonus, 0);
+  const prize = done.data.chest?.prize;
+  assert.equal(await coinsOf(player), 60 + (prize?.kind === 'coins' ? prize.amount : 0));
+});
+
 test('le Monde : la Récolte se joue contre une partie de la réserve, rejouée et payée une seule fois', async () => {
   const visitor = await guest();
   assert.equal((await api('POST', '/play/world/harvest/start', {}, visitor)).status, 402);

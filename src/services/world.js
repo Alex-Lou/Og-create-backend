@@ -655,11 +655,15 @@ function finishRun(userId, runId, moves) {
         await stockOf(userId, conn, true);
         const g = played.gains;
         await addStock(userId, g, conn);
-        // Et des écus : 1 par tranche de 10 ressources gagnées, versés une seule fois pour cette partie
-        const earned = Math.floor((g.stone + g.wood + g.water + g.food) / HARVEST_COIN_EVERY);
+        // Et des écus : 1 par tranche de 10 ressources gagnées, versés une seule fois pour cette partie, dans le plafond
+        // des mini-jeux (harvestCap : 60 × le multiplicateur du plus haut palier de l'île) ; les ressources, elles,
+        // ne sont pas plafonnées
+        const cap = harvestCap((await levelsOf(userId, conn)).levels);
+        const earned = Math.min(Math.floor((g.stone + g.wood + g.water + g.food) / HARVEST_COIN_EVERY), cap);
         if (earned > 0) await ledger.credit(userId, earned, 'recolte', runId, conn);
-        // Le niveau : ses étoiles (la marge de coups quand l'objectif est rempli), leur bonus la première fois
-        const level = config.lvl ? await levelDone(userId, 'recolte', config.lvl, played, config.maxMoves, Infinity, conn) : null;
+        // Le niveau : ses étoiles (la marge de coups quand l'objectif est rempli), leur bonus la première fois, dans
+        // le même plafond
+        const level = config.lvl ? await levelDone(userId, 'recolte', config.lvl, played, config.maxMoves, cap - earned, conn) : null;
         // Parfois un coffre (sûr avec une grande chaîne)
         const rarity = loot.harvestChest(moves.length, Math.max(0, ...moves.map(path => path.length)), random);
         const chest = rarity ? await grant(userId, `recolte:${runId}`, rarity, conn) : null;
@@ -670,6 +674,13 @@ function finishRun(userId, runId, moves) {
 
 // Ce qu'a donné une partie d'un niveau : ses étoiles, inscrites, et leur bonus (au plus room écus). { level, goal,
 // stars (celles de la partie), best (le meilleur du niveau), bonus }
+// Plafond d'écus d'une Récolte : celui des mini-jeux (60 × le multiplicateur de palier), au plus haut palier de l'île (la
+// Récolte n'a pas de bâtiment à elle). Choix du 2026-10-09 (DECISIONS.md A-4) : un début d'île plafonne à 60, une île
+// au palier VII à 108
+function harvestCap(levels) {
+    const highest = Math.max(0, ...Object.values(levels || {}).map(Number).filter(Number.isFinite));
+    return Math.round(minigames.CAP * minigames.multOf(highest));
+}
 async function levelDone(userId, game, n, played, limit, room, conn) {
     const outcome = gridLevels.outcomeOf(game, n, played, limit);
     const won = await stars.award(userId, game, n, outcome.stars, room, conn);
@@ -946,7 +957,7 @@ async function chooseSign(userId, siteId, styleId) {
 
 module.exports = {
     SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, pendingOf, chargesAt, effectsOf, productionOf,
-    view, build, buyZone, buyItem, undoItem, chooseSkin, startRun, finishRun, collect, migrate, claimQuest, board, openChest, openAll,
+    view, build, buyZone, buyItem, undoItem, harvestCap, chooseSkin, startRun, finishRun, collect, migrate, claimQuest, board, openChest, openAll,
     placeAnnex, moveAnnex, poseAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople, namePlayer, chooseAvatar, arianeTargets, guidedInkOf, restartIsland,
     refundDecorations, startCraft, finishCraft, placeCraft, moveCraft, storeCraft, turnCraft, startExpedition, findLandmark, gatherDeposit, pickUp,
     anyaOf, breathRefused, revealAnya, breatheAnya, brumeSavoirOf, talkBrume, startNights, repelCreature, repairSite, skipPrologue, layPaths,
