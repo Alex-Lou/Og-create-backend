@@ -62,7 +62,7 @@ async function toV2(userId, stock, conn) {
 // v2 → v3 (la grande île) : les quartiers achetés restent (mêmes identifiants), les bâtiments gardent leur palier
 // (leur place vient de la carte) ; chaque décoration rejoint son quartier, sur une case libre au plus près de son
 // panneau, dans l'ordre où elles étaient rangées (de haut en bas, de gauche à droite). Un quartier trop petit
-// déborde sur la Grève.
+// déborde sur la plage de Brumelune.
 async function toV3(userId, conn) {
     const tiles = await tilesOf(userId, conn);
     if (!tiles.length) return;

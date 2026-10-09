@@ -298,7 +298,7 @@ router.post('/world/deposit', withAccount(async (req, res, owner, b) => {
     res.json({ find: done.find, amount: done.amount, world: await worldView(owner, b) });
 }));
 
-// Ce que la mer a rendu sur la Grève : un toucher le ramasse (services/pickups.js)
+// Ce que la mer a rendu sur la plage de Brumelune : un toucher le ramasse (services/pickups.js)
 router.post('/world/pickup', withAccount(async (req, res, owner, b) => {
     const id = String(req.body.id || '');
     if (!/^greve-[a-z]{1,12}-\d$/.test(id)) return res.status(400).json({ message: 'Trouvaille invalide' });

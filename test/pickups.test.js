@@ -1,4 +1,4 @@
-// Le tutoriel de l'île neuve (bible du dépôt front, § 9) : la Grève, le feu bâti avec Brume, puis Aster et sa Récolte ;
+// Le tutoriel de l'île neuve (bible du dépôt front, § 9) : la plage de Brumelune, le feu bâti avec Brume, puis Aster et sa Récolte ;
 // un compte d'avant la v6 garde ses règles (le feu allumé d'office, Cannelle après la Récolte, Rivet
 // après la soupe) et ne recule jamais
 const test = require('node:test');
@@ -15,7 +15,7 @@ const pick = (player, id) => api('POST', '/play/world/pickup', { id }, player);
 const foyerOf = world => world.sites.find(s => s.id === 'foyer').level;
 const met = world => world.villagers.map(v => v.id);
 
-test('ramasser sur la Grève : une fois, puis la mer en rapporte ; cases inconnues, mal écrites ou recouvertes refusées', async () => {
+test('ramasser sur la plage de Brumelune : une fois, puis la mer en rapporte ; cases inconnues, mal écrites ou recouvertes refusées', async () => {
   const player = await newPlayer({ veteran: false });
   const id = player.userId;
   assert.equal((await pick(player, 'greve-bois-9')).status, 404);
@@ -34,7 +34,7 @@ test('ramasser sur la Grève : une fois, puis la mer en rapporte ; cases inconnu
   await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'cloture', 93, 98)`, [id]);
   assert.equal((await view(player)).pickups.some(p => p.id === 'greve-bois-1'), false);
   assert.equal((await pick(player, 'greve-bois-1')).status, 404);
-  // Les ramassages de la Grève ne comptent pas pour les gisements (quête « trouvaille »)
+  // Les ramassages de la plage ne comptent pas pour les gisements (quête « trouvaille »)
   await sql('DELETE FROM world_quests WHERE user_id = $1', [id]);
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'coeur')`, [id]);
   const trouvaille = (await view(player)).brume.quest;
@@ -67,14 +67,14 @@ test('un nouveau compte bâtit son feu ; Aster vient au matin, Cannelle après s
   assert.equal(met(await view(player)).includes('atelier'), true);
 });
 
-test('un ancien compte incomplet reprend sur la Grève, puis retrouve ses règles dès la première nuit validée', async () => {
+test('un ancien compte incomplet reprend sur la plage de Brumelune, puis retrouve ses règles dès la première nuit validée', async () => {
   const player = await newPlayer({ veteran: false });
   const id = player.userId;
   // Créé juste avant la v6 (après la bible : pas un vétéran)
   await sql('UPDATE users SET created_at = $2 WHERE id = $1', [id, new Date(V6_SINCE.getTime() - 60000)]);
   const first = await view(player);
   assert.deepEqual([foyerOf(first), met(first), first.brume.quest.id], [0, [], 'pages']);
-  // Au milieu du prologue (les pages réclamées) : la Grève s'offre aussi, rien n'est perdu
+  // Au milieu du prologue (les pages réclamées) : la plage s'offre aussi, rien n'est perdu
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'pages')`, [id]);
   assert.equal((await view(player)).brume.quest.id, 'ramasser');
   // La Récolte réclamée valide la reprise : les anciennes règles redeviennent actives sans perdre l'avancée.

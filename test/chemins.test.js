@@ -18,7 +18,7 @@ const LINK = [[90, 86], [91, 86], [92, 86], [93, 86], [94, 86], [94, 87], [94, 8
 test('une île neuve n’a que son sentier ; une île d’avant garde ses routes', async () => {
     const fresh = await newPlayer();
     const w = await view(fresh);
-    // La grande route de la Grève (rangées 90-91) est redevenue de l'herbe ; le sentier descend du Feu au rivage
+    // La grande route de la plage (rangées 90-91) est redevenue de l'herbe ; le sentier descend du Feu au rivage
     assert.equal(at(w, 90, 90), 'g');
     for (let y = 89; y <= 95; y++) assert.equal(at(w, 97, y), 'p', `sentier ${y}`);
     assert.deepEqual([w.roads.laid, w.roads.free, w.roads.stone], [[], 12, 1]);
@@ -36,7 +36,7 @@ test('tracer : douze cases offertes, puis une pierre la case ; effacer rend la p
     const player = await newPlayer();
     await view(player);
     await sql('UPDATE world_stock SET stone = 1 WHERE user_id = $1', [player.userId]);
-    // Sur la Grève (à soi d'office), là où passait la grande route : de l'herbe libre
+    // Sur la plage de Brumelune (à soi d'office), là où passait la grande route : de l'herbe libre
     const twelve = [[92, 91], ...[92, 93, 94, 95, 96, 98, 99, 100, 101, 102, 103].map(x => [x, 90])];
     const first = await draw(player, twelve);
     assert.equal(first.status, 200, JSON.stringify(first.data));

@@ -1,6 +1,6 @@
 // La carte de l'île, la même pour tous : la grande carte (144 × 144, carte v5), dessinée case par case — relief, sol et
 // quartiers. C'est la très grande île v4 (worldMapV4.js, 96 × 96 : le cœur 48 × 48 et les terres nouvelles autour) à
-// l'échelle × 1,5, côtes lissées (islandV5.js, généré par scripts/scaleMap.js). La Grève est ouverte d'office ; les
+// l'échelle × 1,5, côtes lissées (islandV5.js, généré par scripts/scaleMap.js). Brumelune est ouverte d'office ; les
 // autres quartiers s'achètent (écus + chapitre du Livre), et ceux des terres nouvelles se découvrent d'abord par une
 // expédition. Fonctions pures, sans base de données.
 const island = require('./islandV5');

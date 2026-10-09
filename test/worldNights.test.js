@@ -25,7 +25,7 @@ const blightsOf = async userId => (await sql('SELECT blights FROM world_nights W
 // Le bilan d'une nuit (ce que Brume dit au matin) : combien de chaque sort
 const countsOf = ({ fates }) => Object.values(fates).reduce((out, f) => ({ ...out, [f.end]: out[f.end] + 1 }), { luciole: 0, barre: 0, camarade: 0, touche: 0, arrive: 0 });
 
-// Une île : la Grève et la Source, le Puits bâti ; sans défense posée ; ses habitants tristes, sans repas depuis un mois
+// Une île : Brumelune et la Source, le Puits bâti ; sans défense posée ; ses habitants tristes, sans repas depuis un mois
 // (aucun camarade content : un habitant sans ligne de besoins arrive comblé, donc content)
 const ISLAND = { owned: new Set(['coeur', 'source']), sites: [{ id: 'foyer', level: 1 }, { id: 'puits', level: 1 }], acts: 0 };
 const FIRE = nights.defenseOf([], { foyer: 1 });

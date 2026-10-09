@@ -1,4 +1,4 @@
-// Le camp des naufragés sur la Grève (world/camp.js) : sobre et qui libère ; il change avec les actes et les paliers ;
+// Le camp des naufragés sur la plage de Brumelune (world/camp.js) : sobre et qui libère ; il change avec les actes et les paliers ;
 // une place prise par le joueur fait poser l'élément au plus près ; ses cases sont réservées (ni annexe ni création)
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -24,7 +24,7 @@ test('au début : l’épave, la cuisine de Cannelle, les débris d’Aster et d
   assert.equal(start.reduce((n, c) => n + c.w * c.h, 0), 20);
 });
 
-test('il change avec l’histoire, et libère la Grève', () => {
+test('il change avec l’histoire, et libère la plage de Brumelune', () => {
   assert.deepEqual(ids(camp.campOf({ acts: ['I'], levels: { foyer: 1 } })).slice(2, 4), ['aster_abri', 'rivet_abri']);
   // Pas de cabanon avant l'Abri ; à l'Abri, Cannelle quitte la cuisine de l'épave
   assert.equal(camp.campOf({ acts: ['I', 'II'], levels: { foyer: 1 } }).find(c => c.id === 'aster').art, 'aster_abri');

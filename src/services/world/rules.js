@@ -52,7 +52,7 @@ const tier = (name, plan, cost, coins = 0) => ({ name, plan, cost, coins });
 const SITES = {
     foyer: {
         levels: [
-            // (bâti par un nouveau compte, avec ce que la mer a rendu sur la Grève : bible, § 9, étape 5 ; le Brasier
+            // (bâti par un nouveau compte, avec ce que la mer a rendu sur la plage de Brumelune : bible, § 9, étape 5 ; le Brasier
             // écrit au Grimoire, le premier bâtiment que le Grimoire fait naître sur l'île)
             tier('Feu de camp', 'Brasier', { wood: 4, stone: 2 }),
             tier('Abri', 'Bois', { wood: 20, stone: 10 }),

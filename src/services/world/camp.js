@@ -1,4 +1,4 @@
-// Le camp des naufragés sur la Grève (dessins : design/bibliotheque/svg/decor/camp/camp.json) : l'épave de
+// Le camp des naufragés sur la plage de Brumelune (dessins : design/bibliotheque/svg/decor/camp/camp.json) : l'épave de
 // l'Hirondelle, la cuisine de Cannelle, les coins d'Aster et de Rivet (débris, abri, cabanon), quelques objets ; les
 // voyageurs de l'acte IV y plantent leur tente et leur hamac, et le panneau SOS s'en va. La cage aux poules de Cannelle
 // (decor/camp/poules) y paraît avec elle, coincée sous les rochers ; ouverte, elle reste près du feu.
@@ -21,7 +21,7 @@ const ABRI = 2;
 const BIG = Object.fromEntries(Object.keys(map.SITE_BIG).map(id => [id, map.BIG_FROM]));
 
 // Place prévue (coin haut-gauche), taille (2 : 2 × 2 cases, sinon 1), dessin selon l'avancée (null : pas encore, ou
-// plus). at : { acts (actes finis), levels (paliers des bâtiments), cage ('coincee', 'ouverte' ou null) }. Un camp sobre, qui libère la Grève : l'épave et
+// plus). at : { acts (actes finis), levels (paliers des bâtiments), cage ('coincee', 'ouverte' ou null) }. Un camp sobre, qui libère la plage : l'épave et
 // trois objets restent ; le coin d'Aster s'en va quand son Ponton est bâti, celui de Rivet avec son Atelier, la cuisine
 // de Cannelle avec l'Abri ; le SOS, quand les voyageurs arrivent (acte IV) avec leur tente et leur hamac
 const has = (at, act) => at.acts.includes(act);
@@ -45,7 +45,7 @@ const PLACES = [
     { id: 'cage', x: 98, y: 94, art: at => (at.cage ? `cage_${at.cage}` : null) }
 ];
 
-// Case où le camp peut se poser : sol constructible de la Grève, hors des grandes emprises, des lieux remarquables et
+// Case où le camp peut se poser : sol constructible de la plage, hors des grandes emprises, des lieux remarquables et
 // des gisements (taken : clés des cases occupées)
 const open = (x, y, taken) => x >= 0 && y >= 0 && x < SIZE && y < SIZE && map.zoneAt(x, y) === ZONE && map.buildable(x, y)
     && !map.inFootprint(x, y, BIG) && !landmarks.isLandmark(x, y) && !finds.isDeposit(x, y) && !taken.has(y * SIZE + x);

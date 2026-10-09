@@ -106,7 +106,7 @@ async function gatherDeposit(userId, depositId, now = Date.now()) {
     });
 }
 
-// Ramasse ce que la mer a rendu sur la Grève (bible, § 9, étape 4), s'il a repoussé : un peu de bois, de nourriture
+// Ramasse ce que la mer a rendu sur la plage de Brumelune (bible, § 9, étape 4), s'il a repoussé : un peu de bois, de nourriture
 // ou de pierre, versé une seule fois (la ligne de stock est verrouillée), gardé comme un gisement (world_deposits).
 // { kind, gives } ou { status, message }
 async function pickUp(userId, spotId, now = Date.now()) {

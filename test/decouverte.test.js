@@ -40,7 +40,7 @@ test('« Recommencer l’île » : une fois, confirmé en toutes lettres ; l’�
     assert.equal((await restart(player)).status, 409);
 
     const after = await view(player);
-    // L'île : vide, personne encore, le feu à bâtir, la Grève
+    // L'île : vide, personne encore, le feu à bâtir, la plage de Brumelune
     // seule à soi, la réserve vide
     assert.equal(after.sites.find(s => s.id === 'foyer').level, 0);
     assert.deepEqual(after.villagers.map(v => v.id), []);
