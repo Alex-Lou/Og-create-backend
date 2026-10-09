@@ -197,9 +197,9 @@ Corps du 429 : `{ message }` si l'option `message` est donnée, sinon le `handle
 | Route | Accès | Corps → réponse | Erreurs | Front |
 |---|---|---|---|---|
 | `GET /progress/load` (`R/progress.js:11`) | session | → `{ discoveredElements, coins, timerProgress, lastSaved }` (`S/progress.js:7-16`) | 401, 429, 500 | `App/account.js:87` |
-| `POST /progress/save` (`R/progress.js:19`) | session | `{ timerProgress? }` (objet fusionné) → `{ message, lastSaved }` ; le reste est ignoré (`S/progress.js:19-23`) | 500 | non appelé par le front |
+| `POST /progress/save` (`R/progress.js:19`) | session | `{ timerProgress? }` (même filtre que `update-timer-progress`, lot R2) → `{ message, lastSaved }` ; le reste est ignoré (`S/progress.js:19-23`) | 500 | non appelé par le front |
 | `GET /timer/load-progress` (`R/timer.js:11`) | session | → `{ completedQuestions, unlockedCategories, bestScores }` (`S/timerProgress.js:28-31`) | 401, 429 | `TimerQuestions.vue:239` via `trialService.js:23` |
-| `POST /timer/update-timer-progress` (`R/timer.js:19`) | session | `{ timerProgress: objet }`. Fusion de `completedQuestions` et de `unlockedCategories[Facile/Moyen/Difficile]` ; tout autre champ est ignoré (`S/timerProgress.js:9-17`). → `{ message, timerProgress: {…, bestScores} }` | 400 si l'objet manque | `TimerQuestions.vue:337`, `App/trial.js:142` |
+| `POST /timer/update-timer-progress` (`R/timer.js:19`) | session | `{ timerProgress: objet }`. Annonce du navigateur, filtrée (lot R2) : une question n'entre que si le serveur l'a payée (`coin_ledger`, `timer-question`) dans ce niveau et ce chapitre ; un chapitre n'est scellé que complet ; fusion question par question ; rien de gardé n'est retiré ; tout autre champ est ignoré (`S/timerProgress.js`, `merge`). → `{ message, timerProgress: {…, bestScores} }` | 400 si l'objet manque | `TimerQuestions.vue:337`, `App/trial.js:142` |
 | `GET /game-data/timer-questions` (`R/gameData.js:9`) | public | → `{ levels: { <niveau>: { timer, categories: { <chap>: { questions: [{ id, text, points, initialElements:{ validationMode, requiredCount, required, additional } }] } } } } }`, sans les réponses (`S/timerQuestions.js:9-31`) | 500 | `TimerQuestions.vue:243` via `trialService.js:13` |
 | `GET /game-data/timer_questions` | public | alias du précédent | — | non appelé par le front |
 
@@ -396,7 +396,7 @@ Coordonnées : entiers de 0 à 143 (`W:202`, `S/worldMap.js:8`).
 
 | # | Constat | Réf. | Gravité |
 |---|---|---|---|
-| V1 | La progression de l'Épreuve vient du client : `completedQuestions` et `unlockedCategories` sont fusionnés sans contrôle de clés ni de valeurs. `/play/run` ne vérifie pas que le chapitre est ouvert. Le verrou des chapitres n'existe donc que dans le navigateur. Les points restent versés une fois par question (`timer-question`, ref = id) | `S/timerProgress.js:9-17`, `P/trial.js:12-20`, `S/trial.js:91-93` | moyenne |
+| V1 | **Écriture corrigée (lot R2)** : `completedQuestions` et `unlockedCategories` ne gardent que ce que le serveur a jugé et payé. **Reste** : `/play/run` ne vérifie pas que le chapitre est ouvert ; l'ordre des chapitres n'est imposé que par le navigateur. Les points restent versés une fois par question (`timer-question`, ref = id) | `S/timerProgress.js:9-17`, `P/trial.js:12-20`, `S/trial.js:91-93` | moyenne |
 | V2 | `launch: true` sur `/play/run` remet `free_jokers` à 2 à chaque appel. En relançant, on obtient des jokers offerts sans limite, au prix de la remise à zéro du score de la partie (hypothèse sur l'intérêt réel) | `S/trial.js:42-43,55` | faible |
 | V3 | `register` ne refuse pas les adresses `@provisoire.invalid`, que seul `claim` refuse. Un tel compte est vu comme provisoire : email masqué, réglages refusés, effacement après 30 j sans session | `R/auth.js:44-45` vs `:80`, `S/accounts.js:52-53,87-95` | moyenne — **corrigé (lot R3)** |
 | V4 | `register` : ni longueur max ni type pour l'email. Un email > 255 caractères bute sur le `VARCHAR(255)` (500). Un tableau passe la regex par coercition, puis `usernameFor` échoue (500) | `R/auth.js:43-45`, `S/accounts.js:23`, `db/schema.sql:17` | faible — **corrigé (lot R3)** |

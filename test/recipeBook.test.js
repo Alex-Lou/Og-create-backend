@@ -23,16 +23,35 @@ test('recettes inexplorées par élément possédé', () => {
   assert.deepEqual(unexplored(BOOK, [...BASE, 'Vapeur']), { Air: 1, Vapeur: 1, Eau: 1, Feu: 1, Terre: 1 });
 });
 
-test('fusion de la progression de l’Épreuve', () => {
+test('fusion de la progression de l’Épreuve : seul ce que le serveur a payé entre, rien de gardé ne se perd', () => {
   const { merge } = require('../src/services/timerProgress');
+  // Chapitres connus du serveur : questions du chapitre (total) et celles payées à ce joueur (solved)
+  const chapters = new Map([
+    ['Facile\u0000A', { total: 2, solved: new Set([1, 2]) }],
+    ['Facile\u0000B', { total: 3, solved: new Set([4]) }],
+    ['Moyen\u0000B', { total: 1, solved: new Set([7]) }],
+    ['Moyen\u0000C', { total: 2, solved: new Set() }]
+  ]);
   const merged = merge(
-    { completedQuestions: { Facile: { A: [1] } }, unlockedCategories: { Facile: ['A'] }, bestScores: { Facile: 5 } },
-    { completedQuestions: { Moyen: { B: [2] } }, unlockedCategories: { Facile: ['A', 'B'], Moyen: ['C'] }, bestScores: { Facile: 3, Moyen: 2 } });
-  // Les records envoyés par le navigateur ne sont pas gardés
+    // Gardé : y compris une entrée d'avant la règle (Difficile/Z, chapitre inconnu) et un sceau sans détail (Moyen/D)
+    { completedQuestions: { Facile: { A: [1] }, Difficile: { Z: [99] } }, unlockedCategories: { Moyen: ['D'] }, bestScores: { Facile: 5 } },
+    {
+      completedQuestions: {
+        Facile: { A: [1, 2, 2, 3], B: [4, 5, '4'], Inconnu: [1] }, // 3 et 5 non payées, '4' pas un identifiant
+        Moyen: { B: [7], C: [8] }, // 8 non payée
+        Expert: { A: [1] } // niveau inconnu
+      },
+      unlockedCategories: { Facile: ['A', 'B', 42], Moyen: ['B', 'C'], Difficile: ['Z'] },
+      bestScores: { Facile: 3, Moyen: 2 }
+    },
+    chapters);
   assert.deepEqual(merged, {
-    completedQuestions: { Facile: { A: [1] }, Moyen: { B: [2] } },
-    unlockedCategories: { Facile: ['A', 'B'], Moyen: ['C'], Difficile: [] }
+    completedQuestions: { Facile: { A: [1, 2], B: [4] }, Difficile: { Z: [99] }, Moyen: { B: [7] } },
+    // A (2/2) et Moyen/B (1/1) sont complets ; Facile/B (1/3) non ; Moyen/C rien de payé ; Difficile/Z inconnu
+    unlockedCategories: { Facile: ['A'], Moyen: ['D', 'B'], Difficile: [] }
   });
+  // Une annonce vide ne retire rien
+  assert.deepEqual(merge(merged, {}, chapters), merged);
 });
 
 test('le Livre : pages trouvées, pages à portée sans nom, chapitres scellés', () => {

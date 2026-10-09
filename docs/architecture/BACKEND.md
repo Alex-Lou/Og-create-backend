@@ -262,9 +262,9 @@ Toucher un moteur, c'est toucher les deux côtés et les deux suites de tests (`
 ## 8. Tests
 
 - **Lancement** : `npm test` (`node --test test/*.test.js`), un processus par fichier, en parallèle.
-- **Volume** : 33 fichiers, 232 tests. 16 fichiers démarrent le vrai serveur sur une base ; 17 sont purs
+- **Volume** : 33 fichiers, 235 tests. 16 fichiers démarrent le vrai serveur sur une base ; 17 sont purs
   (`jwt.test.js` au lot R1 ; `emails.test.js`, `emailsDoubles.test.js` au lot R3).
-- **Référence (2026-10-09)** : 216 / 216 avant les lots ; 232 / 232 après R1, R4 et R3, sur un Postgres 16
+- **Référence (2026-10-09)** : 216 / 216 avant les lots ; 235 / 235 après R1, R4, R3 et R2, sur un Postgres 16
   temporaire et isolé.
 - **`whileHeld`** (`test/helpers.js`) : rafraîchit `pg_stat_activity` à chaque tour (`pg_stat_clear_snapshot()`),
   sinon une connexion ouverte après la première lecture restait invisible et le test se bloquait ; en cas d'échec, la
@@ -332,9 +332,10 @@ code). À traiter comme une migration de données.
     trompeur ; pas d'index sur `LOWER(email)`.
 - Mot de passe oublié : `sendMail` attendu sans délai maximal (`services/passwordReset.js:27`). La durée de la
   réponse diffère selon que le compte existe (hypothèse : fuite par la durée).
-- `timer_progress.completedQuestions` vient du navigateur. La fusion est superficielle au niveau de la difficulté
-  (`timerProgress.js:9-16`) : un envoi partiel remplace les chapitres déjà enregistrés de ce niveau, malgré le
-  commentaire « ne se perdent jamais ».
+- `timer_progress` — **corrigé (lot R2, 2026-10-09)** : l'annonce du navigateur est filtrée par
+  `chaptersOf` (questions payées au joueur dans `coin_ledger`, `timer-question`, et nombre de questions par chapitre) ;
+  fusion question par question (un envoi partiel n'efface plus rien) ; un chapitre ne se scelle que complet ; une
+  valeur non itérable ne fait plus 500. Les entrées gardées d'avant la règle restent telles quelles.
 - `config/emailConfig.js` appelle `transporter.verify()` au chargement : sans identifiants, une erreur est
   journalisée à chaque démarrage.
 - La 404 et la bannière de démarrage écrivent par `console.log`, hors du logger.

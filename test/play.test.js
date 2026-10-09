@@ -114,13 +114,13 @@ test('les routes de l’ancien Registre (piste, origines) n’existent plus', as
   assert.equal((await api('POST', '/coins/spend', { reason: 'piste' }, player)).status, 404);
 });
 
-test('la progression de l’Épreuve fusionne ; les records envoyés par le navigateur sont ignorés', async () => {
+test('la progression de l’Épreuve : records et chapitres annoncés par le navigateur sans preuve sont ignorés', async () => {
   const player = await newPlayer();
   await api('POST', '/timer/update-timer-progress', { timerProgress: { bestScores: { Facile: 4 }, unlockedCategories: { Facile: ['A'] } } }, player);
   await api('POST', '/progress/save', { timerProgress: { bestScores: { Facile: 2, Moyen: 1 }, unlockedCategories: { Facile: ['B'] } } }, player);
   const loaded = await api('GET', '/timer/load-progress', null, player);
   assert.deepEqual(loaded.data.bestScores, { Facile: 0, Moyen: 0, Difficile: 0 });
-  assert.deepEqual(loaded.data.unlockedCategories.Facile, ['A', 'B']);
+  assert.deepEqual(loaded.data.unlockedCategories.Facile, []);
   // Un ancien record gonflé resté en base n'est plus lu
   await sql(`UPDATE progress SET timer_progress = timer_progress || '{"bestScores":{"Facile":80}}' WHERE user_id = $1`, [player.userId]);
   const progress = await api('GET', '/progress/load', null, player);
@@ -248,6 +248,69 @@ test('l’Épreuve : le bonus de record vient du score compté par le serveur', 
   assert.equal(twice.data.score, 0);
   assert.equal(await coinsOf(player), q.points + 5);
   assert.equal((await api('POST', '/coins/claim/timer-record', { level: q.level, score: 9 }, player)).status, 404);
+});
+
+// Progression de l'Épreuve (lot R2) : le navigateur annonce, le serveur ne garde que ce qu'il a lui-même jugé et payé
+const sendProgress = (player, level, category, ids, unlock = []) => api('POST', '/timer/update-timer-progress',
+  { timerProgress: { completedQuestions: { [level]: { [category]: ids } }, unlockedCategories: { [level]: unlock } } }, player);
+
+test('l’Épreuve : une question réussie en jeu entre dans la progression, une question inventée non', async () => {
+  const q = await oneStepQuestion();
+  const player = await newPlayer();
+  const [forged] = await sql('SELECT id FROM timer_questions WHERE level = $1 AND category = $2 AND id <> $3 ORDER BY id LIMIT 1', [q.level, q.category, q.id]);
+  const extra = forged ? [forged.id] : [];
+  // Avant de la réussir : rien n'entre, même annoncée
+  const early = await sendProgress(player, q.level, q.category, [q.id, ...extra]);
+  assert.equal(early.status, 200);
+  assert.deepEqual(early.data.timerProgress.completedQuestions, {});
+  // Réussie en jeu (le serveur juge et paie), puis annoncée par le navigateur comme le fait le jeu
+  await api('POST', '/play/run', { mode: 'timer', questionId: q.id, launch: true }, player);
+  assert.equal((await api('POST', '/play/combine', { mode: 'timer', ingredients: q.ingredients }, player)).data.trial.solved, true);
+  const saved = await sendProgress(player, q.level, q.category, [q.id, ...extra, 999999]);
+  assert.deepEqual(saved.data.timerProgress.completedQuestions, { [q.level]: { [q.category]: [q.id] } });
+  const loaded = await api('GET', '/timer/load-progress', null, player);
+  assert.deepEqual(loaded.data.completedQuestions, { [q.level]: { [q.category]: [q.id] } });
+});
+
+test('l’Épreuve : un chapitre ne se scelle que complet ; un envoi partiel n’efface rien ; une question d’un autre chapitre n’y entre pas', async () => {
+  const player = await newPlayer();
+  const [chapter] = await sql(`SELECT level, category, array_agg(id ORDER BY id) AS ids FROM timer_questions
+                               GROUP BY level, category HAVING COUNT(*) = 2 ORDER BY level, category LIMIT 1`);
+  assert.ok(chapter, 'aucun chapitre de deux questions');
+  const [a, b] = chapter.ids;
+  const [elsewhere] = await sql('SELECT id FROM timer_questions WHERE NOT (level = $1 AND category = $2) ORDER BY id LIMIT 1', [chapter.level, chapter.category]);
+  // Comme si le serveur avait jugé et payé ces questions (services/trial.js : coin_ledger, 'timer-question')
+  const pay = id => sql(`INSERT INTO coin_ledger (user_id, amount, reason, ref) VALUES ($1, 10, 'timer-question', $2)`, [player.userId, String(id)]);
+  await pay(a);
+  await pay(elsewhere.id);
+  const send = (ids, unlock) => sendProgress(player, chapter.level, chapter.category, ids, unlock);
+
+  // a payée, b non ; la question d'un autre chapitre, même payée, n'entre pas ici ; le chapitre (1/2) reste ouvert
+  let progress = (await send([a, b, elsewhere.id], [chapter.category])).data.timerProgress;
+  assert.deepEqual(progress.completedQuestions, { [chapter.level]: { [chapter.category]: [a] } });
+  assert.deepEqual(progress.unlockedCategories[chapter.level], []);
+  // b payée à son tour, annoncée seule : a reste (fusion question par question), le chapitre complet se scelle
+  await pay(b);
+  progress = (await send([b], [chapter.category])).data.timerProgress;
+  assert.deepEqual(progress.completedQuestions, { [chapter.level]: { [chapter.category]: [a, b] } });
+  assert.deepEqual(progress.unlockedCategories[chapter.level], [chapter.category]);
+  // Une annonce vide ou bancale ne retire rien
+  for (const body of [{ completedQuestions: {} }, { completedQuestions: { [chapter.level]: [] } }, { completedQuestions: { [chapter.level]: { [chapter.category]: 'a' } } },
+    { unlockedCategories: { [chapter.level]: 5 } }, { completedQuestions: null, unlockedCategories: null }]) {
+    const res = await api('POST', '/timer/update-timer-progress', { timerProgress: body }, player);
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.data.timerProgress.completedQuestions, { [chapter.level]: { [chapter.category]: [a, b] } });
+    assert.deepEqual(res.data.timerProgress.unlockedCategories[chapter.level], [chapter.category]);
+  }
+});
+
+test('l’Épreuve : une progression gardée d’avant la règle est conservée telle quelle', async () => {
+  const player = await newPlayer();
+  const legacy = { completedQuestions: { Facile: { Ancien: [1, 2, 3] } }, unlockedCategories: { Facile: ['Ancien'], Moyen: [], Difficile: [] } };
+  await sql('UPDATE progress SET timer_progress = $1 WHERE user_id = $2', [JSON.stringify(legacy), player.userId]);
+  const res = await api('POST', '/timer/update-timer-progress', { timerProgress: { completedQuestions: { Facile: { Ancien: [4] } } } }, player);
+  assert.deepEqual(res.data.timerProgress.completedQuestions, legacy.completedQuestions);
+  assert.deepEqual(res.data.timerProgress.unlockedCategories, legacy.unlockedCategories);
 });
 
 test('l’Expédition a disparu : ni mode de jeu, ni carte, ni routes', async () => {

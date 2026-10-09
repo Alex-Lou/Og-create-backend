@@ -138,7 +138,7 @@ game_data, timer_questions : isolées (lues en mémoire par le serveur)
 |---|---|---|
 | `guest_players.elements`, `progress.infinite_elements` | `["Eau","Feu",…]`, noms ; ajout atomique `\|\| to_jsonb(nom)` si absent | `players.js:108-128` |
 | `progress.achievements` | `{ "<nom>": { unlocked, unlockedAt } }` | `achievementService.js:38-60` |
-| `progress.timer_progress` | `{ completedQuestions: { niveau: { chapitre: [ids] } }, unlockedCategories: { niveau: [chapitres] } }` ; `bestScores` n'est plus lu (records tirés de `coin_ledger`) | `timerProgress.js:9-43` |
+| `progress.timer_progress` | `{ completedQuestions: { niveau: { chapitre: [ids] } }, unlockedCategories: { niveau: [chapitres] } }` ; `bestScores` n'est plus lu (records tirés de `coin_ledger`). Depuis le lot R2, une question n'y entre que payée par le serveur (`coin_ledger`, `timer-question`, `ref` = id) | `timerProgress.js` |
 | `progress.user_customization` | `{ selectedFrame, selectedAvatar }` ; NULL vaut les pièces par défaut | `customization.js:4`, `:35` |
 | `play_runs.inventory` / `solved_ids` | `[noms]` / `[ids de question]` | `players.js:131-149`, `trial.js` |
 | `game_data.elements` | `{ elements: { Famille: { Nom: "svg:…" } } }` ; la ligne `elements_data` a une **liste** : ignorée | `recipeBook.js:18-29` |
@@ -274,7 +274,7 @@ un verrou exclusif bref sur sa table : un déploiement pendant le jeu peut atten
 
 - `play_runs.mode` CHECK accepte encore `'explorer'` (mode retiré) ; seul `'timer'` est écrit.
 - `progress.timer_progress` a pour défaut `bestScores: { Facile: 0, … }`, que le code ne lit plus. Le champ disparaît
-  à la première écriture (`timerProgress.js:9-16`).
+  à la première écriture (`timerProgress.js`, `merge`).
 - `progress.world_collected_at` n'est lue qu'une fois, à la création de `world_stock` (`world/reads.js:98`).
 - `world_tiles` est gardée pour les remboursements.
 - `achievements_list.unlocked` vaut toujours FALSE dans le seed ; il est remplacé par l'état du joueur.
