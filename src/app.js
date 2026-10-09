@@ -65,6 +65,7 @@ app.use('/api/progress', gameLimiter, require('./routes/progress'));
 app.use('/api/achievements', gameLimiter, require('./routes/achievements'));
 app.use('/api/coins', gameLimiter, require('./routes/coins'));
 app.use('/api/contact', require('./routes/contact'));
+app.use('/api/client-errors', require('./routes/clientErrors'));
 app.use('/api/customization', require('./routes/customization'));
 app.use('/api/play', require('./routes/play'));
 app.use('/api/game-data', gameLimiter, require('./routes/gameData'));
