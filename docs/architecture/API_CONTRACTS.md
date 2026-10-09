@@ -96,7 +96,7 @@ session oubliée et rechargement (`http.js:73-90`).
 | `{ message, errorDetails }` | 500 via `failure()` ; `errorDetails` vaut `error.message` en `development`, sinon `null` | `src/utils/failure.js:4-7` |
 | `{ message }` 500 | Jeu (`fail`), contact, refresh, logout, reset | `P/shared.js:29-32`, `R/contact.js:42`, `R/auth.js:122,142` |
 | `{ message, error }` | Gestionnaire global : `err.status` ou 500 ; `error` = message en dev, `{}` sinon | `app:77-84` |
-| `{ error, retryAfter }` | 429 des limites globale et « jeu » | `app:38` |
+| `{ error, message, retryAfter }` | 429 des limites globale et « jeu » ; `retryAfter` = minutes à attendre (lot jeu, 2026-10-09) | `app.js` (`tooMany`) |
 | Champs en plus | `letter` 409 `{ message, page, hangman }` ; `purchase` 400 `{ message, required }` | `P/book.js:71`, `S/customization.js:55` |
 
 ### 3.2 Codes HTTP
@@ -150,7 +150,7 @@ Corps du 429 : `{ message }` si l'option `message` est donnée, sinon le `handle
 | `code: 'NO_PLAYER'` | `asPlayer` : `POST /play/guest` (une seule création à la fois), puis un seul nouvel essai | `PS:6-22` |
 | Île en 401 ou 402 | L'île passe en mode invitation (`guest = true`) | `WV/WorldView.vue:819-823` |
 | Message affiché | `error.response.data.message`, sinon un texte de secours | front `src/utils/errors.js:2-4` |
-| 429 | Aucun traitement dédié ; les 429 `{ error }` donnent le texte de secours | `app:38`, front `src/utils/errors.js:3` |
+| 429 | Le jeu affiche `message` (« Trop de requêtes, réessaie dans N min. ») | `app.js` (`tooMany`), front `src/utils/errors.js:3` |
 
 `asPlayer` enveloppe `state`, `combine`, `run`, `book`, `ink`, `letter`, `retry`, `joker` et `finishTimer`. Il n'enveloppe pas les appels `/world*` (`PS:26-263`).
 
@@ -171,8 +171,8 @@ Corps du 429 : `{ message }` si l'option `message` est donnée, sinon le `handle
 | Route | Accès | Corps → réponse | Erreurs | Front |
 |---|---|---|---|---|
 | `POST /auth/register` (`:42`) | public | `{ email, password }`. Email : texte ≤ 255, `/^[^\s@]+@[^\s@]+\.[^\s@]+$/`, pas `@provisoire.invalid` ; unique sans tenir compte des majuscules (lot R3). Mot de passe : chaîne d'une ligne, ≥ 8 caractères, ≤ 72 octets (`S/accounts.js:15-20`). → 201 `{ message, userId, username }` + cookies | 400 (champs, format, mot de passe, email ou username pris, y compris course simultanée), 429 | `SeuilModal.vue:69`, `PrologueName.vue:76` via `authService.js:18` |
-| `POST /auth/provisional` (`:62`) | public | — → 201 `{ userId, username, provisional:true }` + cookies | 409 si déjà connecté ; 429 | non appelé par le front |
-| `POST /auth/claim` (`:77`) | session | `{ email, password }` : même format, ≤ 255, pas `@provisoire.invalid` → `{ message, userId, username, provisional:false }` + nouvelle session | 400, 404, 409 (déjà signé) (`S/accounts.js:68-81`) | non appelé par le front |
+| `POST /auth/provisional` (`:62`) | public | — → 201 `{ userId, username, provisional:true }` + cookies | 409 si déjà connecté ; 429 | **appelé par le front** depuis l'île d'abord (2026-10-09) : `authService.provisional`, `story.js` (`openProvisional`) |
+| `POST /auth/claim` (`:77`) | session | `{ email, password }` : même format, ≤ 255, pas `@provisoire.invalid` → `{ message, userId, username, provisional:false }` + nouvelle session | 400, 404, 409 (déjà signé) (`S/accounts.js:68-81`) | **appelé par le front** (page de garde, 2026-10-09) : `authService.claim`, `PrologueName.vue` (`sign`) |
 | `POST /auth/login` (`:97`) | public | `{ email, password }` (email textuel, majuscules ignorées, lot R3) → `{ userId, username, back? }` ; `back` ∈ `suspendu`, `suppression` (`S/accountSettings.js:146-154`) | 400, 401 `Authentification échouée`, 429 | `SeuilModal.vue:68`, `PrologueName.vue:73` |
 | `POST /auth/refresh` (`:115`) | cookie refresh | — → `{ userId, username }` + cookies tournés | 401 (absente, expirée, révoquée), 409 `REFRESH_RACE`, 429, 500 | `http:56` |
 | `GET /auth/me` (`:127`) | session | `{ userId, username, provisional }` | 401 `TOKEN_EXPIRED` | `http:57` (après un 409 seulement) |
@@ -319,7 +319,7 @@ Coordonnées : entiers de 0 à 143 (`W:202`, `S/worldMap.js:8`).
 
 - **Appelé par le front mais absent du serveur** : aucun. Le front appelle 87 routes (86 chaînes `http.get/post`, dont `/auth/${endpoint}` pour login et register). Toutes existent côté serveur ; les deux listes ont été comparées mécaniquement.
 - **Exposé mais inutilisé par le front** :
-  - `POST /auth/provisional` (`R/auth.js:62`) et `POST /auth/claim` (`:77`) ;
+  - ~~`POST /auth/provisional` et `POST /auth/claim`~~ : appelés par le front depuis l'île d'abord (2026-10-09) ;
   - `GET /coins/balance` (`R/coins.js:10`) ;
   - `POST /progress/save` (`R/progress.js:19`) ;
   - l'alias `GET /game-data/timer_questions` (`R/gameData.js:9`) ;

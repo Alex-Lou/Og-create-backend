@@ -90,8 +90,9 @@ une variable à 0 rend le défaut, pas 0.
 | `guestLimiter` | 60 min | 20 | IP | **aucune** | `shared.js:27` |
 
 - Toutes les routes de l'île passent par `playLimiter` (`routes/play/world.js:14`).
-- Le 429 global calcule `retryAfter = ceil(resetTime / 1000 / 60)` (`app.js:38`). En v7, `resetTime` est une `Date`
-  (`index.d.ts:169`) : on obtient des minutes depuis 1970, pas un délai.
+- Le 429 global (`tooMany`, `app.js`) renvoie `{ error, message, retryAfter }` : `retryAfter` = minutes restantes de la
+  fenêtre (au moins 1), `message` = « Trop de requêtes, réessaie dans N min. » — corrigé (lot jeu, 2026-10-09) ; avant,
+  `retryAfter` valait des minutes depuis 1970 et le jeu affichait son texte de secours. Test : `test/limits.test.js`.
 
 **Le reste du parcours**
 
@@ -316,7 +317,6 @@ code). À traiter comme une migration de données.
 
 **Autres points vérifiés**
 
-- `retryAfter` faux dans le 429 global (§ 3).
 - `CORS_ORIGIN` absent → `*` avec `credentials` : le navigateur refuse les cookies cross-origin. Sans effet si le
   front relaie `/api` sur son domaine, comme le dit `app.js:9-10` (hypothèse sur le déploiement).
 - `TRUST_PROXY_HOPS` vaut 1 alors que `app.js:9-10` décrit deux sauts (hébergeur + relais du site). Trop bas,
