@@ -98,7 +98,7 @@ test('au tutoriel, La Source se découvre en écrivant la Source : sans écus ; 
     const done = ['pages', 'ramasser', 'feu', 'nuit', 'recolte', 'soupe', 'poules', 'deco'];
     await sql(`INSERT INTO world_quests (user_id, quest) SELECT $1, unnest($2::text[])`, [id, done]);
     const first = await view(player);
-    assert.deepEqual([first.brume.quest.id, first.brume.quest.label], ['achat-source', 'Découvre La Source : fais-la naître dans l’Athanor']);
+    assert.deepEqual([first.brume.quest.id, first.brume.quest.label], ['achat-source', 'Découvre la région de La Source']);
     const source = first.map.zones.find(z => z.id === 'source');
     assert.deepEqual([source.price, source.plan, source.planOwned], [0, 'Source', false]);
     // Le ruban mène à la Source, l'Encre de sa page est offerte

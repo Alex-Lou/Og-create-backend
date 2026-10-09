@@ -149,8 +149,9 @@ const ZONE_PLANS = { source: 'Source' };
 // Ce que Brume en dit alors
 const ZONE_QUESTS = {
     'achat-source': {
-        label: 'Découvre La Source : fais-la naître dans l’Athanor',
-        say: 'J’entends de l’eau au nord-ouest, et quelqu’un qui ronfle. Mêle les bons éléments dans l’Athanor : la Source naîtra, la brume se lèvera.'
+        // « La Source » est une région (un quartier), pas encore le Puits : on la dit clairement, sans révéler Ondin
+        label: 'Découvre la région de La Source',
+        say: 'Au nord-ouest, une région dort encore sous la brume : La Source. Fais naître « Source » dans l’Athanor : la brume s’y lèvera, et la région sera tienne.'
     }
 };
 async function arianeTargets(userId) {
