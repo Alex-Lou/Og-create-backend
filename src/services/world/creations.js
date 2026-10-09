@@ -10,6 +10,7 @@ const { SIZE, CRAFT_TTL_MS, keyOf } = require('./rules');
 const { annexesOf, levelsOf, stockOf, zonesOf, findsOf, spendFinds, craftsOf, placedOf, madeOf } = require('./reads');
 const { migrate } = require('./migrate');
 const { livesHere } = require('./people');
+const { STATIC, footprintAt, inFootprintAt, placesOf } = require('./places');
 const { campOfUser, cellsOfCamp } = require('./camp');
 const { gatherBefore, payWith } = require('./produce');
 const { roadsOf } = require('./paths');
@@ -17,15 +18,16 @@ const { roadsOf } = require('./paths');
 // Contexte des règles de pose (crafts.spotBlock) : sol, case libre (sur l'île, hors chantier, quartier à soi, ni annexe,
 // ni autre création, ni lieu remarquable, ni gisement), emprise d'un bâtiment bâti, créations posées (sauf skip : celle qu'on déplace)
 // (cells : les cases libres, calculées une fois pour toutes les créations)
-// (blocked : cases réservées en plus, celles du camp des naufragés ; ground : le sol du joueur, ses chemins compris)
-function craftCtx(levels, zones, annexRows, rows, skip = null, blocked = new Set(), ground = map.groundAt) {
+// (blocked : cases réservées en plus, celles du camp des naufragés ; ground : le sol du joueur, ses chemins compris ;
+// places : où sont ses bâtiments, world/places.js)
+function craftCtx({ levels, zones, annexRows, rows, skip = null, blocked = new Set(), ground = map.groundAt, places = STATIC }) {
     const others = placedOf(rows).filter(r => r.id !== skip);
     const busy = new Set([...annexRows.map(keyOf), ...others.map(keyOf), ...blocked]);
     const open = new Uint8Array(SIZE * SIZE);
     const cells = [];
     for (let y = 0; y < SIZE; y++) {
         for (let x = 0; x < SIZE; x++) {
-            if (!map.isLand(x, y) || !zones.has(map.zoneAt(x, y)) || busy.has(y * SIZE + x) || map.inFootprint(x, y, levels) || landmarks.isLandmark(x, y) || finds.isDeposit(x, y)) continue;
+            if (!map.isLand(x, y) || !zones.has(map.zoneAt(x, y)) || busy.has(y * SIZE + x) || inFootprintAt(places, x, y, levels) || landmarks.isLandmark(x, y) || finds.isDeposit(x, y)) continue;
             open[y * SIZE + x] = 1;
             cells.push({ x, y });
         }
@@ -34,7 +36,7 @@ function craftCtx(levels, zones, annexRows, rows, skip = null, blocked = new Set
         ground,
         climate: (x, y) => map.ZONE_BY_ID[map.zoneAt(x, y)]?.climate,
         free: (x, y) => Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < SIZE && y < SIZE && open[y * SIZE + x] === 1,
-        site: id => (livesHere(id, levels, zones) ? map.footprintOf(id, levels[id]) : null),
+        site: id => (livesHere(id, levels, zones) ? footprintAt(places, id, levels[id]) : null),
         placed: others,
         cells
     };
@@ -44,8 +46,8 @@ function craftSpots(c, ctx) {
     return ctx.cells.filter(({ x, y }) => !crafts.spotBlock(c, x, y, ctx)).map(({ x, y }) => ({ x, y }));
 }
 // Créations posées sur une case qui n'est plus libre (chantier agrandi) : rangées dans la réserve
-async function stowCrafts(userId, rows, levels, zones, annexRows) {
-    const ctx = craftCtx(levels, zones, annexRows, []);
+async function stowCrafts(userId, rows, levels, zones, annexRows, places = STATIC) {
+    const ctx = craftCtx({ levels, zones, annexRows, rows: [], places });
     const out = placedOf(rows).filter(r => !ctx.free(r.x, r.y));
     if (!out.length) return rows;
     // Seulement si elle est toujours sur cette case : déplacée entre-temps (/craft/move), elle reste où elle est
@@ -167,7 +169,8 @@ async function placeCraft(userId, craftId, x, y, flip = false) {
         const annexRows = await annexesOf(userId, conn);
         const campCells = cellsOfCamp(await campOfUser(userId, conn, { levels, annexRows, craftRows: rows }));
         const { ground } = await roadsOf(userId, conn);
-        const block = crafts.spotBlock(c, x, y, craftCtx(levels, await zonesOf(userId, conn), annexRows, rows, null, campCells, ground));
+        const { places } = await placesOf(userId, conn);
+        const block = crafts.spotBlock(c, x, y, craftCtx({ levels, zones: await zonesOf(userId, conn), annexRows, rows, blocked: campCells, ground, places }));
         if (block) return db.rollback({ status: 400, message: block });
         await conn.query('UPDATE world_crafts SET flip = $2 WHERE id = $1', [row.id, flip]);
         return setSpot(userId, conn, stock, row, x, y);
@@ -186,7 +189,8 @@ async function moveCraft(userId, x, y, toX, toY) {
         const annexRows = await annexesOf(userId, conn);
         const campCells = cellsOfCamp(await campOfUser(userId, conn, { levels, annexRows, craftRows: rows }));
         const { ground } = await roadsOf(userId, conn);
-        const block = crafts.spotBlock(crafts.CRAFT_BY_ID[row.craft], toX, toY, craftCtx(levels, await zonesOf(userId, conn), annexRows, rows, row.id, campCells, ground));
+        const { places } = await placesOf(userId, conn);
+        const block = crafts.spotBlock(crafts.CRAFT_BY_ID[row.craft], toX, toY, craftCtx({ levels, zones: await zonesOf(userId, conn), annexRows, rows, skip: row.id, blocked: campCells, ground, places }));
         if (block) return db.rollback({ status: 400, message: block });
         // Une création posée près d'elle (règle « près de ») doit la garder à portée
         const needed = crafts.leaveBlock(row, toX, toY, placedOf(rows));

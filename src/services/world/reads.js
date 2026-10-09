@@ -97,7 +97,8 @@ async function stockOf(userId, conn = db, lock = false) {
         `INSERT INTO world_stock (user_id, charges, collected_at)
          SELECT $1, 3, (SELECT world_collected_at FROM progress WHERE user_id = $1)
          ON CONFLICT (user_id) DO NOTHING RETURNING user_id`, [userId]);
-    if (born.rows.length) await conn.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, 'ile:sentiers', 'ile') ON CONFLICT DO NOTHING`, [userId]);
+    // (une île qui naît part de ses seuls sentiers, et son Feu brûle sur la plage : world/paths.js, world/places.js)
+    if (born.rows.length) await conn.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, 'ile:sentiers', 'ile'), ($1, 'ile:plage', 'ile') ON CONFLICT DO NOTHING`, [userId]);
     const { rows } = await read();
     return rows[0];
 }

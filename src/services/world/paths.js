@@ -10,6 +10,7 @@ const map = require('../worldMap');
 const landmarks = require('../landmarks');
 const finds = require('../finds');
 const { SIZE } = require('./rules');
+const { STATIC, inSiteAt, PLAGE } = require('./places');
 
 const MARK = 'ile:sentiers';
 const PREFIX = 'chemin:';
@@ -19,9 +20,12 @@ const MAX_CELLS = 80;
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 const isPath = g => g === 'p' || g === 'k';
 
-// Le sentier d'une île neuve : de la porte du Feu (sous son emprise) jusqu'au sable de l'épave
+// Le sentier d'une île neuve : de la porte du Feu (sous son emprise) jusqu'au sable de l'épave. Sur une île à la
+// plage (world/places.js : le Feu contre l'épave, la cuisine de Cannelle à son ancienne place), il part de la cuisine
+// et finit d'une case de plus, devant la porte du Feu (le bas de son emprise : world/places.js, BEACH)
 const SENTIER = [89, 90, 91, 92, 93, 94, 95].map(y => ({ x: 97, y }));
-const SENTIER_KEYS = new Set(SENTIER.map(c => c.y * SIZE + c.x));
+const SENTIER_BEACH = [...SENTIER, { x: 98, y: 95 }];
+const keysOf = cells => new Set(cells.map(c => c.y * SIZE + c.x));
 // Les vieilles marches : cases de chemin de la carte à côté d'une autre de hauteur différente
 const MARCHES = new Set();
 for (let y = 0; y < SIZE; y++) {
@@ -40,12 +44,17 @@ function regrown(x, y) {
     return ['g', 's', 'm'].reduce((best, g) => (count[g] > count[best] ? g : best), 'g');
 }
 // Le sol d'une île neuve : la carte, sans ses routes (gués, marches et sentier gardés)
-const FRESH = map.GROUND.map((row, y) => [...row].map((g, x) => {
-    const key = y * SIZE + x;
-    if (SENTIER_KEYS.has(key)) return 'p';
-    if (g !== 'p' || MARCHES.has(key)) return g;
-    return regrown(x, y);
-}).join(''));
+const freshOf = sentier => {
+    const keys = keysOf(sentier);
+    return map.GROUND.map((row, y) => [...row].map((g, x) => {
+        const key = y * SIZE + x;
+        if (keys.has(key)) return 'p';
+        if (g !== 'p' || MARCHES.has(key)) return g;
+        return regrown(x, y);
+    }).join(''));
+};
+const FRESH = freshOf(SENTIER);
+const FRESH_BEACH = freshOf(SENTIER_BEACH);
 
 // Les cases tracées d'un joueur : [{ x, y, free }]
 async function laidOf(userId, conn) {
@@ -56,29 +65,31 @@ async function laidOf(userId, conn) {
     }).sort((a, b) => a.y - b.y || a.x - b.x);
 }
 // L'île part-elle de ses seuls sentiers ?
+// { fresh, beach } : l'île part de ses seuls sentiers ; son Feu brûle sur la plage
 async function newRoadsOf(userId, conn) {
-    const { rows } = await conn.query('SELECT 1 FROM world_items WHERE user_id = $1 AND item = $2', [userId, MARK]);
-    return rows.length > 0;
+    const { rows } = await conn.query('SELECT item FROM world_items WHERE user_id = $1 AND item = ANY($2)', [userId, [MARK, PLAGE]]);
+    const items = new Set(rows.map(r => r.item));
+    return { fresh: items.has(MARK), beach: items.has(MARK) && items.has(PLAGE) };
 }
 // Le sol vu par un joueur (lignes, comme map.GROUND) : la carte (sans ses routes pour une île neuve), plus ses chemins
-function groundRows(fresh, laid) {
-    const rows = (fresh ? FRESH : map.GROUND).map(row => [...row]);
+function groundRows(fresh, laid, beach = false) {
+    const rows = (fresh ? (beach ? FRESH_BEACH : FRESH) : map.GROUND).map(row => [...row]);
     for (const c of laid) rows[c.y][c.x] = 'p';
     return rows.map(row => row.join(''));
 }
 // Les chemins d'un joueur, lus une fois : { fresh, laid, rows, added, ground(x, y), key } (key : ce qui décide du sol)
 async function roadsOf(userId, conn) {
-    const fresh = await newRoadsOf(userId, conn);
+    const { fresh, beach } = await newRoadsOf(userId, conn);
     const laid = await laidOf(userId, conn);
-    const rows = groundRows(fresh, laid);
+    const rows = groundRows(fresh, laid, beach);
     const sum = laid.length ? crypto.createHash('sha1').update(laid.map(c => `${c.x},${c.y}`).join(';')).digest('hex').slice(0, 10) : '';
     // Les cases de chemin en plus de la carte (le sentier d'une île neuve, les cases tracées) : ni annexe ni camp dessus
     const added = new Set();
-    for (const c of fresh ? [...SENTIER, ...laid] : laid) if (!isPath(map.groundAt(c.x, c.y))) added.add(c.y * SIZE + c.x);
+    for (const c of fresh ? [...(beach ? SENTIER_BEACH : SENTIER), ...laid] : laid) if (!isPath(map.groundAt(c.x, c.y))) added.add(c.y * SIZE + c.x);
     return {
         fresh, laid, rows, added,
         ground: (x, y) => (Number.isInteger(x) && Number.isInteger(y) ? rows[y]?.[x] : undefined),
-        key: `${fresh ? 'n' : 'v'}${laid.length}${sum}`
+        key: `${fresh ? (beach ? 'b' : 'n') : 'v'}${laid.length}${sum}`
     };
 }
 
@@ -108,14 +119,14 @@ function linked(ground, a, b) {
 }
 
 // Ce qui empêche de tracer un chemin sur (x, y) (texte), ou null. ctx : { ground(x, y), zones (à soi), taken (clés des
-// cases prises : annexes, créations posées, camp), laid (clés déjà tracées) }
+// cases prises : annexes, créations posées, camp), laid (clés déjà tracées), places (où sont les bâtiments) }
 function layBlock(x, y, ctx) {
     if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= SIZE || y >= SIZE) return 'Case hors de l’île.';
     if (!ctx.zones.has(map.zoneAt(x, y))) return 'Trace tes chemins dans tes quartiers.';
     const g = ctx.ground(x, y);
     if (isPath(g)) return 'Il y a déjà un chemin ici.';
     if (!['g', 's', 'm'].includes(g)) return 'Un chemin se trace sur l’herbe, le sable ou la prairie.';
-    if (map.inSite(x, y) || landmarks.isLandmark(x, y) || finds.isDeposit(x, y) || ctx.taken.has(y * SIZE + x)) return 'Cette case est occupée.';
+    if (inSiteAt(ctx.places || STATIC, x, y) || landmarks.isLandmark(x, y) || finds.isDeposit(x, y) || ctx.taken.has(y * SIZE + x)) return 'Cette case est occupée.';
     return null;
 }
 

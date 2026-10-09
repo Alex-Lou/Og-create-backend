@@ -12,17 +12,22 @@ test.after(() => server?.kill());
 const view = async player => (await api('GET', '/play/world', null, player)).data;
 const at = (w, x, y) => w.map.ground[y][x];
 const draw = (player, lay, erase = []) => api('POST', '/play/world/paths', { lay, erase }, player);
-// Du Puits (palier I, 2 × 2 en 88, 85) au Feu (2 × 2 en 96, 87) : dix cases d'herbe, hors des grandes emprises
+// Du Puits (palier I, 2 × 2 en 88, 85) au sentier (97, 89), qui descend jusqu'à la porte du Feu sur la plage : dix
+// cases d'herbe, hors des grandes emprises
 const LINK = [[90, 86], [91, 86], [92, 86], [93, 86], [94, 86], [94, 87], [94, 88], [94, 89], [95, 89], [96, 89]];
 
 test('une île neuve n’a que son sentier ; une île d’avant garde ses routes', async () => {
     const fresh = await newPlayer();
     const w = await view(fresh);
-    // La grande route de la plage (rangées 90-91) est redevenue de l'herbe ; le sentier descend du Feu au rivage
+    // La grande route de la plage (rangées 90-91) est redevenue de l'herbe ; le sentier descend de la cuisine de
+    // Cannelle au rivage, puis d'une case jusqu'à la porte du Feu, qui brûle près de l'épave (île à la plage)
     assert.equal(at(w, 90, 90), 'g');
     for (let y = 89; y <= 95; y++) assert.equal(at(w, 97, y), 'p', `sentier ${y}`);
+    assert.equal(at(w, 98, 95), 'p');
     assert.deepEqual([w.roads.laid, w.roads.free, w.roads.stone], [[], 12, 1]);
-    assert.match(w.map.key, /:n0$/);
+    assert.match(w.map.key, /:b0$/);
+    const foyer = w.sites.find(s => s.id === 'foyer');
+    assert.deepEqual([foyer.x, foyer.y, foyer.w], [99, 93, 2]);
 
     const old = await newPlayer();
     await view(old);
@@ -74,7 +79,7 @@ test('une création au bord d’un chemin le garde ; « Recommencer l’île » 
     const w = await view(player);
     assert.deepEqual([w.roads.laid, w.roads.free], [[], 12]);
     assert.equal(at(w, 92, 90), 'g');
-    assert.match(w.map.key, /:n0$/);
+    assert.match(w.map.key, /:b0$/);
 });
 
 test('la quête du premier chemin : relier le Puits au Feu', async () => {

@@ -11,30 +11,34 @@ const { annexesOf, levelsOf, stockOf, zonesOf, findsOf, spendFinds } = require('
 const { migrate } = require('./migrate');
 const { gather } = require('./produce');
 const { campOfUser, cellsOfCamp } = require('./camp');
+const { STATIC, inSiteAt, placesOf } = require('./places');
 const { roadsOf } = require('./paths');
 
 // Case où une annexe de ce bâtiment peut se poser (sans compter ce qui l'occupe) : sol constructible du quartier du
-// bâtiment, n'importe où dans ce quartier, hors des grandes emprises des chantiers et des lieux remarquables
-function annexSpotOk(siteId, x, y) {
-    const at = map.SITE_BIG[siteId];
-    return Boolean(at) && Number.isInteger(x) && Number.isInteger(y) && map.buildable(x, y) && !map.inSite(x, y) && !landmarks.isLandmark(x, y)
-        && map.zoneAt(x, y) === map.siteZone(siteId);
+// bâtiment, n'importe où dans ce quartier, hors des grandes emprises des bâtiments (où qu'ils soient : places) et des
+// lieux remarquables
+function annexSpotOk(siteId, x, y, places = STATIC) {
+    return Boolean(places[siteId]) && Number.isInteger(x) && Number.isInteger(y) && map.buildable(x, y) && !inSiteAt(places, x, y)
+        && !landmarks.isLandmark(x, y) && map.zoneAt(x, y) === map.siteZone(siteId);
 }
-// Cases où une annexe de chaque bâtiment peut se poser, des plus proches de lui aux plus lointaines (une fois pour
-// toutes : la carte ne change pas)
+// Cases où une annexe de chaque bâtiment peut se poser, des plus proches de lui aux plus lointaines (gardées par
+// disposition des bâtiments : elles ne changent qu'avec elle)
 const SPOTS = new Map();
-function spotsOf(siteId) {
-    if (!SPOTS.has(siteId)) {
-        const at = map.SITE_BIG[siteId];
+const MAX_KEPT = 64;
+function spotsOf(siteId, places) {
+    const key = `${siteId}|${Object.values(places).map(p => `${p.x},${p.y}`).join(';')}`;
+    if (!SPOTS.has(key)) {
+        if (SPOTS.size >= MAX_KEPT) SPOTS.clear();
+        const at = places[siteId];
         const spots = [];
-        for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) if (annexSpotOk(siteId, x, y)) spots.push({ x, y, d: annexes.reachOf(x, y, at) });
-        SPOTS.set(siteId, spots.sort((a, b) => a.d - b.d || a.y - b.y || a.x - b.x).map(({ x, y }) => ({ x, y })));
+        for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) if (annexSpotOk(siteId, x, y, places)) spots.push({ x, y, d: annexes.reachOf(x, y, at) });
+        SPOTS.set(key, spots.sort((a, b) => a.d - b.d || a.y - b.y || a.x - b.x).map(({ x, y }) => ({ x, y })));
     }
-    return SPOTS.get(siteId);
+    return SPOTS.get(key);
 }
 // Cases libres où poser une annexe de ce bâtiment (taken : clés des cases occupées), des plus proches aux plus lointaines
-function annexSpots(siteId, taken) {
-    return spotsOf(siteId).filter(({ x, y }) => !taken.has(y * SIZE + x));
+function annexSpots(siteId, taken, places = STATIC) {
+    return spotsOf(siteId, places).filter(({ x, y }) => !taken.has(y * SIZE + x));
 }
 // Ce que la fiche d'un bâtiment montre de ses annexes : posées, prochain exemplaire (palier, prix), effet
 function annexesView(siteId, rows) {
@@ -75,11 +79,11 @@ const CAMP_MESSAGE = 'Cette case est au camp des naufragés.';
 async function placeAnnex(userId, annexId, x, y, { flip = false, look = null } = {}) {
     const a = annexes.ANNEX_BY_ID[annexId];
     if (!a) return { status: 404, message: 'Annexe inconnue.' };
-    if (!annexSpotOk(a.site, x, y)) return { status: 400, message: SPOT_MESSAGE };
     if (!lookOk(a, look)) return { status: 400, message: LOOK_MESSAGE };
     await migrate(userId);
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
+        if (!annexSpotOk(a.site, x, y, (await placesOf(userId, conn)).places)) return db.rollback({ status: 400, message: SPOT_MESSAGE });
         const { levels } = await levelsOf(userId, conn);
         const level = levels[a.site] || 0;
         if (!level || !(await zonesOf(userId, conn)).has(map.siteZone(a.site))) return db.rollback({ status: 403, message: 'Bâtis d’abord ce bâtiment.' });
@@ -114,7 +118,7 @@ async function moveAnnex(userId, x, y, toX, toY) {
         const found = await annexAt(userId, x, y, conn);
         if (!found) return db.rollback({ status: 404, message: 'Aucune annexe sur cette case.' });
         const a = annexes.ANNEX_BY_ID[found.annex];
-        if (!a || !annexSpotOk(a.site, toX, toY)) return db.rollback({ status: 400, message: SPOT_MESSAGE });
+        if (!a || !annexSpotOk(a.site, toX, toY, (await placesOf(userId, conn)).places)) return db.rollback({ status: 400, message: SPOT_MESSAGE });
         if (x === toX && y === toY) return {};
         if (await cellTaken(userId, toX, toY, conn)) return db.rollback({ status: 409, message: 'Cette case est déjà occupée.' });
         if (cellsOfCamp(await campOfUser(userId, conn)).has(toY * SIZE + toX)) return db.rollback({ status: 409, message: CAMP_MESSAGE });

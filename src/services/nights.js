@@ -9,6 +9,7 @@
 // nuit) : le serveur seul décide, le front montre.
 const crypto = require('node:crypto');
 const map = require('./worldMap');
+const { STATIC, footprintAt } = require('./world/places');
 
 const START_HOUR = 21;
 const END_HOUR = 6;
@@ -99,9 +100,9 @@ function lineOf(a, b) {
         if (e2 <= dx) { err += dx; y += sy; }
     }
 }
-// Les cases d'un bâtiment (son emprise, selon son palier)
-function cellsOf(site, level) {
-    const f = map.footprintOf(site, level);
+// Les cases d'un bâtiment (son emprise, selon son palier et sa place : world/places.js)
+function cellsOf(site, level, places = STATIC) {
+    const f = footprintAt(places, site, level);
     const out = [];
     for (let y = f.y; y < f.y + f.h; y++) for (let x = f.x; x < f.x + f.w; x++) out.push({ x, y });
     return out;
@@ -109,9 +110,9 @@ function cellsOf(site, level) {
 const distance = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
 
 // Les égarés d'une nuit. island = { owned (Set des quartiers à soi), sites ([{ id, level }] : bâtiments bâtis),
-// acts (actes finis) }. [{ id, site, path: [{ x, y }], at (instant d'apparition), arrives (instant d'arrivée) }]
+// acts (actes finis), places (où sont les bâtiments ; ceux de la carte par défaut) }. [{ id, site, path: [{ x, y }], at (instant d'apparition), arrives (instant d'arrivée) }]
 function planOf(userId, night, island) {
-    const sites = island.sites.map(s => ({ id: s.id, cells: cellsOf(s.id, s.level) }));
+    const sites = island.sites.map(s => ({ id: s.id, cells: cellsOf(s.id, s.level, island.places) }));
     const border = borderOf(island.owned);
     if (!sites.length || !border.length) return [];
     const random = randomOf('nuit', userId, night);
@@ -132,10 +133,10 @@ function planOf(userId, night, island) {
 }
 
 // Les défenses de l'île : lumières (le feu du Foyer, lanternes, braseros) et barrières (clôtures, murets).
-// crafts : [{ craft, x, y }] posées ; levels : { site: palier }
-function defenseOf(crafts, levels) {
+// crafts : [{ craft, x, y }] posées ; levels : { site: palier } ; places : où sont les bâtiments
+function defenseOf(crafts, levels, places = STATIC) {
     const lights = crafts.filter(c => LIGHTS.has(c.craft)).map(c => ({ x: c.x, y: c.y }));
-    if (levels.foyer) lights.push(...cellsOf('foyer', levels.foyer));
+    if (levels.foyer) lights.push(...cellsOf('foyer', levels.foyer, places));
     return { lights, fences: new Set(crafts.filter(c => FENCES.has(c.craft)).map(key)) };
 }
 // Le sort d'un égaré sur son chemin : { end: 'luciole' | 'barre' | 'arrive', step } (step : la case où il s'arrête)

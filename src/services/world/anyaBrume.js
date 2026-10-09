@@ -8,6 +8,7 @@ const finds = require('../finds');
 const landmarks = require('../landmarks');
 const { stockOf, zonesOf, claimedOf, exploredOf, levelsOf, foundOf } = require('./reads');
 const { migrate } = require('./migrate');
+const { placesOf: sitePlacesOf, freeSpotsAt } = require('./places');
 
 // Les endroits où Anya peut passer (v6 : n'importe où sur l'île à soi) : quelques cases libres près du panneau de
 // chaque quartier à soi (ni création, ni annexe, ni gisement, ni lieu remarquable), et le Cercle de menhirs une fois
@@ -15,12 +16,13 @@ const { migrate } = require('./migrate');
 const NEAR_PANEL = 12;
 async function placesOf(userId, conn, owned) {
     const { levels } = await levelsOf(userId, conn);
+    const { places: sitePlaces } = await sitePlacesOf(userId, conn);
     const crafts = (await conn.query('SELECT x, y FROM world_crafts WHERE user_id = $1 AND x IS NOT NULL', [userId])).rows;
     const annexes = (await conn.query('SELECT x, y FROM world_annexes WHERE user_id = $1', [userId])).rows;
     const taken = new Set([...crafts, ...annexes, ...landmarks.LANDMARKS].map(c => c.y * map.SIZE + c.x));
     const places = map.ZONES.filter(zone => owned.has(zone.id)).map(zone => ({
         // La première case libre est celle du panneau du quartier
-        cells: map.freeSpots(zone.id, levels).filter(c => !taken.has(c.y * map.SIZE + c.x) && !finds.isDeposit(c.x, c.y)).slice(1, 1 + NEAR_PANEL)
+        cells: freeSpotsAt(sitePlaces, zone.id, levels).filter(c => !taken.has(c.y * map.SIZE + c.x) && !finds.isDeposit(c.x, c.y)).slice(1, 1 + NEAR_PANEL)
     }));
     if ((await foundOf(userId, conn)).has('menhirs')) {
         const cercle = landmarks.LANDMARK_BY_ID.menhirs;

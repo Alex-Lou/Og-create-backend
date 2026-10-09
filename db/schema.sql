@@ -419,6 +419,16 @@ CREATE TABLE IF NOT EXISTS world_visitors (
 CREATE INDEX IF NOT EXISTS idx_world_visitors_user ON world_visitors (user_id, arrived_at);
 -- Lot 7d-2 : visiteur comblé resté sur l'île, dans une maison du Foyer (il devient habitant)
 ALTER TABLE world_visitors ADD COLUMN IF NOT EXISTS settled_at TIMESTAMPTZ;
+-- Places des bâtiments déplacés par le joueur (services/world/places.js) : coin haut-gauche de la grande emprise
+-- (3 × 3) ; sans ligne, la place de la carte (ou celle de l'île à la plage). Ajout seul (9 oct.) : rien n'est effacé.
+CREATE TABLE IF NOT EXISTS world_site_places (
+    user_id    INTEGER     NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    site       VARCHAR(20) NOT NULL,
+    x          SMALLINT    NOT NULL,
+    y          SMALLINT    NOT NULL,
+    moved_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, site)
+);
 -- Créations d'île (services/crafts.js, lot 8) : fabriquées, en réserve (x, y vides) ou posées sur une case
 CREATE TABLE IF NOT EXISTS world_crafts (
     id SERIAL PRIMARY KEY,

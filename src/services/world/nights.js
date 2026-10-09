@@ -16,6 +16,7 @@ const { stockOf, levelsOf, zonesOf, craftsOf, placedOf, claimedOf, needRowsOf, s
 const { migrate } = require('./migrate');
 const { payWith } = require('./produce');
 const { presenceOf, residentsOf, moodsOf } = require('./people');
+const { placesOf } = require('./places');
 
 // Un jour de grâce entre la présentation et la première nuit
 const GRACE_MS = 24 * 3600 * 1000;
@@ -34,9 +35,10 @@ async function islandOf(userId, conn) {
     const presence = await presenceOf(userId, conn);
     const residents = residentsOf(levels, zones, await settlersOf(userId, conn), presence);
     const filled = await needRowsOf(userId, conn);
-    const helpersAt = at => new Set(Object.values(moodsOf(residents, levels, zones, decor, filled, presence, at))
+    const { places } = await placesOf(userId, conn);
+    const helpersAt = at => new Set(Object.values(moodsOf(residents, levels, zones, decor, filled, presence, at, places))
         .filter(m => m.built && m.mood !== 'triste').map(m => m.site));
-    return { island: { owned: zones, sites, acts }, defense: nights.defenseOf(decor, levels), levels, helpersAt };
+    return { island: { owned: zones, sites, acts, places }, defense: nights.defenseOf(decor, levels, places), levels, helpersAt };
 }
 
 // Anya révélée : le cœur de l'île libéré, et la Révélation vue (sa ligne world_friends)

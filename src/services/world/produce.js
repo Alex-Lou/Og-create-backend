@@ -10,6 +10,7 @@ const {
     itemsOf, needRowsOf, settlersOf, annexesOf, levelsOf, stockOf, zonesOf, foundOf, craftsOf, placedOf, blightsOf
 } = require('./reads');
 const { migrate } = require('./migrate');
+const { placesOf } = require('./places');
 const { presenceOf, withMoods, withLandmarks, withBlights, residentsOf, moodsOf, prodSteps, sameSteps } = require('./people');
 
 // Ce dont dépend la production : bâtiments, île (quartiers, habitants, créations posées, besoins), bonus de la
@@ -19,7 +20,8 @@ async function sourcesOf(userId, conn) {
     const zones = await zonesOf(userId, conn);
     const island = {
         levels, zones, settlers: await settlersOf(userId, conn), presence: await presenceOf(userId, conn),
-        decor: placedOf(await craftsOf(userId, conn)), filled: await needRowsOf(userId, conn), blights: await blightsOf(userId, conn)
+        decor: placedOf(await craftsOf(userId, conn)), filled: await needRowsOf(userId, conn), blights: await blightsOf(userId, conn),
+        places: (await placesOf(userId, conn)).places
     };
     const base = { bonuses: shop.bonusesOf(await itemsOf(userId, conn)), extra: annexes.bonusesOf(await annexesOf(userId, conn)) };
     return { builtAt, island, base, lm: landmarks.bonusesOf((await foundOf(userId, conn)).keys()) };
@@ -27,8 +29,8 @@ async function sourcesOf(userId, conn) {
 
 // Bonus avec l'humeur des habitants à l'instant at, et les bâtiments embrumés (sources : sourcesOf) : { bonuses, extra }
 function bonusesAt({ island, base, lm }, at) {
-    const { levels, zones, settlers, presence, decor, filled, blights } = island;
-    const moods = moodsOf(residentsOf(levels, zones, settlers, presence), levels, zones, decor, filled, presence, at);
+    const { levels, zones, settlers, presence, decor, filled, blights, places } = island;
+    const moods = moodsOf(residentsOf(levels, zones, settlers, presence), levels, zones, decor, filled, presence, at, places);
     const { bonuses, extra } = withLandmarks(withMoods(base.bonuses, base.extra, moods), lm);
     return { bonuses: withBlights(bonuses, blights, at), extra };
 }

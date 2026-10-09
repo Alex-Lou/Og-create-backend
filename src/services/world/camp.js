@@ -5,63 +5,74 @@
 // Chaque élément a sa place prévue (PLACES) ; si un objet du joueur l'occupe déjà, l'élément se pose sur la case libre
 // la plus proche : rien du joueur ne bouge, et le camp est toujours complet. Ses cases sont ensuite réservées (on n'y
 // pose ni annexe ni création). Fonctions pures, et campOfUser qui lit dans la base ce qui le décide.
+// Sur une île qui suit l'histoire (choix de l'auteur, 9 oct.), rien n'est là avant son personnage : l'épave seule tant
+// que Brume est seule avec le joueur ; le camp d'Aster (son coin, le SOS, les caisses, le filet, les rondins) avec
+// Aster ; la cuisine avec Cannelle ; le coin de Rivet avec Rivet. Sur une île à la plage (world/places.js), la cuisine
+// de Cannelle prend l'ancienne place du Feu, qui brûle désormais contre l'épave.
 const map = require('../worldMap');
 const landmarks = require('../landmarks');
 const finds = require('../finds');
 const quests = require('../quests');
 const { SIZE } = require('./rules');
-const { annexesOf, levelsOf, claimedOf, craftsOf } = require('./reads');
+const { annexesOf, levelsOf, claimedOf, craftsOf, zonesOf } = require('./reads');
 const { cageOf } = require('./beasts');
 const { roadsOf } = require('./paths');
+const { STATIC, inSiteAt, placesOf } = require('./places');
+const { presenceOf, metOf } = require('./people');
 
 const ZONE = 'coeur';
 // Le Foyer à l'Abri (palier II) : Cannelle quitte la cuisine de l'épave, les cabanons peuvent venir
 const ABRI = 2;
-// Les grandes emprises (palier IV) de tous les chantiers restent libres, quel que soit le palier du joueur
-const BIG = Object.fromEntries(Object.keys(map.SITE_BIG).map(id => [id, map.BIG_FROM]));
+// La cuisine de Cannelle sur une île à la plage : l'ancienne place du Feu (sa petite emprise)
+const KITCHEN_BEACH = map.SITE_PLACES.foyer;
 
 // Place prévue (coin haut-gauche), taille (2 : 2 × 2 cases, sinon 1), dessin selon l'avancée (null : pas encore, ou
-// plus). at : { acts (actes finis), levels (paliers des bâtiments), cage ('coincee', 'ouverte' ou null) }. Un camp sobre, qui libère la plage : l'épave et
+// plus). at : { acts (actes finis), levels (paliers des bâtiments), cage ('coincee', 'ouverte' ou null), here (le
+// personnage est là ? id de son bâtiment : ponton Aster, foyer Cannelle, atelier Rivet) }. Un camp sobre, qui libère la plage : l'épave et
 // trois objets restent ; le coin d'Aster s'en va quand son Ponton est bâti, celui de Rivet avec son Atelier, la cuisine
 // de Cannelle avec l'Abri ; le SOS, quand les voyageurs arrivent (acte IV) avec leur tente et leur hamac
 const has = (at, act) => at.acts.includes(act);
 const foyer = at => at.levels.foyer || 0;
-// Un coin de maître, tant que son bâtiment n'est pas bâti : débris, abri (acte I), cabanon (acte II, et le Foyer à l'Abri)
+// Le camp d'Aster (et ce que la mer a laissé autour) arrive avec elle
+const aster = at => at.here('ponton');
+// Un coin de maître, une fois arrivé et tant que son bâtiment n'est pas bâti : débris, abri (acte I), cabanon (acte II,
+// et le Foyer à l'Abri)
 const corner = (who, site) => at => {
-    if (at.levels[site]) return null;
+    if (at.levels[site] || !at.here(site)) return null;
     return `${who}_${has(at, 'II') && foyer(at) >= ABRI ? 'cabanon' : has(at, 'I') ? 'abri' : 'debris'}`;
 };
 const PLACES = [
     { id: 'hirondelle', x: 96, y: 96, size: 2, art: () => 'hirondelle' },
-    { id: 'cannelle', x: 99, y: 96, size: 2, art: at => (foyer(at) < ABRI ? 'cannelle_debris' : null) },
+    { id: 'cannelle', x: 99, y: 96, size: 2, art: at => (foyer(at) < ABRI && at.here('foyer') ? 'cannelle_debris' : null) },
     { id: 'aster', x: 101, y: 93, size: 2, art: corner('aster', 'ponton') },
     { id: 'rivet', x: 92, y: 92, size: 2, art: corner('rivet', 'atelier') },
     { id: 'tente', x: 93, y: 96, size: 2, art: at => (has(at, 'IV') ? 'tente' : null) },
     { id: 'hamac', x: 102, y: 96, size: 2, art: at => (has(at, 'IV') ? 'hamac' : null) },
-    { id: 'sos', x: 104, y: 93, art: at => (has(at, 'IV') ? null : 'sos') },
-    { id: 'caisses', x: 99, y: 93, art: () => 'caisses' },
-    { id: 'filet', x: 104, y: 95, art: () => 'filet' },
-    { id: 'rondins', x: 95, y: 92, art: () => 'rondins' },
+    { id: 'sos', x: 104, y: 93, art: at => (has(at, 'IV') || !aster(at) ? null : 'sos') },
+    { id: 'caisses', x: 99, y: 93, art: at => (aster(at) ? 'caisses' : null) },
+    { id: 'filet', x: 104, y: 95, art: at => (aster(at) ? 'filet' : null) },
+    { id: 'rondins', x: 95, y: 92, art: at => (aster(at) ? 'rondins' : null) },
     { id: 'cage', x: 98, y: 94, art: at => (at.cage ? `cage_${at.cage}` : null) }
 ];
 
 // Case où le camp peut se poser : sol constructible de la plage, hors des grandes emprises, des lieux remarquables et
 // des gisements (taken : clés des cases occupées)
-const open = (x, y, taken) => x >= 0 && y >= 0 && x < SIZE && y < SIZE && map.zoneAt(x, y) === ZONE && map.buildable(x, y)
-    && !map.inFootprint(x, y, BIG) && !landmarks.isLandmark(x, y) && !finds.isDeposit(x, y) && !taken.has(y * SIZE + x);
+// (places : où sont les bâtiments ; leurs grandes emprises restent libres, quel que soit leur palier)
+const open = (x, y, taken, places) => x >= 0 && y >= 0 && x < SIZE && y < SIZE && map.zoneAt(x, y) === ZONE && map.buildable(x, y)
+    && !inSiteAt(places, x, y) && !landmarks.isLandmark(x, y) && !finds.isDeposit(x, y) && !taken.has(y * SIZE + x);
 const cellsOf = (x, y, size) => Array.from({ length: size * size }, (_, i) => [x + (i % size), y + Math.floor(i / size)]);
-const fits = (x, y, size, taken) => cellsOf(x, y, size).every(([a, b]) => open(a, b, taken));
+const fits = (x, y, size, taken, places) => cellsOf(x, y, size).every(([a, b]) => open(a, b, taken, places));
 
 // Où se pose un élément : sa place si elle est libre, sinon la plus proche qui l'est (à égalité : plus haut, puis plus
 // à gauche), ou null s'il n'y en a aucune à RADIUS cases
 const RADIUS = 8;
-function spotOf(place, size, taken) {
-    if (fits(place.x, place.y, size, taken)) return { x: place.x, y: place.y };
+function spotOf(place, size, taken, places) {
+    if (fits(place.x, place.y, size, taken, places)) return { x: place.x, y: place.y };
     let best = null;
     for (let y = place.y - RADIUS; y <= place.y + RADIUS; y++) {
         for (let x = place.x - RADIUS; x <= place.x + RADIUS; x++) {
             const d = (x - place.x) ** 2 + (y - place.y) ** 2;
-            if (d > RADIUS * RADIUS || !fits(x, y, size, taken)) continue;
+            if (d > RADIUS * RADIUS || !fits(x, y, size, taken, places)) continue;
             if (!best || d < best.d || (d === best.d && (y < best.y || (y === best.y && x < best.x)))) best = { x, y, d };
         }
     }
@@ -70,16 +81,17 @@ function spotOf(place, size, taken) {
 
 // Le camp d'un joueur : [{ id, art, x, y, w, h }] (ce qui se voit maintenant). acts : actes finis ; levels : paliers
 // des bâtiments ; taken : clés (y × SIZE + x) des cases occupées par ses annexes et ses créations posées ; cage : la
-// cage aux poules
-function campOf({ acts = [], levels = {}, taken = new Set(), cage = null }) {
-    const at = { acts, levels, cage };
+// cage aux poules ; met : ids des bâtiments dont le personnage est là (null : tous, un compte d'avant la bible) ;
+// places, beach : où sont les bâtiments, île à la plage (world/places.js)
+function campOf({ acts = [], levels = {}, taken = new Set(), cage = null, met = null, places = STATIC, beach = false }) {
+    const at = { acts, levels, cage, here: site => !met || met.has(site) };
     const busy = new Set(taken);
     const out = [];
     for (const place of PLACES) {
         const art = place.art(at);
         if (!art) continue;
         const size = place.size || 1;
-        const spot = spotOf(place, size, busy);
+        const spot = spotOf(beach && place.id === 'cannelle' ? { ...place, ...KITCHEN_BEACH } : place, size, busy, places);
         if (!spot) continue;
         cellsOf(spot.x, spot.y, size).forEach(([x, y]) => busy.add(y * SIZE + x));
         out.push({ id: place.id, art, x: spot.x, y: spot.y, w: size, h: size });
@@ -100,7 +112,12 @@ async function campOfUser(userId, conn, { levels, annexRows, craftRows } = {}) {
     const taken = new Set([...annexList, ...craftList.filter(r => r.x !== null && r.x !== undefined)].map(r => r.y * SIZE + r.x));
     // (les chemins tracés, et le sentier d'une île neuve)
     for (const k of (await roadsOf(userId, conn)).added) taken.add(k);
-    return campOf({ acts, levels: lv, taken, cage: await cageOf(userId, conn) });
+    const { places, beach } = await placesOf(userId, conn);
+    // Qui est là (un compte d'avant la bible : tout le monde, comme avant)
+    const presence = await presenceOf(userId, conn);
+    const zones = await zonesOf(userId, conn);
+    const met = presence.veteran ? null : new Set(['ponton', 'foyer', 'atelier'].filter(id => metOf(id, lv, zones, presence)));
+    return campOf({ acts, levels: lv, taken, cage: await cageOf(userId, conn), met, places, beach });
 }
 
 module.exports = { PLACES, campOf, cellsOfCamp, campOfUser };

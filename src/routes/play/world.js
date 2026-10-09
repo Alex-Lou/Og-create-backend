@@ -219,6 +219,19 @@ router.post('/world/annex', withAccount(async (req, res, owner, b) => {
 }));
 
 // Annexe : déplacement gratuit vers une autre case libre autour de son bâtiment
+// Déplacer un bâtiment (services/world/moves.js) : où il peut aller ; puis l'y poser (le coin de sa grande emprise)
+router.get('/world/site/spots', withAccount(async (req, res, owner) => {
+    const done = await world.siteSpots(owner.id, String(req.query.site || ''));
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json(done);
+}));
+router.post('/world/site/move', withAccount(async (req, res, owner, b) => {
+    const x = Number(req.body.x), y = Number(req.body.y);
+    if (!cellOk(x, y) || typeof req.body.site !== 'string') return res.status(400).json({ message: 'Place invalide' });
+    const done = await world.moveSite(owner.id, req.body.site, x, y);
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json(await worldView(owner, b));
+}));
 router.post('/world/annex/move', withAccount(async (req, res, owner, b) => {
     const [x, y, toX, toY] = ['x', 'y', 'toX', 'toY'].map(k => Number(req.body[k]));
     if (!cellOk(x, y, toX, toY)) return res.status(400).json({ message: 'Case invalide' });

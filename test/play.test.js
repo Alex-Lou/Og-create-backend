@@ -820,8 +820,8 @@ test('le Monde : un article de la Récolte qui a servi ne se rend plus ; un skin
 
 test('le Monde : une création déplacée pendant que l’île s’ouvre n’est pas rangée par erreur', async () => {
   const player = await newPlayer();
-  await api('GET', '/play/world', null, player);
-  const foyer = worldMap.footprintOf('foyer', 1);
+  // (le Foyer de ce joueur, là où il est : world/places.js)
+  const foyer = (await api('GET', '/play/world', null, player)).data.sites.find(s => s.id === 'foyer');
   const [{ id }] = await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'cloture', $2, $3) RETURNING id`, [player.userId, foyer.x, foyer.y]);
   const cell = async () => (await sql('SELECT x, y FROM world_crafts WHERE id = $1', [id]))[0];
   // Sur une case prise (le Foyer), elle est rangée dans la réserve à l'ouverture de l'île

@@ -38,7 +38,7 @@ const {
 const { migrate } = require('./world/migrate');
 const { openedOf, chestsView, grant, openChest, openAll } = require('./world/chests');
 const {
-    SLEEPERS, presenceOf, residentsOf, hungryOf, HUNGRY_AGO, moodsOf, withMoods, withLandmarks, withBlights, prodSteps,
+    SLEEPERS, metOf, presenceOf, residentsOf, hungryOf, HUNGRY_AGO, moodsOf, withMoods, withLandmarks, withBlights, prodSteps,
     runsSince, visitorNow, visitorView, befriend, fillNeeds, satisfyVisitor, settleVisitor
 } = require('./world/people');
 const { bonusesFor, gather, payWith, collect } = require('./world/produce');
@@ -52,6 +52,8 @@ const {
 const { annexSpotOk, annexSpots, annexesView, placeAnnex, moveAnnex, poseAnnex } = require('./world/annexPlots');
 const { campOfUser, cellsOfCamp } = require('./world/camp');
 const paths = require('./world/paths');
+const { PLAGE, placesOf, footprintAt } = require('./world/places');
+const { siteSpots, moveSite } = require('./world/moves');
 const gridLevels = require('./levels');
 const stars = require('./world/stars');
 const { startNights, repelCreature, repairSite, nightsView } = require('./world/nights');
@@ -93,10 +95,11 @@ async function factsOf(userId, owned, stars, conn = db, moods = null) {
         namesOf(userId, conn)
     ]);
     const placed = placedOf(craftRows);
+    const { places } = await placesOf(userId, conn);
     if (!moods) {
         const presence = await presenceOf(userId, conn);
         const residents = residentsOf(levels, zones, await settlersOf(userId, conn), presence);
-        moods = moodsOf(residents, levels, zones, placed, filled, presence);
+        moods = moodsOf(residents, levels, zones, placed, filled, presence, Date.now(), places);
     }
     // Un besoin comblé depuis l'ouverture de la quête en cours (la dernière réclamée) reste fait pour elle, même s'il
     // revient avant qu'on la réclame. La faim de Cannelle à son arrivée (welcome, datée d'avant) ne compte pas
@@ -121,14 +124,14 @@ async function factsOf(userId, owned, stars, conn = db, moods = null) {
         settled,
         named: Boolean(names.peuple),
         // Les bâtiments reliés par un chemin (« puits-foyer »), quand ils sont bâtis
-        links: await linksOf(userId, levels, conn)
+        links: await linksOf(userId, levels, places, conn)
     };
 }
 // Paires de bâtiments bâtis que relie un chemin (world/paths.js) : Set de « a-b » (pour la quête du premier chemin)
 const LINKS = [['puits', 'foyer']];
-async function linksOf(userId, levels, conn = db) {
+async function linksOf(userId, levels, places, conn = db) {
     const { ground } = await paths.roadsOf(userId, conn);
-    return new Set(LINKS.filter(([a, b]) => levels[a] && levels[b] && paths.linked(ground, map.footprintOf(a, levels[a]), map.footprintOf(b, levels[b])))
+    return new Set(LINKS.filter(([a, b]) => levels[a] && levels[b] && paths.linked(ground, footprintAt(places, a, levels[a]), footprintAt(places, b, levels[b])))
         .map(pair => pair.join('-')));
 }
 
@@ -213,7 +216,7 @@ const ISLAND_TABLES = [
     'world_game_runs', 'world_games', 'world_craft_runs', 'world_crafts', 'world_annexes', 'world_tiles', 'world_buildings',
     'world_quests', 'world_zones', 'world_runs', 'world_beasts', 'world_visitors', 'world_needs', 'world_friends',
     'world_expeditions', 'world_landmarks', 'world_finds', 'world_deposits', 'world_nights', 'world_signs',
-    'world_sign_names', 'world_names'
+    'world_sign_names', 'world_names', 'world_site_places'
 ];
 async function restartIsland(userId) {
     return db.transaction(async conn => {
@@ -233,7 +236,7 @@ async function restartIsland(userId) {
         await conn.query('DELETE FROM world_items WHERE user_id = $1 AND item LIKE $2', [userId, `${paths.PREFIX}%`]);
         // Les étoiles des jeux à grille aussi (choix de l'auteur : un vrai départ ; leurs bonus se regagnent)
         await conn.query('DELETE FROM world_items WHERE user_id = $1 AND item LIKE $2', [userId, `${stars.PREFIX}%`]);
-        await conn.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'ile') ON CONFLICT DO NOTHING`, [userId, paths.MARK]);
+        await conn.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'ile'), ($1, $3, 'ile') ON CONFLICT DO NOTHING`, [userId, paths.MARK, PLAGE]);
         // La réserve repart vide, ses parties de Récolte pleines, sur la carte du moment (rien à faire passer)
         await conn.query('DELETE FROM world_stock WHERE user_id = $1', [userId]);
         await conn.query('INSERT INTO world_stock (user_id, charges, collected_at, map_version) VALUES ($1, 3, NOW(), $2)', [userId, MAP_VERSION]);
@@ -255,7 +258,7 @@ async function layPaths(userId, lay, erase) {
         const placed = placedOf(craftRows);
         const camp = cellsOfCamp(await campOfUser(userId, conn, { levels, annexRows, craftRows }));
         const plan = paths.planOf(lay, erase, roads.laid, stock, {
-            fresh: roads.fresh, ground: roads.ground, zones: await zonesOf(userId, conn),
+            fresh: roads.fresh, ground: roads.ground, zones: await zonesOf(userId, conn), places: (await placesOf(userId, conn)).places,
             taken: new Set([...annexRows.map(keyOf), ...placed.map(keyOf), ...camp]),
             placedNeedingPath: placed.filter(r => crafts.CRAFT_BY_ID[r.craft]?.place.path).map(r => ({ x: r.x, y: r.y, name: crafts.CRAFT_BY_ID[r.craft].name }))
         });
@@ -276,19 +279,19 @@ async function layPaths(userId, lay, erase) {
 async function view(userId, owned, book) {
     await migrate(userId);
     // (lectures indépendantes, ensemble : la base est distante, chaque requête coûte un aller-retour)
-    const [{ levels, builtAt }, items, skins, signed, played, friends, named, annexRows, stock, zones] = await Promise.all([
+    const [{ levels, builtAt }, items, skins, signed, played, friends, named, annexRows, stock, zones, { places }] = await Promise.all([
         levelsOf(userId), itemsOf(userId), skinsOf(userId), signsOf(userId), gamesOf(userId), friendsOf(userId), namesOf(userId),
-        annexesOf(userId), stockOf(userId), zonesOf(userId)
+        annexesOf(userId), stockOf(userId), zonesOf(userId), placesOf(userId)
     ]);
     const shopBonuses = shop.bonusesOf(items);
     const annexCells = new Set(annexRows.map(keyOf));
-    const craftRows = await stowCrafts(userId, await craftsOf(userId), levels, zones, annexRows);
+    const craftRows = await stowCrafts(userId, await craftsOf(userId), levels, zones, annexRows, places);
     const decor = placedOf(craftRows);
     const filled = await needRowsOf(userId);
     const settlers = await settlersOf(userId);
     const presence = await presenceOf(userId);
     const residents = residentsOf(levels, zones, settlers, presence);
-    const moods = moodsOf(residents, levels, zones, decor, filled, presence);
+    const moods = moodsOf(residents, levels, zones, decor, filled, presence, Date.now(), places);
     await welcome(userId, moods, filled, presence);
     const found = await foundOf(userId);
     const lmBonuses = landmarks.bonusesOf(found.keys());
@@ -308,14 +311,14 @@ async function view(userId, owned, book) {
     // embrumé ne produit plus (withBlights)
     const now = Date.now();
     const blights = await blightsOf(userId);
-    const island = { levels, zones, settlers, presence, decor, filled, blights };
+    const island = { levels, zones, settlers, presence, decor, filled, blights, places };
     const steps = prodSteps(island, { bonuses: shopBonuses, extra: annexes.bonusesOf(annexRows) }, lmBonuses, stock.collected_at, now);
     const blighted = withBlights(bonuses, blights, now);
     const production = productionAll(levels, builtAt, stock.collected_at, now, blighted, extra, steps);
     const sites = Object.entries(SITES).map(([id, site]) => {
         const level = levels[id] || 0;
         const next = site.levels[level];
-        const place = map.footprintOf(id, level);
+        const place = footprintAt(places, id, level);
         const zone = map.siteZone(id);
         const made = production.find(p => p.site === id);
         const step = l => ({
@@ -324,6 +327,9 @@ async function view(userId, owned, book) {
         });
         return {
             id, x: place.x, y: place.y, w: place.w, h: place.h, level, maxLevel: site.levels.length, zone, locked: !zones.has(zone),
+            // Un chantier dont le personnage n'est pas encore là ne se voit pas (choix de l'auteur, 9 oct. : rien avant
+            // son personnage ; le Feu de camp, celui de Brume, toujours) ; un compte d'avant la bible voit tout, comme avant
+            hidden: !presence.veteran && !level && id !== 'foyer' && !metOf(id, levels, zones, presence),
             // Nom choisi par le joueur (dès le palier III), sinon celui du palier
             name: named[`site:${id}`] || (level ? site.levels[level - 1].name : site.levels[0].name),
             baseName: level ? site.levels[level - 1].name : site.levels[0].name,
@@ -355,7 +361,7 @@ async function view(userId, owned, book) {
             fullIn: site.produce && level ? fullInOf(builtAt[id], stock.collected_at, CAP_HOURS + (extra.cap[id] || 0), now) : null,
             // Annexes : catalogue du bâtiment et cases libres où en poser une (dès le palier II)
             annexes: annexesView(id, annexRows),
-            spots: level >= 2 && zones.has(zone) ? annexSpots(id, taken) : [],
+            spots: level >= 2 && zones.has(zone) ? annexSpots(id, taken, places) : [],
             next: next ? step(next) : null
         };
     });
@@ -440,7 +446,7 @@ async function view(userId, owned, book) {
             laid: roads.laid.map(c => [c.x, c.y, c.free ? 1 : 0]), stone: 1, free: Math.max(0, paths.FREE - roads.laid.filter(c => c.free).length),
             max: paths.MAX_CELLS
         },
-        crafts: craftsView(craftRows, craftCtx(levels, zones, annexRows, craftRows, null, campCells, roads.ground), {
+        crafts: craftsView(craftRows, craftCtx({ levels, zones, annexRows, rows: craftRows, blocked: campCells, ground: roads.ground, places }), {
             owned: have, stock: paidStock, open: crafts.tiersOpen(book.finished || new Set(), epreuves, book.stars ?? 0), epreuves, stars: book.stars ?? 0, have: stockFinds
         }, id => sites.find(site => site.id === id)?.name || id),
         // Habitants (la troupe rencontrée, les visiteurs installés) : prénom, goûts, amitié, déjà vus ou gâtés
@@ -958,7 +964,7 @@ async function chooseSign(userId, siteId, styleId) {
 module.exports = {
     SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, pendingOf, chargesAt, effectsOf, productionOf,
     view, build, buyZone, buyItem, undoItem, harvestCap, chooseSkin, startRun, finishRun, collect, migrate, claimQuest, board, openChest, openAll,
-    placeAnnex, moveAnnex, poseAnnex, annexSpotOk, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople, namePlayer, chooseAvatar, arianeTargets, guidedInkOf, restartIsland,
+    placeAnnex, moveAnnex, poseAnnex, annexSpotOk, siteSpots, moveSite, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople, namePlayer, chooseAvatar, arianeTargets, guidedInkOf, restartIsland,
     refundDecorations, startCraft, finishCraft, placeCraft, moveCraft, storeCraft, turnCraft, startExpedition, findLandmark, gatherDeposit, pickUp,
     anyaOf, breathRefused, revealAnya, breatheAnya, brumeSavoirOf, talkBrume, startNights, repelCreature, repairSite, skipPrologue, layPaths,
     feedBeast, collectBeasts, openCage

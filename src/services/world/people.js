@@ -20,12 +20,13 @@ const { grant } = require('./chests');
 const gatherBefore = (...args) => require('./produce').gatherBefore(...args);
 const gather = (...args) => require('./produce').gather(...args);
 const payWith = (...args) => require('./produce').payWith(...args);
+const { STATIC, footprintAt, placesOf } = require('./places');
 
 // Un habitant vit sur l'île quand son bâtiment est bâti, dans un quartier à soi
 const livesHere = (id, levels, zones) => (levels[id] || 0) >= 1 && zones.has(map.siteZone(id));
-// Décorations à reach cases au plus (en tous sens) de l'emprise d'un bâtiment
-function decosNear(tiles, siteId, level, reach) {
-    const at = map.footprintOf(siteId, level);
+// Décorations à reach cases au plus (en tous sens) de l'emprise d'un bâtiment (où qu'il soit : places)
+function decosNear(tiles, siteId, level, reach, places = STATIC) {
+    const at = footprintAt(places, siteId, level);
     const gap = (v, from, size) => Math.max(from - v, 0, v - (from + size - 1));
     return tiles.filter(t => Math.max(gap(t.x, at.x, at.w), gap(t.y, at.y, at.h)) <= reach).length;
 }
@@ -69,14 +70,15 @@ const hungryOf = (id, presence) => id === 'foyer' && !presence.veteran && !prese
 const HUNGRY_AGO = (villagers.NEEDS.manger.hours * 60 + 1) * 60 * 1000;
 // Besoins et humeur de chaque habitant à l'instant now : { habitant: { needs, mood, site, built } } (se distraire :
 // les créations d'île posées autour du bâtiment où il travaille, une fois ce bâtiment bâti et le prologue fini)
-function moodsOf(residents, levels, zones, decor, filled, presence, now = Date.now()) {
+// (places : où sont les bâtiments, world/places.js)
+function moodsOf(residents, levels, zones, decor, filled, presence, now = Date.now(), places = STATIC) {
     const atelier = livesHere('atelier', levels, zones);
     const prologue = !presence.veteran && !presence.done.has('puits-ondin');
     const out = {};
     for (const { id, site, built } of residents) {
         const rows = hungryOf(id, presence) && !filled[id]?.manger ? { ...filled[id], manger: new Date(now - HUNGRY_AGO) } : filled[id] || {};
         const deco = built && !prologue;
-        const needs = villagers.needsOf(rows, deco ? decosNear(decor, site, levels[site], villagers.NEEDS.deco.reach) : 0, atelier, now, { deco });
+        const needs = villagers.needsOf(rows, deco ? decosNear(decor, site, levels[site], villagers.NEEDS.deco.reach, places) : 0, atelier, now, { deco });
         const mood = villagers.moodOf(needs);
         out[id] = { needs, mood: presence.blessed ? anya.blessedMood(mood) : mood, site, built };
     }
@@ -138,15 +140,15 @@ const blightTimes = (blights = [], from, to) => blights.flatMap(b => [b.since, b
 
 // La part de production en plus de chaque bâtiment depuis la dernière récolte, à chaque instant où elle change d'elle-même
 // (l'humeur, à l'échéance d'un besoin : moodTimes ; une panne qui commence ou finit) : [{ at, prod }] pour
-// productionAll. island = { levels, zones, settlers, presence, decor, filled, blights } ; base = { bonuses, extra } de
+// productionAll. island = { levels, zones, settlers, presence, decor, filled, blights, places } ; base = { bonuses, extra } de
 // la boutique et des annexes ; lm : landmarks.bonusesOf
 function prodSteps(island, base, lm, collectedAt, now) {
-    const { levels, zones, settlers, presence, decor, filled, blights } = island;
+    const { levels, zones, settlers, presence, decor, filled, blights, places } = island;
     const residents = residentsOf(levels, zones, settlers, presence);
     const from = collectedAt ? new Date(collectedAt).getTime() : 0;
     const times = [...new Set([...moodTimes(filled, from, now), ...blightTimes(blights, from, now)])].sort((a, b) => a - b);
     return times.map(at => {
-        const moods = moodsOf(residents, levels, zones, decor, filled, presence, at);
+        const moods = moodsOf(residents, levels, zones, decor, filled, presence, at, places);
         return { at, prod: withBlights(withLandmarks(withMoods(base.bonuses, base.extra, moods), lm).bonuses, blights, at).prod };
     });
 }
@@ -277,7 +279,7 @@ async function fillNeeds(userId, targets = null, now = Date.now()) {
         const zones = await zonesOf(userId, conn);
         const presence = await presenceOf(userId, conn, now);
         const residents = residentsOf(levels, zones, await settlersOf(userId, conn), presence);
-        const moods = moodsOf(residents, levels, zones, placedOf(await craftsOf(userId, conn)), await needRowsOf(userId, conn), presence, now);
+        const moods = moodsOf(residents, levels, zones, placedOf(await craftsOf(userId, conn)), await needRowsOf(userId, conn), presence, now, (await placesOf(userId, conn)).places);
         const wanted = targets || Object.entries(moods).flatMap(([villager, m]) => m.needs.filter(n => n.cost).map(n => ({ villager, need: n.id })));
         // Ce qui a été produit est encaissé d'abord, avec l'humeur d'avant : cela compte pour payer ; le stock le comprend
         const { balance } = await gather(userId, conn, locked);
