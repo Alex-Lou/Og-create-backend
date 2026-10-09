@@ -14,7 +14,7 @@ const view = async player => (await api('GET', '/play/world', null, player)).dat
 const restart = (player, confirm = 'RECOMMENCER') => api('POST', '/play/world/restart', { confirm }, player);
 const count = async (table, id) => (await sql(`SELECT COUNT(*)::int AS n FROM ${table} WHERE user_id = $1`, [id]))[0].n;
 
-test('« Recommencer l’île » : une fois, confirmé en toutes lettres ; l’île repart de zéro, le Grimoire et les écus restent', async () => {
+test('« Recommencer l’île » : confirmé en toutes lettres ; tout repart de zéro, sauf le compte', async () => {
     const player = await newPlayer({ coins: 777 });
     const id = player.userId;
     await view(player);
@@ -30,7 +30,6 @@ test('« Recommencer l’île » : une fois, confirmé en toutes lettres ; l’�
     await sql(`UPDATE world_stock SET wood = 50, stone = 40 WHERE user_id = $1`, [id]);
     const before = await view(player);
     assert.ok(before.villagers.length > 1);
-    const chaptersBefore = (await api('GET', '/play/book', null, player)).data.chapters.map(c => c.open);
 
     assert.equal((await api('POST', '/play/world/restart', { confirm: 'RECOMMENCER' }, { cookies: {} })).status, 401);
     assert.equal((await restart(player, 'oui')).status, 400);
@@ -49,15 +48,16 @@ test('« Recommencer l’île » : une fois, confirmé en toutes lettres ; l’�
     for (const table of ['world_quests', 'world_crafts', 'world_buildings']) assert.equal(await count(table, id), 0, table);
     // Le tutoriel reprend (la vue de Brume le dit) : « Passer » est oublié
     assert.deepEqual([after.brume.tutorial, after.brume.skipped], [true, false]);
-    // Gardés : les écus, le Grimoire (ses chapitres ouverts aussi), le coffre de chapitre, la boutique
-    assert.equal((await sql('SELECT coins FROM progress WHERE user_id = $1', [id]))[0].coins, 777);
-    assert.ok((await sql('SELECT infinite_elements FROM progress WHERE user_id = $1', [id]))[0].infinite_elements.includes('Boue'));
-    assert.deepEqual((await api('GET', '/play/book', null, player)).data.chapters.map(c => c.open), chaptersBefore);
-    const chests = (await sql('SELECT source FROM world_chests WHERE user_id = $1 ORDER BY source', [id])).map(r => r.source);
-    assert.deepEqual(chests, ['chapitre:I']);
+    // Tout le reste aussi (choix de l'auteur, 9 oct.) : les écus et leur grand livre, le Grimoire réduit aux quatre
+    // Souffles, les coffres, la boutique ; le compte, lui, reste (et sa session)
+    const [prog] = await sql('SELECT coins, infinite_elements, achievements, user_customization FROM progress WHERE user_id = $1', [id]);
+    assert.deepEqual([prog.coins, prog.infinite_elements, prog.achievements, prog.user_customization], [0, ['Eau', 'Feu', 'Terre', 'Air'], {}, null]);
+    for (const table of ['coin_ledger', 'world_chests', 'user_items', 'book_tries', 'world_avatars']) assert.equal(await count(table, id), 0, table);
+    assert.equal((await sql('SELECT COUNT(*)::int AS n FROM users WHERE id = $1', [id]))[0].n, 1);
+    assert.equal((await api('GET', '/account', null, player)).status, 200);
     const items = (await sql('SELECT item FROM world_items WHERE user_id = $1 ORDER BY item', [id])).map(r => r.item);
     // (l'île recommencée part de ses sentiers, son Feu sur la plage : world/places.js)
-    assert.deepEqual(items, ['banc', 'ile:plage', 'ile:recommencee', 'ile:sentiers']);
+    assert.deepEqual(items, ['ile:plage', 'ile:recommencee', 'ile:sentiers']);
     // Les habitants arrivent un à un : Aster après le feu, Cannelle après la Récolte.
     await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'pages'), ($1, 'ramasser'), ($1, 'feu')`, [id]);
     assert.deepEqual((await view(player)).villagers.map(v => v.id), ['ponton']);

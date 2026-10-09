@@ -273,6 +273,16 @@ function actsDoneOf(done) {
     return ACTS.filter(act => done.has(QUESTS.filter(quest => quest.act === act).pop().id));
 }
 
+// Les étapes du tutoriel (de la première page au premier chemin : le prologue du jeu, game/prologue.js), pour le suivi
+// des quêtes : [{ id, label, done }] (done : réclamée)
+const TUTORIAL_LAST = 'chemin';
+const TUTORIAL = QUESTS.slice(0, INDEX.get(TUTORIAL_LAST) + 1);
+function tutorialStepsOf(claimed) {
+    const done = doneOf(claimed);
+    return TUTORIAL.map(quest => ({ id: quest.id, label: quest.label, done: done.has(quest.id) }));
+}
+const inTutorial = id => TUTORIAL.some(quest => quest.id === id);
+
 function boardOf(claimed, facts) {
     const done = doneOf(claimed);
     return { quest: active(claimed, facts), done: QUESTS.filter(quest => done.has(quest.id)).length, total: QUESTS.length, acts: actsDoneOf(done), rested: RESTED };
@@ -300,5 +310,5 @@ const RESTED = 'La brume s’est levée sur toute l’île. Merci, alchimiste : 
 
 module.exports = {
     QUESTS, LEGACY, QUEST_CHESTS, BEASTS, GUIDED_INK, FIRST_NIGHT_DONE, SHORE_TUTORIAL_MARK,
-    reachOf, doneOf, firstNightDoneOf, currentOf, progressOf, active, boardOf, actsDoneOf, actStartsOf
+    reachOf, doneOf, firstNightDoneOf, currentOf, progressOf, active, boardOf, actsDoneOf, actStartsOf, tutorialStepsOf, inTutorial
 };

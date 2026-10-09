@@ -205,18 +205,18 @@ async function skipPrologue(userId) {
     return { skipped: true };
 }
 
-// « Recommencer l'île » (choix de l'auteur) : une fois par compte (sinon les récompenses du prologue se rejoueraient),
-// d'un seul tenant. Efface l'île : bâtiments, quêtes, quartiers, créations, annexes, objets posés, réserves et parties
-// de Récolte, bêtes, visiteurs, besoins et amitiés des habitants, expéditions, lieux, trouvailles, gisements, nuits,
-// mini-jeux, enseignes, noms ; les coffres de quêtes, de lieux et de Récolte ; « Passer le tutoriel ». Garde le
-// Grimoire (éléments, pages, coffres de chapitre), les écus, l'avatar, les achats de boutique (articles, skins, styles
-// d'enseigne), les coffres du jour et les bouteilles. L'île suit ensuite les règles d'un compte neuf
-// (players.RESTARTED). { restarted: true }, ou { status, message } si refus
-const ISLAND_TABLES = [
+// « Recommencer l'île » (choix de l'auteur, 9 oct. : « ça doit TOUT effacer sauf mon compte et me permettre de revivre
+// le tuto depuis le départ »), d'un seul tenant : tout ce que le joueur a fait s'efface (île, Grimoire réduit aux quatre
+// Souffles, écus et leur grand livre, succès, Épreuve, Cabinet, avatar, coffres, pages et lettres du Livre) ; restent
+// le compte (adresse, mot de passe, sessions). L'île repart neuve, à la plage, et suit le tutoriel depuis le début
+// (players.RESTARTED). Rien ne peut s'y gagner deux fois : les écus repartent de zéro avec leur grand livre.
+// { restarted: true }, ou { status, message } si refus
+const PLAYER_TABLES = [
     'world_game_runs', 'world_games', 'world_craft_runs', 'world_crafts', 'world_annexes', 'world_tiles', 'world_buildings',
     'world_quests', 'world_zones', 'world_runs', 'world_beasts', 'world_visitors', 'world_needs', 'world_friends',
     'world_expeditions', 'world_landmarks', 'world_finds', 'world_deposits', 'world_nights', 'world_signs',
-    'world_sign_names', 'world_names', 'world_site_places'
+    'world_sign_names', 'world_sign_styles', 'world_names', 'world_site_places', 'world_items', 'world_skins', 'world_chests',
+    'world_avatars', 'world_stock', 'coin_ledger', 'user_items', 'book_tries'
 ];
 async function restartIsland(userId) {
     return db.transaction(async conn => {
@@ -228,19 +228,17 @@ async function restartIsland(userId) {
         if (done.rows.length && (process.env.ISLAND_RESTART_ONCE === '1' || done.rows[0].fresh)) {
             return db.rollback({ status: 409, message: process.env.ISLAND_RESTART_ONCE === '1' ? 'Ton île a déjà été recommencée une fois.' : 'Ton île vient d’être recommencée.' });
         }
-        for (const table of ISLAND_TABLES) await conn.query(`DELETE FROM ${table} WHERE user_id = $1`, [userId]);
-        await conn.query(`DELETE FROM world_chests WHERE user_id = $1 AND (source LIKE 'quete:%' OR source LIKE 'lieu:%' OR source LIKE 'recolte:%')`, [userId]);
-        await conn.query('DELETE FROM world_items WHERE user_id = $1 AND item = $2', [userId, PROLOGUE_SKIP]);
-        await conn.query('DELETE FROM world_items WHERE user_id = $1 AND item = $2', [userId, quests.SHORE_TUTORIAL_MARK]);
-        // Ses chemins tracés s'effacent : l'île repart de ses seuls sentiers
-        await conn.query('DELETE FROM world_items WHERE user_id = $1 AND item LIKE $2', [userId, `${paths.PREFIX}%`]);
-        // Les étoiles des jeux à grille aussi (choix de l'auteur : un vrai départ ; leurs bonus se regagnent)
-        await conn.query('DELETE FROM world_items WHERE user_id = $1 AND item LIKE $2', [userId, `${stars.PREFIX}%`]);
-        await conn.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'ile'), ($1, $3, 'ile') ON CONFLICT DO NOTHING`, [userId, paths.MARK, PLAGE]);
-        // La réserve repart vide, ses parties de Récolte pleines, sur la carte du moment (rien à faire passer)
-        await conn.query('DELETE FROM world_stock WHERE user_id = $1', [userId]);
+        for (const table of PLAYER_TABLES) await conn.query(`DELETE FROM ${table} WHERE user_id = $1`, [userId]);
+        // (le Livre et l'Épreuve rangent leurs parties par joueur : 'u:<id>')
+        await conn.query('DELETE FROM book_letters WHERE owner = $1', [`u:${userId}`]);
+        await conn.query('DELETE FROM play_runs WHERE owner = $1', [`u:${userId}`]);
+        await conn.query(`UPDATE progress SET infinite_elements = DEFAULT, achievements = DEFAULT, timer_progress = DEFAULT,
+            user_customization = NULL, coins = 0, world_collected_at = NULL, last_saved = NOW() WHERE user_id = $1`, [userId]);
+        // L'île neuve : ses seuls sentiers, son Feu sur la plage, sa réserve vide et ses parties de Récolte pleines, sur la
+        // carte du moment ; recommencée (elle suit le tutoriel)
         await conn.query('INSERT INTO world_stock (user_id, charges, collected_at, map_version) VALUES ($1, 3, NOW(), $2)', [userId, MAP_VERSION]);
-        await conn.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'ile') ON CONFLICT (user_id, item) DO UPDATE SET bought_at = NOW()`, [userId, players.RESTARTED]);
+        await conn.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'ile'), ($1, $3, 'ile'), ($1, $4, 'ile')`,
+            [userId, paths.MARK, PLAGE, players.RESTARTED]);
         return { restarted: true };
     });
 }
@@ -516,6 +514,8 @@ async function view(userId, owned, book) {
             };
             // Le fil d'Ariane de la quête active : la cible et les pages qui restent (le Grimoire montre la page marquée)
             if (out.quest && !out.quest.done && book.ariane) out.quest.ariane = { target: book.ariane.target, remaining: book.ariane.remaining };
+            // Le tutoriel en cours : toutes ses étapes, pour le suivi des quêtes (faites, en cours, à venir)
+            if (out.tutorial && !out.skipped && out.quest && quests.inTutorial(out.quest.id)) out.steps = quests.tutorialStepsOf(claimed);
             return out;
         })(),
         // Le Savoir de Brume, une fois le Phare allumé : { open, talked }
