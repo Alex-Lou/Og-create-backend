@@ -263,6 +263,9 @@ test('la boutique des ateliers : bonus additionnés et plafonnés, effets sur la
   assert.equal(home.moves, 4);
   assert.equal(home.charges, 1);
   assert.equal(home.regenMs, 25 * 60 * 1000);
+  // L'alambic de l'atelier (palier IV) : +1 coup ; le toit de cuivre et les toits du Foyer, dès leur palier
+  assert.equal(shop.bonusesOf(['alambic']).moves, 1);
+  assert.deepEqual(['alambic', 'toit-cuivre', 'toit-rouge', 'toit-bleu-foyer', 'toit-chaume-foyer'].map(id => shop.ITEM_BY_ID[id].minLevel), [4, 3, 1, 1, 1]);
   const eff = effectsOf({ foyer: 1, atelier: 1 }, home);
   assert.equal(eff.maxMoves, 15 + 3 + 4);
   assert.equal(eff.maxCharges, 4);
