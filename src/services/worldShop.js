@@ -104,11 +104,13 @@ const ITEMS = [
     { id: 'etabli', site: 'atelier', kind: 'outil', name: 'Établi', price: 150, minLevel: 1, effect: { moves: 1 } },
     { id: 'enclume', site: 'atelier', kind: 'outil', name: 'Enclume', price: 250, minLevel: 2, effect: { moves: 1 } },
     { id: 'soufflet', site: 'atelier', kind: 'objet', name: 'Soufflet de forge', price: 450, minLevel: 3, effect: { moves: 2 } },
+    { id: 'alambic', site: 'atelier', kind: 'objet', name: 'Alambic de cuivre', price: 420, minLevel: 4, effect: { moves: 1 } },
     { id: 'marteau-pilon', site: 'atelier', kind: 'outil', name: 'Marteau-pilon', price: 700, minLevel: 5, effect: { moves: 1 } },
     { id: 'automate', site: 'atelier', kind: 'objet', name: 'Automate', price: 1300, minLevel: 6, effect: { moves: 2 } },
     { id: 'athanor', site: 'atelier', kind: 'objet', name: 'Athanor d’or', price: 2400, minLevel: 7, effect: { moves: 2 } },
     { id: 'enseigne-doree', site: 'atelier', kind: 'skin', name: 'Enseigne dorée', price: 80, minLevel: 1 },
     { id: 'toit-ardoise', site: 'atelier', kind: 'skin', name: 'Toit d’ardoise', price: 80, minLevel: 2 },
+    { id: 'toit-cuivre', site: 'atelier', kind: 'skin', name: 'Toit de cuivre', price: 80, minLevel: 3 },
     // Foyer
     { id: 'cuisine', site: 'foyer', kind: 'outil', name: 'Cuisine', price: 300, minLevel: 1, effect: { regenMs: 25 * 60 * 1000 } },
     { id: 'lit', site: 'foyer', kind: 'outil', name: 'Lit douillet', price: 450, minLevel: 2, effect: { charges: 1 } },
@@ -117,9 +119,9 @@ const ITEMS = [
     { id: 'sablier', site: 'foyer', kind: 'outil', name: 'Sablier', price: 700, minLevel: 5, effect: { regenMs: 20 * 60 * 1000 } },
     { id: 'hibou', site: 'foyer', kind: 'objet', name: 'Hibou', price: 1300, minLevel: 6, effect: { charges: 1 } },
     { id: 'grimoire', site: 'foyer', kind: 'objet', name: 'Grimoire volant', price: 2400, minLevel: 7, effect: { charges: 1 } },
-    { id: 'toit-rouge', site: 'foyer', kind: 'skin', name: 'Toit rouge', price: 70, minLevel: 2 },
-    { id: 'toit-bleu-foyer', site: 'foyer', kind: 'skin', name: 'Toit bleu', price: 70, minLevel: 3 },
-    { id: 'toit-chaume-foyer', site: 'foyer', kind: 'skin', name: 'Toit de chaume', price: 70, minLevel: 4 },
+    { id: 'toit-rouge', site: 'foyer', kind: 'skin', name: 'Toit rouge', price: 70, minLevel: 1 },
+    { id: 'toit-bleu-foyer', site: 'foyer', kind: 'skin', name: 'Toit bleu', price: 70, minLevel: 1 },
+    { id: 'toit-chaume-foyer', site: 'foyer', kind: 'skin', name: 'Toit de chaume', price: 70, minLevel: 1 },
     ...TINTS.flatMap(t => SITE_IDS.map(site => ({ id: `${t.id}-${site}`, site, kind: 'skin', name: t.name, price: t.price, minLevel: t.minLevel, tint: true }))),
     ...RARES.map(rare => ({ ...rare, kind: 'skin', price: null, minLevel: 1, rare: true }))
 ];
