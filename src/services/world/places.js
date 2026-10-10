@@ -15,9 +15,21 @@ const PLAGE = 'ile:plage';
 const NEW_ISLAND = 'ile:sentiers';
 const BIG = 3;
 const SMALL = 2;
-// Le Feu sur la plage, au-dessus de l'épave et du sable : sa porte (le bas de son emprise, y = 95) touche le bout du
-// sentier (world/paths.js : SENTIER_BEACH), à tous ses paliers
-const BEACH = { foyer: { x: 98, y: 92 } };
+// Une île à la plage (choix de l'auteur, 10 oct.) : une zone par personnage, qui ne se découvre qu'avec lui, et son
+// bâtiment au milieu, avec la place autour pour ses annexes, ses objets et deux bâtiments à venir (le jeu dessine les
+// zones : src/world/zones.js, mêmes cases). Le Feu, bâtiment de Cannelle, sur la plage (sa porte, le bas de son emprise,
+// y = 95, touche le bout du sentier : world/paths.js, SENTIER_BEACH, à tous ses paliers) ; le Ponton d'Aster au
+// sud-ouest, contre la mer ; l'Atelier de Rivet au nord du Feu ; le Puits d'Ondin à l'ouest, près du ruisseau ; ceux
+// des actes suivants au bord de leur quartier (celui qu'il faut acheter pour les bâtir : map.siteZone)
+const BEACH = {
+    foyer: { x: 98, y: 92 },
+    ponton: { x: 87, y: 98 },
+    atelier: { x: 95, y: 82 },
+    puits: { x: 86, y: 86 },
+    carriere: { x: 86, y: 69 },
+    potager: { x: 73, y: 70 },
+    bosquet: { x: 72, y: 86 }
+};
 
 // Les places d'un joueur : { bâtiment : { x, y } } (coin haut-gauche de la grande emprise). beach : île à la plage ;
 // rows : ses déplacements [{ site, x, y }]

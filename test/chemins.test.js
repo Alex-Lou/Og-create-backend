@@ -12,9 +12,9 @@ test.after(() => server?.kill());
 const view = async player => (await api('GET', '/play/world', null, player)).data;
 const at = (w, x, y) => w.map.ground[y][x];
 const draw = (player, lay, erase = []) => api('POST', '/play/world/paths', { lay, erase }, player);
-// Du Puits (palier I, 2 × 2 en 97, 89) au Feu sur la plage : le chemin contourne le Puits par l'est et rejoint la porte
-// du Feu (hors des grandes emprises et du camp)
-const LINK = [[99, 91], [100, 91], [101, 91], [101, 92]];
+// Du Puits d'Ondin (île à la plage : palier I, 2 × 2 en 87, 87, dans sa zone à l'ouest) au sentier du Feu : six cases
+// vers l'est, sous le Puits, jusqu'au haut du sentier (95, 89)
+const LINK = [[89, 89], [90, 89], [91, 89], [92, 89], [93, 89], [94, 89]];
 
 test('une île neuve n’a que son sentier ; une île d’avant garde ses routes', async () => {
     const fresh = await newPlayer();

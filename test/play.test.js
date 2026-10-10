@@ -6,6 +6,7 @@ const loot = require('../src/services/loot');
 const minigames = require('../src/services/minigames');
 // Cases du cœur : coordonnées de la grande île (v3) + décalage dans la très grande île (v4), passées à la grande carte
 // (× 1,5, v5)
+const places = require('../src/services/world/places');
 const worldMap = require('../src/services/worldMap');
 const { OFFSET } = require('../src/services/worldMapV4');
 const X = x => worldMap.fromV4(x + OFFSET.x);
@@ -1353,6 +1354,8 @@ test('le Monde : un chantier demande son quartier, son plan du Livre et ses ress
 });
 
 test('le Monde : les paliers III à VII demandent chapitre et écus, le palier IV agrandit l’emprise et range les créations', async () => {
+  // (une île neuve est à la plage : la Carrière de Galet au bord de La Colline, world/places.js)
+  const CARRIERE = places.BEACH.carriere;
   const player = await newPlayer({ coins: 0 });
   const siteOf = (world, id) => world.sites.find(s => s.id === id);
   const build = () => api('POST', '/play/world/build', { site: 'carriere' }, player);
@@ -1383,19 +1386,19 @@ test('le Monde : les paliers III à VII demandent chapitre et écus, le palier I
   assert.deepEqual(third.data.world.stock, { stone: 470, wood: 455, water: 500, food: 485 });
   assert.deepEqual(third.data.world.harvest.boosts, { stone: 4 });
   const galerie = siteOf(third.data.world, 'carriere');
-  assert.deepEqual([galerie.x, galerie.y, galerie.w, galerie.h], [worldMap.SITE_PLACES.carriere.x, worldMap.SITE_PLACES.carriere.y, 2, 2]);
+  assert.deepEqual([galerie.x, galerie.y, galerie.w, galerie.h], [CARRIERE.x + 1, CARRIERE.y + 1, 2, 2]);
 
   // Une création posée là où la Mine va s'étendre est rangée dans la réserve quand l'emprise s'agrandit
-  await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'cloture', $2, $3)`, [player.userId, worldMap.SITE_BIG.carriere.x, worldMap.SITE_BIG.carriere.y]);
+  await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'cloture', $2, $3)`, [player.userId, CARRIERE.x, CARRIERE.y]);
   const fourth = await build();
   assert.equal(fourth.status, 200);
   assert.equal(fourth.data.built, 'Galerie');
   assert.equal(fourth.data.coins, 850 - 300);
   const big = siteOf(fourth.data.world, 'carriere');
-  assert.deepEqual([big.x, big.y, big.w, big.h], [worldMap.SITE_BIG.carriere.x, worldMap.SITE_BIG.carriere.y, 3, 3]);
+  assert.deepEqual([big.x, big.y, big.w, big.h], [CARRIERE.x, CARRIERE.y, 3, 3]);
   assert.deepEqual(fourth.data.world.crafts.placed, []);
   assert.equal(fourth.data.world.crafts.catalog.find(c => c.id === 'cloture').reserve, 1);
-  assert.equal((await api('POST', '/play/world/craft/place', { craft: 'cloture', x: worldMap.SITE_BIG.carriere.x, y: worldMap.SITE_BIG.carriere.y + 1 }, player)).status, 400);
+  assert.equal((await api('POST', '/play/world/craft/place', { craft: 'cloture', x: CARRIERE.x, y: CARRIERE.y + 1 }, player)).status, 400);
   // Palier V : chapitre V encore fermé
   const fifth = await build();
   assert.equal(fifth.status, 403);
@@ -1718,9 +1721,13 @@ test('besoins des habitants : manger, travailler, se distraire ; l’humeur chan
   assert.equal((await fill('foyer', 'outils')).status, 403);
   await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'est')`, [player.userId]);
   await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'atelier', 1)`, [player.userId]);
+  // L'Atelier est dans la zone de Rivet, au nord du Feu (île à la plage : world/places.js) : trois clôtures autour de
+  // lui, Rivet a de quoi se distraire, il est heureux
+  const shop = places.BEACH.atelier;
+  await sql(`INSERT INTO world_crafts (user_id, craft, x, y) SELECT $1, 'cloture', c[1], c[2] FROM jsonb_to_recordset($2::jsonb) AS t(c int[])`,
+    [player.userId, JSON.stringify([[shop.x + 3, shop.y + 1], [shop.x + 3, shop.y + 2], [shop.x - 1, shop.y + 2]].map(c => ({ c })))]);
   const forge = await view();
   assert.deepEqual(who(forge, 'foyer').needs.map(n => n.id), ['manger', 'outils', 'deco']);
-  // L'Atelier est au campement, près des clôtures du Foyer : Rivet a de quoi se distraire, il est heureux
   assert.equal(who(forge, 'atelier').mood, 'heureux');
   // Sans outils, il redevient content ; affamé aussi, il devient triste : −2 coups par Récolte (4 de moins qu'heureux)
   await ago('atelier', 'outils', 50);

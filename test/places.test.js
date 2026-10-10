@@ -13,7 +13,10 @@ test('les places : la carte, la plage, puis le joueur', () => {
   assert.deepEqual(places.STATIC.foyer, map.SITE_BIG.foyer);
   const beach = places.placesFrom({ beach: true });
   assert.deepEqual(beach.foyer, places.BEACH.foyer);
-  assert.deepEqual(beach.puits, map.SITE_BIG.puits);
+  // Une île à la plage : chaque personnage a sa zone, son bâtiment au milieu (le Puits d'Ondin à l'ouest, près du
+  // ruisseau) ; une île d'avant garde les places de la carte
+  assert.deepEqual(beach.puits, { x: 86, y: 86 });
+  assert.deepEqual(places.STATIC.puits, map.SITE_BIG.puits);
   assert.deepEqual(places.placesFrom({ beach: true, rows: [{ site: 'foyer', x: 90, y: 92 }, { site: 'inconnu', x: 1, y: 1 }] }).foyer, { x: 90, y: 92 });
   // Emprise : le coin avant (2 × 2) avant le palier IV, la grande ensuite ; réservée en entier dès le départ
   assert.deepEqual(places.footprintAt(beach, 'foyer', 1), { x: 99, y: 93, w: 2, h: 2 });
@@ -24,16 +27,27 @@ test('les places : la carte, la plage, puis le joueur', () => {
   assert.equal(places.inFootprintAt(beach, 99, 93, { foyer: 1 }), true);
 });
 
-test('le camp : rien avant son personnage ; sur une île à la plage, la cuisine prend l’ancienne place du Feu', () => {
+test('une île à la plage : chaque bâtiment tient sur sa place (herbe, sable ou prairie, libre, dans son quartier)', () => {
+  const beach = places.placesFrom({ beach: true });
+  const ctx = { places: beach, levels: {}, zones: new Set(map.ZONES.map(z => z.id)), ground: map.groundAt, taken: new Set(), placed: [] };
+  for (const [id, at] of Object.entries(places.BEACH)) {
+    assert.equal(moveBlock(id, at.x, at.y, ctx), null, id);
+    assert.ok(['coeur', map.siteZone(id)].includes(map.zoneAt(at.x + 1, at.y + 1)), id);
+  }
+});
+
+test('le camp : rien avant son personnage ; sur une île à la plage, chacun dans sa zone', () => {
   const ids = camp => camp.map(c => c.id).sort();
   // Brume seule : l'épave, rien d'autre
   assert.deepEqual(ids(campOf({ met: new Set() })), ['hirondelle']);
   // Aster arrive avec son camp
   assert.deepEqual(ids(campOf({ met: new Set(['ponton']) })), ['aster', 'caisses', 'filet', 'hirondelle', 'rondins', 'sos']);
-  // Cannelle : sa cuisine ; sur une île à la plage, à l'ancienne place du Feu (le Puits s'y est installé : la cuisine se pose juste au-dessus)
+  // Sur une île à la plage : la cuisine de Cannelle sur la plage (sa zone), le camp d'Aster au sud-ouest, le coin de
+  // Rivet au nord du Feu
   const beach = places.placesFrom({ beach: true });
-  const kitchen = campOf({ met: new Set(['ponton', 'foyer']), places: beach, beach: true }).find(c => c.id === 'cannelle');
-  assert.deepEqual([kitchen.x, kitchen.y], [map.SITE_PLACES.foyer.x, map.SITE_PLACES.foyer.y - 1]);
+  const camp = campOf({ met: new Set(['ponton', 'foyer', 'atelier']), places: beach, beach: true });
+  const at = id => { const c = camp.find(e => e.id === id); return [c.x, c.y]; };
+  assert.deepEqual([at('cannelle'), at('aster'), at('rivet')], [[99, 96], [90, 93], [93, 86]]);
   // Un compte d'avant la bible (met : null) : tout, comme avant
   assert.ok(ids(campOf({})).includes('cannelle') && ids(campOf({})).includes('rivet'));
   // Rien du camp sur la grande emprise du Feu (les caisses et la cage s'écartent)

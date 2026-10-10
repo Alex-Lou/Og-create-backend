@@ -7,8 +7,9 @@
 // pose ni annexe ni création). Fonctions pures, et campOfUser qui lit dans la base ce qui le décide.
 // Sur une île qui suit l'histoire (choix de l'auteur, 9 oct.), rien n'est là avant son personnage : l'épave seule tant
 // que Brume est seule avec le joueur ; le camp d'Aster (son coin, le SOS, les caisses, le filet, les rondins) avec
-// Aster ; la cuisine avec Cannelle ; le coin de Rivet avec Rivet. Sur une île à la plage (world/places.js), la cuisine
-// de Cannelle prend l'ancienne place du Feu, qui brûle désormais contre l'épave.
+// Aster ; la cuisine avec Cannelle ; le coin de Rivet avec Rivet. Sur une île à la plage (world/places.js : une zone par
+// personnage), le camp d'Aster et ce que la mer a laissé autour sont dans sa zone, au sud-ouest, le coin de Rivet dans
+// la sienne, au nord du Feu ; la cuisine de Cannelle reste sur la plage, sa zone, près de son Feu.
 const map = require('../worldMap');
 const landmarks = require('../landmarks');
 const finds = require('../finds');
@@ -23,8 +24,11 @@ const { presenceOf, metOf } = require('./people');
 const ZONE = 'coeur';
 // Le Foyer à l'Abri (palier II) : Cannelle quitte la cuisine de l'épave, les cabanons peuvent venir
 const ABRI = 2;
-// La cuisine de Cannelle sur une île à la plage : l'ancienne place du Feu (sa petite emprise)
-const KITCHEN_BEACH = map.SITE_PLACES.foyer;
+// Les places du camp sur une île à la plage (world/places.js) : dans la zone de chacun
+const BEACH_PLACES = {
+    aster: { x: 90, y: 93 }, sos: { x: 85, y: 94 }, caisses: { x: 88, y: 95 }, filet: { x: 86, y: 96 }, rondins: { x: 91, y: 96 },
+    rivet: { x: 93, y: 86 }
+};
 
 // Place prévue (coin haut-gauche), taille (2 : 2 × 2 cases, sinon 1), dessin selon l'avancée (null : pas encore, ou
 // plus). at : { acts (actes finis), levels (paliers des bâtiments), cage ('coincee', 'ouverte' ou null), here (le
@@ -91,7 +95,7 @@ function campOf({ acts = [], levels = {}, taken = new Set(), cage = null, met = 
         const art = place.art(at);
         if (!art) continue;
         const size = place.size || 1;
-        const spot = spotOf(beach && place.id === 'cannelle' ? { ...place, ...KITCHEN_BEACH } : place, size, busy, places);
+        const spot = spotOf(beach && BEACH_PLACES[place.id] ? { ...place, ...BEACH_PLACES[place.id] } : place, size, busy, places);
         if (!spot) continue;
         cellsOf(spot.x, spot.y, size).forEach(([x, y]) => busy.add(y * SIZE + x));
         out.push({ id: place.id, art, x: spot.x, y: spot.y, w: size, h: size });
