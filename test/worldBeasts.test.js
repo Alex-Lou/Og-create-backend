@@ -11,7 +11,7 @@ test.after(() => server?.kill());
 const herdOf = async player => (await api('GET', '/play/world', null, player)).data.beasts;
 
 // Cannelle est là après la première Récolte d'Aster ; les quêtes d'avant comptent comme faites.
-const withCannelle = id => sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'recolte') ON CONFLICT DO NOTHING`, [id]);
+const withCannelle = id => sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'recolte'), ($1, 'veille') ON CONFLICT DO NOTHING`, [id]);
 const cageOf = async player => ((await api('GET', '/play/world', null, player)).data.camp || []).find(c => c.id === 'cage') || null;
 
 test('la cage de Cannelle : au camp dès qu’elle est là, ouverte une fois ; Paprika, Brioche et Madame en sortent', async () => {

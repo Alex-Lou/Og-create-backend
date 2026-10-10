@@ -550,8 +550,8 @@ async function sleep(userId) {
     await migrate(userId);
     return db.transaction(async conn => {
         const quest = quests.currentOf(await claimedOf(userId, conn));
-        if (!quest || quest.id !== 'nuit') return db.rollback({ status: 409, message: 'Ce n’est pas le moment de dormir.' });
-        const added = await conn.query('INSERT INTO world_quests (user_id, quest) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING quest', [userId, 'nuit']);
+        if (!quest || quest.goal.kind !== 'sleep') return db.rollback({ status: 409, message: 'Ce n’est pas le moment de dormir.' });
+        const added = await conn.query('INSERT INTO world_quests (user_id, quest) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING quest', [userId, quest.id]);
         if (!added.rows.length) return db.rollback({ status: 409, message: 'Tu as déjà dormi.' });
         return { slept: true };
     });

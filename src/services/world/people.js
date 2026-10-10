@@ -34,7 +34,7 @@ function decosNear(tiles, siteId, level, reach, places = STATIC) {
 const SETTLER_ID = /^v\d{1,9}$/;
 const knownResident = id => Object.hasOwn(villagers.VILLAGERS, id) || SETTLER_ID.test(id);
 // La troupe est là dès sa rencontre (bible, § 6.6), un personnage à la fois. Pour une île neuve, Aster arrive après le
-// feu et ouvre la Récolte ; Cannelle attend que cette leçon soit terminée, puis Rivet arrive après les poules. Avant la
+// feu et ouvre la Récolte ; Cannelle attend la deuxième nuit (un personnage par jour), puis Rivet arrive après les poules. Avant la
 // v6 : Aster dès le compte, Cannelle après la Récolte, Rivet après la soupe, gardés tels quels. Les quatre dormeurs
 // (SLEEPERS) apparaissent dès que leur quartier
 // est à soi ; un joueur d'avant la bible garde aussi chaque habitant dont le bâtiment est bâti. presence : { veteran,
@@ -43,7 +43,8 @@ const SLEEPERS = ['puits', 'bosquet', 'carriere', 'potager'];
 function metOf(id, levels, zones, presence) {
     if (presence.veteran && livesHere(id, levels, zones)) return true;
     if (id === 'ponton') return !presence.fresh || presence.done.has('nuit');
-    if (id === 'foyer') return presence.done.has('recolte');
+    // (une île neuve : Cannelle arrive au matin du troisième jour, après la deuxième nuit)
+    if (id === 'foyer') return presence.done.has(presence.fresh ? 'veille' : 'recolte');
     if (id === 'atelier') return presence.done.has(presence.fresh ? 'poules' : 'soupe');
     if (id === 'puits') return presence.done.has('deco');
     return zones.has(map.siteZone(id));

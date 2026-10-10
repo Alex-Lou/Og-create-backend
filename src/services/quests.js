@@ -40,6 +40,10 @@ const QUESTS = [
         'Le feu tient. La nuit tombe sur Brumelune, qui ne s’éveille que pour toi. Explore à ta guise… puis dors : demain, nous ne serons plus seuls.'),
     q('recolte', 'T', { kind: 'runs', need: 1 }, 15, 'Termine une Récolte avec Aster',
         'Aster a rejoint le camp au matin. Suis-la au rivage : relie ce qui se ressemble, vite, avant la marée.'),
+    // La deuxième nuit (choix de l'auteur, 10 oct. : un personnage par jour) : la journée d'Aster finit autour du feu ;
+    // Cannelle arrivera au matin
+    q('veille', 'T', { kind: 'sleep', site: 'foyer' }, 0, 'Passe ta deuxième nuit',
+        'Deux, ce soir, autour du feu. Dors : je veille.'),
     q('soupe', 'T', { kind: 'need', villager: 'foyer', what: 'manger' }, 15, 'Une soupe pour Cannelle',
         'Cannelle grelotte… Sa bulle dit ce qui lui manque. Donne-lui de quoi manger, depuis sa fiche.'),
     // (v6, étape 8 : les poules de la cuisine du navire, coincées sous les rochers ; nourries, elles pondent)

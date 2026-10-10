@@ -63,7 +63,7 @@ test('un nouveau compte bâtit son feu ; Aster vient au matin, Cannelle après s
   assert.deepEqual(met(await view(player)), []);
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'nuit')`, [id]);
   assert.deepEqual(met(await view(player)), ['ponton']);
-  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'recolte'), ($1, 'soupe')`, [id]);
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'recolte'), ($1, 'veille'), ($1, 'soupe')`, [id]);
   const after = await view(player);
   assert.deepEqual([met(after).includes('ponton'), met(after).includes('foyer'), met(after).includes('atelier')], [true, true, false]);
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'poules')`, [id]);
@@ -81,7 +81,7 @@ test('un ancien compte incomplet reprend sur la plage de Brumelune, puis retrouv
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'pages')`, [id]);
   assert.equal((await view(player)).brume.quest.id, 'ramasser');
   // La Récolte réclamée valide la reprise : les anciennes règles redeviennent actives sans perdre l'avancée.
-  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'ramasser'), ($1, 'recolte')`, [id]);
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'ramasser'), ($1, 'recolte'), ($1, 'veille')`, [id]);
   const cannelle = await view(player);
   assert.deepEqual([met(cannelle).includes('foyer'), cannelle.brume.quest.id], [true, 'soupe']);
   // La soupe réclamée : Rivet, sans attendre les poules
@@ -124,7 +124,7 @@ test('la première nuit ne se passe pas ; ensuite le choix se retient sur le com
   assert.equal((await view(veteran)).brume.tutorial, false);
   assert.equal((await api('POST', '/play/world/prologue/skip', {}, { cookies: {} })).status, 401);
   assert.equal((await api('POST', '/play/world/prologue/skip', {}, player)).status, 409);
-  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'recolte')`, [player.userId]);
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'recolte'), ($1, 'veille')`, [player.userId]);
   const both = await Promise.all([1, 2].map(() => api('POST', '/play/world/prologue/skip', {}, player)));
   assert.deepEqual(both.map(r => r.status), [200, 200]);
   assert.equal((await brume()).skipped, true);

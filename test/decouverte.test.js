@@ -23,7 +23,7 @@ test('« Recommencer l’île » : confirmé en toutes lettres ; tout repart de 
     // article de boutique, « Passer le tutoriel »
     await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'foyer', 3), ($1, 'puits', 1) ON CONFLICT (user_id, site) DO UPDATE SET level = EXCLUDED.level`, [id]);
     await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'source'), ($1, 'lisiere')`, [id]);
-    await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'pages'), ($1, 'ramasser'), ($1, 'recolte')`, [id]);
+    await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'pages'), ($1, 'ramasser'), ($1, 'recolte'), ($1, 'veille')`, [id]);
     await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'cloture', 93, 98)`, [id]);
     await sql(`INSERT INTO world_chests (user_id, source, rarity, prize) VALUES ($1, 'quete:recolte', 'rare', '{}'), ($1, 'chapitre:I', 'legendaire', '{}')`, [id]);
     await sql(`INSERT INTO world_items (user_id, item, source) VALUES ($1, 'banc', 'boutique'), ($1, 'prologue:passe', 'tutoriel')`, [id]);
@@ -58,12 +58,15 @@ test('« Recommencer l’île » : confirmé en toutes lettres ; tout repart de 
     const items = (await sql('SELECT item FROM world_items WHERE user_id = $1 ORDER BY item', [id])).map(r => r.item);
     // (l'île recommencée part de ses sentiers, son Feu sur la plage : world/places.js)
     assert.deepEqual(items, ['ile:plage', 'ile:recommencee', 'ile:sentiers']);
-    // Les habitants arrivent un à un : personne pendant la première nuit, Aster au matin, Cannelle après la Récolte.
+    // Les habitants arrivent un à un, un par jour : personne pendant la première nuit, Aster au matin, Cannelle après
+    // la deuxième nuit (pas dès la Récolte d'Aster)
     await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'pages'), ($1, 'ramasser'), ($1, 'feu')`, [id]);
     assert.deepEqual((await view(player)).villagers.map(v => v.id), []);
     await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'nuit')`, [id]);
     assert.deepEqual((await view(player)).villagers.map(v => v.id), ['ponton']);
     await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'recolte')`, [id]);
+    assert.equal((await view(player)).villagers.some(v => v.id === 'foyer'), false);
+    await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'veille')`, [id]);
     assert.equal((await view(player)).villagers.some(v => v.id === 'foyer'), true);
     // Pendant le développement, on recommence autant qu'on veut (pas deux fois coup sur coup)
     await sql(`UPDATE world_items SET bought_at = NOW() - INTERVAL '1 minute' WHERE user_id = $1 AND item = 'ile:recommencee'`, [id]);

@@ -21,7 +21,7 @@ const OLD = ['deco', 'recolte', 'source', 'puits', 'lisiere', 'cabane', 'livre5'
   'crique', 'ponton', 'livre45', 'hameau', 'deco10', 'phare', 'livre70', 'legendes'];
 
 test('chaque quête désigne un vrai quartier, palier, création, lieu ou habitant, avec un texte et une récompense', () => {
-  assert.equal(QUESTS.length, 60);
+  assert.equal(QUESTS.length, 61);
   assert.equal(new Set(QUESTS.map(q => q.id)).size, QUESTS.length);
   for (const q of QUESTS) {
     assert.match(q.id, /^[a-z0-9-]{1,30}$/);
@@ -108,7 +108,7 @@ test('la quête active est la première pas encore faite ; à la fin, Brume se r
   const first = active(new Set(), facts());
   assert.deepEqual(QUESTS.slice(0, 5).map(q => q.id), ['pages', 'ramasser', 'feu', 'nuit', 'recolte']);
   assert.match(QUESTS.find(q => q.id === 'feu').say, /sur la plage de Brumelune/);
-  assert.deepEqual([first.id, first.act, first.step, first.total, first.kind, first.done], ['pages', 'T', 1, 60, 'element', false]);
+  assert.deepEqual([first.id, first.act, first.step, first.total, first.kind, first.done], ['pages', 'T', 1, 61, 'element', false]);
   assert.equal(active(new Set(), facts({ elements: new Set([...facts().elements, 'Vent']) })).done, true);
   const ondin = active(new Set(['deco']), facts());
   assert.deepEqual([ondin.id, ondin.target], ['eveil-ondin', { villager: 'puits' }]);
