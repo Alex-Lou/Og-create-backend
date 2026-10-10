@@ -20,7 +20,6 @@ const CLIMATES = {
 // en plus trip : la durée (heures) de l'expédition qui les découvre
 const ZONES = [
     { id: 'coeur', name: 'Brumelune', price: 0, chapter: null, code: 'a' },
-    { id: 'source', name: 'La Source', price: 100, chapter: 'I', code: 'b' },
     { id: 'lisiere', name: 'La Lisière', price: 150, chapter: 'I', code: 'c' },
     { id: 'colline', name: 'La Colline', price: 250, chapter: 'II', code: 'd' },
     { id: 'jardins', name: 'Les Jardins', price: 400, chapter: 'III', code: 'e' },
@@ -88,8 +87,8 @@ function inFootprint(x, y, levels = {}) {
 const inSite = (x, y) => Object.values(SITE_BIG).some(p => x >= p.x && x < p.x + 3 && y >= p.y && y < p.y + 3);
 // Le quartier d'origine de chaque bâtiment (l'acheter permet de le bâtir). Il reste celui de la carte, même quand le
 // bâtiment est posé ailleurs (le campement, world/places.js) : les maisons sont regroupées au cœur, mais on achète
-// toujours La Source pour bâtir le Puits, La Lisière pour le Bosquet, etc.
-const SITE_ZONE = { foyer: 'coeur', puits: 'source', bosquet: 'lisiere', carriere: 'colline', potager: 'jardins', atelier: 'est', ponton: 'crique' };
+// toujours La Lisière pour le Bosquet, La Colline pour la Carrière, etc.
+const SITE_ZONE = { foyer: 'coeur', puits: 'coeur', bosquet: 'lisiere', carriere: 'colline', potager: 'jardins', atelier: 'est', ponton: 'crique' };
 const siteZone = id => SITE_ZONE[id] || zoneAt(SITE_BIG[id].x, SITE_BIG[id].y);
 
 // Grille des quartiers : un caractère par case ('.' mer, sinon l'index du quartier en base 36)

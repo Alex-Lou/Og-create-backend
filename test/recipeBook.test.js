@@ -349,7 +349,7 @@ test('la très grande île : calques cohérents, le cœur intact, chantiers à p
     for (let x = 0; x < map.SIZE; x++) {
       const [g, h, r] = [v4.GROUND[src(y)][src(x)], v4.HEIGHT[src(y)][src(x)], v4.REGION[src(y)][src(x)]];
       const raccord = map.GROUND[y][x] === 'p' && 'gsm'.includes(g) && (x % 3 === 1 || y % 3 === 1);
-      if (g !== '~') assert.deepEqual([raccord ? g : map.GROUND[y][x], map.HEIGHT[y][x], map.REGION[y][x]], [g, h, r], `${x},${y}`);
+      if (g !== '~') assert.deepEqual([raccord ? g : map.GROUND[y][x], map.HEIGHT[y][x], map.REGION[y][x]], [g, h, r === 'b' ? 'a' : r], `${x},${y}`);
       else if (map.GROUND[y][x] !== '~') assert.ok('sgm'.includes(map.GROUND[y][x]), `${x},${y}`);
     }
   }
@@ -357,29 +357,43 @@ test('la très grande île : calques cohérents, le cœur intact, chantiers à p
     for (let x = 0; x < v4.SIZE; x++) {
       if (!v4.isLand(x, y)) continue;
       const [X, Y] = [map.fromV4(x), map.fromV4(y)];
-      assert.deepEqual([map.groundAt(X, Y), map.zoneAt(X, Y)], [v4.groundAt(x, y), v4.zoneAt(x, y)], `${x},${y}`);
+      assert.deepEqual([map.groundAt(X, Y), map.zoneAt(X, Y)], [v4.groundAt(x, y), v4.zoneAt(x, y) === 'source' ? 'coeur' : v4.zoneAt(x, y)], `${x},${y}`);
     }
   }
   // Deux cases v4 voisines restent deux cases v5 distinctes : rien ne se heurte à la migration
   assert.ok(Array.from({ length: v4.SIZE - 1 }, (_, v) => map.fromV4(v + 1) - map.fromV4(v)).every(d => d === 1 || d === 2));
-  assert.deepEqual(map.NEIGHBORS, v4.NEIGHBORS);
+  // La Source, absorbée par le cœur : ses voisins deviennent ceux du cœur
+  const merged = {};
+  for (const [id, neigh] of Object.entries(v4.NEIGHBORS)) {
+    if (id === 'source') continue;
+    const set = new Set(neigh.map(n => (n === 'source' ? 'coeur' : n)));
+    if (id === 'coeur') for (const n of v4.NEIGHBORS.source) set.add(n);
+    set.delete(id);
+    merged[id] = [...set].sort();
+  }
+  assert.deepEqual(map.NEIGHBORS, merged);
   // Le cœur de la grande île (v3) est toujours là, en son centre
   assert.equal(heart.GROUND[0].length, 48);
   // Chaque chantier : grande emprise 3 × 3 plate, constructible, dans un seul quartier ; la petite y est incluse
+  // (le sol vu au tutoriel : les vieilles routes de la carte rendues à l'herbe, world/paths.js ; le Puits est remonté
+  // contre le Feu et chevauche l'ancienne route, effacée pour une île neuve)
+  const paths = require('../src/services/world/paths');
+  const ground = paths.groundRows(true, [], true);
   for (const [id, p] of Object.entries(map.SITE_BIG)) {
     const cells = [];
     for (let dy = 0; dy < 3; dy++) for (let dx = 0; dx < 3; dx++) cells.push([p.x + dx, p.y + dy]);
     assert.equal(new Set(cells.map(([x, y]) => map.zoneAt(x, y))).size, 1, id);
     assert.equal(new Set(cells.map(([x, y]) => map.heightAt(x, y))).size, 1, id);
-    assert.ok(cells.every(([x, y]) => map.buildable(x, y)), id);
+    assert.ok(cells.every(([x, y]) => ['g', 's', 'm'].includes(ground[y][x])), id);
     const small = map.footprintOf(id, 1);
     assert.ok(small.x >= p.x && small.y >= p.y && small.x + 2 <= p.x + 3 && small.y + 2 <= p.y + 3, id);
   }
   assert.equal(map.siteZone('foyer'), 'coeur');
   // Les maisons sont au campement (choix de l'auteur, 9 oct.) : la Carrière n'est plus adossée à la falaise de la
   // Colline, elle est au village comme les autres ; son quartier d'origine (la Colline) reste celui qu'on achète
-  // Vingt-quatre quartiers, chacun avec son panneau ; ceux des terres nouvelles ont un climat et une durée d'expédition
-  assert.equal(map.ZONES.length, 24);
+  // Vingt-trois quartiers (La Source, absorbée par le cœur), chacun avec son panneau ; ceux des terres nouvelles ont un
+  // climat et une durée d'expédition
+  assert.equal(map.ZONES.length, 23);
   map.ZONES.forEach(z => assert.ok(map.ANCHORS[z.id], z.id));
   const fresh = map.ZONES.filter(z => z.trip);
   assert.equal(fresh.length, 12);
@@ -394,19 +408,20 @@ test('la très grande île : calques cohérents, le cœur intact, chantiers à p
     grew = false;
     for (const z of fresh) if (!reached.has(z.id) && map.NEIGHBORS[z.id].some(id => reached.has(id))) { reached.add(z.id); grew = true; }
   }
-  assert.equal(reached.size, 24);
+  assert.equal(reached.size, 23);
   // Un quartier inconnu montre sa côte et son relief, qu'on devine sous la brume, mais pas son sol
   const veil = map.veiled(new Set(['x']));
   const crater = [map.ANCHORS.cratere.x, map.ANCHORS.cratere.y];
   assert.deepEqual([veil.ground[crater[1]][crater[0]], veil.height[crater[1]][crater[0]]], ['u', map.HEIGHT[crater[1]][crater[0]]]);
   // Le cœur de l'île : ses quartiers des chapitres I à III, sans les terres à expédition
-  assert.deepEqual(map.CORE, ['coeur', 'source', 'lisiere', 'colline', 'jardins', 'est', 'hauteurs']);
+  assert.deepEqual(map.CORE, ['coeur', 'lisiere', 'colline', 'jardins', 'est', 'hauteurs']);
   assert.equal(veil.ground[map.SITE_BIG.foyer.y][map.SITE_BIG.foyer.x], map.GROUND[map.SITE_BIG.foyer.y][map.SITE_BIG.foyer.x]);
   // Chaque ancien quartier tient dans le nouveau, même avec tous les chantiers au plus grand
   const all = Object.fromEntries(Object.keys(map.SITE_BIG).map(id => [id, 7]));
   const old = {};
   for (let y = 0; y < legacy.SIZE; y++) for (let x = 0; x < legacy.SIZE; x++) { const z = legacy.zoneAt(x, y); if (z) old[z] = (old[z] || 0) + 1; }
-  for (const [zone, count] of Object.entries(old)) assert.ok(map.freeSpots(zone, all).length >= count, zone);
+  // La Source (ancien quartier) a été absorbée par le cœur
+  for (const [zone, count] of Object.entries(old)) assert.ok(map.freeSpots(zone === 'source' ? 'coeur' : zone, all).length >= count, zone);
   assert.equal(map.isLand(0, 0), false);
   assert.equal(map.isLand(map.SITE_BIG.foyer.x, map.SITE_BIG.foyer.y), true);
 });

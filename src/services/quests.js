@@ -26,7 +26,7 @@ const BEASTS = ['Poisson', 'Méduse', 'Grenouille', 'Oiseau', 'Tortue', 'Papillo
 const q = (id, act, goal, coins, label, say, chest) => ({ id, act, goal, coins, label, say, ...(chest ? { chest } : {}) });
 const QUESTS = [
     // Prologue : Brume accompagne une action à la fois jusqu'à la première nuit. Aster ouvre ensuite sa propre leçon
-    // par la Récolte. Les écus, jusqu'à La Source, en paient le prix (100), pas plus.
+    // par la Récolte.
     q('pages', 'T', { kind: 'element', element: 'Vent' }, 20, 'Découvre ta première recette : le Vent',
         'Le Grimoire s’est ouvert pour toi. Mêle l’Air à l’Air dans l’Athanor : que le Vent chasse la brume du rivage.'),
     q('ramasser', 'T', { kind: 'pickup', need: 6 }, 10, 'Ramasse les six trouvailles du rivage',
@@ -47,8 +47,6 @@ const QUESTS = [
         'Des caquets, sous les rochers… La cage du navire ! Ouvre-la, puis nourris les poules depuis leur fiche.'),
     q('deco', 'T', { kind: 'crafts', need: 1 }, 15, 'Pose ta première création sur l’île',
         'Rivet a monté un établi près du feu. Assemble une Clôture, puis pose-la là où l’île brille d’or.'),
-    q('achat-source', 'T', { kind: 'zone', zone: 'source' }, 30, 'Achète La Source',
-        'J’entends de l’eau, au nord-ouest… et quelqu’un qui ronfle. Achète La Source : je dissiperai la brume.'),
     q('eveil-ondin', 'T', { kind: 'wake', villager: 'puits' }, 10, 'Réveille Ondin',
         'Un petit dort contre un rocher, sa baguette à la main. Parle-lui doucement : la brume endort, sans faire de mal.'),
     q('souvenir-ondin', 'T', { kind: 'element', element: 'Puits' }, 20, 'Rends son don à Ondin : fais naître le Puits',
@@ -168,7 +166,7 @@ const INDEX = new Map(QUESTS.map((quest, i) => [quest.id, i]));
 // Anciennes quêtes (avant la chaîne de la bible) : où elles se rangent dans la nouvelle chaîne (les mêmes identifiants
 // s'y rangent tout seuls), et leurs coffres. Une ancienne quête réclamée vaut celle-ci comme « plus avancée ».
 const LEGACY = {
-    source: { at: 'achat-source', label: 'Achète La Source', chest: 'rare' },
+    source: { at: 'deco', label: 'Achète La Source', chest: 'rare' },
     puits: { at: 'puits-ondin', label: 'Construis le Puits' },
     livre5: { at: 'cabane', label: 'Inscris 5 découvertes au Grimoire' },
     mine: { at: 'cabane', label: 'Ouvre la Carrière', chest: 'epique' },
@@ -218,7 +216,7 @@ function currentOf(claimed) {
 // gathered, visitors, settled, named, links: Set ('puits-foyer' : bâtiments reliés par un chemin) }
 // Quêtes du tutoriel qui passent par le Grimoire : la page que marque le ruban a son Encre offerte (le joueur, qui a
 // peu d'écus, n'est jamais bloqué devant une énigme) : le Brasier du feu de camp, la Source, le Puits d'Ondin
-const GUIDED_INK = new Set(['feu', 'achat-source', 'souvenir-ondin']);
+const GUIDED_INK = new Set(['feu', 'souvenir-ondin']);
 
 const HAVE = {
     crafts: (goal, facts) => facts.crafts,

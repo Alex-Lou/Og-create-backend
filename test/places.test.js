@@ -30,10 +30,10 @@ test('le camp : rien avant son personnage ; sur une île à la plage, la cuisine
   assert.deepEqual(ids(campOf({ met: new Set() })), ['hirondelle']);
   // Aster arrive avec son camp
   assert.deepEqual(ids(campOf({ met: new Set(['ponton']) })), ['aster', 'caisses', 'filet', 'hirondelle', 'rondins', 'sos']);
-  // Cannelle : sa cuisine ; sur une île à la plage, à l'ancienne place du Feu (rien ne l'y gêne)
+  // Cannelle : sa cuisine ; sur une île à la plage, à l'ancienne place du Feu (le Puits s'y est installé : la cuisine se pose juste au-dessus)
   const beach = places.placesFrom({ beach: true });
   const kitchen = campOf({ met: new Set(['ponton', 'foyer']), places: beach, beach: true }).find(c => c.id === 'cannelle');
-  assert.deepEqual([kitchen.x, kitchen.y], [map.SITE_PLACES.foyer.x, map.SITE_PLACES.foyer.y]);
+  assert.deepEqual([kitchen.x, kitchen.y], [map.SITE_PLACES.foyer.x, map.SITE_PLACES.foyer.y - 1]);
   // Un compte d'avant la bible (met : null) : tout, comme avant
   assert.ok(ids(campOf({})).includes('cannelle') && ids(campOf({})).includes('rivet'));
   // Rien du camp sur la grande emprise du Feu (les caisses et la cage s'écartent)
@@ -52,7 +52,7 @@ test('déplacer : sur ses quartiers, sur l’herbe ou le sable, sur des cases li
   // Hors de ses quartiers, hors de l'île, sur un chemin, sur un autre bâtiment, sur une case prise
   assert.match(moveBlock('foyer', 40, 40, ctx()), /tes quartiers/);
   assert.match(moveBlock('foyer', -1, 0, ctx()), /Hors/);
-  assert.match(moveBlock('foyer', 95, 89, ctx({ ground: (x, y) => (x === 97 ? 'p' : map.groundAt(x, y)) })), /chemin/);
+  assert.match(moveBlock('foyer', 97, 88, ctx({ ground: (x, y) => (x === 97 ? 'p' : map.groundAt(x, y)) })), /chemin/);
   assert.match(moveBlock('puits', 98, 92, ctx({ zones: new Set(['coeur', 'source']) })), /prise/);
   assert.match(moveBlock('foyer', 92, 92, ctx({ taken: new Set([93 * map.SIZE + 93]) })), /prise/);
   // Un Étal du marché posé près du Feu (7 cases) : le Feu ne s'en éloigne pas
@@ -75,7 +75,7 @@ test.describe('île', () => {
     assert.deepEqual(start.sites.filter(s => !s.hidden).map(s => s.id), ['foyer']);
     assert.deepEqual(start.camp.map(c => c.id), ['hirondelle']);
     // Le suivi des quêtes montre tout le tutoriel : treize étapes, de la première page au premier chemin
-    assert.deepEqual([start.brume.steps.length, start.brume.steps[0].id, start.brume.steps.at(-1).id], [13, 'pages', 'chemin']);
+    assert.deepEqual([start.brume.steps.length, start.brume.steps[0].id, start.brume.steps.at(-1).id], [12, 'pages', 'chemin']);
     assert.ok(start.brume.steps.every(st => st.label && st.done === false));
     // Le feu fait : personne encore (la première nuit se passe seul) ; la nuit passée : Aster arrive, son Ponton et
     // son camp avec elle

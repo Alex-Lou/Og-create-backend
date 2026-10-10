@@ -49,7 +49,7 @@ test('l’île s’ouvre avant le compte ; signer y met l’adresse et le mot de
   assert.deepEqual([taken.status, taken.data.message], [400, 'Email ou username déjà utilisé']);
   assert.equal((await api('GET', '/auth/me', null, player)).data.provisional, true);
   // Puis la vraie adresse : même compte, même île ; on s'y connecte comme à tout compte
-  await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'source')`, [userId]);
+  await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'lisiere')`, [userId]);
   const mine = email('b');
   const signed = await claim({ email: mine, password });
   assert.equal(signed.status, 200);
@@ -60,7 +60,7 @@ test('l’île s’ouvre avant le compte ; signer y met l’adresse et le mot de
   const login = await api('POST', '/auth/login', { email: mine, password }, elsewhere);
   assert.equal(login.data.userId, userId);
   const world = (await api('GET', '/play/world', null, elsewhere)).data;
-  assert.ok(world.map.zones.find(z => z.id === 'source').owned);
+  assert.ok(world.map.zones.find(z => z.id === 'lisiere').owned);
   // Une fois signé, c'est fini ; un compte ordinaire non plus
   assert.equal((await claim({ email: email('c'), password })).status, 409);
   assert.equal((await api('POST', '/auth/claim', { email: email('d'), password }, other)).status, 409);

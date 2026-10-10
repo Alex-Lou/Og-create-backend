@@ -12,9 +12,9 @@ test.after(() => server?.kill());
 const view = async player => (await api('GET', '/play/world', null, player)).data;
 const at = (w, x, y) => w.map.ground[y][x];
 const draw = (player, lay, erase = []) => api('POST', '/play/world/paths', { lay, erase }, player);
-// Du Puits (palier I, 2 × 2 en 96, 84) au Feu sur la plage : le Puits est au nord du campement, le chemin contourne les
-// maisons et rejoint le sentier, puis la porte du Feu (hors des grandes emprises et du camp)
-const LINK = [[95, 86], [95, 87], [95, 88], [95, 89], [96, 89], [98, 89], [99, 89], [100, 89], [101, 89], [101, 90], [101, 91], [101, 92]];
+// Du Puits (palier I, 2 × 2 en 97, 89) au Feu sur la plage : le chemin contourne le Puits par l'est et rejoint la porte
+// du Feu (hors des grandes emprises et du camp)
+const LINK = [[99, 91], [100, 91], [101, 91], [101, 92]];
 
 test('une île neuve n’a que son sentier ; une île d’avant garde ses routes', async () => {
     const fresh = await newPlayer();
@@ -22,7 +22,9 @@ test('une île neuve n’a que son sentier ; une île d’avant garde ses routes
     // La grande route de la plage (rangées 90-91) est redevenue de l'herbe ; le sentier descend de la cuisine de
     // Cannelle au rivage, puis d'une case jusqu'à la porte du Feu, qui brûle près de l'épave (île à la plage)
     assert.equal(at(w, 90, 90), 'g');
-    for (let y = 89; y <= 95; y++) assert.equal(at(w, 97, y), 'p', `sentier ${y}`);
+    for (let y = 89; y <= 95; y++) assert.equal(at(w, 95, y), 'p', `sentier ${y}`);
+    assert.equal(at(w, 96, 95), 'p');
+    assert.equal(at(w, 97, 95), 'p');
     assert.equal(at(w, 98, 95), 'p');
     assert.deepEqual([w.roads.laid, w.roads.free, w.roads.stone], [[], 12, 1]);
     assert.match(w.map.key, /:b0$/);
@@ -42,7 +44,7 @@ test('tracer : douze cases offertes, puis une pierre la case ; effacer rend la p
     await view(player);
     await sql('UPDATE world_stock SET stone = 1 WHERE user_id = $1', [player.userId]);
     // Sur la plage de Brumelune (à soi d'office), là où passait la grande route : de l'herbe libre
-    const twelve = [[92, 91], ...[92, 93, 94, 95, 96, 98, 99, 100, 101, 102, 103].map(x => [x, 90])];
+    const twelve = [[92, 91], [92, 90], [93, 90], [94, 90], [99, 90], [100, 90], [101, 90], [102, 90], [103, 90], [96, 91], [97, 91], [98, 91]];
     const first = await draw(player, twelve);
     assert.equal(first.status, 200, JSON.stringify(first.data));
     assert.deepEqual([first.data.laid, first.data.world.roads.free, first.data.world.stock.stone], [12, 0, 1]);
@@ -85,11 +87,10 @@ test('une création au bord d’un chemin le garde ; « Recommencer l’île » 
 test('la quête du premier chemin : relier le Puits au Feu', async () => {
     const player = await newPlayer({ veteran: false });
     await view(player);
-    const done = ['pages', 'ramasser', 'feu', 'nuit', 'recolte', 'soupe', 'poules', 'deco', 'achat-source', 'eveil-ondin', 'souvenir-ondin', 'puits-ondin'];
-    await sql(`INSERT INTO world_quests (user_id, quest) SELECT $1, unnest($2::text[])`, [player.userId, done]);
-    await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'source')`, [player.userId]);
-    await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'foyer', 1), ($1, 'puits', 1)
-        ON CONFLICT (user_id, site) DO UPDATE SET level = EXCLUDED.level`, [player.userId]);
+  const done = ['pages', 'ramasser', 'feu', 'nuit', 'recolte', 'soupe', 'poules', 'deco', 'eveil-ondin', 'souvenir-ondin', 'puits-ondin'];
+  await sql(`INSERT INTO world_quests (user_id, quest) SELECT $1, unnest($2::text[])`, [player.userId, done]);
+  await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'foyer', 1), ($1, 'puits', 1)
+      ON CONFLICT (user_id, site) DO UPDATE SET level = EXCLUDED.level`, [player.userId]);
     const before = await view(player);
     assert.deepEqual([before.brume.quest.id, before.brume.quest.done], ['chemin', false]);
     const linked = await draw(player, LINK);
@@ -97,14 +98,13 @@ test('la quête du premier chemin : relier le Puits au Feu', async () => {
     assert.equal(linked.data.world.brume.quest.done, true);
     const claim = await api('POST', '/play/world/quest', { id: 'chemin' }, player);
     assert.equal(claim.status, 200, JSON.stringify(claim.data));
-    // Une île d'avant (toutes ses routes) : ses maisons, regroupées au campement, ne sont plus reliées par la grande
-    // route (choix de l'auteur : le village) ; elle retrace donc son premier chemin comme une île neuve
+    // Une île d'avant (toutes ses routes) : le Puits, remonté contre le Feu, retombe sur la grande route, qui les relie
+    // déjà ; elle n'a donc plus ce chemin à tracer
     const old = await newPlayer();
     await view(old);
     await sql(`DELETE FROM world_items WHERE user_id = $1 AND item = 'ile:sentiers'`, [old.userId]);
-    await sql(`INSERT INTO world_quests (user_id, quest) SELECT $1, unnest($2::text[])`, [old.userId, done]);
-    await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'source')`, [old.userId]);
-    await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'foyer', 1), ($1, 'puits', 1)
-        ON CONFLICT (user_id, site) DO UPDATE SET level = EXCLUDED.level`, [old.userId]);
-    assert.equal((await view(old)).brume.quest.done, false);
+  await sql(`INSERT INTO world_quests (user_id, quest) SELECT $1, unnest($2::text[])`, [old.userId, done]);
+  await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'foyer', 1), ($1, 'puits', 1)
+      ON CONFLICT (user_id, site) DO UPDATE SET level = EXCLUDED.level`, [old.userId]);
+    assert.equal((await view(old)).brume.quest.done, true);
 });

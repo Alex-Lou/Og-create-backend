@@ -5,14 +5,14 @@
 const crypto = require('node:crypto');
 const map = require('./worldMap');
 
-// Les neuf quartiers du cœur (Brumelune est toujours à soi ; les terres lointaines et les îlots ne comptent pas)
-const CORE = ['source', 'lisiere', 'colline', 'jardins', 'est', 'hauteurs', 'crique', 'foret', 'hameau'];
+// Les huit quartiers du cœur (Brumelune est toujours à soi ; les terres lointaines et les îlots ne comptent pas)
+const CORE = ['lisiere', 'colline', 'jardins', 'est', 'hauteurs', 'crique', 'foret', 'hameau'];
 // Les douze terres lointaines : elles portaient les traces avant la v6
 const LANDS = map.ZONES.filter(zone => zone.trip).map(zone => zone.id);
 const TARGET = 'anya';
 // La Bénédiction : les gisements repoussent en 4 h au lieu de 6 ; l'humeur ne descend plus sous « content »
 const BLESSING = { regrowMs: 4 * 3600 * 1000, moodFloor: 'content' };
-// Huit traces, une par quartier du cœur libéré après La Source, dans l'ordre : la huitième précède la Révélation
+// Huit traces, une par quartier du cœur libéré, dans l'ordre : la huitième précède la Révélation
 const TRACE_COUNT = 8;
 
 // Le cœur de l'île est libéré : les neuf quartiers sont à soi (owned : Set des quartiers)
@@ -23,7 +23,7 @@ const awakeOf = owned => CORE.every(id => owned.has(id));
 // jusqu'à la huitième, qui reste celle de la Révélation : un joueur ne voit jamais son compte baisser
 function stateOf(owned, explored = [], revealed = false) {
     const awake = awakeOf(owned);
-    const freed = CORE.filter(id => id !== 'source' && owned.has(id)).length;
+    const freed = CORE.filter(id => owned.has(id)).length;
     const before = new Set(explored.filter(id => LANDS.includes(id))).size;
     const count = awake ? TRACE_COUNT : Math.min(Math.max(freed, before), TRACE_COUNT - 1);
     return { traces: Array.from({ length: count }, (_, i) => i + 1), awake, revealed: awake && revealed };

@@ -145,15 +145,9 @@ async function guidedInkOf(userId) {
 }
 // Au tutoriel (une île qui n'est pas d'avant la bible), un quartier du prologue se découvre en écrivant son élément,
 // sans écus (choix de l'auteur : découvrir, pas acheter ; les achats viennent après le prologue)
-const ZONE_PLANS = { source: 'Source' };
-// Ce que Brume en dit alors
-const ZONE_QUESTS = {
-    'achat-source': {
-        // « La Source » est une région (un quartier), pas encore le Puits : on la dit clairement, sans révéler Ondin
-        label: 'Découvre la région de La Source',
-        say: 'Au nord-ouest, une région dort encore sous la brume : La Source. Fais naître « Source » dans l’Athanor : la brume s’y lèvera, et la région sera tienne.'
-    }
-};
+const ZONE_PLANS = {};
+// Ce que Brume en dit alors (plus de quartier du prologue à découvrir ainsi : La Source est devenue le Puits)
+const ZONE_QUESTS = {};
 async function arianeTargets(userId) {
     const quest = quests.currentOf(await claimedOf(userId));
     const goal = quest && quest.goal;

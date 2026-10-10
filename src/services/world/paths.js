@@ -23,8 +23,8 @@ const isPath = g => g === 'p' || g === 'k';
 // Le sentier d'une île neuve : de la porte du Feu (sous son emprise) jusqu'au sable de l'épave. Sur une île à la
 // plage (world/places.js : le Feu contre l'épave, la cuisine de Cannelle à son ancienne place), il part de la cuisine
 // et finit d'une case de plus, devant la porte du Feu (le bas de son emprise : world/places.js, BEACH)
-const SENTIER = [89, 90, 91, 92, 93, 94, 95].map(y => ({ x: 97, y }));
-const SENTIER_BEACH = [...SENTIER, { x: 98, y: 95 }];
+const SENTIER = [89, 90, 91, 92, 93, 94, 95].map(y => ({ x: 95, y }));
+const SENTIER_BEACH = [...SENTIER, { x: 96, y: 95 }, { x: 97, y: 95 }, { x: 98, y: 95 }];
 const keysOf = cells => new Set(cells.map(c => c.y * SIZE + c.x));
 // Les vieilles marches : cases de chemin de la carte à côté d'une autre de hauteur différente
 const MARCHES = new Set();

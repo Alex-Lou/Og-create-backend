@@ -21,7 +21,7 @@ const OLD = ['deco', 'recolte', 'source', 'puits', 'lisiere', 'cabane', 'livre5'
   'crique', 'ponton', 'livre45', 'hameau', 'deco10', 'phare', 'livre70', 'legendes'];
 
 test('chaque quête désigne un vrai quartier, palier, création, lieu ou habitant, avec un texte et une récompense', () => {
-  assert.equal(QUESTS.length, 61);
+  assert.equal(QUESTS.length, 60);
   assert.equal(new Set(QUESTS.map(q => q.id)).size, QUESTS.length);
   for (const q of QUESTS) {
     assert.match(q.id, /^[a-z0-9-]{1,30}$/);
@@ -50,10 +50,7 @@ test('chaque quête désigne un vrai quartier, palier, création, lieu ou habita
   const acts = QUESTS.map(q => ACTS.indexOf(q.act));
   assert.deepEqual(acts, [...acts].sort((a, b) => a - b));
   assert.deepEqual(QUESTS.filter(q => q.chest).map(q => q.act), ACTS);
-  assert.equal(QUESTS.reduce((sum, q) => sum + q.coins, 0), 5155);
-  // Le prologue paie La Source (100 écus) avant de la demander
-  const source = QUESTS.findIndex(q => q.goal.zone === 'source');
-  assert.equal(QUESTS.slice(0, source).reduce((sum, q) => sum + q.coins, 0), map.ZONE_BY_ID.source.price);
+  assert.equal(QUESTS.reduce((sum, q) => sum + q.coins, 0), 5125);
   assert.ok(BEASTS.includes('Poisson') && !BEASTS.includes('Lapin'));
 });
 
@@ -111,9 +108,9 @@ test('la quête active est la première pas encore faite ; à la fin, Brume se r
   const first = active(new Set(), facts());
   assert.deepEqual(QUESTS.slice(0, 5).map(q => q.id), ['pages', 'ramasser', 'feu', 'nuit', 'recolte']);
   assert.match(QUESTS.find(q => q.id === 'feu').say, /sur la plage de Brumelune/);
-  assert.deepEqual([first.id, first.act, first.step, first.total, first.kind, first.done], ['pages', 'T', 1, 61, 'element', false]);
+  assert.deepEqual([first.id, first.act, first.step, first.total, first.kind, first.done], ['pages', 'T', 1, 60, 'element', false]);
   assert.equal(active(new Set(), facts({ elements: new Set([...facts().elements, 'Vent']) })).done, true);
-  const ondin = active(new Set(['achat-source']), facts());
+  const ondin = active(new Set(['deco']), facts());
   assert.deepEqual([ondin.id, ondin.target], ['eveil-ondin', { villager: 'puits' }]);
   const souvenir = active(new Set(['eveil-ondin']), facts());
   assert.deepEqual([souvenir.id, souvenir.kind, souvenir.element], ['souvenir-ondin', 'element', 'Puits']);
@@ -149,7 +146,7 @@ test('un joueur d’avant la bible ne recule jamais : ses anciennes quêtes se r
   for (const id of OLD) assert.ok(ids.has(id) || ids.has(LEGACY[id]?.at), id);
   // Une quête placée avant la plus avancée réclamée compte comme faite (sans récompense de plus)
   const veteran = doneOf(new Set(['deco', 'recolte', 'source']));
-  assert.ok(['pages', 'feu', 'recolte', 'soupe', 'deco', 'achat-source'].every(id => veteran.has(id)));
+  assert.ok(['pages', 'feu', 'recolte', 'soupe', 'deco'].every(id => veteran.has(id)));
   assert.equal(active(new Set(['deco', 'recolte', 'source']), facts()).id, 'eveil-ondin');
   // Plus loin dans l'ancienne chaîne, jamais plus tôt dans la nouvelle
   let before = -1;

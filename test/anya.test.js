@@ -4,13 +4,13 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const anya = require('../src/services/anya');
 
-test('Anya s’éveille quand le cœur de l’île est libéré : les neuf quartiers, sans les terres lointaines', () => {
-  assert.equal(anya.CORE.length, 9);
+test('Anya s’éveille quand le cœur de l’île est libéré : les huit quartiers, sans les terres lointaines', () => {
+  assert.equal(anya.CORE.length, 8);
   assert.equal(anya.LANDS.length, 12);
   const core = new Set(['coeur', ...anya.CORE]);
-  // Les neuf quartiers suffisent ; la Révélation vue ne compte qu'une fois éveillée
+  // Les huit quartiers suffisent ; la Révélation vue ne compte qu'une fois éveillée
   assert.deepEqual(anya.stateOf(core, [], true), { traces: [1, 2, 3, 4, 5, 6, 7, 8], awake: true, revealed: true });
-  assert.equal(anya.stateOf(new Set(['coeur', 'source']), [], true).revealed, false);
+  assert.equal(anya.stateOf(new Set(['coeur']), [], true).revealed, false);
   // Un quartier manque : elle dort, même avec les douze terres explorées
   const missing = new Set(['coeur', ...anya.CORE.slice(1)]);
   assert.equal(anya.stateOf(missing, anya.LANDS).awake, false);

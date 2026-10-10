@@ -150,7 +150,7 @@ async function whileHeld(hold, request) {
 // Le cœur de l'île à soi (le quartier du Cœur l'est toujours) : les terres alentour s'ouvrent alors aux expéditions
 async function ownCore(player) {
   await sql(`INSERT INTO world_zones (user_id, zone) SELECT $1, unnest($2::text[]) ON CONFLICT DO NOTHING`,
-    [player.userId, ['source', 'lisiere', 'colline', 'jardins', 'est', 'hauteurs']]);
+    [player.userId, ['lisiere', 'colline', 'jardins', 'est', 'hauteurs']]);
 }
 
 async function coinsOf(player) {

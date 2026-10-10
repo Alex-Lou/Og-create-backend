@@ -45,6 +45,7 @@ function metOf(id, levels, zones, presence) {
     if (id === 'ponton') return !presence.fresh || presence.done.has('nuit');
     if (id === 'foyer') return presence.done.has('recolte');
     if (id === 'atelier') return presence.done.has(presence.fresh ? 'poules' : 'soupe');
+    if (id === 'puits') return presence.done.has('deco');
     return zones.has(map.siteZone(id));
 }
 // Ce qu'il faut pour savoir qui est là : compte d'avant la bible, quêtes faites ; et la Bénédiction d'Anya (le cœur de
