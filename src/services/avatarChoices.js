@@ -21,7 +21,7 @@ const FORMES = {
     genre: ['femme', 'homme'],
     taille: ['petite', 'moyenne', 'grande'],
     silhouette: ['fine', 'moyenne', 'large', 'ronde'],
-    visage: ['rond', 'ovale', 'carre'],
+    visage: ['rond', 'ovale', 'coeur', 'carre', 'anguleux', 'large'],
     formeYeux: ['ronds', 'amande', 'grands', 'rieurs', 'paisibles'],
     cils: ['sans', 'legers', 'recourbes'],
     sourcils: ['fins', 'epais', 'doux'],
