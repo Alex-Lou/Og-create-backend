@@ -18,12 +18,15 @@ const NUANCIERS = {
 // Les teintures rares : elles s'ajoutent aux tissus et aux cheveux, une fois gagnées
 const TEINTURES = ['nacre', 'opale', 'or', 'argent', 'rubis', 'saphir', 'emeraude', 'amethyste', 'onyx', 'aurore'];
 const FORMES = {
+    genre: ['femme', 'homme'],
     taille: ['petite', 'moyenne', 'grande'],
     silhouette: ['fine', 'moyenne', 'large', 'ronde'],
     visage: ['rond', 'ovale', 'carre'],
     formeYeux: ['ronds', 'amande', 'grands', 'rieurs', 'paisibles'],
     cils: ['sans', 'legers', 'recourbes'],
     sourcils: ['fins', 'epais', 'doux'],
+    barbe: ['sans', 'courte', 'pleine', 'bouc'],
+    moustache: ['sans', 'fine', 'epaisse'],
     bouche: ['douce', 'sourire', 'malice', 'serieuse'],
     rousseur: ['non', 'legere', 'oui'],
     joues: ['roses', 'discretes'],
@@ -35,14 +38,14 @@ const FORMES = {
 };
 // Chaque choix et ce dans quoi il se prend : une forme, ou un nuancier
 const CHOIX = {
-    taille: 'formes', silhouette: 'formes', peau: 'peau', visage: 'formes', yeux: 'yeux', formeYeux: 'formes', cils: 'formes',
-    sourcils: 'formes', bouche: 'formes', levres: 'levres', rousseur: 'formes', joues: 'formes', grain: 'formes',
+    genre: 'formes', taille: 'formes', silhouette: 'formes', peau: 'peau', visage: 'formes', yeux: 'yeux', formeYeux: 'formes', cils: 'formes',
+    sourcils: 'formes', barbe: 'formes', moustache: 'formes', bouche: 'formes', levres: 'levres', rousseur: 'formes', joues: 'formes', grain: 'formes',
     coupe: 'formes', cheveux: 'cheveux', meches: 'formes', couleurMeches: 'cheveux', haut: 'formes', couleurHaut: 'tissus',
     bas: 'formes', couleurBas: 'tissus', chaussures: 'tissus'
 };
 const DEFAUT = {
-    taille: 'moyenne', silhouette: 'moyenne', peau: 'peche', visage: 'rond', yeux: 'brun', formeYeux: 'ronds', cils: 'sans', sourcils: 'fins',
-    bouche: 'douce', levres: 'naturelles', rousseur: 'non', joues: 'roses', grain: 'non', coupe: 'courte', cheveux: 'brun', meches: 'sans',
+    genre: 'femme', taille: 'moyenne', silhouette: 'moyenne', peau: 'peche', visage: 'rond', yeux: 'brun', formeYeux: 'ronds', cils: 'sans', sourcils: 'fins',
+    barbe: 'sans', moustache: 'sans', bouche: 'douce', levres: 'naturelles', rousseur: 'non', joues: 'roses', grain: 'non', coupe: 'courte', cheveux: 'brun', meches: 'sans',
     couleurMeches: 'blond', haut: 'tshirt', couleurHaut: 'corail', bas: 'pantalon', couleurBas: 'jean', chaussures: 'cuir'
 };
 // Les accessoires : [emplacement, zones de couleur (t : tissu, m : métal), couleurs par défaut, gratuit]
@@ -121,6 +124,8 @@ function cleanChoices(raw, owned = new Set()) {
         if (!ok) return refuse('Ce choix n’existe pas, ou n’est pas encore à toi.');
         out[key] = value;
     }
+    // La barbe et la moustache ne vont qu'à l'homme : chez la femme (le défaut), elles s'effacent
+    if (out.genre !== 'homme') { out.barbe = 'sans'; out.moustache = 'sans'; }
     const worn = own(raw, 'accessoires') ? raw.accessoires : {};
     if (!plain(worn)) return refuse('Avatar invalide.');
     out.accessoires = {};
