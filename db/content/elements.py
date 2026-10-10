@@ -8,7 +8,7 @@ FAMILIES = {
 
   "Matériaux": {
     "Boue": "svg:boue", "Lave": "svg:lave", "Vapeur": "svg:vapeur", "Poussière": "svg:poussiere", "Fumée": "svg:fumee",
-    "Pierre": "svg:pierre", "Sable": "svg:sable", "Cendre": "svg:cendre", "Métal": "svg:metal", "Verre": "svg:verre",
+    "Pierre": "svg:pierre", "Arbre": "svg:arbre", "Bois": "svg:bois", "Sable": "svg:sable", "Cendre": "svg:cendre", "Métal": "svg:metal", "Verre": "svg:verre",
     "Cristal": "svg:cristal", "Magma": "svg:magma",
     "Argile": "svg:argile", "Charbon": "svg:charbon", "Sel": "svg:sel", "Fer": "svg:fer", "Cuivre": "svg:cuivre", "Or": "svg:or",
     "Argent": "svg:argent", "Étain": "svg:etain", "Bronze": "svg:bronze", "Acier": "svg:acier", "Plomb": "svg:plomb",
@@ -30,7 +30,7 @@ FAMILIES = {
     "Pluie": "svg:pluie", "Nuage": "svg:nuage", "Énergie": "svg:energie", "Vent": "svg:vent", "Bourrasque": "svg:bourrasque",
     "Tempête": "svg:tempete", "Éclair": "svg:eclair", "Tornade": "svg:tornade", "Explosion": "svg:explosion", "Incendie": "svg:incendie",
     "Brasier": "svg:brasier", "Geyser": "svg:geyser", "Vague": "svg:vague", "Ozone": "svg:ozone", "Lumière": "svg:lumiere",
-    "Arc-en-ciel": "svg:arc-en-ciel", "Temps": "svg:temps", "Neige": "svg:neige", "Glace": "svg:glace",
+    "Arc-en-ciel": "svg:arc-en-ciel", "Temps": "svg:temps", "Graine": "svg:graine", "Neige": "svg:neige", "Glace": "svg:glace",
     "Blizzard": "svg:blizzard", "Tsunami": "svg:tsunami", "Déluge": "svg:deluge",
     "Brouillard": "svg:brouillard", "Rosée": "svg:rosee", "Givre": "svg:givre", "Grêle": "svg:grele", "Orage": "svg:orage",
     "Ouragan": "svg:ouragan", "Séisme": "svg:seisme", "Érosion": "svg:erosion", "Marée": "svg:maree", "Chaleur": "svg:chaleur",
@@ -95,12 +95,12 @@ FAMILIES = {
   },
 
   "Flore": {
-    "Plante": "svg:plante", "Arbre": "svg:arbre", "Herbe": "svg:herbe", "Fleur": "svg:fleur", "Rose": "svg:rose",
+    "Plante": "svg:plante", "Herbe": "svg:herbe", "Fleur": "svg:fleur", "Rose": "svg:rose",
     "Cactus": "svg:cactus", "Bambou": "svg:bambou", "Blé": "svg:ble", "Riz": "svg:riz", "Maïs": "svg:mais", "Vigne": "svg:vigne",
     "Raisin": "svg:raisin", "Pomme": "svg:pomme", "Olive": "svg:olive", "Légume": "svg:legume", "Pomme de terre": "svg:pomme-de-terre",
     "Tournesol": "svg:tournesol", "Chêne": "svg:chene", "Sapin": "svg:sapin", "Palmier": "svg:palmier", "Lierre": "svg:lierre",
-    "Mousse": "svg:mousse", "Fougère": "svg:fougere", "Champignon": "svg:champignon", "Algue": "svg:algue", "Graine": "svg:graine",
-    "Fruit": "svg:fruit", "Pollen": "svg:pollen", "Feuille": "svg:feuille", "Racine": "svg:racine", "Bois": "svg:bois",
+    "Mousse": "svg:mousse", "Fougère": "svg:fougere", "Champignon": "svg:champignon", "Algue": "svg:algue",
+    "Fruit": "svg:fruit", "Pollen": "svg:pollen", "Feuille": "svg:feuille", "Racine": "svg:racine",
     "Cotonnier": "svg:cotonnier", "Lin": "svg:lin", "Thé": "svg:the", "Café": "svg:cafe", "Cacao": "svg:cacao",
     "Canne à sucre": "svg:canne-a-sucre", "Herbe médicinale": "svg:herbe-medicinale", "Lichen": "svg:lichen", "Nénuphar": "svg:nenuphar",
     # Paquet thématique (culture commune)
