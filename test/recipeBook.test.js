@@ -376,9 +376,8 @@ test('la très grande île : calques cohérents, le cœur intact, chantiers à p
     assert.ok(small.x >= p.x && small.y >= p.y && small.x + 2 <= p.x + 3 && small.y + 2 <= p.y + 3, id);
   }
   assert.equal(map.siteZone('foyer'), 'coeur');
-  // La Mine s'adosse à la falaise de la Colline : du relief plus haut juste derrière elle
-  const mine = map.SITE_BIG.carriere;
-  assert.ok([0, 1, 2].some(d => map.heightAt(mine.x + d, mine.y - 1) > map.heightAt(mine.x, mine.y)));
+  // Les maisons sont au campement (choix de l'auteur, 9 oct.) : la Carrière n'est plus adossée à la falaise de la
+  // Colline, elle est au village comme les autres ; son quartier d'origine (la Colline) reste celui qu'on achète
   // Vingt-quatre quartiers, chacun avec son panneau ; ceux des terres nouvelles ont un climat et une durée d'expédition
   assert.equal(map.ZONES.length, 24);
   map.ZONES.forEach(z => assert.ok(map.ANCHORS[z.id], z.id));

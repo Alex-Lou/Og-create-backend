@@ -1720,11 +1720,15 @@ test('besoins des habitants : manger, travailler, se distraire ; l’humeur chan
   await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'atelier', 1)`, [player.userId]);
   const forge = await view();
   assert.deepEqual(who(forge, 'foyer').needs.map(n => n.id), ['manger', 'outils', 'deco']);
-  assert.equal(who(forge, 'atelier').mood, 'content');
+  // L'Atelier est au campement, près des clôtures du Foyer : Rivet a de quoi se distraire, il est heureux
+  assert.equal(who(forge, 'atelier').mood, 'heureux');
+  // Sans outils, il redevient content ; affamé aussi, il devient triste : −2 coups par Récolte (4 de moins qu'heureux)
   await ago('atelier', 'outils', 50);
+  assert.equal(who(await view(), 'atelier').mood, 'content');
+  await ago('atelier', 'manger', 30);
   const worn = await view();
   assert.equal(who(worn, 'atelier').moodEffect, '−2 coups par Récolte');
-  assert.equal(worn.harvest.maxMoves, forge.harvest.maxMoves - 2);
+  assert.equal(worn.harvest.maxMoves, forge.harvest.maxMoves - 4);
   // Deux Récoltes déjà jouées : celle-ci n'est plus une des premières (courtes)
   await sql(`INSERT INTO world_runs (user_id, seed, config, finished_at) VALUES ($1, 1, '{}', NOW()), ($1, 2, '{}', NOW())`, [player.userId]);
   const run = await api('POST', '/play/world/harvest/start', {}, player);

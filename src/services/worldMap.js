@@ -86,7 +86,11 @@ function inFootprint(x, y, levels = {}) {
 }
 // Case de la grande emprise d'un chantier (réservée, quel que soit son niveau)
 const inSite = (x, y) => Object.values(SITE_BIG).some(p => x >= p.x && x < p.x + 3 && y >= p.y && y < p.y + 3);
-const siteZone = id => zoneAt(SITE_BIG[id].x, SITE_BIG[id].y);
+// Le quartier d'origine de chaque bâtiment (l'acheter permet de le bâtir). Il reste celui de la carte, même quand le
+// bâtiment est posé ailleurs (le campement, world/places.js) : les maisons sont regroupées au cœur, mais on achète
+// toujours La Source pour bâtir le Puits, La Lisière pour le Bosquet, etc.
+const SITE_ZONE = { foyer: 'coeur', puits: 'source', bosquet: 'lisiere', carriere: 'colline', potager: 'jardins', atelier: 'est', ponton: 'crique' };
+const siteZone = id => SITE_ZONE[id] || zoneAt(SITE_BIG[id].x, SITE_BIG[id].y);
 
 // Grille des quartiers : un caractère par case ('.' mer, sinon l'index du quartier en base 36)
 const GRID = data.REGION.map(row => [...row].map(c => {

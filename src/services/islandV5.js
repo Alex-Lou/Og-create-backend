@@ -1,6 +1,8 @@
 // La carte v5 (144 × 144, la grande carte), figée : générée une fois par scripts/scaleMap.js depuis la carte v4
 // (worldMapV4.js) à l'échelle × 1,5, côtes lissées. Ne plus la modifier à la main. Mêmes calques que la v4, d'une lettre
 // par case (légende : islandData.js et islandOuter.js) ; SITES : coin haut-gauche de l'emprise 3 × 3 de chaque bâtiment.
+// (Les SITES, eux, ont été regroupés en campement autour du Feu le 9 oct. — choix de l'auteur : worldMap.SITE_ZONE garde
+// le quartier d'origine de chacun.)
 
 const HEIGHT = [
     '                             222222222233333                                                                                                    ',
@@ -443,6 +445,6 @@ const REGION = [
     '.......................................................ttttt....................................................................................'
 ];
 
-const SITES = { foyer: { x: 95, y: 86 }, puits: { x: 87, y: 84 }, bosquet: { x: 71, y: 86 }, carriere: { x: 88, y: 69 }, potager: { x: 73, y: 70 }, atelier: { x: 104, y: 67 }, ponton: { x: 101, y: 57 } };
+const SITES = { foyer: { x: 95, y: 86 }, puits: { x: 95, y: 83 }, bosquet: { x: 98, y: 86 }, carriere: { x: 89, y: 86 }, potager: { x: 101, y: 83 }, atelier: { x: 102, y: 86 }, ponton: { x: 86, y: 86 } };
 
 module.exports = { HEIGHT, GROUND, REGION, SITES };

@@ -86,9 +86,10 @@ test('une annexe se pose n’importe où dans le quartier de son bâtiment, hors
   const at = map.SITE_BIG.potager;
   // Juste à côté de l'emprise 3 × 3 : oui si le sol s'y prête ; dans l'emprise : jamais
   assert.equal(world.annexSpotOk('potager', at.x + 1, at.y + 1), false);
+  // Les annexes se posent dans le quartier d'origine du bâtiment (Les Jardins), pas autour de lui (le campement, au cœur)
   const ring = [];
-  for (let y = at.y - 2; y <= at.y + 4; y++) for (let x = at.x - 2; x <= at.x + 4; x++) if (world.annexSpotOk('potager', x, y)) ring.push({ x, y });
-  assert.ok(ring.length >= 10, `cases autour du Potager : ${ring.length}`);
+  for (let y = 0; y < map.SIZE; y++) for (let x = 0; x < map.SIZE; x++) if (map.zoneAt(x, y) === 'jardins' && world.annexSpotOk('potager', x, y)) ring.push({ x, y });
+  assert.ok(ring.length >= 20, `cases des Jardins pour le Potager : ${ring.length}`);
   for (const c of ring) assert.equal(map.zoneAt(c.x, c.y), map.siteZone('potager'));
   // Loin du bâtiment mais dans son quartier : oui ; dans un autre quartier : non
   let far = null, other = null;

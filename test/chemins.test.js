@@ -12,9 +12,9 @@ test.after(() => server?.kill());
 const view = async player => (await api('GET', '/play/world', null, player)).data;
 const at = (w, x, y) => w.map.ground[y][x];
 const draw = (player, lay, erase = []) => api('POST', '/play/world/paths', { lay, erase }, player);
-// Du Puits (palier I, 2 × 2 en 88, 85) au sentier (97, 89), qui descend jusqu'à la porte du Feu sur la plage : dix
-// cases d'herbe, hors des grandes emprises
-const LINK = [[90, 86], [91, 86], [92, 86], [93, 86], [94, 86], [94, 87], [94, 88], [94, 89], [95, 89], [96, 89]];
+// Du Puits (palier I, 2 × 2 en 96, 84) au Feu sur la plage : le Puits est au nord du campement, le chemin contourne les
+// maisons et rejoint le sentier, puis la porte du Feu (hors des grandes emprises et du camp)
+const LINK = [[95, 86], [95, 87], [95, 88], [95, 89], [96, 89], [98, 89], [99, 89], [100, 89], [101, 89], [101, 90], [101, 91], [101, 92]];
 
 test('une île neuve n’a que son sentier ; une île d’avant garde ses routes', async () => {
     const fresh = await newPlayer();
@@ -97,7 +97,8 @@ test('la quête du premier chemin : relier le Puits au Feu', async () => {
     assert.equal(linked.data.world.brume.quest.done, true);
     const claim = await api('POST', '/play/world/quest', { id: 'chemin' }, player);
     assert.equal(claim.status, 200, JSON.stringify(claim.data));
-    // Une île d'avant (toutes ses routes) a déjà son chemin
+    // Une île d'avant (toutes ses routes) : ses maisons, regroupées au campement, ne sont plus reliées par la grande
+    // route (choix de l'auteur : le village) ; elle retrace donc son premier chemin comme une île neuve
     const old = await newPlayer();
     await view(old);
     await sql(`DELETE FROM world_items WHERE user_id = $1 AND item = 'ile:sentiers'`, [old.userId]);
@@ -105,5 +106,5 @@ test('la quête du premier chemin : relier le Puits au Feu', async () => {
     await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'source')`, [old.userId]);
     await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'foyer', 1), ($1, 'puits', 1)
         ON CONFLICT (user_id, site) DO UPDATE SET level = EXCLUDED.level`, [old.userId]);
-    assert.equal((await view(old)).brume.quest.done, true);
+    assert.equal((await view(old)).brume.quest.done, false);
 });

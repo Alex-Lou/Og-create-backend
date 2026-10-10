@@ -6,7 +6,6 @@ const assert = require('node:assert/strict');
 const { startServer, api, sql, newPlayer } = require('./helpers');
 const db = require('../src/config/db');
 const nights = require('../src/services/nights');
-const map = require('../src/services/worldMap');
 const anya = require('../src/services/anya');
 const worldNights = require('../src/services/world/nights');
 const { stockOf } = require('../src/services/world/reads');
@@ -26,13 +25,17 @@ const blightsOf = async userId => (await sql('SELECT blights FROM world_nights W
 const countsOf = ({ fates }) => Object.values(fates).reduce((out, f) => ({ ...out, [f.end]: out[f.end] + 1 }), { luciole: 0, barre: 0, camarade: 0, touche: 0, arrive: 0 });
 
 // Une île : Brumelune et la Source, le Puits bâti ; sans défense posée ; ses habitants tristes, sans repas depuis un mois
-// (aucun camarade content : un habitant sans ligne de besoins arrive comblé, donc content)
-const ISLAND = { owned: new Set(['coeur', 'source']), sites: [{ id: 'foyer', level: 1 }, { id: 'puits', level: 1 }], acts: 0 };
+// (aucun camarade content : un habitant sans ligne de besoins arrive comblé, donc content). Le Puits est posé loin du
+// Feu (un quartier à part) : c'est ainsi que les nuits se testent, quelle que soit la disposition du campement.
+const PLACES = { foyer: { x: 95, y: 86 }, puits: { x: 87, y: 84 } };
+const ISLAND = { owned: new Set(['coeur', 'source']), sites: [{ id: 'foyer', level: 1 }, { id: 'puits', level: 1 }], acts: 0, places: PLACES };
 const FIRE = nights.defenseOf([], { foyer: 1 });
 async function islandPlayer() {
   const player = await newPlayer();
   await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'source')`, [player.userId]);
   await sql(`INSERT INTO world_buildings (user_id, site, level, built_at) VALUES ($1, 'puits', 1, NOW() - INTERVAL '30 days')`, [player.userId]);
+  // Le Puits est posé loin du Feu (comme la disposition PLACES) : les nuits se testent sur un bâtiment qu'elles atteignent
+  await sql(`INSERT INTO world_site_places (user_id, site, x, y) VALUES ($1, 'puits', 87, 84)`, [player.userId]);
   await sql(`INSERT INTO world_needs (user_id, villager, need, filled_at) VALUES ($1, 'puits', 'manger', NOW() - INTERVAL '30 days'), ($1, 'foyer', 'manger', NOW() - INTERVAL '30 days')`, [player.userId]);
   return player;
 }
@@ -95,7 +98,7 @@ test('une lumière près du Puits change en lucioles ceux qui y vont : aucune pa
   const { start, end } = nightWhere(id, Date.now() + 2 * DAY, toWell);
   await startBefore(id, start);
   // La lanterne au coin de la grande emprise du Puits, à côté de sa petite (2 × 2 cases)
-  await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'lanterne', $2, $3)`, [id, map.SITE_BIG.puits.x, map.SITE_BIG.puits.y]);
+  await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'lanterne', $2, $3)`, [id, PLACES.puits.x, PLACES.puits.y]);
   const evening = await view(id, start - HOUR);
   assert.ok(evening.creatures.filter(c => c.site === 'puits').every(c => c.end === 'luciole'));
   assert.equal(evening.panne, null);
