@@ -29,6 +29,7 @@ const FORMES = {
     moustache: ['sans', 'fine', 'epaisse', 'guidon', 'gauloise'],
     bouche: ['douce', 'sourire', 'malice', 'serieuse'],
     rousseur: ['non', 'legere', 'oui', 'dense', 'nez'],
+    menton: ['doux', 'fin', 'court', 'fort', 'fendu'],
     age: ['jeune', 'adulte', 'mur', 'age'],
     cicatrice: ['sans', 'sourcil', 'joue', 'nez', 'levre'],
     joues: ['roses', 'discretes', 'sans'],
@@ -45,13 +46,13 @@ const FORMES = {
 };
 // Chaque choix et ce dans quoi il se prend : une forme, ou un nuancier
 const CHOIX = {
-    genre: 'formes', age: 'formes', cicatrice: 'formes', taille: 'formes', silhouette: 'formes', peau: 'peau', visage: 'formes', yeux: 'yeux', formeYeux: 'formes', cils: 'formes',
+    genre: 'formes', menton: 'formes', age: 'formes', cicatrice: 'formes', taille: 'formes', silhouette: 'formes', peau: 'peau', visage: 'formes', yeux: 'yeux', formeYeux: 'formes', cils: 'formes',
     sourcils: 'formes', barbe: 'formes', moustache: 'formes', bouche: 'formes', levres: 'levres', rousseur: 'formes', joues: 'formes', grain: 'formes',
     coupe: 'formes', cheveux: 'cheveux', meches: 'formes', couleurMeches: 'cheveux', haut: 'formes', couleurHaut: 'tissus', motifHaut: 'formes', couleurHaut2: 'tissus',
     bas: 'formes', couleurBas: 'tissus', motifBas: 'formes', couleurBas2: 'tissus', chaussures: 'tissus', formeChaussures: 'formes'
 };
 const DEFAUT = {
-    genre: 'femme', age: 'adulte', cicatrice: 'sans', taille: 'moyenne', silhouette: 'moyenne', peau: 'peche', visage: 'rond', yeux: 'brun', formeYeux: 'ronds', cils: 'sans', sourcils: 'fins',
+    genre: 'femme', menton: 'doux', age: 'adulte', cicatrice: 'sans', taille: 'moyenne', silhouette: 'moyenne', peau: 'peche', visage: 'rond', yeux: 'brun', formeYeux: 'ronds', cils: 'sans', sourcils: 'fins',
     barbe: 'sans', moustache: 'sans', bouche: 'douce', levres: 'naturelles', rousseur: 'non', joues: 'roses', grain: 'non', coupe: 'milongue', cheveux: 'brun', meches: 'sans',
     couleurMeches: 'blond', haut: 'tshirt', couleurHaut: 'corail', motifHaut: 'uni', couleurHaut2: 'soleil', bas: 'pantalon', couleurBas: 'jean', motifBas: 'uni', couleurBas2: 'marine', chaussures: 'cuir', formeChaussures: 'souliers'
 };
@@ -131,8 +132,8 @@ function cleanChoices(raw, owned = new Set()) {
         if (!ok) return refuse('Ce choix n’existe pas, ou n’est pas encore à toi.');
         out[key] = value;
     }
-    // La barbe et la moustache ne vont qu'à l'homme : chez la femme (le défaut), elles s'effacent
-    if (out.genre !== 'homme') { out.barbe = 'sans'; out.moustache = 'sans'; }
+    // La barbe, la moustache et le menton ne vont qu'à l'homme : chez la femme (le défaut), ils s'effacent
+    if (out.genre !== 'homme') { out.barbe = 'sans'; out.moustache = 'sans'; out.menton = 'doux'; }
     const worn = own(raw, 'accessoires') ? raw.accessoires : {};
     if (!plain(worn)) return refuse('Avatar invalide.');
     out.accessoires = {};

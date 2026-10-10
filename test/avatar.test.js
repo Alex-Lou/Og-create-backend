@@ -12,18 +12,18 @@ test.after(() => server?.kill());
 test('choix : complétés par défaut ; inconnus, mal formés ou pas encore gagnés, refusés', () => {
   const empty = cleanChoices({});
   assert.deepEqual(empty.choices, { ...DEFAUT, accessoires: {} });
-  // Chaque choix du catalogue passe, chacun à son tour (la barbe et la moustache, chez l'homme)
+  // Chaque choix du catalogue passe, chacun à son tour (la barbe, la moustache et le menton, chez l'homme)
   for (const [key, from] of Object.entries(CHOIX)) {
     for (const value of from === 'formes' ? FORMES[key] : NUANCIERS[from]) {
-      const extra = (key === 'barbe' || key === 'moustache') ? { genre: 'homme' } : {};
+      const extra = (key === 'barbe' || key === 'moustache' || key === 'menton') ? { genre: 'homme' } : {};
       assert.equal(cleanChoices({ ...extra, [key]: value }).choices[key], value, `${key} = ${value}`);
     }
   }
-  // La barbe et la moustache ne vont qu'à l'homme : chez la femme, elles s'effacent
-  const femme = cleanChoices({ genre: 'femme', barbe: 'pleine', moustache: 'epaisse' }).choices;
-  assert.deepEqual([femme.barbe, femme.moustache], ['sans', 'sans']);
-  const homme = cleanChoices({ genre: 'homme', barbe: 'pleine', moustache: 'epaisse' }).choices;
-  assert.deepEqual([homme.barbe, homme.moustache], ['pleine', 'epaisse']);
+  // La barbe, la moustache et le menton ne vont qu'à l'homme : chez la femme, ils s'effacent
+  const femme = cleanChoices({ genre: 'femme', barbe: 'pleine', moustache: 'epaisse', menton: 'fendu' }).choices;
+  assert.deepEqual([femme.barbe, femme.moustache, femme.menton], ['sans', 'sans', 'doux']);
+  const homme = cleanChoices({ genre: 'homme', barbe: 'pleine', moustache: 'epaisse', menton: 'fendu' }).choices;
+  assert.deepEqual([homme.barbe, homme.moustache, homme.menton], ['pleine', 'epaisse', 'fendu']);
   const refused = [
     null, 'avatar-01', [], { taille: 'immense' }, { peau: 'vert' }, { pouvoir: 'voler' }, { taille: ['petite'] },
     { couleurHaut: 'or' }, // une teinture rare, pas gagnée
