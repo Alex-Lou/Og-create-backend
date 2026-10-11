@@ -47,7 +47,7 @@ test('le camp : rien avant son personnage ; sur une île à la plage, chacun dan
   const beach = places.placesFrom({ beach: true });
   const camp = campOf({ met: new Set(['ponton', 'foyer', 'atelier']), places: beach, beach: true });
   const at = id => { const c = camp.find(e => e.id === id); return [c.x, c.y]; };
-  assert.deepEqual([at('cannelle'), at('aster'), at('rivet')], [[99, 96], [89, 96], [93, 86]]);
+  assert.deepEqual([at('cannelle'), at('aster'), at('rivet')], [[99, 96], [90, 96], [93, 86]]);
   // Un compte d'avant la bible (met : null) : tout, comme avant
   assert.ok(ids(campOf({})).includes('cannelle') && ids(campOf({})).includes('rivet'));
   // Rien du camp sur la grande emprise du Feu (les caisses et la cage s'écartent)
@@ -71,7 +71,7 @@ test('déplacer : sur ses quartiers, sur l’herbe ou le sable, sur des cases li
   assert.match(moveBlock('foyer', 92, 92, ctx({ taken: new Set([93 * map.SIZE + 93]) })), /prise/);
   // Un Étal du marché posé près du Feu (7 cases) : le Feu ne s'en éloigne pas
   const placed = [{ craft: 'etal', x: 100, y: 97 }];
-  assert.match(moveBlock('foyer', 93, 86, ctx({ placed })), /Étal du marché/);
+  assert.match(moveBlock('foyer', 95, 80, ctx({ placed })), /Étal du marché/);
   assert.equal(moveBlock('foyer', 92, 92, ctx({ placed })), null);
 });
 

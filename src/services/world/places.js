@@ -26,7 +26,8 @@ const BEACH = {
     // (contre l'épave, sur le rivage, choix de l'auteur, 11 oct. : on se rapproche pour s'entraider, et l'île ne se
     // découvre que par petits morceaux)
     ponton: { x: 92, y: 96 },
-    atelier: { x: 95, y: 82 },
+    // (au nord du Feu, à deux pas du sentier, choix de l'auteur, 11 oct. : on le rapproche)
+    atelier: { x: 95, y: 85 },
     // (contre le village, entre le ruisseau et le sentier, choix de l'auteur, 11 oct. : les bases ensemble)
     puits: { x: 88, y: 86 },
     carriere: { x: 86, y: 69 },

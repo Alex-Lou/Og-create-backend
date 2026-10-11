@@ -27,7 +27,7 @@ const ABRI = 2;
 // Les places du camp sur une île à la plage (world/places.js) : dans la zone de chacun
 const BEACH_PLACES = {
     // (le camp d'Aster serré autour de son Ponton, contre l'épave : sa zone est petite)
-    aster: { x: 89, y: 96 }, sos: { x: 89, y: 94 }, caisses: { x: 91, y: 95 }, filet: { x: 90, y: 98 }, rondins: { x: 92, y: 94 },
+    aster: { x: 90, y: 96 }, sos: { x: 90, y: 94 }, caisses: { x: 91, y: 95 }, filet: { x: 90, y: 98 }, rondins: { x: 92, y: 94 },
     rivet: { x: 93, y: 86 }
 };
 
