@@ -34,8 +34,10 @@ async function islandPlayer() {
   const player = await newPlayer();
   await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'source')`, [player.userId]);
   await sql(`INSERT INTO world_buildings (user_id, site, level, built_at) VALUES ($1, 'puits', 1, NOW() - INTERVAL '30 days')`, [player.userId]);
-  // Le Puits est posé loin du Feu (comme la disposition PLACES) : les nuits se testent sur un bâtiment qu'elles atteignent
-  await sql(`INSERT INTO world_site_places (user_id, site, x, y) VALUES ($1, 'puits', 87, 84)`, [player.userId]);
+  // Le Feu et le Puits aux places de PLACES (le Puits loin du Feu) : les nuits se testent sur un bâtiment qu'elles
+  // atteignent, et le serveur tire les mêmes nuits que ce test (un joueur neuf est sur l'île à la plage, son Feu ailleurs)
+  await sql(`INSERT INTO world_site_places (user_id, site, x, y) VALUES ($1, 'foyer', $2, $3), ($1, 'puits', $4, $5)`,
+    [player.userId, PLACES.foyer.x, PLACES.foyer.y, PLACES.puits.x, PLACES.puits.y]);
   await sql(`INSERT INTO world_needs (user_id, villager, need, filled_at) VALUES ($1, 'puits', 'manger', NOW() - INTERVAL '30 days'), ($1, 'foyer', 'manger', NOW() - INTERVAL '30 days')`, [player.userId]);
   return player;
 }
