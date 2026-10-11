@@ -18,6 +18,8 @@ router.get('/book', playLimiter, withPlayer(async (req, res, owner, b) => {
     const owned = await players.elements(owner);
     // Le fil d'Ariane suit la quête active de l'île (compte seulement)
     const ariane = owner.kind === 'user' ? bookPages.arianeOf(b, owned, await world.arianeTargets(owner.id)) : null;
+    // (la recette que dit la quête, sur la page marquée)
+    if (ariane) ariane.hint = await world.elementHintOf(owner.id);
     // Pages où l'Encre a déjà servi : leur ingrédient se revoit sur tout appareil
     const inked = owner.kind === 'user' ? await ledger.refsOf(owner.id, 'encre') : new Set();
     const guided = owner.kind === 'user' && await world.guidedInkOf(owner.id);

@@ -224,7 +224,7 @@ function view(b, owned, misses = {}, letters = {}, veteran = false, ariane = nul
     });
     // Le ruban du fil d'Ariane : la cible (déjà nommée par la quête), les pages qui restent, la page marquée
     const marked = ariane && chapters.flatMap(c => c.pages).find(p => p.marked);
-    return { stars, chapters, ariane: marked ? { target: ariane.target, remaining: ariane.remaining, page: marked.id, chapter: chapterOf(b.meta.get(ariane.next).family).id } : null };
+    return { stars, chapters, ariane: marked ? { target: ariane.target, remaining: ariane.remaining, page: marked.id, chapter: chapterOf(b.meta.get(ariane.next).family).id, ...(ariane.hint ? { hint: ariane.hint } : {}) } : null };
 }
 
 // Élément inconnu à portée qui porte cet identifiant de page, avec la recette que montre sa page, ou null

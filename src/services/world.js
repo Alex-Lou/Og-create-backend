@@ -172,6 +172,13 @@ async function arianeTargets(userId) {
     return plan ? [plan] : [];
 }
 
+// L'indice de la quête active, à montrer sur la page que marque le ruban : le texte d'une quête « fais naître un
+// élément » dit la recette (« Le Feu et la Terre font la Lave… »), ou null
+async function elementHintOf(userId) {
+    const quest = quests.currentOf(await claimedOf(userId));
+    return quest && quest.goal.kind === 'element' ? quest.say : null;
+}
+
 // Le tableau de Brume, avec le chapitre encore fermé qu'attend la quête active (un quartier ou un palier d'un
 // chapitre pas encore ouvert : le joueur doit d'abord écrire des découvertes). openChapters : Set des chapitres ouverts
 function boardWith(claimed, facts, openChapters, tutorial = false) {
@@ -1004,7 +1011,7 @@ async function chooseSign(userId, siteId, styleId) {
 module.exports = {
     SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, pendingOf, chargesAt, effectsOf, productionOf,
     view, build, buyZone, buyItem, undoItem, harvestCap, chooseSkin, startRun, finishRun, collect, migrate, claimQuest, sleep, board, openChest, openAll,
-    placeAnnex, moveAnnex, poseAnnex, annexSpotOk, siteSpots, moveSite, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople, namePlayer, chooseAvatar, arianeTargets, guidedInkOf, restartIsland,
+    placeAnnex, moveAnnex, poseAnnex, annexSpotOk, siteSpots, moveSite, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople, namePlayer, chooseAvatar, arianeTargets, elementHintOf, guidedInkOf, restartIsland,
     refundDecorations, startCraft, finishCraft, placeCraft, moveCraft, storeCraft, turnCraft, startExpedition, findLandmark, gatherDeposit, pickUp,
     anyaOf, breathRefused, revealAnya, breatheAnya, brumeSavoirOf, talkBrume, startNights, repelCreature, repairSite, skipPrologue, layPaths,
     feedBeast, collectBeasts, openCage
