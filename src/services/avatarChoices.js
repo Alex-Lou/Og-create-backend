@@ -35,7 +35,7 @@ const FORMES = {
     joues: ['roses', 'discretes', 'sans'],
     grain: ['non', 'joue', 'levre'],
     coupe: ['courte', 'meche', 'bataille', 'carre', 'milongue', 'longue', 'ondulee', 'queue', 'queueCote', 'couettes', 'chignon', 'deuxChignons', 'couronne', 'tresses', 'bouclee', 'locks', 'rasee',
-        'degrade', 'banane', 'raie', 'herisse', 'boucleeCourte', 'chignonHomme'],
+        'degrade', 'banane', 'raie', 'herisse', 'boucleeCourte', 'chignonHomme', 'pixie', 'demiQueue', 'tresseCote', 'puffs', 'locksLongues'],
     meches: ['sans', 'pointes', 'meches'],
     haut: ['tshirt', 'mariniere', 'pull', 'sweat', 'chemise', 'veste', 'debardeur', 'polo', 'colRoule', 'gilet'],
     bas: ['pantalon', 'short', 'jupe', 'salopette', 'robe', 'robeEntiere', 'bermuda', 'jupePlissee', 'robeLongue'],

@@ -24,6 +24,8 @@ test('choix : complétés par défaut ; inconnus, mal formés ou pas encore gagn
   assert.deepEqual([femme.barbe, femme.moustache, femme.menton], ['sans', 'sans', 'doux']);
   const homme = cleanChoices({ genre: 'homme', barbe: 'pleine', moustache: 'epaisse', menton: 'fendu' }).choices;
   assert.deepEqual([homme.barbe, homme.moustache, homme.menton], ['pleine', 'epaisse', 'fendu']);
+  // Les coupes de femme ajoutées (pixie, demi-queue, tresse sur le côté, puffs, locks longues) sont acceptées
+  for (const coupe of ['pixie', 'demiQueue', 'tresseCote', 'puffs', 'locksLongues']) assert.equal(cleanChoices({ genre: 'femme', coupe }).choices.coupe, coupe);
   const refused = [
     null, 'avatar-01', [], { taille: 'immense' }, { peau: 'vert' }, { pouvoir: 'voler' }, { taille: ['petite'] },
     { couleurHaut: 'or' }, // une teinture rare, pas gagnée
