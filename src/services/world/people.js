@@ -45,7 +45,8 @@ function metOf(id, levels, zones, presence) {
     if (id === 'ponton') return !presence.fresh || presence.done.has('nuit');
     // (une île neuve : Cannelle arrive au matin du troisième jour, après la deuxième nuit)
     if (id === 'foyer') return presence.done.has(presence.fresh ? 'veille' : 'recolte');
-    if (id === 'atelier') return presence.done.has(presence.fresh ? 'poules' : 'soupe');
+    // (une île neuve : Rivet au matin du quatrième jour, après la troisième nuit, celle du jour de Cannelle)
+    if (id === 'atelier') return presence.done.has(presence.fresh ? 'nuit-cannelle' : 'soupe');
     if (id === 'puits') return presence.done.has('deco');
     return zones.has(map.siteZone(id));
 }

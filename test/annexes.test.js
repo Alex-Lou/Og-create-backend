@@ -7,15 +7,21 @@ const map = require('../src/services/worldMap');
 
 const hoursAgo = (h, now) => new Date(now - h * 3600000);
 
-test('trois annexes par bâtiment : petite (palier II), réserve (IV), grande (VI) ; le Foyer a aussi ses maisons', () => {
-  assert.equal(annexes.ANNEXES.length, 28);
+test('trois annexes par bâtiment : petite (palier II), réserve (IV), grande (VI) ; le Foyer a aussi ses maisons et le poulailler', () => {
+  assert.equal(annexes.ANNEXES.length, 29);
   for (const site of Object.keys(world.SITES)) {
-    const own = annexes.ANNEXES.filter(a => a.site === site && a.kind !== 'house' && a.kind !== 'climate');
+    const own = annexes.ANNEXES.filter(a => a.site === site && !['house', 'climate', 'coop'].includes(a.kind));
     assert.deepEqual(own.map(a => a.kind), ['small', 'reserve', 'grand'], site);
     assert.deepEqual(own.map(a => annexes.levelFor(a, 0)), [2, 4, 6], site);
   }
   assert.deepEqual(annexes.ANNEXES.filter(a => a.kind === 'house').map(a => [a.id, a.site]), [['maison', 'foyer']]);
-  assert.equal(new Set(annexes.ANNEXES.map(a => a.id)).size, 28);
+  assert.equal(new Set(annexes.ANNEXES.map(a => a.id)).size, 29);
+  // Le poulailler de Cannelle (sa leçon : poser une annexe) : un seul, dès le Feu bâti, gratuit
+  const coop = annexes.ANNEX_BY_ID.poulailler;
+  assert.deepEqual([coop.site, coop.kind, annexes.maxOf(coop), annexes.levelFor(coop, 0)], ['foyer', 'coop', 1, 1]);
+  assert.deepEqual(annexes.priceOf(coop, 0), { cost: {}, coins: 0, finds: {} });
+  // (ses cases dorées s'offrent donc dès le palier I du Feu ; les autres bâtiments, au palier II)
+  assert.deepEqual([annexes.openLevelOf('foyer'), annexes.openLevelOf('ponton'), annexes.openLevelOf('inconnu')], [1, 2, 2]);
 });
 
 test('annexes de climat : une par trouvaille, au palier III, payées aussi en trouvailles', () => {

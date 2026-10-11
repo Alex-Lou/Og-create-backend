@@ -47,9 +47,21 @@ const QUEST_TEXTS = {
         label: 'Une soupe pour Cannelle',
         say: 'Cannelle grelotte… Touche la bulle au-dessus d’elle : un repas chaud, et elle reprend des couleurs.'
     },
+    cage: {
+        label: 'Ouvre la cage des poules',
+        say: 'Des caquets sur l’eau… La cage du navire s’est échouée au bout de la plage. Ouvre-la avec Cannelle.'
+    },
     poules: {
-        label: 'Nourris les poules',
-        say: 'Des caquets, sous les rochers… La cage du navire ! Ouvre-la, puis nourris les poules depuis leur fiche.'
+        label: 'Nourris les trois poules',
+        say: 'Paprika, Brioche et Madame ont faim : deux vivres chacune, depuis la bulle au-dessus d’elles.'
+    },
+    poulailler: {
+        label: 'Pose le poulailler de Cannelle',
+        say: 'Il leur faut un toit : touche le Feu de camp, puis « Annexes », et pose le poulailler près de la cuisine de Cannelle.'
+    },
+    'nuit-cannelle': {
+        label: 'Passe ta troisième nuit',
+        say: 'Trois, ce soir, autour du feu. Dors : je veille.'
     },
     deco: {
         label: 'Fabrique ta première lanterne',

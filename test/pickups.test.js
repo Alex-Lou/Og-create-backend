@@ -40,7 +40,7 @@ test('ramasser sur la plage de Brumelune : une fois, puis la mer en rapporte ; c
   // Au jour de Cannelle, les coquillages
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'veille')`, [id]);
   assert.deepEqual((await view(player)).pickups.filter(p => p.kind === 'coquillage').map(p => p.id), ['greve-coquillage-1', 'greve-coquillage-2']);
-  assert.deepEqual((await pick(player, 'greve-coquillage-1')).data.gives, { food: 2 });
+  assert.deepEqual((await pick(player, 'greve-coquillage-1')).data.gives, { food: 5 });
   // Les ramassages de la plage ne comptent pas pour les gisements (quête « trouvaille »)
   await sql('DELETE FROM world_quests WHERE user_id = $1', [id]);
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'coeur')`, [id]);
@@ -48,7 +48,14 @@ test('ramasser sur la plage de Brumelune : une fois, puis la mer en rapporte ; c
   assert.deepEqual([trouvaille.id, trouvaille.done], ['trouvaille', false]);
 });
 
-test('un nouveau compte bâtit son feu ; Aster vient au matin, Cannelle après sa Récolte, Rivet après les poules', async () => {
+test('les trouvailles de la plage paient chacune leur leçon : deux bois et un galet le feu, deux coquillages la soupe de Cannelle', () => {
+    const pickups = require('../src/services/pickups');
+    const villagers = require('../src/services/villagers');
+    const gives = (after, resource) => pickups.SPOTS.filter(s => (s.after || null) === after).reduce((n, s) => n + (pickups.KINDS[s.kind].gives[resource] || 0), 0);
+    assert.ok(gives('veille', 'food') >= villagers.NEEDS.manger.cost.food);
+});
+
+test('un nouveau compte bâtit son feu ; Aster vient au matin, Cannelle après sa Récolte, Rivet après la troisième nuit', async () => {
   const player = await newPlayer({ veteran: false });
   const id = player.userId;
   const first = await view(player);
@@ -73,7 +80,10 @@ test('un nouveau compte bâtit son feu ; Aster vient au matin, Cannelle après s
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'recolte'), ($1, 'veille'), ($1, 'soupe')`, [id]);
   const after = await view(player);
   assert.deepEqual([met(after).includes('ponton'), met(after).includes('foyer'), met(after).includes('atelier')], [true, true, false]);
-  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'poules')`, [id]);
+  // Le jour de Cannelle (la cage, ses poules, leur poulailler) ne fait pas encore venir Rivet : sa troisième nuit, si
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'cage'), ($1, 'poules'), ($1, 'poulailler')`, [id]);
+  assert.equal(met(await view(player)).includes('atelier'), false);
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'nuit-cannelle')`, [id]);
   assert.equal(met(await view(player)).includes('atelier'), true);
 });
 
@@ -94,7 +104,7 @@ test('un ancien compte incomplet reprend sur la plage de Brumelune, puis retrouv
   // La soupe réclamée : Rivet, sans attendre les poules
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'soupe')`, [id]);
   const rivet = await view(player);
-  assert.deepEqual([met(rivet).includes('atelier'), rivet.brume.quest.id], [true, 'poules']);
+  assert.deepEqual([met(rivet).includes('atelier'), rivet.brume.quest.id], [true, 'cage']);
   // Le feu bâti ensuite (Abri) passe au palier II comme avant
   assert.equal(foyerOf(rivet), 1);
 });

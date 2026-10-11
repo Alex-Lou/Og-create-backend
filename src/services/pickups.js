@@ -6,15 +6,17 @@
 // Ce que donne chaque sorte, versé dans les réserves
 const KINDS = {
     bois: { name: 'Bois flotté', gives: { wood: 2 } },
-    coquillage: { name: 'Coquillages', gives: { food: 2 } },
+    // (deux coquillages : la soupe de Cannelle, dix vivres, le jour de Cannelle ; choix de l'auteur, 11 oct.)
+    coquillage: { name: 'Coquillages', gives: { food: 5 } },
     galet: { name: 'Galets', gives: { stone: 2 } }
 };
 // Les cases de la plage : le sable au bord de l'eau, au pied du camp (le cœur de l'île, à soi dès le départ), toutes
 // sur le sable découvert dès l'arrivée. Le premier soir (choix de l'auteur, 11 oct.) : deux bois flottés et un galet,
 // exactement le prix du feu de camp ; les coquillages, au jour de Cannelle (after : la quête faite avant qu'ils
-// paraissent)
+// paraissent). Le coin de Cannelle, au bout de la plage (x 99 et plus), reste sous la brume jusqu'à son arrivée : rien du
+// premier soir n'y est
 const SPOTS = [
-    ['greve-bois-1', 'bois', 95, 98], ['greve-galet-1', 'galet', 98, 98], ['greve-bois-2', 'bois', 100, 98],
+    ['greve-bois-1', 'bois', 95, 98], ['greve-galet-1', 'galet', 98, 98], ['greve-bois-2', 'bois', 97, 98],
     ['greve-coquillage-1', 'coquillage', 102, 98, 'veille'], ['greve-coquillage-2', 'coquillage', 103, 98, 'veille']
 ].map(([id, kind, x, y, after]) => ({ id, kind, x, y, ...(after ? { after } : {}) }));
 // La trouvaille paraît-elle déjà ? done : les quêtes faites (quests.doneOf)
