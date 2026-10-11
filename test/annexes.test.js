@@ -20,6 +20,8 @@ test('trois annexes par bâtiment : petite (palier II), réserve (IV), grande (V
   const coop = annexes.ANNEX_BY_ID.poulailler;
   assert.deepEqual([coop.site, coop.kind, annexes.maxOf(coop), annexes.levelFor(coop, 0)], ['foyer', 'coop', 1, 1]);
   assert.deepEqual(annexes.priceOf(coop, 0), { cost: {}, coins: 0, finds: {} });
+  // (ses cases dorées s'offrent donc dès le palier I du Feu ; les autres bâtiments, au palier II)
+  assert.deepEqual([annexes.openLevelOf('foyer'), annexes.openLevelOf('ponton'), annexes.openLevelOf('inconnu')], [1, 2, 2]);
 });
 
 test('annexes de climat : une par trouvaille, au palier III, payées aussi en trouvailles', () => {

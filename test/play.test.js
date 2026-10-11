@@ -2559,7 +2559,9 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Aster ouvre s
   const hens = await api('POST', '/play/world/beast/feed', { beast: 'poule-noire' }, player);
   assert.deepEqual([hens.status, hens.data.world.brume.quest.done], [200, true]);
   assert.equal((await claim('poules')).status, 200);
-  // Le poulailler : sur une case libre près du Feu, sans rien payer
+  // Le poulailler : sur une case libre près du Feu, sans rien payer (ses cases dorées s'offrent dès le palier I du Feu)
+  const foyer = (await view()).sites.find(s => s.id === 'foyer');
+  assert.deepEqual([foyer.level, foyer.spots.length > 0], [1, true]);
   let coop = null;
   for (const [x, y] of [[101, 94], [101, 95], [97, 95], [101, 93], [102, 94], [97, 92]]) {
     coop = await api('POST', '/play/world/annex', { annex: 'poulailler', x, y }, player);

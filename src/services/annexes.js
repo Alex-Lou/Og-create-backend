@@ -67,6 +67,11 @@ const ANNEX_BY_ID = Object.fromEntries(ANNEXES.map(a => [a.id, a]));
 const maxOf = a => (a.kind === 'house' ? HOUSE_LEVELS.length : a.kind === 'small' && a.effect.rate ? SMALL_LEVELS.length : 1);
 // Palier du bâtiment qui ouvre l'exemplaire n° copy (0, 1, 2…)
 const levelFor = (a, copy) => (a.kind === 'house' ? HOUSE_LEVELS[copy] : a.kind === 'small' ? SMALL_LEVELS[copy] : KIND_LEVEL[a.kind]);
+// Le palier d'un bâtiment où s'ouvre sa première annexe : le palier II, sauf le Feu, dès le palier I (le poulailler de
+// Cannelle, le jour de Cannelle)
+const OPEN_LEVEL = {};
+for (const a of ANNEXES) OPEN_LEVEL[a.site] = Math.min(OPEN_LEVEL[a.site] ?? Infinity, levelFor(a, 0));
+const openLevelOf = site => OPEN_LEVEL[site] || 2;
 // Prix de l'exemplaire n° copy : { cost, coins, finds } ; le coût en ressources double à chaque exemplaire ; finds :
 // trouvailles de climat (annexes de climat)
 function priceOf(a, copy) {
@@ -118,4 +123,4 @@ const reachOf = (x, y, at) => Math.max(at.x - x, 0, x - (at.x + 2), at.y - y, 0,
 const LOOKS = { champ: 3, filon: 3, coupe: 3, citerne: 3, vivier: 3, maison: 4 };
 const looksOf = a => LOOKS[a.id] || 1;
 
-module.exports = { ANNEXES, ANNEX_BY_ID, maxOf, levelFor, priceOf, bonusesOf, regenWith, effectText, reachOf, looksOf };
+module.exports = { ANNEXES, ANNEX_BY_ID, maxOf, levelFor, openLevelOf, priceOf, bonusesOf, regenWith, effectText, reachOf, looksOf };

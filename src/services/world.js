@@ -379,9 +379,10 @@ async function view(userId, owned, book) {
             capHours: CAP_HOURS + (extra.cap[id] || 0),
             // Temps avant que sa réserve soit pleine (0 : pleine, la production attend le ramassage)
             fullIn: site.produce && level ? fullInOf(builtAt[id], stock.collected_at, CAP_HOURS + (extra.cap[id] || 0), now) : null,
-            // Annexes : catalogue du bâtiment et cases libres où en poser une (dès le palier II)
+            // Annexes : catalogue du bâtiment et cases libres où en poser une (dès que la première s'ouvre : le palier II,
+            // le Feu dès le palier I)
             annexes: annexesView(id, annexRows),
-            spots: level >= 2 && zones.has(zone) ? annexSpots(id, taken, places) : [],
+            spots: level && level >= annexes.openLevelOf(id) && zones.has(zone) ? annexSpots(id, taken, places) : [],
             next: next ? step(next) : null
         };
     });
