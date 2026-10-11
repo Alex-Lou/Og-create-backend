@@ -20,20 +20,27 @@ test('ramasser sur la plage de Brumelune : une fois, puis la mer en rapporte ; c
   const id = player.userId;
   assert.equal((await pick(player, 'greve-bois-9')).status, 404);
   for (const bad of ['', 'cratere-1', 'greve-BOIS-1', 'greve-bois-12']) assert.equal((await pick(player, bad)).status, 400, JSON.stringify(bad));
-  assert.equal((await api('POST', '/play/world/pickup', { id: 'greve-galet-2' }, { cookies: {} })).status, 401);
+  assert.equal((await api('POST', '/play/world/pickup', { id: 'greve-galet-1' }, { cookies: {} })).status, 401);
+  // Le premier soir : deux bois flottés et un galet, le prix du feu ; les coquillages attendent le jour de Cannelle
+  assert.deepEqual((await view(player)).pickups.map(p => p.id), ['greve-bois-1', 'greve-galet-1', 'greve-bois-2']);
+  assert.equal((await pick(player, 'greve-coquillage-1')).status, 404);
   // Deux touchers à la fois : un seul ramassage versé
-  const both = await Promise.all([1, 2].map(() => pick(player, 'greve-galet-2')));
+  const both = await Promise.all([1, 2].map(() => pick(player, 'greve-galet-1')));
   assert.deepEqual(both.map(r => r.status).sort(), [200, 409]);
   assert.equal((await view(player)).stock.stone, 2);
   assert.ok((await view(player)).pickups.every(p => p.zone === 'coeur'));
   // Trois heures plus tard, la mer en a rapporté
   await sql(`UPDATE world_deposits SET gathered_at = gathered_at - INTERVAL '3 hours' WHERE user_id = $1`, [id]);
-  assert.equal((await view(player)).pickups.find(p => p.id === 'greve-galet-2').readyIn, 0);
-  assert.equal((await pick(player, 'greve-galet-2')).status, 200);
+  assert.equal((await view(player)).pickups.find(p => p.id === 'greve-galet-1').readyIn, 0);
+  assert.equal((await pick(player, 'greve-galet-1')).status, 200);
   // Une création posée sur la case la cache : rien à ramasser là
-  await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'cloture', 93, 98)`, [id]);
+  await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'cloture', 95, 98)`, [id]);
   assert.equal((await view(player)).pickups.some(p => p.id === 'greve-bois-1'), false);
   assert.equal((await pick(player, 'greve-bois-1')).status, 404);
+  // Au jour de Cannelle, les coquillages
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'veille')`, [id]);
+  assert.deepEqual((await view(player)).pickups.filter(p => p.kind === 'coquillage').map(p => p.id), ['greve-coquillage-1', 'greve-coquillage-2']);
+  assert.deepEqual((await pick(player, 'greve-coquillage-1')).data.gives, { food: 2 });
   // Les ramassages de la plage ne comptent pas pour les gisements (quête « trouvaille »)
   await sql('DELETE FROM world_quests WHERE user_id = $1', [id]);
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'coeur')`, [id]);

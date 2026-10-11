@@ -1,5 +1,5 @@
-// Ce que la mer a rendu, sur la plage de Brumelune (bible, § 9, étape 4 : « ramasser ») : du bois flotté, des coquillages et des
-// galets, à des cases fixes du sable, près du camp. Un toucher en verse un peu dans les réserves (le sac : bois,
+// Ce que la mer a rendu, sur la plage de Brumelune (bible, § 9, étape 4 : « ramasser ») : du bois flotté, des galets, puis des
+// coquillages, à des cases fixes du sable, près du camp. Un toucher en verse un peu dans les réserves (le sac : bois,
 // nourriture, pierre), puis la trouvaille repousse. Les ramassages se gardent comme ceux des gisements de climat
 // (world_deposits, identifiants « greve-… »), sans donnée nouvelle. Fonctions pures.
 
@@ -9,14 +9,19 @@ const KINDS = {
     coquillage: { name: 'Coquillages', gives: { food: 2 } },
     galet: { name: 'Galets', gives: { stone: 2 } }
 };
-// Les cases de la plage : le sable au bord de l'eau, au pied du camp (le cœur de l'île, à soi dès le départ)
+// Les cases de la plage : le sable au bord de l'eau, au pied du camp (le cœur de l'île, à soi dès le départ), toutes
+// sur le sable découvert dès l'arrivée. Le premier soir (choix de l'auteur, 11 oct.) : deux bois flottés et un galet,
+// exactement le prix du feu de camp ; les coquillages, au jour de Cannelle (after : la quête faite avant qu'ils
+// paraissent)
 const SPOTS = [
-    ['greve-bois-1', 'bois', 93, 98], ['greve-coquillage-1', 'coquillage', 95, 98], ['greve-galet-1', 'galet', 98, 98],
-    ['greve-bois-2', 'bois', 100, 98], ['greve-coquillage-2', 'coquillage', 102, 98], ['greve-galet-2', 'galet', 104, 98]
-].map(([id, kind, x, y]) => ({ id, kind, x, y }));
+    ['greve-bois-1', 'bois', 95, 98], ['greve-galet-1', 'galet', 98, 98], ['greve-bois-2', 'bois', 100, 98],
+    ['greve-coquillage-1', 'coquillage', 102, 98, 'veille'], ['greve-coquillage-2', 'coquillage', 103, 98, 'veille']
+].map(([id, kind, x, y, after]) => ({ id, kind, x, y, ...(after ? { after } : {}) }));
+// La trouvaille paraît-elle déjà ? done : les quêtes faites (quests.doneOf)
+const shownFor = (spot, done) => !spot.after || done.has(spot.after);
 const SPOT_BY_ID = Object.fromEntries(SPOTS.map(s => [s.id, s]));
 const PREFIX = 'greve-';
 // Une trouvaille ramassée repousse en 3 h (la mer en rend d'autres)
 const REGROW_MS = 3 * 3600 * 1000;
 
-module.exports = { KINDS, SPOTS, SPOT_BY_ID, PREFIX, REGROW_MS };
+module.exports = { KINDS, SPOTS, SPOT_BY_ID, PREFIX, REGROW_MS, shownFor };

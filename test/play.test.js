@@ -2462,23 +2462,21 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Aster ouvre s
   assert.equal((await claim('pages')).status, 200);
   // La plage de Brumelune : ce que la mer a rendu (v6, étape 4) ; pas de feu encore, le Foyer est à bâtir
   const shore = await view();
-  assert.deepEqual(shore.pickups.map(p => [p.id, p.kind, p.readyIn]).slice(0, 3), [['greve-bois-1', 'bois', 0], ['greve-coquillage-1', 'coquillage', 0], ['greve-galet-1', 'galet', 0]]);
+  assert.deepEqual(shore.pickups.map(p => [p.id, p.kind, p.readyIn]), [['greve-bois-1', 'bois', 0], ['greve-galet-1', 'galet', 0], ['greve-bois-2', 'bois', 0]]);
   assert.deepEqual([shore.sites.find(s => s.id === 'foyer').level, shore.brume.quest.id], [0, 'ramasser']);
   const pick = id => api('POST', '/play/world/pickup', { id }, player);
   const wood = await pick('greve-bois-1');
   assert.deepEqual([wood.status, wood.data.kind, wood.data.gives, wood.data.world.pickups.find(p => p.id === 'greve-bois-1').readyIn > 0], [200, 'bois', { wood: 2 }, true]);
   assert.equal((await pick('greve-bois-1')).status, 409);
   assert.equal((await pick('greve-bois-2')).status, 200);
-  assert.equal((await pick('greve-galet-1')).status, 200);
-  assert.equal((await pick('greve-galet-2')).status, 200);
-  assert.equal((await pick('greve-coquillage-1')).status, 200);
-  const sixth = await pick('greve-coquillage-2');
-  assert.deepEqual([sixth.data.world.stock.wood, sixth.data.world.stock.stone, sixth.data.world.stock.food, sixth.data.world.brume.quest.done], [4, 4, 4, true]);
+  // (trois trouvailles : exactement le prix du feu)
+  const third = await pick('greve-galet-1');
+  assert.deepEqual([third.data.world.stock.wood, third.data.world.stock.stone, third.data.world.stock.food, third.data.world.brume.quest.done], [4, 2, 0, true]);
   assert.equal((await claim('ramasser')).status, 200);
   // Le Brasier n'est appris qu'au moment de bâtir. Le feu ferme la leçon de Brume et fait arriver Aster, pas Cannelle.
   await write(['Brasier']);
   const fire = await api('POST', '/play/world/build', { site: 'foyer' }, player);
-  assert.deepEqual([fire.status, fire.data.world.stock.wood, fire.data.world.stock.stone], [200, 0, 2]);
+  assert.deepEqual([fire.status, fire.data.world.stock.wood, fire.data.world.stock.stone], [200, 0, 0]);
   assert.equal(fire.data.world.brume.quest.done, true);
   assert.equal((await claim('feu')).status, 200);
   // La première nuit : personne ; dormir fait venir Aster au matin, pas Cannelle
