@@ -77,7 +77,7 @@ async function factsOf(userId, owned, stars, conn = db, moods = null) {
     // (lectures indépendantes, ensemble ; dans une transaction, elles passent l'une après l'autre sur sa connexion)
     const count = (sql, params) => countOf(conn, sql, params);
     const [{ levels }, zones, craftRows, filled, lastRows, friends, runs, annexCount, houses, expeditions, found, gathered, pickupCount, hensFed,
-        visitors, settled, names, crateRows] = await Promise.all([
+        visitors, settled, names, crateRows, hensFreed, coops] = await Promise.all([
         levelsOf(userId, conn), zonesOf(userId, conn), craftsOf(userId, conn), needRowsOf(userId, conn),
         conn.query('SELECT MAX(claimed_at) AS at FROM world_quests WHERE user_id = $1', [userId]), friendsOf(userId, conn), runsOf(userId, conn),
         count('SELECT COUNT(*)::int AS n FROM world_annexes WHERE user_id = $1', [userId]),
@@ -94,7 +94,10 @@ async function factsOf(userId, owned, stars, conn = db, moods = null) {
         count('SELECT COUNT(*)::int AS n FROM world_visitors WHERE user_id = $1 AND settled_at IS NOT NULL', [userId]),
         namesOf(userId, conn),
         // Les caisses des personnages ouvertes (world/chests.js : CRATES)
-        conn.query(`SELECT source FROM world_chests WHERE user_id = $1 AND source LIKE 'caisse:%'`, [userId])
+        conn.query(`SELECT source FROM world_chests WHERE user_id = $1 AND source LIKE 'caisse:%'`, [userId]),
+        // La cage des poules ouverte (chacune a sa ligne : world/beasts.js) ; le poulailler de Cannelle posé
+        count('SELECT COUNT(*)::int AS n FROM world_beasts WHERE user_id = $1 AND beast = ANY($2)', [userId, beastRules.HENS]),
+        count('SELECT COUNT(*)::int AS n FROM world_annexes WHERE user_id = $1 AND annex = $2', [userId, 'poulailler'])
     ]);
     const placed = placedOf(craftRows);
     const { places } = await placesOf(userId, conn);
@@ -122,6 +125,8 @@ async function factsOf(userId, owned, stars, conn = db, moods = null) {
         gathered,
         pickups: pickupCount,
         hensFed,
+        hensFreed,
+        coops,
         crates: new Set(crateRows.rows.map(r => r.source.slice('caisse:'.length))),
         visitors,
         settled,

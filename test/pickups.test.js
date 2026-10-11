@@ -48,7 +48,7 @@ test('ramasser sur la plage de Brumelune : une fois, puis la mer en rapporte ; c
   assert.deepEqual([trouvaille.id, trouvaille.done], ['trouvaille', false]);
 });
 
-test('un nouveau compte bâtit son feu ; Aster vient au matin, Cannelle après sa Récolte, Rivet après les poules', async () => {
+test('un nouveau compte bâtit son feu ; Aster vient au matin, Cannelle après sa Récolte, Rivet après la troisième nuit', async () => {
   const player = await newPlayer({ veteran: false });
   const id = player.userId;
   const first = await view(player);
@@ -73,7 +73,10 @@ test('un nouveau compte bâtit son feu ; Aster vient au matin, Cannelle après s
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'recolte'), ($1, 'veille'), ($1, 'soupe')`, [id]);
   const after = await view(player);
   assert.deepEqual([met(after).includes('ponton'), met(after).includes('foyer'), met(after).includes('atelier')], [true, true, false]);
-  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'poules')`, [id]);
+  // Le jour de Cannelle (la cage, ses poules, leur poulailler) ne fait pas encore venir Rivet : sa troisième nuit, si
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'cage'), ($1, 'poules'), ($1, 'poulailler')`, [id]);
+  assert.equal(met(await view(player)).includes('atelier'), false);
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'nuit-cannelle')`, [id]);
   assert.equal(met(await view(player)).includes('atelier'), true);
 });
 
@@ -94,7 +97,7 @@ test('un ancien compte incomplet reprend sur la plage de Brumelune, puis retrouv
   // La soupe réclamée : Rivet, sans attendre les poules
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'soupe')`, [id]);
   const rivet = await view(player);
-  assert.deepEqual([met(rivet).includes('atelier'), rivet.brume.quest.id], [true, 'poules']);
+  assert.deepEqual([met(rivet).includes('atelier'), rivet.brume.quest.id], [true, 'cage']);
   // Le feu bâti ensuite (Abri) passe au palier II comme avant
   assert.equal(foyerOf(rivet), 1);
 });

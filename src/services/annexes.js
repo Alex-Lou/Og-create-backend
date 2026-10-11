@@ -6,6 +6,8 @@
 // - une grande annexe au palier VI.
 // Le Foyer a aussi ses maisons (lot 7d) : jusqu'à 4, ouvertes aux paliers II à V, chacune loge un visiteur qui reste.
 // Annexes de climat (lot 9d) : une par trouvaille de climat, au palier III, payée aussi en trouvailles (finds).
+// Le poulailler de Cannelle (choix de l'auteur, 11 oct. : sa leçon, poser une annexe) : un seul, dès le Feu bâti,
+// gratuit ; ses poules y vivent.
 // Effets : rate = ressources par heure en plus et earn = écus par heure en plus (production du bâtiment, comptée
 // depuis la pose, avec les bonus de production de la boutique) ; cap = heures de production gardées en plus ;
 // charges, regenCut, moves : réserve, retour d'une partie, coups de Récolte (comme la boutique) ; house : un logement.
@@ -13,8 +15,8 @@
 
 const SMALL_LEVELS = [2, 3, 5, 6, 7, 7]; // palier du bâtiment qui ouvre chaque exemplaire d'une petite annexe
 const SMALL_COINS = [100, 250, 600, 1200, 2000, 3000];
-const KIND_LEVEL = { reserve: 4, grand: 6, climate: 3 };
-const KIND_COINS = { reserve: 400, grand: 1200, climate: 500 };
+const KIND_LEVEL = { reserve: 4, grand: 6, climate: 3, coop: 1 };
+const KIND_COINS = { reserve: 400, grand: 1200, climate: 500, coop: 0 };
 const HOUSE_LEVELS = [2, 3, 4, 5]; // palier du Foyer qui ouvre chaque maison
 const HOUSE_COINS = [80, 200, 400, 800];
 const REGEN_FLOOR_MS = 10 * 60 * 1000; // une partie ne revient jamais en moins de 10 minutes
@@ -47,6 +49,7 @@ const ANNEXES = [
     annex('four', 'foyer', 'reserve', 'Four à pain', { stone: 90, wood: 60 }, { regenCut: 5 * 60 * 1000 }),
     annex('belvedere', 'foyer', 'grand', 'Belvédère', { stone: 150, wood: 150 }, { charges: 1 }),
     annex('maison', 'foyer', 'house', 'Maison', { wood: 30, stone: 20 }, { house: 1 }),
+    annex('poulailler', 'foyer', 'coop', 'Poulailler', {}, { hens: 1 }),
     annex('charbon', 'atelier', 'small', 'Tas de charbon', { wood: 40, stone: 20 }, { moves: 1 }),
     annex('hangar', 'atelier', 'reserve', 'Hangar', { wood: 90, stone: 60 }, { moves: 1 }),
     annex('fourneau', 'atelier', 'grand', 'Haut fourneau', { stone: 180, wood: 80, water: 40 }, { moves: 2 }),
@@ -102,6 +105,7 @@ function effectText(a, words, capHours) {
     if (e.regenCut) return `Une partie revient ${Math.round(e.regenCut / 60000)} min plus vite`;
     if (e.moves) return `+${e.moves} coup${e.moves > 1 ? 's' : ''} par Récolte`;
     if (e.house) return 'Loge un visiteur qui veut rester sur l’île';
+    if (e.hens) return 'Un toit pour les poules de Cannelle';
     return '';
 }
 

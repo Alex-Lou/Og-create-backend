@@ -26,11 +26,14 @@ async function herdOf(userId, conn) {
     const freed = freedOf(rows);
     return { level, freed, rows, herd: beasts.beastsOf(level, freed) };
 }
-// La cage des poules, au camp : 'ouverte', 'coincee' (sous les rochers, dès que Cannelle est là), ou null (pas encore)
+// La cage des poules, au camp : 'ouverte', 'coincee' (dès que Cannelle est là ; sur une île neuve, échouée par la mer
+// près du Ponton une fois sa soupe faite : le jour de Cannelle, choix de l'auteur, 11 oct.), ou null (pas encore)
 async function cageOf(userId, conn = db) {
     if (freedOf(await rowsOf(userId, conn))) return 'ouverte';
     const { levels } = await levelsOf(userId, conn);
-    return metOf('foyer', levels, await zonesOf(userId, conn), await presenceOf(userId, conn)) ? 'coincee' : null;
+    const presence = await presenceOf(userId, conn);
+    if (presence.fresh && !presence.veteran && !presence.done.has('soupe')) return null;
+    return metOf('foyer', levels, await zonesOf(userId, conn), presence) ? 'coincee' : null;
 }
 
 // Ouvrir la cage (un toucher, une fois) : Paprika, Brioche et Madame sortent, affamées (on les nourrit depuis leur

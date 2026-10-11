@@ -52,8 +52,13 @@ const QUESTS = [
     // Cannelle arrivera au matin
     q('veille', 'T', { kind: 'sleep', site: 'foyer' }, 0),
     q('soupe', 'T', { kind: 'need', villager: 'foyer', what: 'manger' }, 15),
-    // (v6, étape 8 : les poules de la cuisine du navire, coincées sous les rochers ; nourries, elles pondent)
-    q('poules', 'T', { kind: 'hens', need: 1 }, 10),
+    // Le jour de Cannelle (choix de l'auteur, 11 oct.) : la cage de ses poules arrive par la mer, près du Ponton ; on
+    // l'ouvre, on attrape les poules (le jeu), on les nourrit toutes les trois ; puis leur poulailler, sa leçon à elle
+    // (poser une annexe) ; et la troisième nuit, avant Rivet. (Les œufs viendront plus tard, avec le coq.)
+    q('cage', 'T', { kind: 'cage' }, 10),
+    q('poules', 'T', { kind: 'hens', need: 3 }, 10),
+    q('poulailler', 'T', { kind: 'coop' }, 15),
+    q('nuit-cannelle', 'T', { kind: 'sleep', site: 'foyer' }, 0),
     // (sa première création : une lanterne, la suite des clôtures ; au tutoriel, sans palier ni éléments : crafts.js,
     // TUTORIAL_CRAFTS)
     q('deco', 'T', { kind: 'craft', craft: 'lanterne' }, 15),
@@ -196,6 +201,9 @@ const HAVE = {
     gather: (goal, facts) => facts.gathered,
     pickup: (goal, facts) => facts.pickups,
     hens: (goal, facts) => facts.hensFed,
+    // La cage ouverte (ses poules libérées) ; le poulailler de Cannelle posé
+    cage: (goal, facts) => (facts.hensFreed ? 1 : 0),
+    coop: (goal, facts) => (facts.coops ? 1 : 0),
     crate: (goal, facts) => (facts.crates.has(goal.crate) ? 1 : 0),
     visitor: (goal, facts) => facts.visitors,
     settle: (goal, facts) => facts.settled,
