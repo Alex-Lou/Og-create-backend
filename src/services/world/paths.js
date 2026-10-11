@@ -10,7 +10,7 @@ const map = require('../worldMap');
 const landmarks = require('../landmarks');
 const finds = require('../finds');
 const { SIZE } = require('./rules');
-const { STATIC, inSiteAt, PLAGE } = require('./places');
+const { STATIC, inFootprintAt, PLAGE } = require('./places');
 
 const MARK = 'ile:sentiers';
 const PREFIX = 'chemin:';
@@ -119,14 +119,16 @@ function linked(ground, a, b) {
 }
 
 // Ce qui empêche de tracer un chemin sur (x, y) (texte), ou null. ctx : { ground(x, y), zones (à soi), taken (clés des
-// cases prises : annexes, créations posées, camp), laid (clés déjà tracées), places (où sont les bâtiments) }
+// cases prises : annexes, créations posées, camp), laid (clés déjà tracées), places (où sont les bâtiments), levels
+// (leurs paliers) }. Un bâtiment ne prend que son emprise du moment (choix de l'auteur, 11 oct. : le chemin touche le
+// bâtiment, sans case d'écart) : sa place réservée peut porter un chemin, effacé quand il grandit (world.js, build)
 function layBlock(x, y, ctx) {
     if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= SIZE || y >= SIZE) return 'Case hors de l’île.';
     if (!ctx.zones.has(map.zoneAt(x, y))) return 'Trace tes chemins dans tes quartiers.';
     const g = ctx.ground(x, y);
     if (isPath(g)) return 'Il y a déjà un chemin ici.';
     if (!['g', 's', 'm'].includes(g)) return 'Un chemin se trace sur l’herbe, le sable ou la prairie.';
-    if (inSiteAt(ctx.places || STATIC, x, y) || landmarks.isLandmark(x, y) || finds.isDeposit(x, y) || ctx.taken.has(y * SIZE + x)) return 'Cette case est occupée.';
+    if (inFootprintAt(ctx.places || STATIC, x, y, ctx.levels || {}) || landmarks.isLandmark(x, y) || finds.isDeposit(x, y) || ctx.taken.has(y * SIZE + x)) return 'Cette case est occupée.';
     return null;
 }
 

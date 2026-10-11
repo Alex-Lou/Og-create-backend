@@ -26,7 +26,8 @@ const BEACH = {
     // (rapproché du Feu de trois cases, choix de l'auteur, 11 oct. : on se rapproche pour s'entraider)
     ponton: { x: 90, y: 97 },
     atelier: { x: 95, y: 82 },
-    puits: { x: 86, y: 86 },
+    // (contre le village, entre le ruisseau et le sentier, choix de l'auteur, 11 oct. : les bases ensemble)
+    puits: { x: 88, y: 86 },
     carriere: { x: 86, y: 69 },
     potager: { x: 73, y: 70 },
     bosquet: { x: 72, y: 86 }

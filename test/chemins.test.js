@@ -12,9 +12,9 @@ test.after(() => server?.kill());
 const view = async player => (await api('GET', '/play/world', null, player)).data;
 const at = (w, x, y) => w.map.ground[y][x];
 const draw = (player, lay, erase = []) => api('POST', '/play/world/paths', { lay, erase }, player);
-// Du Puits d'Ondin (île à la plage : palier I, 2 × 2 en 87, 87, dans sa zone à l'ouest) au sentier du Feu : six cases
+// Du Puits d'Ondin (île à la plage : palier I, 2 × 2 en 89, 87, contre le village) au sentier du Feu : quatre cases
 // vers l'est, sous le Puits, jusqu'au haut du sentier (95, 89)
-const LINK = [[89, 89], [90, 89], [91, 89], [92, 89], [93, 89], [94, 89]];
+const LINK = [[91, 89], [92, 89], [93, 89], [94, 89]];
 
 test('une île neuve n’a que son sentier ; une île d’avant garde ses routes', async () => {
     const fresh = await newPlayer();
@@ -93,6 +93,14 @@ test('la quête du premier chemin : relier le Puits au Feu', async () => {
       ON CONFLICT (user_id, site) DO UPDATE SET level = EXCLUDED.level`, [player.userId]);
     const before = await view(player);
     assert.deepEqual([before.brume.quest.id, before.brume.quest.done], ['chemin', false]);
+    // Le chemin touche le bâtiment (choix de l'auteur, 11 oct.) : la place réservée derrière le Puits encore petit (sa
+    // grande emprise, 88-90 × 86-88) se trace ; le Puits lui-même, non
+    const puits = before.sites.find(s => s.id === 'puits');
+    assert.deepEqual([puits.x, puits.y, puits.w], [89, 87, 2]);
+    assert.equal((await draw(player, [[89, 87]])).status, 400);
+    const behind = await draw(player, [[88, 87]]);
+    assert.equal(behind.status, 200, JSON.stringify(behind.data));
+    assert.equal((await draw(player, [], [[88, 87]])).status, 200);
     const linked = await draw(player, LINK);
     assert.equal(linked.status, 200, JSON.stringify(linked.data));
     assert.equal(linked.data.world.brume.quest.done, true);

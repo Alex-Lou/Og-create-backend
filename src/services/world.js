@@ -262,7 +262,7 @@ async function layPaths(userId, lay, erase) {
         const placed = placedOf(craftRows);
         const camp = cellsOfCamp(await campOfUser(userId, conn, { levels, annexRows, craftRows }));
         const plan = paths.planOf(lay, erase, roads.laid, stock, {
-            fresh: roads.fresh, ground: roads.ground, zones: await zonesOf(userId, conn), places: (await placesOf(userId, conn)).places,
+            fresh: roads.fresh, ground: roads.ground, zones: await zonesOf(userId, conn), places: (await placesOf(userId, conn)).places, levels,
             taken: new Set([...annexRows.map(keyOf), ...placed.map(keyOf), ...camp]),
             placedNeedingPath: placed.filter(r => crafts.CRAFT_BY_ID[r.craft]?.place.path).map(r => ({ x: r.x, y: r.y, name: crafts.CRAFT_BY_ID[r.craft].name }))
         });
@@ -600,6 +600,15 @@ async function buyZone(userId, zoneId, openChapters, owned = []) {
 // pas encore à soi. Les paliers suivants suivent la règle
 const tutorialPonton = (siteId, level, presence) => siteId === 'ponton' && !level && !presence.veteran;
 
+// Les chemins tracés dans l'emprise f { x, y, w, h } s'effacent ; leurs pierres (pas celles des cases offertes) reviennent
+async function clearGrown(userId, conn, f) {
+    const items = [];
+    for (let y = f.y; y < f.y + f.h; y++) for (let x = f.x; x < f.x + f.w; x++) items.push(`${paths.PREFIX}${x}:${y}`);
+    const { rows } = await conn.query('DELETE FROM world_items WHERE user_id = $1 AND item = ANY($2) RETURNING source', [userId, items]);
+    const back = rows.filter(r => r.source !== 'offert').length;
+    if (back) await conn.query('UPDATE world_stock SET stone = stone + $2 WHERE user_id = $1', [userId, back]);
+}
+
 // Construit le palier suivant d'un chantier : chapitre du palier ouvert dans le Livre, plan découvert, ressources,
 // écus (débités une seule fois, même en double clic). openChapters : Set des chapitres ouverts.
 // Les décorations prises dans une emprise agrandie sont déplacées au prochain affichage (settle). { status, message } si refus
@@ -632,6 +641,8 @@ async function build(userId, owned, siteId, openChapters = new Set()) {
         await conn.query(
             `INSERT INTO world_buildings (user_id, site, level) VALUES ($1, $2, $3)
              ON CONFLICT (user_id, site) DO UPDATE SET level = EXCLUDED.level, built_at = NOW()`, [userId, siteId, level + 1]);
+        // Il grandit (3 × 3) : les chemins tracés sur sa place réservée s'effacent, leurs pierres rendues (world/paths.js)
+        if (level + 1 === map.BIG_FROM) await clearGrown(userId, conn, footprintAt((await placesOf(userId, conn)).places, siteId, level + 1));
         return { built: next.name, ...(coins !== undefined ? { coins } : {}) };
     });
 }

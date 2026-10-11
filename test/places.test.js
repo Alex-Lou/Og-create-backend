@@ -15,7 +15,7 @@ test('les places : la carte, la plage, puis le joueur', () => {
   assert.deepEqual(beach.foyer, places.BEACH.foyer);
   // Une île à la plage : chaque personnage a sa zone, son bâtiment au milieu (le Puits d'Ondin à l'ouest, près du
   // ruisseau) ; une île d'avant garde les places de la carte
-  assert.deepEqual(beach.puits, { x: 86, y: 86 });
+  assert.deepEqual(beach.puits, { x: 88, y: 86 });
   assert.deepEqual(places.STATIC.puits, map.SITE_BIG.puits);
   assert.deepEqual(places.placesFrom({ beach: true, rows: [{ site: 'foyer', x: 90, y: 92 }, { site: 'inconnu', x: 1, y: 1 }] }).foyer, { x: 90, y: 92 });
   // Emprise : le coin avant (2 × 2) avant le palier IV, la grande ensuite ; réservée en entier dès le départ
