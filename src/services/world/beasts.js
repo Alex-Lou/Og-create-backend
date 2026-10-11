@@ -27,7 +27,7 @@ async function herdOf(userId, conn) {
     return { level, freed, rows, herd: beasts.beastsOf(level, freed) };
 }
 // La cage des poules, au camp : 'ouverte', 'coincee' (dès que Cannelle est là ; sur une île neuve, échouée par la mer
-// près du Ponton une fois sa soupe faite : le jour de Cannelle, choix de l'auteur, 11 oct.), ou null (pas encore)
+// au bout de la plage une fois sa soupe faite : le jour de Cannelle, choix de l'auteur, 11 oct.), ou null (pas encore)
 async function cageOf(userId, conn = db) {
     if (freedOf(await rowsOf(userId, conn))) return 'ouverte';
     const { levels } = await levelsOf(userId, conn);

@@ -49,7 +49,7 @@ const QUEST_TEXTS = {
     },
     cage: {
         label: 'Ouvre la cage des poules',
-        say: 'Des caquets sur l’eau… La cage du navire s’est échouée près du Ponton. Ouvre-la avec Cannelle.'
+        say: 'Des caquets sur l’eau… La cage du navire s’est échouée au bout de la plage. Ouvre-la avec Cannelle.'
     },
     poules: {
         label: 'Nourris les trois poules',

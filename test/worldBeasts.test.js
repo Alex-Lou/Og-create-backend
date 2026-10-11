@@ -14,7 +14,7 @@ const herdOf = async player => (await api('GET', '/play/world', null, player)).d
 const withCannelle = id => sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'recolte'), ($1, 'veille') ON CONFLICT DO NOTHING`, [id]);
 const cageOf = async player => ((await api('GET', '/play/world', null, player)).data.camp || []).find(c => c.id === 'cage') || null;
 
-test('la cage de Cannelle : échouée près du Ponton une fois sa soupe faite, ouverte une fois ; Paprika, Brioche et Madame en sortent', async () => {
+test('la cage de Cannelle : échouée au bout de la plage une fois sa soupe faite, ouverte une fois ; Paprika, Brioche et Madame en sortent', async () => {
   // Un compte d'après la bible (un ancien compte a déjà Cannelle, et la cage à ouvrir)
   const player = await newPlayer({ veteran: false });
   const id = player.userId;
@@ -25,12 +25,12 @@ test('la cage de Cannelle : échouée près du Ponton une fois sa soupe faite, o
   assert.equal((await open()).status, 403);
   assert.deepEqual([(await api('POST', '/play/world/beast/feed', { beast: 'poule-rousse' }, player)).data.message], ['Ouvre d’abord la cage des poules, au camp.']);
   // Cannelle est là, affamée : pas encore de cage (son jour commence par la soupe) ; la soupe faite, la cage s'échoue
-  // près du Ponton, entre lui et l'épave
+  // au bout de la plage, dans le coin de Cannelle
   await withCannelle(id);
   assert.equal(await cageOf(player), null);
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'soupe')`, [id]);
   const cage = await cageOf(player);
-  assert.deepEqual([cage.art, cage.x, cage.y], ['cage_coincee', 95, 98]);
+  assert.deepEqual([cage.art, cage.x, cage.y], ['cage_coincee', 101, 98]);
   const opened = await open();
   assert.equal(opened.status, 200);
   assert.deepEqual(opened.data.hens, ['Paprika', 'Brioche', 'Madame']);

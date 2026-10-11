@@ -52,7 +52,7 @@ const QUESTS = [
     // Cannelle arrivera au matin
     q('veille', 'T', { kind: 'sleep', site: 'foyer' }, 0),
     q('soupe', 'T', { kind: 'need', villager: 'foyer', what: 'manger' }, 15),
-    // Le jour de Cannelle (choix de l'auteur, 11 oct.) : la cage de ses poules arrive par la mer, près du Ponton ; on
+    // Le jour de Cannelle (choix de l'auteur, 11 oct.) : la cage de ses poules arrive par la mer, au bout de la plage ; on
     // l'ouvre, on attrape les poules (le jeu), on les nourrit toutes les trois ; puis leur poulailler, sa leçon à elle
     // (poser une annexe) ; et la troisième nuit, avant Rivet. (Les œufs viendront plus tard, avec le coq.)
     q('cage', 'T', { kind: 'cage' }, 10),
