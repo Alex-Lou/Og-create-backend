@@ -6,7 +6,8 @@
 // Ce que donne chaque sorte, versé dans les réserves
 const KINDS = {
     bois: { name: 'Bois flotté', gives: { wood: 2 } },
-    coquillage: { name: 'Coquillages', gives: { food: 2 } },
+    // (deux coquillages : la soupe de Cannelle, dix vivres, le jour de Cannelle ; choix de l'auteur, 11 oct.)
+    coquillage: { name: 'Coquillages', gives: { food: 5 } },
     galet: { name: 'Galets', gives: { stone: 2 } }
 };
 // Les cases de la plage : le sable au bord de l'eau, au pied du camp (le cœur de l'île, à soi dès le départ), toutes

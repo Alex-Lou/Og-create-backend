@@ -2551,7 +2551,7 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Aster ouvre s
   // (la soupe a tout mangé : des coquillages ramassés sur la plage font le repas d'une poule)
   assert.equal((await api('POST', '/play/world/beast/feed', { beast: 'poule-rousse' }, player)).status, 400);
   await sql(`UPDATE world_deposits SET gathered_at = gathered_at - INTERVAL '3 hours' WHERE user_id = $1 AND deposit = 'greve-coquillage-1'`, [player.userId]);
-  assert.deepEqual((await pick('greve-coquillage-1')).data.gives, { food: 2 });
+  assert.deepEqual((await pick('greve-coquillage-1')).data.gives, { food: 5 });
   assert.equal((await api('POST', '/play/world/beast/feed', { beast: 'poule-rousse' }, player)).status, 200);
   assert.equal((await view()).brume.quest.done, false);
   await sql('UPDATE world_stock SET food = 4 WHERE user_id = $1', [player.userId]);

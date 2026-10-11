@@ -40,12 +40,19 @@ test('ramasser sur la plage de Brumelune : une fois, puis la mer en rapporte ; c
   // Au jour de Cannelle, les coquillages
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'veille')`, [id]);
   assert.deepEqual((await view(player)).pickups.filter(p => p.kind === 'coquillage').map(p => p.id), ['greve-coquillage-1', 'greve-coquillage-2']);
-  assert.deepEqual((await pick(player, 'greve-coquillage-1')).data.gives, { food: 2 });
+  assert.deepEqual((await pick(player, 'greve-coquillage-1')).data.gives, { food: 5 });
   // Les ramassages de la plage ne comptent pas pour les gisements (quête « trouvaille »)
   await sql('DELETE FROM world_quests WHERE user_id = $1', [id]);
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'coeur')`, [id]);
   const trouvaille = (await view(player)).brume.quest;
   assert.deepEqual([trouvaille.id, trouvaille.done], ['trouvaille', false]);
+});
+
+test('les trouvailles de la plage paient chacune leur leçon : deux bois et un galet le feu, deux coquillages la soupe de Cannelle', () => {
+    const pickups = require('../src/services/pickups');
+    const villagers = require('../src/services/villagers');
+    const gives = (after, resource) => pickups.SPOTS.filter(s => (s.after || null) === after).reduce((n, s) => n + (pickups.KINDS[s.kind].gives[resource] || 0), 0);
+    assert.ok(gives('veille', 'food') >= villagers.NEEDS.manger.cost.food);
 });
 
 test('un nouveau compte bâtit son feu ; Aster vient au matin, Cannelle après sa Récolte, Rivet après la troisième nuit', async () => {
