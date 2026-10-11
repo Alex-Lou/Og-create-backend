@@ -4,12 +4,13 @@ const crypto = require('crypto');
 const db = require('../../config/db');
 const map = require('../worldMap');
 const crafts = require('../crafts');
+const quests = require('../quests');
 const landmarks = require('../landmarks');
 const finds = require('../finds');
 const { SIZE, CRAFT_TTL_MS, keyOf } = require('./rules');
 const { annexesOf, levelsOf, stockOf, zonesOf, findsOf, spendFinds, craftsOf, placedOf, madeOf } = require('./reads');
 const { migrate } = require('./migrate');
-const { livesHere } = require('./people');
+const { livesHere, presenceOf } = require('./people');
 const { STATIC, footprintAt, inFootprintAt, placesOf } = require('./places');
 const { campOfUser, cellsOfCamp } = require('./camp');
 const { gatherBefore, payWith } = require('./produce');
@@ -57,6 +58,14 @@ async function stowCrafts(userId, rows, levels, zones, annexRows, places = STATI
         [userId, out.map(r => r.id), out.map(r => r.x), out.map(r => r.y)]);
     return craftsOf(userId);
 }
+// Ce que le tutoriel fait fabriquer sans palier ni éléments (crafts.TUTORIAL_CRAFTS), pendant sa leçon seulement (la
+// lanterne de Rivet : la quête « deco » en cours) ; rien pour un compte d'avant la bible. presence : people.presenceOf
+const LESSON = 'deco';
+const tutorialOf = presence => {
+    const current = quests.QUESTS.find(q => !presence.done.has(q.id));
+    return !presence.veteran && current && current.id === LESSON ? crafts.TUTORIAL_CRAFTS : new Set();
+};
+
 // Questions de l'Épreuve réussies (progress.timer_progress : niveau → catégorie → identifiants)
 async function epreuvesOf(userId, conn = db) {
     const { rows } = await conn.query('SELECT timer_progress FROM progress WHERE user_id = $1', [userId]);
@@ -67,7 +76,8 @@ async function epreuvesOf(userId, conn = db) {
 // où poser ou déplacer une création déjà fabriquée), créations posées. Une création posée dont d'autres ont besoin
 // (règle « près de ») dit lesquelles : keeps = leurs cases et leur portée (elle ne se déplace qu'à portée de chacune),
 // keepText = pourquoi elle ne se range pas (crafts.leaveBlock)
-function craftsView(rows, ctx, { owned, stock, open, epreuves, stars = 0, have }, siteName) {
+function craftsView(rows, ctx, { owned, stock, open, epreuves, stars = 0, have, presence = null }, siteName) {
+    const tutorial = presence ? tutorialOf(presence) : new Set();
     const made = madeOf(rows);
     const placed = placedOf(rows);
     const keepsOf = r => {
@@ -85,8 +95,9 @@ function craftsView(rows, ctx, { owned, stock, open, epreuves, stars = 0, have }
             const reserve = rows.filter(r => r.craft === c.id && r.x === null).length;
             return {
                 id: c.id, name: c.name, tier: c.tier, cost: c.cost, finds: c.finds, elements: c.elements.map(name => ({ name, have: owned.has(name) })),
-                after: c.after, open: open.has(c.tier), made: made[c.id] || 0, reserve, climate: c.place.climate || null,
-                block: crafts.blockOf(c, { made, owned, stock, open, have }), place: crafts.placeText(c, siteName),
+                // (tutorial : la leçon du tutoriel la fait fabriquer avant son palier ; le front ouvre l'établi sur elle)
+                after: c.after, open: open.has(c.tier) || tutorial.has(c.id), tutorial: tutorial.has(c.id), made: made[c.id] || 0, reserve, climate: c.place.climate || null,
+                block: crafts.blockOf(c, { made, owned, stock, open, have, tutorial: tutorial.has(c.id) }), place: crafts.placeText(c, siteName),
                 spots: made[c.id] ? craftSpots(c, ctx) : []
             };
         }),
@@ -105,7 +116,8 @@ async function startCraft(userId, craftId, owned, finished, stars = 0) {
         // Ce qui attend dans les bâtiments est encaissé d'abord : cela compte pour les matériaux
         const { stock, balance } = await payWith(userId, conn, await stockOf(userId, conn, true));
         const open = crafts.tiersOpen(finished, await epreuvesOf(userId, conn), stars);
-        const block = crafts.blockOf(c, { made: madeOf(await craftsOf(userId, conn)), owned: new Set(owned), stock, open, have: await findsOf(userId, conn) });
+        const tutorial = tutorialOf(await presenceOf(userId, conn)).has(c.id);
+        const block = crafts.blockOf(c, { made: madeOf(await craftsOf(userId, conn)), owned: new Set(owned), stock, open, have: await findsOf(userId, conn), tutorial });
         if (block) return db.rollback({ status: 403, message: block });
         const seed = crypto.randomInt(1, 2147483647);
         const { rows } = await conn.query('INSERT INTO world_craft_runs (user_id, craft, seed) VALUES ($1, $2, $3) RETURNING id', [userId, craftId, seed]);
@@ -133,7 +145,8 @@ function finishCraft(userId, runId, layout, owned, finished, stars = 0) {
         // Entre le début et la fin, le stock ou le Livre ont pu changer ; ce qui attend dans les bâtiments compte encore
         const { stock: paid, balance } = await payWith(userId, conn, stock);
         const open = crafts.tiersOpen(finished, await epreuvesOf(userId, conn), stars);
-        const block = crafts.blockOf(c, { made: madeOf(await craftsOf(userId, conn)), owned: new Set(owned), stock: paid, open, have: await findsOf(userId, conn) });
+        const tutorial = tutorialOf(await presenceOf(userId, conn)).has(c.id);
+        const block = crafts.blockOf(c, { made: madeOf(await craftsOf(userId, conn)), owned: new Set(owned), stock: paid, open, have: await findsOf(userId, conn), tutorial });
         if (block) return { status: 409, message: block };
         const n = r => c.cost[r] || 0;
         await conn.query('UPDATE world_stock SET stone = stone - $2, wood = wood - $3, water = water - $4, food = food - $5 WHERE user_id = $1',

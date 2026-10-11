@@ -171,13 +171,19 @@ function tiersOpen(finished, epreuves, stars = 0) {
     return open;
 }
 
+// Les créations que le tutoriel fait fabriquer avant leur palier et leurs éléments (la lanterne de Rivet, sa première
+// leçon à l'établi, choix de l'auteur, 11 oct.) : world/creations.js les passe à blockOf (tutorial) tant qu'elle n'est
+// pas faite
+const TUTORIAL_CRAFTS = new Set(['lanterne']);
+
 // Ce qui empêche de fabriquer une création (texte), ou null. made : { création: nombre fabriqué } ; owned : Set des
-// éléments du Livre ; stock : ressources ; open : paliers ouverts ; have : trouvailles de climat
-function blockOf(c, { made, owned, stock, open, have = {} }) {
-    if (!open.has(c.tier)) return c.tier === 'I' ? `Palier I : inscris ${STARS} découvertes au Grimoire, ou réussis ${EPREUVES} questions de l’Épreuve.` : `Palier ${c.tier} : finis le chapitre ${c.tier} du Grimoire.`;
+// éléments du Livre ; stock : ressources ; open : paliers ouverts ; have : trouvailles de climat ; tutorial : le
+// tutoriel la fait fabriquer (ni palier ni éléments)
+function blockOf(c, { made, owned, stock, open, have = {}, tutorial = false }) {
+    if (!tutorial && !open.has(c.tier)) return c.tier === 'I' ? `Palier I : inscris ${STARS} découvertes au Grimoire, ou réussis ${EPREUVES} questions de l’Épreuve.` : `Palier ${c.tier} : finis le chapitre ${c.tier} du Grimoire.`;
     const before = c.after.filter(id => !made[id]);
     if (before.length) return `Fabrique d’abord : ${before.map(id => CRAFT_BY_ID[id].name).join(', ')}.`;
-    const unknown = c.elements.filter(e => !owned.has(e));
+    const unknown = tutorial ? [] : c.elements.filter(e => !owned.has(e));
     if (unknown.length) return `Il faut savoir faire : ${unknown.join(', ')} (Grimoire).`;
     if (Object.entries(c.cost).some(([r, n]) => (stock[r] || 0) < n)) return 'Il te manque des ressources : joue une Récolte.';
     const short = Object.entries(c.finds).find(([f, n]) => (have[f] || 0) < n);
@@ -243,6 +249,6 @@ function leaveBlock(row, x, y, placed) {
 }
 
 module.exports = {
-    EPREUVES, STARS, TIERS, PIECE_MAX, TURNED, CRAFTS, CRAFT_BY_ID, cellsOf, mulberry32, normal, turn, piecesOf, check, tiersOpen, blockOf, placeText, gapTo, spotBlock,
+    EPREUVES, STARS, TIERS, TUTORIAL_CRAFTS, PIECE_MAX, TURNED, CRAFTS, CRAFT_BY_ID, cellsOf, mulberry32, normal, turn, piecesOf, check, tiersOpen, blockOf, placeText, gapTo, spotBlock,
     strandedBy, leaveBlock
 };

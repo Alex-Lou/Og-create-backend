@@ -30,7 +30,7 @@ const QUESTS = [
     q('pages', 'T', { kind: 'element', element: 'Vent' }, 20, 'Découvre ta première recette : le Vent',
         'Le Grimoire s’est ouvert pour toi. Mêle l’Air à l’Air dans l’Athanor : que le Vent chasse la brume du rivage.'),
     q('ramasser', 'T', { kind: 'pickup', need: 3 }, 10, 'Ramasse les trois trouvailles du rivage',
-        'Du bois flotté, un galet. Ramasse les trois trouvailles : de quoi bâtir notre premier feu.'),
+        'Deux bois flottés, un galet : ramasse les trois trouvailles, de quoi bâtir notre premier feu.'),
     // Le premier feu est réellement bâti avec les trouvailles ; c'est le Foyer au palier I.
     q('feu', 'T', { kind: 'level', site: 'foyer', need: 1 }, 15, 'Allume le Feu de camp',
         'Ceux d’avant faisaient un cercle de pierres, et le bois au milieu. Bâtis le feu ici, sur la plage de Brumelune : tes trouvailles suffiront.'),
@@ -52,19 +52,21 @@ const QUESTS = [
     q('chemin-aster', 'T', { kind: 'link', from: 'ponton', to: 'foyer' }, 15, 'Relie le Ponton au Feu',
         'Deux camps, un seul chemin : trace-le du Ponton jusqu’au Feu. Les premières pierres sont offertes.'),
     // (ses quatre piquets, dans sa caisse : world/chests.js, CRATES ; une clôture barre la route d'un égaré, nights.js)
-    q('clotures', 'T', { kind: 'craft', craft: 'cloture', need: 4 }, 15, 'Pose les quatre clôtures du camp',
-        'Les piquets d’Aster : plante-les autour du camp. La nuit, des égarés rôdent parfois.'),
+    q('clotures', 'T', { kind: 'craft', craft: 'cloture', need: 4 }, 15, 'Barre le passage des égarés',
+        'Brume l’a dit : ils viendront du nord. Plante les quatre piquets en travers de leur passage.'),
     // La deuxième nuit (choix de l'auteur, 10 oct. : un personnage par jour) : la journée d'Aster finit autour du feu ;
     // Cannelle arrivera au matin
     q('veille', 'T', { kind: 'sleep', site: 'foyer' }, 0, 'Passe ta deuxième nuit',
         'Deux, ce soir, autour du feu. Dors : je veille.'),
     q('soupe', 'T', { kind: 'need', villager: 'foyer', what: 'manger' }, 15, 'Une soupe pour Cannelle',
-        'Cannelle grelotte… Sa bulle dit ce qui lui manque. Donne-lui de quoi manger, depuis sa fiche.'),
+        'Cannelle grelotte… Touche la bulle au-dessus d’elle : un repas chaud, et elle reprend des couleurs.'),
     // (v6, étape 8 : les poules de la cuisine du navire, coincées sous les rochers ; nourries, elles pondent)
     q('poules', 'T', { kind: 'hens', need: 1 }, 10, 'Nourris les poules',
         'Des caquets, sous les rochers… La cage du navire ! Ouvre-la, puis nourris les poules depuis leur fiche.'),
-    q('deco', 'T', { kind: 'crafts', need: 1 }, 15, 'Pose ta première création sur l’île',
-        'Rivet a monté un établi près du feu. Assemble une Clôture, puis pose-la là où l’île brille d’or.'),
+    // (sa première création : une lanterne, la suite des clôtures ; au tutoriel, sans palier ni éléments : crafts.js,
+    // TUTORIAL_CRAFTS)
+    q('deco', 'T', { kind: 'craft', craft: 'lanterne' }, 15, 'Fabrique ta première lanterne',
+        'Rivet a monté un établi près du feu. Assemble une Lanterne, puis pose-la au bord d’un chemin, là où l’île brille d’or.'),
     q('eveil-ondin', 'T', { kind: 'wake', villager: 'puits' }, 10, 'Réveille Ondin',
         'Un petit dort contre un rocher, sa baguette à la main. Parle-lui doucement : la brume endort, sans faire de mal.'),
     q('souvenir-ondin', 'T', { kind: 'element', element: 'Puits' }, 20, 'Rends son don à Ondin : fais naître le Puits',

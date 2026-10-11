@@ -2515,10 +2515,10 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Aster ouvre s
   assert.deepEqual([built2.level, built2.locked, built2.next.plan], [1, false, 'Port']);
   assert.equal((await api('POST', '/play/world/build', { site: 'ponton' }, player)).status, 403);
   assert.equal((await claim('premier-ponton')).status, 200);
-  // Le chemin entre son camp et le nôtre : du Ponton jusqu'au sentier du Feu (cases tracées, offertes)
+  // Le chemin entre son camp et le nôtre : du Ponton (contre l'épave) jusqu'au sentier du Feu (cases tracées, offertes)
   const road = await view();
   assert.deepEqual([road.brume.quest.id, road.brume.quest.kind, road.brume.quest.target, road.brume.quest.done], ['chemin-aster', 'link', { site: 'ponton' }, false]);
-  const trail = [[93, 98], [93, 97], [93, 96], [94, 96], [94, 95]];
+  const trail = [[95, 97], [95, 96]];
   await sql(`INSERT INTO world_items (user_id, item, source) SELECT $1, unnest($2::text[]), 'offert'`, [player.userId, trail.map(([x, y]) => `chemin:${x}:${y}`)]);
   assert.equal((await view()).brume.quest.done, true);
   assert.equal((await claim('chemin-aster')).status, 200);
@@ -2553,9 +2553,13 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Aster ouvre s
   const hen = await api('POST', '/play/world/beast/feed', { beast: 'poule-rousse' }, player);
   assert.deepEqual([hen.status, hen.data.world.brume.quest.done], [200, true]);
   assert.equal((await claim('poules')).status, 200);
-  // Rivet est là ; la Clôture posée, Ondin attend déjà au Puits (plus de quartier à acheter)
-  assert.deepEqual(who(await view(), 'atelier').built, false);
-  await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'cloture', $2, $3)`, [player.userId, X(31), Y(35)]);
+  // Rivet est là ; sa lanterne (au tutoriel, sans palier ni éléments) posée, Ondin attend déjà au Puits (plus de
+  // quartier à acheter)
+  const rivet = await view();
+  assert.deepEqual(who(rivet, 'atelier').built, false);
+  const lantern = rivet.crafts.catalog.find(c => c.id === 'lanterne');
+  assert.ok(!/Palier|savoir faire/.test(lantern.block || ''), lantern.block);
+  await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'lanterne', $2, $3)`, [player.userId, X(31), Y(35)]);
   assert.equal((await claim('deco')).status, 200);
   assert.equal(await coinsOf(player), 155);
   // Ondin dort au Puits : on le réveille en lui parlant
