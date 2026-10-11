@@ -11,7 +11,7 @@
 // - wake : un habitant réveillé (amitié > 0) ; heart : un cœur ;
 // - expedition : expéditions revenues ; landmark : lieux découverts (ou un lieu précis) ; gather : gisements ramassés ;
 // - pickup : trouvailles de la plage de Brumelune ramassées (bois flotté, galets, coquillages : services/pickups.js) ;
-// - hens : poules de Cannelle nourries et encore rassasiées ;
+// - hens : poules de Cannelle nourries et encore rassasiées ; crate : la caisse d'un personnage ouverte (world/chests.js) ;
 // - visitor : voyageurs comblés ; settle : voyageurs installés ; name : le peuple a un nom.
 // chest : la dernière quête des actes donne aussi un coffre de cette rareté (loot.js), à ouvrir une fois réclamée.
 //
@@ -38,8 +38,22 @@ const QUESTS = [
     // matin. Une étape de respiration, sans écus : on explore, puis on dort (world.sleep).
     q('nuit', 'T', { kind: 'sleep', site: 'foyer' }, 0, 'Passe ta première nuit',
         'Le feu tient. La nuit tombe sur Brumelune, qui ne s’éveille que pour toi. Explore à ta guise… puis dors : demain, nous ne serons plus seuls.'),
+    // Le jour d'Aster (choix de l'auteur, 11 oct. : un vrai parcours, pas expédié) : sa scène au réveil, sa caisse
+    // échouée (world/chests.js : CRATES), sa Récolte, son Ponton (le palier I, sans plan ni quartier sur une île du
+    // tutoriel : son carnet de quart en tient lieu, world.js : tutorialPonton), puis sa longue-vue au couchant
+    q('caisse', 'T', { kind: 'crate', crate: 'aster' }, 10, 'Ouvre la caisse d’Aster',
+        'Sa caisse a échoué près du camp. Ouvre-la avec elle : la mer rend ce qu’elle a pris.'),
     q('recolte', 'T', { kind: 'runs', need: 1 }, 15, 'Termine une Récolte avec Aster',
         'Aster a rejoint le camp au matin. Suis-la au rivage : relie ce qui se ressemble, vite, avant la marée.'),
+    q('premier-ponton', 'T', { kind: 'level', site: 'ponton', need: 1 }, 15, 'Bâtis le Ponton d’Aster',
+        'Vingt-cinq bois, et la mer nous ouvre ses portes. Bâtis le Ponton avec Aster.'),
+    // (le premier chemin, entre son camp et le nôtre : se rapprocher pour s'entraider ; les premières pierres offertes,
+    // world/paths.js : FREE)
+    q('chemin-aster', 'T', { kind: 'link', from: 'ponton', to: 'foyer' }, 15, 'Relie le Ponton au Feu',
+        'Deux camps, un seul chemin : trace-le du Ponton jusqu’au Feu. Les premières pierres sont offertes.'),
+    // (ses quatre piquets, dans sa caisse : world/chests.js, CRATES ; une clôture barre la route d'un égaré, nights.js)
+    q('clotures', 'T', { kind: 'craft', craft: 'cloture', need: 4 }, 15, 'Pose les quatre clôtures du camp',
+        'Les piquets d’Aster : plante-les autour du camp. La nuit, des égarés rôdent parfois.'),
     // La deuxième nuit (choix de l'auteur, 10 oct. : un personnage par jour) : la journée d'Aster finit autour du feu ;
     // Cannelle arrivera au matin
     q('veille', 'T', { kind: 'sleep', site: 'foyer' }, 0, 'Passe ta deuxième nuit',
@@ -117,8 +131,9 @@ const QUESTS = [
         'Aster veut reprendre la mer. Au nord-est, une crique abritée : on dit que des dauphins y viennent.'),
     q('souvenir-aster', 'IV', { kind: 'element', element: 'Bateau' }, 30, 'Rends son courage à Aster : fais naître le Bateau',
         '« Je ne sais plus tenir une barre », dit Aster. Le Bois et l’Eau… Fais naître le Bateau : rends-lui la mer.'),
-    q('ponton-aster', 'IV', { kind: 'level', site: 'ponton', need: 1 }, 80, 'Construis le Ponton',
-        'Cap sur la crique ! Construis le Ponton : la mer devient un chemin.'),
+    // (le Ponton I se bâtit au jour d'Aster : l'acte IV en fait un port de pêche, choix de l'auteur, 11 oct.)
+    q('ponton-aster', 'IV', { kind: 'level', site: 'ponton', need: 2 }, 80, 'Fais du Ponton un port de pêche',
+        'Cap sur la crique ! Agrandis le Ponton : la mer devient un chemin.'),
     q('bete', 'IV', { kind: 'element', any: BEASTS }, 50, 'Fais naître une bête',
         'Ce qu’on fabrique renaît. Une bête, dans le Grimoire : Poisson, Oiseau, Grenouille… Sylve dit qu’elles attendent.'),
     q('voyageur', 'IV', { kind: 'visitor', need: 1 }, 80, 'Comble un voyageur',
@@ -224,7 +239,8 @@ const GUIDED_INK = new Set(['feu', 'souvenir-ondin']);
 
 const HAVE = {
     crafts: (goal, facts) => facts.crafts,
-    craft: (goal, facts) => (facts.placed.has(goal.craft) ? 1 : 0),
+    // (need : combien de cette création posées ; une seule par défaut)
+    craft: (goal, facts) => (goal.need ? (facts.placedCount[goal.craft] || 0) : facts.placed.has(goal.craft) ? 1 : 0),
     runs: (goal, facts) => facts.runs,
     stars: (goal, facts) => facts.stars,
     element: (goal, facts) => ((goal.any || [goal.element]).some(name => facts.elements.has(name)) ? 1 : 0),
@@ -240,6 +256,7 @@ const HAVE = {
     gather: (goal, facts) => facts.gathered,
     pickup: (goal, facts) => facts.pickups,
     hens: (goal, facts) => facts.hensFed,
+    crate: (goal, facts) => (facts.crates.has(goal.crate) ? 1 : 0),
     visitor: (goal, facts) => facts.visitors,
     settle: (goal, facts) => facts.settled,
     // Dormir n'est pas un objectif à compter : la première nuit se passe par world.sleep, jamais par une réclamation

@@ -122,6 +122,24 @@ test('au Grimoire, pendant la quête d’Ondin : la page que marque le ruban a s
   assert.equal((await pages()).some(p => p.guidedInk), false);
 });
 
+test('le Brasier dans la même visite du Grimoire que le Vent : le ruban y mène dès le Vent écrit, Encre offerte ; pas pour un ancien compte', async () => {
+  const player = await newPlayer({ veteran: false });
+  const marked = async who => (await api('GET', '/play/book', null, who)).data.chapters.flatMap(c => c.pages).find(p => p.marked);
+  // Avant le Vent : le ruban mène au Vent
+  assert.equal((await api('GET', '/play/book', null, player)).data.ariane.target, 'Vent');
+  await sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Vent"]'::jsonb WHERE user_id = $1`, [player.userId]);
+  const book = (await api('GET', '/play/book', null, player)).data;
+  assert.equal(book.ariane.target, 'Brasier');
+  const page = await marked(player);
+  assert.equal(page.guidedInk, true);
+  // (encore pendant « ramasser » ; plus une fois le Brasier écrit)
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'pages')`, [player.userId]);
+  assert.equal((await api('GET', '/play/book', null, player)).data.ariane.target, 'Brasier');
+  const veteran = await newPlayer();
+  await sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Vent"]'::jsonb WHERE user_id = $1`, [veteran.userId]);
+  assert.notEqual((await api('GET', '/play/book', null, veteran)).data.ariane?.target, 'Brasier');
+});
+
 test('la première nuit ne se passe pas ; ensuite le choix se retient sur le compte', async () => {
   const player = await newPlayer({ veteran: false });
   const brume = async () => (await api('GET', '/play/world/brume', null, player)).data;

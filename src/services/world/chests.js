@@ -63,11 +63,45 @@ async function grant(userId, source, rarity, conn, { wanted = null, streak = nul
     return { source, rarity, prize };
 }
 
+// La caisse d'un personnage, échouée près du camp (choix de l'auteur, 11 oct.) : elle s'ouvre une fois, le jour de son
+// arrivée (after : la quête faite avant), et donne toujours la même chose : des ressources, et ce qu'elle garde (keepsakes,
+// ce que le coffre montre). Celle d'Aster : sa longue-vue, son filet, son carnet de quart (le plan de son Ponton)
+// crafts : des créations prêtes, mises en réserve (les quatre piquets de son camp : la quête des clôtures)
+const CRATES = {
+    aster: {
+        after: 'nuit',
+        prize: { kind: 'stock', stock: { wood: 5 }, keepsakes: ['Longue-vue', 'Filet', 'Carnet de quart (le plan du Ponton)', 'Quatre piquets de clôture'] },
+        crafts: { cloture: 4 }
+    }
+};
+async function openCrate(userId, id) {
+    return db.transaction(async conn => {
+        await stockOf(userId, conn, true);
+        if (!quests.doneOf(await claimedOf(userId, conn)).has(CRATES[id].after)) return db.rollback({ status: 403, message: 'Cette caisse n’a pas encore échoué.' });
+        const { prize } = CRATES[id];
+        const added = await conn.query(
+            `INSERT INTO world_chests (user_id, source, rarity, prize) VALUES ($1, $2, 'commun', $3) ON CONFLICT DO NOTHING RETURNING source`,
+            [userId, `caisse:${id}`, JSON.stringify(prize)]);
+        if (!added.rows.length) return db.rollback({ status: 409, message: 'Cette caisse est déjà ouverte.' });
+        await addStock(userId, prize.stock, conn);
+        for (const [craft, n] of Object.entries(CRATES[id].crafts || {})) {
+            for (let i = 0; i < n; i++) await conn.query('INSERT INTO world_crafts (user_id, craft) VALUES ($1, $2)', [userId, craft]);
+        }
+        return { chest: { source: `caisse:${id}`, rarity: 'commun', prize }, coins: await balanceOf(userId, conn) };
+    });
+}
+
 // Ouvre un coffre qui attend : 'jour' (série), 'bouteille' (tranche de 6 h), 'chapitre:<id>' (chapitre ouvert, sa
-// pièce rare), 'quete:<id>' (quête réclamée qui en donne un), 'lieu:<id>' (lieu remarquable découvert).
+// pièce rare), 'quete:<id>' (quête réclamée qui en donne un), 'lieu:<id>' (lieu remarquable découvert), 'caisse:<id>'
+// (la caisse d'un personnage : CRATES).
 // openChapters : Set des chapitres ouverts. { chest, coins } ou { status, message } si refus
 async function openChest(userId, source, openChapters, now = Date.now()) {
     const [kind, id] = source.split(':');
+    if (kind === 'caisse') {
+        if (!Object.hasOwn(CRATES, id)) return { status: 404, message: 'Coffre inconnu.' };
+        await migrate(userId);
+        return openCrate(userId, id);
+    }
     const chapter = kind === 'chapitre' ? loot.CHAPTER_RARES[id] : null;
     const quest = kind === 'quete' ? QUEST_CHESTS.find(q => q.id === id) : null;
     const place = kind === 'lieu' && Object.hasOwn(landmarks.LANDMARK_BY_ID, id) ? landmarks.LANDMARK_BY_ID[id] : null;
@@ -126,4 +160,4 @@ async function openAll(userId, openChapters, now = Date.now()) {
     });
 }
 
-module.exports = { QUEST_CHESTS, openedOf, streakOf, chestsView, grant, openChest, grantSource, bottleOf, openAll };
+module.exports = { QUEST_CHESTS, CRATES, openedOf, streakOf, chestsView, grant, openChest, grantSource, bottleOf, openAll };

@@ -14,14 +14,14 @@ const ACTS = ['T', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
 const facts = (extra = {}) => ({
   crafts: 0, placed: new Set(), runs: 0, stars: 0, elements: new Set(['Eau', 'Feu', 'Terre', 'Air']), zones: new Set(['coeur']),
   levels: { foyer: 1 }, annexes: 0, houses: 0, met: new Set(), awake: new Set(), hearts: 0, expeditions: 0, landmarks: new Set(),
-  gathered: 0, pickups: 0, hensFed: 0, visitors: 0, settled: 0, named: false, ...extra
+  gathered: 0, pickups: 0, hensFed: 0, crates: new Set(), visitors: 0, settled: 0, named: false, ...extra
 });
 // Les 21 anciennes quêtes, dans leur ordre d'avant la bible
 const OLD = ['deco', 'recolte', 'source', 'puits', 'lisiere', 'cabane', 'livre5', 'colline', 'mine', 'livre12', 'jardins', 'serre', 'maison',
   'crique', 'ponton', 'livre45', 'hameau', 'deco10', 'phare', 'livre70', 'legendes'];
 
 test('chaque quête désigne un vrai quartier, palier, création, lieu ou habitant, avec un texte et une récompense', () => {
-  assert.equal(QUESTS.length, 61);
+  assert.equal(QUESTS.length, 65);
   assert.equal(new Set(QUESTS.map(q => q.id)).size, QUESTS.length);
   for (const q of QUESTS) {
     assert.match(q.id, /^[a-z0-9-]{1,30}$/);
@@ -38,7 +38,8 @@ test('chaque quête désigne un vrai quartier, palier, création, lieu ou habita
     if (goal.kind === 'level') {
       const tier = SITES[goal.site]?.levels[goal.need - 1];
       assert.ok(tier, q.id);
-      assert.ok(q.label.includes(tier.name), q.id);
+      // (« Fais du Ponton un port de pêche » : le palier, en minuscules dans la phrase)
+      assert.ok(q.label.toLowerCase().includes(tier.name.toLowerCase()), q.id);
     }
     if (goal.kind === 'craft') assert.ok(CRAFT_BY_ID[goal.craft], q.id);
     if (goal.kind === 'landmark' && goal.landmark) assert.ok(LANDMARKS.some(l => l.id === goal.landmark), q.id);
@@ -50,7 +51,7 @@ test('chaque quête désigne un vrai quartier, palier, création, lieu ou habita
   const acts = QUESTS.map(q => ACTS.indexOf(q.act));
   assert.deepEqual(acts, [...acts].sort((a, b) => a - b));
   assert.deepEqual(QUESTS.filter(q => q.chest).map(q => q.act), ACTS);
-  assert.equal(QUESTS.reduce((sum, q) => sum + q.coins, 0), 5125);
+  assert.equal(QUESTS.reduce((sum, q) => sum + q.coins, 0), 5180);
   assert.ok(BEASTS.includes('Poisson') && !BEASTS.includes('Lapin'));
 });
 
@@ -64,7 +65,8 @@ test('chaque objectif est atteignable quand sa quête devient active (quartier a
       assert.ok(!zone.chapter || ACTS.indexOf(zone.chapter) <= Math.max(1, act), `${q.id} : chapitre ${zone.chapter}`);
       zones.add(zone.id);
     }
-    if (q.goal.kind === 'level') {
+    // (le Ponton I d'une île du tutoriel se bâtit hors de son quartier : world.js, tutorialPonton)
+    if (q.goal.kind === 'level' && !(q.act === 'T' && q.goal.site === 'ponton' && q.goal.need === 1)) {
       assert.ok(zones.has(map.siteZone(q.goal.site)), `${q.id} : quartier pas encore acheté`);
       assert.ok(ACTS.indexOf(SITES[q.goal.site].levels[q.goal.need - 1].chapter) <= Math.max(1, act), `${q.id} : chapitre du palier`);
     }
@@ -78,6 +80,7 @@ test('avancée de chaque objectif, plafonnée', () => {
   check({ kind: 'crafts', need: 10 }, { crafts: 3 }, 3, 10);
   check({ kind: 'craft', craft: 'lanterne' }, { placed: new Set(['cloture']) }, 0);
   check({ kind: 'craft', craft: 'lanterne' }, { placed: new Set(['lanterne']) }, 1);
+  check({ kind: 'craft', craft: 'cloture', need: 4 }, { placed: new Set(['cloture']), placedCount: { cloture: 3 } }, 3, 4);
   check({ kind: 'stars', need: 3 }, { stars: 9 }, 3, 3);
   check({ kind: 'element', element: 'Vie' }, {}, 0);
   check({ kind: 'element', element: 'Vie' }, { elements: new Set(['Vie']) }, 1);
@@ -99,6 +102,8 @@ test('avancée de chaque objectif, plafonnée', () => {
   check({ kind: 'pickup', need: 3 }, { pickups: 2 }, 2, 3);
   check({ kind: 'hens', need: 1 }, {}, 0);
   check({ kind: 'hens', need: 1 }, { hensFed: 3 }, 1);
+  check({ kind: 'crate', crate: 'aster' }, {}, 0);
+  check({ kind: 'crate', crate: 'aster' }, { crates: new Set(['aster']) }, 1);
   check({ kind: 'visitor', need: 1 }, { visitors: 1 }, 1);
   check({ kind: 'settle', need: 1 }, { settled: 0 }, 0);
   check({ kind: 'name' }, { named: true }, 1);
@@ -106,9 +111,9 @@ test('avancée de chaque objectif, plafonnée', () => {
 
 test('la quête active est la première pas encore faite ; à la fin, Brume se repose', () => {
   const first = active(new Set(), facts());
-  assert.deepEqual(QUESTS.slice(0, 5).map(q => q.id), ['pages', 'ramasser', 'feu', 'nuit', 'recolte']);
+  assert.deepEqual(QUESTS.slice(0, 10).map(q => q.id), ['pages', 'ramasser', 'feu', 'nuit', 'caisse', 'recolte', 'premier-ponton', 'chemin-aster', 'clotures', 'veille']);
   assert.match(QUESTS.find(q => q.id === 'feu').say, /sur la plage de Brumelune/);
-  assert.deepEqual([first.id, first.act, first.step, first.total, first.kind, first.done], ['pages', 'T', 1, 61, 'element', false]);
+  assert.deepEqual([first.id, first.act, first.step, first.total, first.kind, first.done], ['pages', 'T', 1, 65, 'element', false]);
   assert.equal(active(new Set(), facts({ elements: new Set([...facts().elements, 'Vent']) })).done, true);
   const ondin = active(new Set(['deco']), facts());
   assert.deepEqual([ondin.id, ondin.target], ['eveil-ondin', { villager: 'puits' }]);

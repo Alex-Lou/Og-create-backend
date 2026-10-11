@@ -23,7 +23,8 @@ const SMALL = 2;
 // des actes suivants au bord de leur quartier (celui qu'il faut acheter pour les bâtir : map.siteZone)
 const BEACH = {
     foyer: { x: 98, y: 92 },
-    ponton: { x: 87, y: 98 },
+    // (rapproché du Feu de trois cases, choix de l'auteur, 11 oct. : on se rapproche pour s'entraider)
+    ponton: { x: 90, y: 97 },
     atelier: { x: 95, y: 82 },
     puits: { x: 86, y: 86 },
     carriere: { x: 86, y: 69 },

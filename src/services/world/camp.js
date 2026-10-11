@@ -48,7 +48,8 @@ const corner = (who, site) => at => {
 const PLACES = [
     { id: 'hirondelle', x: 96, y: 96, size: 2, art: () => 'hirondelle' },
     { id: 'cannelle', x: 99, y: 96, size: 2, art: at => (foyer(at) < ABRI && at.here('foyer') ? 'cannelle_debris' : null) },
-    { id: 'aster', x: 100, y: 88, size: 2, art: corner('aster', 'ponton') },
+    // (son coin, à côté de son Ponton : elle y plante son camp en débarquant, choix de l'auteur, 11 oct.)
+    { id: 'aster', x: 87, y: 96, size: 2, art: corner('aster', 'ponton') },
     { id: 'rivet', x: 91, y: 94, size: 2, art: corner('rivet', 'atelier') },
     { id: 'tente', x: 93, y: 96, size: 2, art: at => (has(at, 'IV') ? 'tente' : null) },
     { id: 'hamac', x: 102, y: 96, size: 2, art: at => (has(at, 'IV') ? 'hamac' : null) },

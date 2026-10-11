@@ -83,11 +83,11 @@ test('dormir : la première nuit se passe seul, sans écus ; Aster n’arrive qu
     await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'pages'), ($1, 'ramasser'), ($1, 'feu')`, [id]);
     const before = await view();
     assert.deepEqual([before.brume.quest.id, before.villagers.map(v => v.id)], ['nuit', []]);
-    // La nuit passée : la Récolte d'Aster s'ouvre, Aster rejoint le camp ; rien ne se gagne en dormant
+    // La nuit passée : le jour d'Aster s'ouvre (sa caisse d'abord), Aster rejoint le camp ; rien ne se gagne en dormant
     const slept = await api('POST', '/play/world/sleep', {}, player);
     assert.equal(slept.status, 200);
     assert.equal(slept.data.slept, true);
-    assert.deepEqual([slept.data.world.brume.quest.id, slept.data.world.villagers.map(v => v.id)], ['recolte', ['ponton']]);
+    assert.deepEqual([slept.data.world.brume.quest.id, slept.data.world.villagers.map(v => v.id)], ['caisse', ['ponton']]);
     const coins = (await sql('SELECT coins FROM progress WHERE user_id = $1', [id]))[0].coins;
     assert.equal(coins, 0);
     // Dormir deux fois : refusé

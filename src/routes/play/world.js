@@ -479,10 +479,11 @@ router.post('/world/visitor/settle', withAccount(async (req, res, owner, b) => {
     res.json({ settled: done.settled, ...coinsOf(done), world: await worldView(owner, b) });
 }));
 
-// Coffre qui attend : du jour, bouteille à la mer, chapitre du Livre ouvert, quête de Brume réclamée, lieu découvert
+// Coffre qui attend : du jour, bouteille à la mer, chapitre du Livre ouvert, quête de Brume réclamée, lieu découvert,
+// caisse d'un personnage
 router.post('/world/chest', withAccount(async (req, res, owner, b) => {
     const source = String(req.body.source || '');
-    if (!/^(jour|bouteille|chapitre:[IVX]{1,4}|quete:[a-z0-9-]{1,30}|lieu:[a-z]{1,20})$/.test(source)) return res.status(400).json({ message: 'Coffre invalide' });
+    if (!/^(jour|bouteille|chapitre:[IVX]{1,4}|quete:[a-z0-9-]{1,30}|lieu:[a-z]{1,20}|caisse:[a-z]{1,20})$/.test(source)) return res.status(400).json({ message: 'Coffre invalide' });
     const done = await world.openChest(owner.id, source, await chaptersOf(owner, b, await players.elements(owner)));
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ chest: done.chest, coins: done.coins, world: await worldView(owner, b) });

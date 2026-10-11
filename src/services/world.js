@@ -33,7 +33,7 @@ const {
 const {
     itemsOf, skinsOf, signsOf, namesOf, avatarOf, friendsOf, needRowsOf, settlersOf, gamesOf, annexesOf, levelsOf, stockOf,
     zonesOf, findsOf, depositsOf, blightsOf, foundOf, claimedOf, helianeOfUser, runsOf, countOf, discoveredOf, craftsOf,
-    placedOf, addStock, balanceOf
+    placedOf, madeOf, addStock, balanceOf
 } = require('./world/reads');
 const { migrate } = require('./world/migrate');
 const { openedOf, chestsView, grant, openChest, openAll } = require('./world/chests');
@@ -77,7 +77,7 @@ async function factsOf(userId, owned, stars, conn = db, moods = null) {
     // (lectures indépendantes, ensemble ; dans une transaction, elles passent l'une après l'autre sur sa connexion)
     const count = (sql, params) => countOf(conn, sql, params);
     const [{ levels }, zones, craftRows, filled, lastRows, friends, runs, annexCount, houses, expeditions, found, gathered, pickupCount, hensFed,
-        visitors, settled, names] = await Promise.all([
+        visitors, settled, names, crateRows] = await Promise.all([
         levelsOf(userId, conn), zonesOf(userId, conn), craftsOf(userId, conn), needRowsOf(userId, conn),
         conn.query('SELECT MAX(claimed_at) AS at FROM world_quests WHERE user_id = $1', [userId]), friendsOf(userId, conn), runsOf(userId, conn),
         count('SELECT COUNT(*)::int AS n FROM world_annexes WHERE user_id = $1', [userId]),
@@ -92,7 +92,9 @@ async function factsOf(userId, owned, stars, conn = db, moods = null) {
             AND fed_at > NOW() - make_interval(secs => $3)`, [userId, beastRules.HENS, beastRules.DAY_MS / 1000]),
         count('SELECT COUNT(*)::int AS n FROM world_visitors WHERE user_id = $1 AND satisfied_at IS NOT NULL', [userId]),
         count('SELECT COUNT(*)::int AS n FROM world_visitors WHERE user_id = $1 AND settled_at IS NOT NULL', [userId]),
-        namesOf(userId, conn)
+        namesOf(userId, conn),
+        // Les caisses des personnages ouvertes (world/chests.js : CRATES)
+        conn.query(`SELECT source FROM world_chests WHERE user_id = $1 AND source LIKE 'caisse:%'`, [userId])
     ]);
     const placed = placedOf(craftRows);
     const { places } = await placesOf(userId, conn);
@@ -108,7 +110,7 @@ async function factsOf(userId, owned, stars, conn = db, moods = null) {
         .filter(([, at]) => !last.at || new Date(at) >= last.at).map(([need]) => `${id}:${need}`));
     const best = Math.max(0, ...Object.values(friends).map(f => f.points));
     return {
-        crafts: placed.length, placed: new Set(placed.map(t => t.craft)), runs, stars,
+        crafts: placed.length, placed: new Set(placed.map(t => t.craft)), placedCount: madeOf(placed), runs, stars,
         elements: new Set(owned), zones, levels,
         annexes: annexCount,
         houses,
@@ -120,6 +122,7 @@ async function factsOf(userId, owned, stars, conn = db, moods = null) {
         gathered,
         pickups: pickupCount,
         hensFed,
+        crates: new Set(crateRows.rows.map(r => r.source.slice('caisse:'.length))),
         visitors,
         settled,
         named: Boolean(names.peuple),
@@ -128,7 +131,7 @@ async function factsOf(userId, owned, stars, conn = db, moods = null) {
     };
 }
 // Paires de bâtiments bâtis que relie un chemin (world/paths.js) : Set de « a-b » (pour la quête du premier chemin)
-const LINKS = [['puits', 'foyer']];
+const LINKS = [['ponton', 'foyer'], ['puits', 'foyer']];
 async function linksOf(userId, levels, places, conn = db) {
     const { ground } = await paths.roadsOf(userId, conn);
     return new Set(LINKS.filter(([a, b]) => levels[a] && levels[b] && paths.linked(ground, footprintAt(places, a, levels[a]), footprintAt(places, b, levels[b])))
@@ -141,7 +144,14 @@ async function linksOf(userId, levels, places, conn = db) {
 // Le tutoriel guide jusqu'au bout (quests.GUIDED_INK) : la page que marque le ruban a son Encre offerte
 async function guidedInkOf(userId) {
     const quest = quests.currentOf(await claimedOf(userId));
-    return Boolean(quest && quests.GUIDED_INK.has(quest.id));
+    return Boolean(quest && (quests.GUIDED_INK.has(quest.id) || await brasierFirst(userId, quest)));
+}
+// Le Brasier dans la même visite du Grimoire que le Vent (choix de l'auteur, 11 oct.) : sur une île du tutoriel, dès le
+// Vent écrit et jusqu'au chantier du feu, le ruban mène au Brasier (son plan), Encre offerte
+const BRASIER_FIRST = new Set(['pages', 'ramasser']);
+async function brasierFirst(userId, quest) {
+    if (!BRASIER_FIRST.has(quest.id) || await players.islandVeteranOf(userId)) return false;
+    return quest.id !== 'pages' || (await players.elements({ kind: 'user', id: userId })).includes('Vent');
 }
 // Au tutoriel (une île qui n'est pas d'avant la bible), un quartier du prologue se découvre en écrivant son élément,
 // sans écus (choix de l'auteur : découvrir, pas acheter ; les achats viennent après le prologue)
@@ -152,6 +162,7 @@ async function arianeTargets(userId) {
     const quest = quests.currentOf(await claimedOf(userId));
     const goal = quest && quest.goal;
     if (!goal) return [];
+    if (await brasierFirst(userId, quest)) return [SITES.foyer.levels[0].plan];
     if (goal.kind === 'element') return goal.any || [goal.element];
     if (goal.kind === 'zone') return ZONE_PLANS[goal.zone] && !(await players.islandVeteranOf(userId)) ? [ZONE_PLANS[goal.zone]] : [];
     if (goal.kind === 'craft') return crafts.CRAFT_BY_ID[goal.craft].elements;
@@ -314,12 +325,16 @@ async function view(userId, owned, book) {
         const place = footprintAt(places, id, level);
         const zone = map.siteZone(id);
         const made = production.find(p => p.site === id);
+        // (le Ponton I d'une île du tutoriel : ni plan ni quartier, tutorialPonton)
+        const waived = tutorialPonton(id, level, presence);
         const step = l => ({
-            name: l.name, plan: l.plan, planOwned: !l.plan || have.has(l.plan), planEmoji: l.plan ? known[l.plan]?.emoji || null : null,
+            name: l.name, plan: waived ? null : l.plan, planOwned: waived || !l.plan || have.has(l.plan), planEmoji: !waived && l.plan ? known[l.plan]?.emoji || null : null,
             cost: l.cost, coins: l.coins, chapter: l.chapter, chapterOpen: book.openChapters.has(l.chapter), effect: l.effect
         });
         return {
-            id, x: place.x, y: place.y, w: place.w, h: place.h, level, maxLevel: site.levels.length, zone, locked: !zones.has(zone),
+            id, x: place.x, y: place.y, w: place.w, h: place.h, level, maxLevel: site.levels.length, zone,
+            // (le Ponton d'une île du tutoriel, bâti hors de son quartier, n'est pas fermé : le palier II demande La Crique)
+            locked: !zones.has(zone) && !(id === 'ponton' && level <= 1 && !presence.veteran),
             // Un chantier dont le personnage n'est pas encore là ne se voit pas (choix de l'auteur, 9 oct. : rien avant
             // son personnage ; le Feu de camp, celui de Brume, toujours) ; un compte d'avant la bible voit tout, comme avant
             hidden: !presence.veteran && !level && id !== 'foyer' && !metOf(id, levels, zones, presence),
@@ -580,6 +595,11 @@ async function buyZone(userId, zoneId, openChapters, owned = []) {
     });
 }
 
+// Le Ponton I d'une île du tutoriel (choix de l'auteur, 11 oct.) : Aster le bâtit à son premier jour, avec le bois de
+// la Récolte seul ; son carnet de quart (dans sa caisse) tient lieu de plan, et son quartier (La Crique, acte IV) n'est
+// pas encore à soi. Les paliers suivants suivent la règle
+const tutorialPonton = (siteId, level, presence) => siteId === 'ponton' && !level && !presence.veteran;
+
 // Construit le palier suivant d'un chantier : chapitre du palier ouvert dans le Livre, plan découvert, ressources,
 // écus (débités une seule fois, même en double clic). openChapters : Set des chapitres ouverts.
 // Les décorations prises dans une emprise agrandie sont déplacées au prochain affichage (settle). { status, message } si refus
@@ -589,13 +609,14 @@ async function build(userId, owned, siteId, openChapters = new Set()) {
     await migrate(userId);
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
-        if (!(await zonesOf(userId, conn)).has(map.siteZone(siteId))) return db.rollback({ status: 403, message: 'Achète d’abord ce quartier de l’île.' });
         const { levels } = await levelsOf(userId, conn);
         const level = levels[siteId] || 0;
+        const waived = tutorialPonton(siteId, level, await presenceOf(userId, conn));
+        if (!waived && !(await zonesOf(userId, conn)).has(map.siteZone(siteId))) return db.rollback({ status: 403, message: 'Achète d’abord ce quartier de l’île.' });
         const next = site.levels[level];
         if (!next) return db.rollback({ status: 409, message: 'Ce chantier est déjà achevé.' });
         if (!openChapters.has(next.chapter)) return db.rollback({ status: 403, message: `Ouvre d’abord le chapitre ${next.chapter} du Grimoire.` });
-        if (next.plan && !owned.includes(next.plan)) return db.rollback({ status: 403, message: `Il te faut d’abord faire naître « ${next.plan} » dans l’Athanor du Grimoire.` });
+        if (!waived && next.plan && !owned.includes(next.plan)) return db.rollback({ status: 403, message: `Il te faut d’abord faire naître « ${next.plan} » dans l’Athanor du Grimoire.` });
         // Ce que les bâtiments avaient produit est encaissé d'abord : cela compte pour payer (et la production du bâtiment
         // repart de zéro à l'évolution)
         const gathered = await gather(userId, conn, stock);
