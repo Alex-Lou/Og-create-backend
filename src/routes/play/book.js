@@ -13,7 +13,9 @@ const { PAGE, playLimiter, withPlayer, payOnce, discovered } = require('./shared
 const router = express.Router();
 
 // Une page à portée ne révèle jamais le nom de l'élément inconnu
-router.get('/book', playLimiter, withPlayer(async (req, res, owner, b) => {
+router.get('/book', playLimiter, withPlayer(async (req, res, owner, common) => {
+    // (le livre du joueur : ses emplacements d'Athanor, qui ont pu grandir avec l'histoire)
+    const b = await world.bookFor(owner, common);
     const misses = owner.kind === 'user' ? await bookTries.missesByPage(owner.id) : {};
     const owned = await players.elements(owner);
     // Le fil d'Ariane suit ce que le joueur a choisi de suivre depuis un verrou de l'île (follow : un élément du livre,
@@ -30,14 +32,15 @@ router.get('/book', playLimiter, withPlayer(async (req, res, owner, b) => {
     // (la page guidée du tutoriel, sans leurre, Encre offerte : seulement sur le ruban de la quête)
     const guided = !follow && owner.kind === 'user' && await world.guidedPageOf(owner.id);
     const ink = !follow && owner.kind === 'user' && await world.guidedInkOf(owner.id);
-    res.json(bookPages.view(b, owned, misses, await bookLetters.byPage(owner), ariane, inked, guided, ink));
+    res.json({ ...bookPages.view(b, owned, misses, await bookLetters.byPage(owner), ariane, inked, guided, ink), athanor: bookPages.slotsFor(b, owned) });
 }));
 
 // Encre : révèle un ingrédient (déjà possédé) d'une page à portée ; offerte à un compte
 // après quelques mélanges ratés différents sur cette page, ou sur la page que marque le ruban pendant une quête du
 // tutoriel au Grimoire (quests.GUIDED_INK), payée sinon. Retenue au grand livre (référence : la page) :
 // elle se revoit sur tout appareil et ne se paie qu'une fois
-router.post('/ink', playLimiter, withPlayer(async (req, res, owner, b) => {
+router.post('/ink', playLimiter, withPlayer(async (req, res, owner, common) => {
+    const b = await world.bookFor(owner, common);
     const id = String(req.body.page || '');
     if (!PAGE.test(id)) return res.status(400).json({ message: 'Page invalide' });
     const owned = await players.elements(owner);
@@ -53,7 +56,8 @@ router.post('/ink', playLimiter, withPlayer(async (req, res, owner, b) => {
 }));
 
 // Pendu : la page visée, ses règles (erreurs permises, première lettre donnée) et l'état à renvoyer
-async function letterTarget(req, res, owner, b) {
+async function letterTarget(req, res, owner, common) {
+    const b = await world.bookFor(owner, common);
     const id = String(req.body.page || '');
     if (!PAGE.test(id)) return res.status(400).json({ message: 'Page invalide' }) && null;
     const target = bookPages.reachableById(b, await players.elements(owner), id);

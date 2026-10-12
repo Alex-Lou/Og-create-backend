@@ -6,6 +6,7 @@ const players = require('../../services/players');
 const trial = require('../../services/trial');
 const bookPages = require('../../services/bookPages');
 const bookTries = require('../../services/bookTries');
+const world = require('../../services/world');
 const { NAME, PAGE, playLimiter, addressLimiter, guestLimiter, fail, withPlayer, discovered } = require('./shared');
 
 const router = express.Router();
@@ -35,7 +36,8 @@ router.get('/state', playLimiter, withPlayer(async (req, res, owner, b) => {
 }));
 
 // Livre : mélange visé sur une page à portée ; si ce n'est pas elle, combien d'ingrédients sont justes
-async function aimOf(owner, b, inHand, page, ingredients, result) {
+async function aimOf(owner, common, inHand, page, ingredients, result) {
+    const b = await world.bookFor(owner, common);
     const aimed = bookPages.aim(b, inHand, page, ingredients);
     if (!aimed || aimed.name === result) return null;
     const misses = owner.kind === 'user' ? await bookTries.record(owner.id, page, book.keyOf(ingredients)) : null;

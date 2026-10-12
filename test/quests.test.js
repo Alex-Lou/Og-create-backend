@@ -117,7 +117,7 @@ test('la quête active est la première pas encore faite ; à la fin, Brume se r
   const ondin = active(new Set(['deco']), facts());
   assert.deepEqual([ondin.id, ondin.target], ['eveil-ondin', { villager: 'puits' }]);
   const souvenir = active(new Set(['eveil-ondin']), facts());
-  assert.deepEqual([souvenir.id, souvenir.kind, souvenir.element], ['souvenir-ondin', 'element', 'Puits']);
+  assert.deepEqual([souvenir.id, souvenir.kind, souvenir.element], ['souvenir-ondin', 'element', 'Pluie']);
   const puits = active(new Set(['souvenir-ondin']), facts());
   assert.deepEqual([puits.target, puits.chest], [{ site: 'puits' }, 'rare']);
   // Le Puits bâti : le premier chemin, du Puits au Feu (Brume attend au Puits)

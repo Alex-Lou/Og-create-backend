@@ -63,7 +63,7 @@ const QUESTS = [
     // TUTORIAL_CRAFTS)
     q('deco', 'T', { kind: 'craft', craft: 'lanterne' }, 15),
     q('eveil-ondin', 'T', { kind: 'wake', villager: 'puits' }, 10),
-    q('souvenir-ondin', 'T', { kind: 'element', element: 'Puits' }, 20),
+    q('souvenir-ondin', 'T', { kind: 'element', element: 'Pluie' }, 20),
     q('puits-ondin', 'T', { kind: 'level', site: 'puits', need: 1 }, 40, 'rare'),
     // Acte I : la Vie et la lumière (Sylve). D'abord le premier chemin (choix de l'auteur, 8 oct. : l'île neuve n'a que
     // son sentier ; ses cases offertes le paient)

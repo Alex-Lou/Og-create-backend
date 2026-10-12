@@ -89,15 +89,16 @@ test('un nouveau compte bâtit son feu ; Aster vient au matin, Cannelle après s
 test('au Grimoire, pendant la quête d’Ondin : la page que marque le ruban a son Encre offerte, elle seule', async () => {
   const player = await newPlayer();
   const id = player.userId;
-  await sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Vent", "Pluie", "Brasier"]'::jsonb WHERE user_id = $1`, [id]);
+  await sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Vent", "Brasier"]'::jsonb WHERE user_id = $1`, [id]);
   const pages = async () => (await api('GET', '/play/book', null, player)).data.chapters.flatMap(c => c.pages);
   const ink = page => api('POST', '/play/ink', { page }, player);
-  // Réveiller Ondin réclamé : la quête active écrit le Puits
+  // Réveiller Ondin réclamé : la quête active écrit la Pluie (la clé du Puits), avec ses leurres
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'eveil-ondin')`, [id]);
   const guided = await pages();
   const marked = guided.find(p => p.marked);
   assert.ok(marked, 'une page marquée');
   assert.deepEqual(guided.filter(p => p.guidedInk).map(p => p.id), [marked.id]);
+  assert.ok(marked.tray.length > 2, 'des leurres : l’Encre sert vraiment');
   // Sans un écu : une autre page se paie (refusée), la page marquée est offerte
   const other = guided.find(p => p.status === 'reach' && !p.marked);
   if (other) assert.equal((await ink(other.id)).status, 400);

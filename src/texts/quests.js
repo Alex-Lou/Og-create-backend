@@ -72,8 +72,8 @@ const QUEST_TEXTS = {
         say: 'Un petit dort contre un rocher, sa baguette à la main. Parle-lui doucement : la brume endort, sans faire de mal.'
     },
     'souvenir-ondin': {
-        label: 'Rends son don à Ondin : fais naître le Puits',
-        say: 'Sa baguette ne trouve plus rien. Le Grimoire s’en souvient pour lui : la Boue, la Brique, puis le Puits.'
+        label: 'Fais naître la Pluie',
+        say: 'La source s’est tue sous ses pieds. Sans pluie, la terre oublie l’eau. Écris-la : sa baguette aura de nouveau quelque chose à chercher.'
     },
     'puits-ondin': {
         label: 'Construis le Puits',

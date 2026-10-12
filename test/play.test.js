@@ -2596,16 +2596,17 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Aster ouvre s
   assert.deepEqual([sleeping.brume.quest.id, sleeping.brume.quest.done], ['eveil-ondin', false]);
   assert.equal((await talk('puits')).data.world.villagers.find(v => v.id === 'puits').asleep, false);
   assert.equal((await claim('eveil-ondin')).status, 200);
-  // Son don : le Puits écrit au Grimoire, puis bâti ; le prologue fini, se distraire compte
+  // Son don : la Pluie écrite au Grimoire (la clé du Puits, chapitre I), puis le Puits bâti ; le prologue fini, se
+  // distraire compte
   const memory = await view();
-  assert.deepEqual([memory.brume.quest.kind, memory.brume.quest.element, memory.brume.quest.done], ['element', 'Puits', false]);
-  await write(['Boue', 'Brique', 'Puits']);
+  assert.deepEqual([memory.brume.quest.kind, memory.brume.quest.element, memory.brume.quest.done], ['element', 'Pluie', false]);
+  await write(['Pluie']);
   assert.equal((await claim('souvenir-ondin')).status, 200);
   assert.equal((await api('POST', '/play/world/build', { site: 'puits' }, player)).status, 200);
   const built = await claim('puits-ondin');
   assert.equal(built.status, 200);
-  // Six découvertes : les chapitres II et III ont leur coffre ; la fin du prologue, le sien
-  assert.deepEqual(built.data.world.chests.pending.map(c => c.source), ['chapitre:II', 'chapitre:III', 'quete:puits-ondin']);
+  // Trois découvertes : le chapitre II a son coffre (le III s'ouvrira avec la Vie et la Plante) ; la fin du prologue, le sien
+  assert.deepEqual(built.data.world.chests.pending.map(c => c.source), ['chapitre:II', 'quete:puits-ondin']);
   assert.deepEqual(who(built.data.world, 'foyer').needs.map(n => n.id), ['manger', 'deco']);
   // (puis le premier chemin, du Puits au Feu : l'île neuve n'a que son sentier)
   assert.deepEqual([who(built.data.world, 'puits').built, built.data.world.brume.quest.id], [true, 'chemin']);
@@ -2680,12 +2681,12 @@ test('chaque objectif de la chaîne se lit dans l’état (création, annexe, ex
 });
 
 // Lot H2 : le fil d'Ariane (bible, § 6.1)
-test('le fil d’Ariane marque la bonne étape suivante : Puits, Arbre, Bateau, Livre, Feu follet', async () => {
+test('le fil d’Ariane marque la bonne étape suivante : Pluie, Vie, Arbre, Bateau, Livre, Feu follet', async () => {
   const { pageId } = require('../src/services/bookPages');
   const player = await newPlayer();
   await api('GET', '/play/world', null, player);
-  const T = ['Vent', 'Pluie', 'Brasier'];
-  const afterT = [...T, 'Boue', 'Brique', 'Puits'];
+  const T = ['Vent', 'Brasier'];
+  const afterT = [...T, 'Pluie'];
   const actI = [...afterT, 'Vie', 'Plante', 'Arbre', 'Vapeur', 'Nuage', 'Énergie', 'Éclair', 'Lumière', 'Lave', 'Pierre', 'Métal', 'Bois'];
   // La quête juste avant l'active, et les éléments écrits
   const at = async (before, names) => {
@@ -2697,21 +2698,25 @@ test('le fil d’Ariane marque la bonne étape suivante : Puits, Arbre, Bateau, 
   // L'indice de la page marquée : le texte de la quête « fais naître un élément » (sa recette)
   const say = id => require('../src/services/quests').QUESTS.find(q => q.id === id).say;
   const marked = book => book.chapters.flatMap(c => c.pages.map(p => ({ ...p, chapter: c.id, open: c.open }))).filter(p => p.marked);
-  // Le Puits (souvenir d'Ondin) : d'abord la Boue, au chapitre II ; la page ne dit pas son nom
-  const puits = await at('eveil-ondin', T);
-  assert.deepEqual(puits.ariane, { target: 'Puits', remaining: 3, page: pageId('Boue'), chapter: 'II', hint: say('souvenir-ondin') });
-  const [boue] = marked(puits);
-  assert.deepEqual([boue.id, boue.status, boue.chapter, boue.name, boue.emoji], [pageId('Boue'), 'reach', 'II', undefined, undefined]);
-  // Plus qu'une page : le Puits lui-même, dans un chapitre encore scellé (Créations humaines, chapitre V)
-  const last = await at('eveil-ondin', [...T, 'Boue', 'Brique']);
-  assert.deepEqual(last.ariane, { target: 'Puits', remaining: 1, page: pageId('Puits'), chapter: 'V', hint: say('souvenir-ondin') });
-  const v = last.chapters.find(c => c.id === 'V');
-  assert.deepEqual([v.open, v.pages.map(p => p.id)], [false, [pageId('Puits')]]);
+  // La Pluie (le don d'Ondin, la clé du Puits) : une page du chapitre I, ouvert ; la page ne dit pas son nom ; elle
+  // garde ses leurres (l'Encre s'y apprend, offerte)
+  const pluie = await at('eveil-ondin', T);
+  assert.deepEqual(pluie.ariane, { target: 'Pluie', remaining: 1, page: pageId('Pluie'), chapter: 'I', hint: say('souvenir-ondin') });
+  const [page] = marked(pluie);
+  assert.deepEqual([page.id, page.status, page.chapter, page.open, page.name, page.emoji, page.guidedInk], [pageId('Pluie'), 'reach', 'I', true, undefined, undefined, true]);
+  assert.ok(page.tray.length > 2, 'des leurres sur la page de la Pluie');
+  // L'Athanor grandit avec l'histoire : deux emplacements au tutoriel, trois le Puits réclamé, quatre Sylve arrivée
+  assert.equal(pluie.athanor, 2);
+  assert.equal((await at('puits-ondin', afterT)).athanor, 3);
+  assert.equal((await at('eveil-sylve', afterT)).athanor, 4);
+  // (l'île le dit aussi : le jeu agrandit l'Athanor sans attendre le Grimoire)
+  assert.equal((await api('GET', '/play/world', null, player)).data.brume.athanor, 4);
   // L'Arbre (souvenir de Sylve) passe par la Vie ; le Bateau (Aster), une page ; le Feu follet, par le Marais
   assert.deepEqual((await at('eveil-sylve', afterT)).ariane, { target: 'Vie', remaining: 1, page: pageId('Vie'), chapter: 'IV', hint: say('vie') });
   assert.deepEqual((await at('vie', afterT)).ariane, { target: 'Arbre', remaining: 3, page: pageId('Vie'), chapter: 'IV', hint: say('souvenir-sylve') });
   assert.deepEqual((await at('crique', actI)).ariane, { target: 'Bateau', remaining: 1, page: pageId('Bateau'), chapter: 'V', hint: say('souvenir-aster') });
-  assert.deepEqual((await at('ile-legendes', actI)).ariane, { target: 'Feu follet', remaining: 2, page: pageId('Marais'), chapter: 'III', hint: say('feu-follet') });
+  // (le Marais naît de la Boue et du Lac : quatre pages, la Boue d'abord, au chapitre II)
+  assert.deepEqual((await at('ile-legendes', actI)).ariane, { target: 'Feu follet', remaining: 4, page: pageId('Boue'), chapter: 'II', hint: say('feu-follet') });
   // Une quête qui ne demande pas d'élément (le palier d'un bâtiment) : pas d'indice de recette
   // Le Livre, plan de la Tour d'étude (une invention) : la quête demande le palier, le fil vise son plan
   await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'foyer', 4) ON CONFLICT (user_id, site) DO UPDATE SET level = 4`, [player.userId]);

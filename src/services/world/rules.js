@@ -90,7 +90,8 @@ const SITES = {
     puits: {
         produce: 'water',
         levels: [
-            tier('Puits', 'Puits', { stone: 10 }),
+            // (la Pluie : l'eau du ciel rend sa source au Puits ; chapitre I, choix de l'auteur, 12 oct.)
+            tier('Puits', 'Pluie', { stone: 10 }),
             tier('Fontaine', 'Fontaine', { stone: 30, water: 15 }),
             tier('Lavoir', 'Savon', { stone: 45, wood: 30, food: 15 }, 150),
             tier('Bassin', 'Source', { stone: 70, wood: 50, water: 20, food: 20 }, 300),

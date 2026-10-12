@@ -41,7 +41,8 @@ const chaptersOf = async (owner, b, owned) => bookPages.openChapters(b, owned);
 function worldView(owner, b) {
     return db.cached(() => worldViewNow(owner, b));
 }
-async function worldViewNow(owner, b) {
+async function worldViewNow(owner, common) {
+    const b = await world.bookFor(owner, common);
     const owned = await players.elements(owner);
     const refund = await world.refundDecorations(owner.id, element => decoPrice(b, element));
     const view = await world.view(owner.id, owned, {
@@ -384,9 +385,10 @@ router.post('/world/anya/reveal', withAccount(async (req, res, owner, b) => {
 // Pages dont l'appareil a déjà un indice (envoyées avec le bavardage) : identifiants valides, liste bornée
 const pagesOf = list => (Array.isArray(list) ? list.slice(-400).filter(id => typeof id === 'string' && PAGE.test(id)) : []);
 // Ce qu'il faut pour le Savoir d'un maître : éléments écrits, essais ratés par page, fil d'Ariane
-async function savoirInputs(owner, b) {
+async function savoirInputs(owner, common) {
     const owned = await players.elements(owner);
-    return { owned, misses: await bookTries.missesByPage(owner.id), ariane: bookPages.arianeOf(b, owned, await world.arianeTargets(owner.id)) };
+    const b = await world.bookFor(owner, common);
+    return { b, owned, misses: await bookTries.missesByPage(owner.id), ariane: bookPages.arianeOf(b, owned, await world.arianeTargets(owner.id)) };
 }
 // Bavarder avec un maître (bible, § 6.4) : son Savoir n'est soufflé que si le bavardage compte (une fois par jour).
 // Anya, une fois éveillée (§ 6.14) : son Souffle, une fois par jour, un ingrédient sur n'importe quelle page à portée
@@ -399,7 +401,7 @@ router.post('/world/villager/talk', withAccount(async (req, res, owner, b) => {
         if (!state.open) return res.status(403).json({ message: 'Brume garde son Savoir pour la fin : allume d’abord le Phare.' });
         if (state.talked) return res.status(409).json({ message: 'Brume t’a déjà soufflé un Savoir aujourd’hui.' });
         const inputs = await savoirInputs(owner, b);
-        const savoir = bookPages.savoir(b, inputs.owned, ['Légendes'], { ...inputs, strong: true, known: pagesOf(req.body.known), heard: pagesOf(req.body.heard) });
+        const savoir = bookPages.savoir(inputs.b, inputs.owned, ['Légendes'], { ...inputs, strong: true, known: pagesOf(req.body.known), heard: pagesOf(req.body.heard) });
         if (savoir) {
             const done = await world.talkBrume(owner.id);
             if (done.status) return res.status(done.status).json({ message: done.message });
@@ -411,7 +413,7 @@ router.post('/world/villager/talk', withAccount(async (req, res, owner, b) => {
         const refused = world.breathRefused(await world.anyaOf(owner.id));
         if (refused) return res.status(refused.status).json({ message: refused.message });
         const inputs = await savoirInputs(owner, b);
-        const savoir = bookPages.savoir(b, inputs.owned, bookPages.FAMILIES, { ...inputs, strong: true, known: pagesOf(req.body.known), heard: pagesOf(req.body.heard) });
+        const savoir = bookPages.savoir(inputs.b, inputs.owned, bookPages.FAMILIES, { ...inputs, strong: true, known: pagesOf(req.body.known), heard: pagesOf(req.body.heard) });
         if (savoir) {
             const done = await world.breatheAnya(owner.id);
             if (done.status) return res.status(done.status).json({ message: done.message });
@@ -422,7 +424,7 @@ router.post('/world/villager/talk', withAccount(async (req, res, owner, b) => {
     const inputs = families ? await savoirInputs(owner, b) : null;
     const done = await world.befriend(owner.id, villager);
     const savoir = inputs && !done.status
-        ? bookPages.savoir(b, inputs.owned, families, { ...inputs, strong: done.hearts >= villagers.SAVOIR_HEARTS, known: pagesOf(req.body.known), heard: pagesOf(req.body.heard) })
+        ? bookPages.savoir(inputs.b, inputs.owned, families, { ...inputs, strong: done.hearts >= villagers.SAVOIR_HEARTS, known: pagesOf(req.body.known), heard: pagesOf(req.body.heard) })
         : null;
     await befriended(res, owner, b, done, { savoir });
 }));

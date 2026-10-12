@@ -24,6 +24,7 @@ const anya = require('./anya');
 const avatarChoices = require('./avatarChoices');
 const pickups = require('./pickups');
 const players = require('./players');
+const bookPages = require('./bookPages');
 const beastRules = require('./beasts');
 const {
     SIZE, CAP_HOURS, REGEN_MS, RUN_TTL_MS, RENAME_LEVEL, GAME_TTL_MS, GAME_SLACK_MS, SHORT_RUNS, SHORT_MOVES, FIRST_RUN_KINDS,
@@ -151,12 +152,22 @@ async function guidedInkOf(userId) {
     const quest = quests.currentOf(await claimedOf(userId));
     return Boolean(quest && quests.GUIDED_INK.has(quest.id));
 }
-// La page que marque le ruban pendant le tutoriel n'a pas de leurre (choix de l'auteur, 9 oct.) : les quêtes à Encre
-// offerte, et le Brasier du feu de camp (sans Encre : Feu + Feu, l'énigme suffit)
+// La page que marque le ruban pendant le tutoriel n'a pas de leurre (choix de l'auteur, 9 oct.) : le Brasier du feu de
+// camp (Feu + Feu, sans Encre). La Pluie d'Ondin garde ses leurres : l'Encre s'y apprend (choix de l'auteur, 12 oct.)
 async function guidedPageOf(userId) {
     const quest = quests.currentOf(await claimedOf(userId));
-    return Boolean(quest && (quests.GUIDED_INK.has(quest.id) || quest.id === 'feu' || await brasierFirst(userId, quest)));
+    return Boolean(quest && (quest.id === 'feu' || await brasierFirst(userId, quest)));
 }
+// L'Athanor grandit avec l'histoire (choix de l'auteur, 12 oct.), en plus des familles : un emplacement de plus quand
+// le Puits d'Ondin est réclamé, la fin du tutoriel ; quatre quand Sylve arrive, juste avant la Vie
+const ATHANOR = [['eveil-sylve', 4], ['puits-ondin', 3]];
+const athanorFrom = claimed => {
+    const done = quests.doneOf(claimed);
+    return (ATHANOR.find(([id]) => done.has(id)) || [null, 2])[1];
+};
+const athanorOf = async userId => athanorFrom(await claimedOf(userId));
+// Le livre d'un joueur : ses emplacements d'Athanor (un invité : le livre commun)
+const bookFor = async (owner, b) => (owner.kind === 'user' ? bookPages.withSlots(b, await athanorOf(owner.id)) : b);
 // Le Brasier dans la même visite du Grimoire que le Vent (choix de l'auteur, 11 oct.) : sur une île du tutoriel, dès le
 // Vent écrit et jusqu'au chantier du feu, le ruban mène au Brasier (son plan) ; sans Encre offerte (Feu + Feu : l'énigme
 // suffit, choix de l'auteur, 12 oct.)
@@ -539,7 +550,9 @@ async function view(userId, owned, book) {
             const out = {
                 ...boardWith(claimed, facts, book.openChapters),
                 tutorial: true,
-                skipped: firstNightDone && items.has(PROLOGUE_SKIP)
+                skipped: firstNightDone && items.has(PROLOGUE_SKIP),
+                // Les emplacements que l'histoire donne à l'Athanor (le jeu garde le plus grand, avec ceux des familles)
+                athanor: athanorFrom(claimed)
             };
             // Le fil d'Ariane de la quête active : la cible et les pages qui restent (le Grimoire montre la page marquée)
             if (out.quest && !out.quest.done && book.ariane) out.quest.ariane = { target: book.ariane.target, remaining: book.ariane.remaining };
@@ -1020,7 +1033,7 @@ async function chooseSign(userId, siteId, styleId) {
 module.exports = {
     SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, pendingOf, chargesAt, effectsOf, productionOf,
     view, build, buyZone, buyItem, undoItem, harvestCap, chooseSkin, startRun, finishRun, collect, migrate, claimQuest, sleep, board, openChest, openAll,
-    placeAnnex, moveAnnex, poseAnnex, annexSpotOk, siteSpots, moveSite, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople, namePlayer, chooseAvatar, arianeTargets, elementHintOf, guidedInkOf, guidedPageOf, restartIsland,
+    placeAnnex, moveAnnex, poseAnnex, annexSpotOk, siteSpots, moveSite, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople, namePlayer, chooseAvatar, arianeTargets, elementHintOf, guidedInkOf, guidedPageOf, athanorOf, bookFor, restartIsland,
     refundDecorations, startCraft, finishCraft, placeCraft, moveCraft, storeCraft, turnCraft, startExpedition, findLandmark, gatherDeposit, pickUp,
     anyaOf, breathRefused, revealAnya, breatheAnya, brumeSavoirOf, talkBrume, startNights, repelCreature, repairSite, skipPrologue, layPaths,
     feedBeast, collectBeasts, openCage
