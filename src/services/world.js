@@ -289,7 +289,8 @@ async function layPaths(userId, lay, erase) {
     });
 }
 
-// Vue de l'île pour le navigateur. book = { describe(noms), openChapters: Set des chapitres ouverts, stars, finished }
+// Vue de l'île pour le navigateur. book = { describe(noms), openChapters: Set des chapitres ouverts, stars, finished,
+// pagesTo(élément) : les pages qui restent jusqu'à lui, needOf(chapitre) : les découvertes qui l'ouvrent }
 async function view(userId, owned, book) {
     await migrate(userId);
     // (lectures indépendantes, ensemble : la base est distante, chaque requête coûte un aller-retour)
@@ -337,10 +338,19 @@ async function view(userId, owned, book) {
         const made = production.find(p => p.site === id);
         // (le Ponton I d'une île du tutoriel : ni plan ni quartier, tutorialPonton)
         const waived = tutorialPonton(id, level);
-        const step = l => ({
-            name: l.name, plan: waived ? null : l.plan, planOwned: waived || !l.plan || have.has(l.plan), planEmoji: !waived && l.plan ? known[l.plan]?.emoji || null : null,
-            cost: l.cost, coins: l.coins, chapter: l.chapter, chapterOpen: book.openChapters.has(l.chapter), effect: l.effect
-        });
+        // Le verrou parlant (choix de l'auteur, 12 oct.) : le palier suivant dit combien de pages restent jusqu'à son
+        // plan et combien de découvertes manquent à son chapitre
+        const step = (l, i) => {
+            const planOwned = waived || !l.plan || have.has(l.plan);
+            const chapterOpen = book.openChapters.has(l.chapter);
+            const ahead = i === level;
+            return {
+                name: l.name, plan: waived ? null : l.plan, planOwned, planEmoji: !waived && l.plan ? known[l.plan]?.emoji || null : null,
+                cost: l.cost, coins: l.coins, chapter: l.chapter, chapterOpen, effect: l.effect,
+                ...(ahead && !planOwned && book.pagesTo ? { planPages: book.pagesTo(l.plan) } : {}),
+                ...(ahead && !chapterOpen && book.needOf ? { chapterMissing: Math.max(0, book.needOf(l.chapter) - (book.stars || 0)) } : {})
+            };
+        };
         return {
             id, x: place.x, y: place.y, w: place.w, h: place.h, level, maxLevel: site.levels.length, zone,
             // (le Ponton du tutoriel, bâti hors de son quartier, n'est pas fermé : le palier II demande La Crique)
@@ -381,7 +391,7 @@ async function view(userId, owned, book) {
             // le Feu dès le palier I)
             annexes: annexesView(id, annexRows),
             spots: level && level >= annexes.openLevelOf(id) && zones.has(zone) ? annexSpots(id, taken, places) : [],
-            next: next ? step(next) : null
+            next: next ? step(next, level) : null
         };
     });
     // Ce que « Tout ramasser » donnerait maintenant, avec ce qui restait du dernier ramassage (world_stock.carry)

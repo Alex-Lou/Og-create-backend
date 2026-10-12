@@ -46,6 +46,9 @@ async function worldViewNow(owner, b) {
     const refund = await world.refundDecorations(owner.id, element => decoPrice(b, element));
     const view = await world.view(owner.id, owned, {
         describe: names => book.describe(b, names), openChapters: await chaptersOf(owner, b, owned), stars: bookPages.starsOf(b, owned),
+        // Les pages qui restent jusqu'à une clé du Grimoire (le verrou parlant : « Écrire « Fer » · 3 pages »), ou null
+        pagesTo: name => bookPages.arianeOf(b, owned, [name])?.remaining || null,
+        needOf: bookPages.needOfChapter,
         ariane: bookPages.arianeOf(b, owned, await world.arianeTargets(owner.id)),
         finished: bookPages.finishedChapters(b, owned)
     });

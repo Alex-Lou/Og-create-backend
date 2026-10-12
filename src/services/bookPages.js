@@ -224,7 +224,7 @@ function view(b, owned, misses = {}, letters = {}, ariane = null, inked = new Se
     });
     // Le ruban du fil d'Ariane : la cible (déjà nommée par la quête), les pages qui restent, la page marquée
     const marked = ariane && chapters.flatMap(c => c.pages).find(p => p.marked);
-    return { stars, chapters, ariane: marked ? { target: ariane.target, remaining: ariane.remaining, page: marked.id, chapter: chapterOf(b.meta.get(ariane.next).family).id, ...(ariane.hint ? { hint: ariane.hint } : {}) } : null };
+    return { stars, chapters, ariane: marked ? { target: ariane.target, remaining: ariane.remaining, page: marked.id, chapter: chapterOf(b.meta.get(ariane.next).family).id, ...(ariane.hint ? { hint: ariane.hint } : {}), ...(ariane.followed ? { followed: true } : {}) } : null };
 }
 
 // Élément inconnu à portée qui porte cet identifiant de page, avec la recette que montre sa page, ou null
@@ -304,4 +304,7 @@ function finishedChapters(b, owned) {
 // Toutes les familles du Grimoire (le Souffle d'Anya porte sur n'importe quelle page)
 const FAMILIES = CHAPTERS.flatMap(chapter => chapter.families);
 
-module.exports = { DIFFICULTY, FAMILIES, view, arianeOf, reachableById, pageId, aim, telling, savoir, difficultyOf, chapterOf, openChapters, finishedChapters, starsOf };
+// Découvertes qu'il faut pour ouvrir un chapitre (id : 'I'…'VII'), ou 0
+const needOfChapter = id => CHAPTERS.find(c => c.id === id)?.need || 0;
+
+module.exports = { DIFFICULTY, FAMILIES, needOfChapter, view, arianeOf, reachableById, pageId, aim, telling, savoir, difficultyOf, chapterOf, openChapters, finishedChapters, starsOf };

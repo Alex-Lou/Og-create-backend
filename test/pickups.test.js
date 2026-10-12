@@ -140,3 +140,26 @@ test('la première nuit ne se passe pas ; ensuite le choix se retient sur le com
   // (une ligne de world_items, que la boutique ignore)
   assert.ok((await view(player)).sites.every(s => s.shop.every(item => item.id !== 'prologue:passe')));
 });
+
+test('le verrou parlant : le palier suivant dit les pages jusqu’à son plan et les découvertes qui manquent à son chapitre ; le ruban suit ce qu’on choisit', async () => {
+  const player = await newPlayer({ settled: true });
+  const world = (await api('GET', '/play/world', null, player)).data;
+  // La Carrière : son palier I demande la Pierre (Air + Lave, Lave = Feu + Terre : deux pages)
+  const carriere = world.sites.find(s => s.id === 'carriere');
+  assert.equal(carriere.next.plan, 'Pierre');
+  assert.equal(carriere.next.planPages, 2);
+  // Un palier plus haut, dans un chapitre scellé : combien de découvertes il manque
+  const foyer = world.sites.find(s => s.id === 'foyer');
+  assert.equal(foyer.levels[2].chapterMissing, undefined); // (seul le palier suivant le dit)
+  const sealed = world.sites.flatMap(s => s.next ? [s.next] : []).find(n => !n.chapterOpen);
+  if (sealed) assert.ok(sealed.chapterMissing > 0);
+  // Suivre la Pierre : le ruban y mène, sans indice de quête ni page guidée
+  const book = (await api('GET', '/play/book?follow=Pierre', null, player)).data;
+  assert.deepEqual([book.ariane.target, book.ariane.remaining, book.ariane.followed], ['Pierre', 2, true]);
+  assert.equal(book.ariane.hint, undefined);
+  // Un nom inconnu, ou déjà écrit : la quête reprend la main
+  const plain = (await api('GET', '/play/book?follow=Inconnu', null, player)).data;
+  assert.notEqual(plain.ariane && plain.ariane.followed, true);
+  const written = (await api('GET', '/play/book?follow=Feu', null, player)).data;
+  assert.notEqual(written.ariane && written.ariane.followed, true);
+});

@@ -16,14 +16,20 @@ const router = express.Router();
 router.get('/book', playLimiter, withPlayer(async (req, res, owner, b) => {
     const misses = owner.kind === 'user' ? await bookTries.missesByPage(owner.id) : {};
     const owned = await players.elements(owner);
-    // Le fil d'Ariane suit la quête active de l'île (compte seulement)
-    const ariane = owner.kind === 'user' ? bookPages.arianeOf(b, owned, await world.arianeTargets(owner.id)) : null;
-    // (la recette que dit la quête, sur la page marquée)
-    if (ariane) ariane.hint = await world.elementHintOf(owner.id);
+    // Le fil d'Ariane suit ce que le joueur a choisi de suivre depuis un verrou de l'île (follow : un élément du livre,
+    // pas encore écrit ; choix de l'auteur, 12 oct.), sinon la quête active de l'île (compte seulement)
+    const wanted = typeof req.query.follow === 'string' && req.query.follow.length <= 60 ? req.query.follow : '';
+    const follow = owner.kind === 'user' && wanted && b.meta.has(wanted) && !owned.includes(wanted)
+        ? bookPages.arianeOf(b, owned, [wanted]) : null;
+    const ariane = follow || (owner.kind === 'user' ? bookPages.arianeOf(b, owned, await world.arianeTargets(owner.id)) : null);
+    // (la recette que dit la quête, sur la page marquée ; rien pour ce qu'on suit soi-même)
+    if (ariane) ariane.hint = follow ? null : await world.elementHintOf(owner.id);
+    if (follow) follow.followed = true;
     // Pages où l'Encre a déjà servi : leur ingrédient se revoit sur tout appareil
     const inked = owner.kind === 'user' ? await ledger.refsOf(owner.id, 'encre') : new Set();
-    const guided = owner.kind === 'user' && await world.guidedPageOf(owner.id);
-    const ink = owner.kind === 'user' && await world.guidedInkOf(owner.id);
+    // (la page guidée du tutoriel, sans leurre, Encre offerte : seulement sur le ruban de la quête)
+    const guided = !follow && owner.kind === 'user' && await world.guidedPageOf(owner.id);
+    const ink = !follow && owner.kind === 'user' && await world.guidedInkOf(owner.id);
     res.json(bookPages.view(b, owned, misses, await bookLetters.byPage(owner), ariane, inked, guided, ink));
 }));
 
