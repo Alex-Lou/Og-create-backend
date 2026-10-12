@@ -2316,6 +2316,10 @@ test('butins : chapitres ouverts, quêtes réclamées et bouteille donnent leur 
   await discover(player, 3);
   const open = source => api('POST', '/play/world/chest', { source }, player);
   const view = (await api('GET', '/play/world', null, player)).data;
+  // La mer ne rend rien pendant le tutoriel : pas de bouteille avant le chemin du Puits, sa dernière étape
+  assert.equal(view.chests.bottle.available, false);
+  assert.equal((await open('bouteille')).status, 403);
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'chemin')`, [player.userId]);
   // Chapitres I et II ouverts (trois découvertes) : le II offre sa pièce rare
   assert.deepEqual(view.chests.pending, [{ source: 'chapitre:II', rarity: 'legendaire', label: 'Chapitre II du Grimoire' }]);
   const chapter = await open('chapitre:II');
@@ -2357,8 +2361,9 @@ test('les mots d’Héliane : la première bouteille ouverte pendant un acte por
   const heliane = async () => (await api('GET', '/play/world', null, player)).data.heliane;
   // Le prologue n'a pas de mot
   assert.deepEqual(await heliane(), { found: [], next: null });
-  // Le prologue fini (le Puits d'Ondin réclamé il y a une heure) : le mot de l'acte I attend
-  await sql(`INSERT INTO world_quests (user_id, quest, claimed_at) VALUES ($1, 'puits-ondin', NOW() - INTERVAL '1 hour')`, [player.userId]);
+  // Le prologue fini (le Puits d'Ondin réclamé il y a une heure, puis son chemin : la mer rend sa première bouteille) :
+  // le mot de l'acte I attend
+  await sql(`INSERT INTO world_quests (user_id, quest, claimed_at) VALUES ($1, 'puits-ondin', NOW() - INTERVAL '1 hour'), ($1, 'chemin', NOW() - INTERVAL '50 minutes')`, [player.userId]);
   assert.deepEqual(await heliane(), { found: [], next: 'I' });
   const first = await open();
   assert.equal(first.data.chest.story, 'I');
@@ -2377,7 +2382,7 @@ test('butins : « Tout ouvrir » ouvre d’un coup le coffre du jour, les chapit
   const player = await newPlayer();
   await discover(player, 3);
   await api('GET', '/play/world', null, player);
-  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'deco'), ($1, 'source')`, [player.userId]);
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'deco'), ($1, 'source'), ($1, 'chemin')`, [player.userId]);
   const all = () => api('POST', '/play/world/chests/all', {}, player);
   // Deux appels simultanés : l'un ouvre tout, l'autre ne trouve plus rien
   const [a, b] = await Promise.all([all(), all()]);

@@ -21,6 +21,11 @@ async function openedOf(userId, now, conn = db) {
     return { day, slot, opened: new Map(rows.map(r => [r.source, r])) };
 }
 
+// La mer ne rend rien pendant le tutoriel (choix de l'auteur, 12 oct.) : la première bouteille s'échoue une fois le
+// chemin du Puits tracé et réclamé, la dernière étape du tutoriel ; Aster la présente sur l'île. Ensuite, une par tranche
+const ASHORE_AFTER = 'chemin';
+const ashoreOf = claimed => quests.doneOf(claimed).has(ASHORE_AFTER);
+
 // Série du coffre du jour : celle d'hier plus un, sinon 1 (un jour manqué la remet à 1)
 const streakOf = (opened, day) => (opened.get(`jour:${loot.dayBefore(day)}`)?.streak || 0) + 1;
 
@@ -44,7 +49,7 @@ function chestsView({ day, slot, opened }, openChapters, claimed, found) {
             available: !today, streak, rarity: loot.dailyRarity(streak), tomorrow: loot.dailyRarity(streak + 1),
             week: Array.from({ length: 7 }, (_, i) => loot.dailyRarity(first + i))
         },
-        bottle: { key: `${day}-${slot}`, available: !opened.has(`bouteille:${day}-${slot}`) }
+        bottle: { key: `${day}-${slot}`, available: ashoreOf(claimed) && !opened.has(`bouteille:${day}-${slot}`) }
     };
 }
 
@@ -113,6 +118,7 @@ async function openChest(userId, source, openChapters, now = Date.now()) {
         const { day, slot, opened } = await openedOf(userId, now, conn);
         if (quest && !(await claimedOf(userId, conn)).has(quest.id)) return db.rollback({ status: 403, message: 'Réclame d’abord cette quête de Brume.' });
         if (place && !(await foundOf(userId, conn)).has(place.id)) return db.rollback({ status: 403, message: 'Découvre d’abord ce lieu sur l’île.' });
+        if (source === 'bouteille' && !ashoreOf(await claimedOf(userId, conn))) return db.rollback({ status: 403, message: 'La mer n’a encore rien rendu.' });
         const chest = await grantSource(userId, source, { day, slot, opened }, conn);
         if (!chest) return db.rollback({ status: 409, message: source === 'bouteille' ? 'La prochaine bouteille n’est pas encore arrivée.' : 'Ce coffre est déjà ouvert.' });
         return { chest, coins: await balanceOf(userId, conn) };
