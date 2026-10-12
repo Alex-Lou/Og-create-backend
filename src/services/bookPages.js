@@ -8,13 +8,14 @@ const hangman = require('./hangman');
 // Les 15 familles regroupées en 7 chapitres ; « need » = découvertes requises (hors 4 éléments de base),
 // « verse » = la phrase de la page de garde du chapitre. Le chapitre II s'ouvre à 3 découvertes (bible, D4)
 // seal : la page-sceau d'un chapitre (choix de l'auteur, 12 oct.) : l'écrire l'ouvre d'un coup, quel que soit le compte
-// de découvertes (la Vie, la grande scène de l'acte I, ouvre « Le Vivant »)
+// de découvertes (la Vie, la grande scène de l'acte I, ouvre « Le Vivant » ; le Village, à la fin de l'acte III, ouvre
+// « Le Foyer », où l'acte IV trouve le Bateau d'Aster)
 const CHAPTERS = [
     { id: 'I', name: 'Les Premiers Souffles', families: ['Elements Fondamentaux', 'Phénomènes Naturels'], need: 0, verse: 'Au commencement, quatre souffles et une étincelle de curiosité.' },
     { id: 'II', name: 'La Matière', families: ['Matériaux', 'Chimie', 'Physique'], need: 3, verse: 'Ce qui se pétrit, se fond, se forge : le monde a des mains.' },
     { id: 'III', name: 'Ciel et Terre', families: ['Cosmos', 'Formations Naturelles'], need: 5, verse: 'Lève les yeux vers les astres, puis baisse-les vers les montagnes.' },
     { id: 'IV', name: 'Le Vivant', families: ['Flore', 'Biologie', 'Vie et Créatures'], need: 12, seal: 'Vie', verse: 'Une graine, un souffle, un battement : tout ce qui pousse et respire.' },
-    { id: 'V', name: 'Le Foyer', families: ['Corps et Esprit', 'Créations Humaines'], need: 25, verse: 'Autour du feu, l’humain invente, rêve et bâtit sa maison.' },
+    { id: 'V', name: 'Le Foyer', families: ['Corps et Esprit', 'Créations Humaines'], need: 25, seal: 'Village', verse: 'Autour du feu, l’humain invente, rêve et bâtit sa maison.' },
     { id: 'VI', name: 'Les Âges', families: ['Histoire', 'Technologie'], need: 45, verse: 'Des silex aux étoiles : les siècles tournent leurs pages.' },
     { id: 'VII', name: 'Les Légendes', families: ['Légendes'], need: 70, verse: 'Ici s’écrit ce que nul n’a vu, et que tout le monde connaît.' }
 ];

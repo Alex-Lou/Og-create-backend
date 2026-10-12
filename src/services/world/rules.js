@@ -49,6 +49,8 @@ const COINS_PER_LEVEL = 2; // écus par heure et par niveau
 // Noms des ressources dans les textes d'effet : production, Récolte
 const WORDS = { stone: ['pierres', 'la pierre'], wood: ['bûches', 'le bois'], water: ['seaux d’eau', 'l’eau'], food: ['vivres', 'la nourriture'] };
 const tier = (name, plan, cost, coins = 0) => ({ name, plan, cost, coins });
+// Les plans des paliers : le tableau des clés (choix de l'auteur, 12 oct. : le Grimoire, clé de l'île), chacune dans un
+// chapitre ouvert quand l'histoire la demande (test/progression.test.js : jamais d'impasse)
 const SITES = {
     foyer: {
         levels: [
@@ -57,7 +59,7 @@ const SITES = {
             tier('Feu de camp', 'Brasier', { wood: 4, stone: 2 }),
             tier('Abri', 'Bois', { wood: 20, stone: 10 }),
             tier('Cabane', 'Cabane', { stone: 40, wood: 30, water: 20 }, 150),
-            tier('Maison de l’alchimiste', 'Potion', { stone: 60, wood: 50, water: 30, food: 20 }, 300),
+            tier('Maison de l’alchimiste', 'Remède', { stone: 60, wood: 50, water: 30, food: 20 }, 300),
             tier('Tour d’étude', 'Livre', { stone: 100, wood: 90, water: 50, food: 40 }, 600),
             tier('Grande tour', 'Télescope', { stone: 170, wood: 150, water: 90, food: 70 }, 1000),
             tier('Phare de Brume', 'Feu follet', { stone: 300, wood: 240, water: 140, food: 120 }, 1800)
@@ -67,12 +69,12 @@ const SITES = {
         produce: 'stone',
         levels: [
             tier('Fissure', 'Pierre', { wood: 5 }),
-            tier('Carrière', 'Marteau', { stone: 30, wood: 20 }),
-            tier('Mine', 'Poulie', { wood: 45, stone: 30, food: 15 }, 150),
-            tier('Galerie', 'Rails', { wood: 70, stone: 50, water: 20, food: 20 }, 300),
-            tier('Puits de mine', 'Fer', { wood: 110, stone: 90, water: 40, food: 40 }, 600),
-            tier('Mine de cristal', 'Cristal', { wood: 180, stone: 150, water: 90, food: 60 }, 1000),
-            tier('Cité minière', 'Ville', { wood: 300, stone: 250, water: 130, food: 120 }, 1800)
+            tier('Carrière', 'Métal', { stone: 30, wood: 20 }),
+            tier('Mine', 'Granite', { wood: 45, stone: 30, food: 15 }, 150),
+            tier('Galerie', 'Marteau', { wood: 70, stone: 50, water: 20, food: 20 }, 300),
+            tier('Puits de mine', 'Poulie', { wood: 110, stone: 90, water: 40, food: 40 }, 600),
+            tier('Mine de cristal', 'Cristallisation', { wood: 180, stone: 150, water: 90, food: 60 }, 1000),
+            tier('Cité minière', 'Menhir', { wood: 300, stone: 250, water: 130, food: 120 }, 1800)
         ]
     },
     bosquet: {
@@ -80,9 +82,9 @@ const SITES = {
         levels: [
             tier('Bosquet', 'Arbre', { stone: 5 }),
             tier('Grand bosquet', 'Forêt', { wood: 25, water: 15 }),
-            tier('Clairière du bûcheron', 'Bûcheron', { stone: 35, water: 35, food: 20 }, 150),
+            tier('Clairière du bûcheron', 'Taïga', { stone: 35, water: 35, food: 20 }, 150),
             tier('Chênaie', 'Chêne', { stone: 60, water: 50, wood: 30, food: 20 }, 300),
-            tier('Scierie', 'Menuisier', { stone: 100, wood: 70, water: 70, food: 40 }, 600),
+            tier('Scierie', 'Bûcheron', { stone: 100, wood: 70, water: 70, food: 40 }, 600),
             tier('Exploitation forestière', 'Grue', { stone: 170, wood: 120, water: 110, food: 80 }, 1000),
             tier('Forêt enchantée', 'Fée', { stone: 280, wood: 200, water: 180, food: 140 }, 1800)
         ]
@@ -92,9 +94,9 @@ const SITES = {
         levels: [
             // (la Pluie : l'eau du ciel rend sa source au Puits ; chapitre I, choix de l'auteur, 12 oct.)
             tier('Puits', 'Pluie', { stone: 10 }),
-            tier('Fontaine', 'Fontaine', { stone: 30, water: 15 }),
-            tier('Lavoir', 'Savon', { stone: 45, wood: 30, food: 15 }, 150),
-            tier('Bassin', 'Source', { stone: 70, wood: 50, water: 20, food: 20 }, 300),
+            tier('Fontaine', 'Source', { stone: 30, water: 15 }),
+            tier('Lavoir', 'Cascade', { stone: 45, wood: 30, food: 15 }, 150),
+            tier('Bassin', 'Distillation', { stone: 70, wood: 50, water: 20, food: 20 }, 300),
             tier('Aqueduc', 'Arche', { stone: 110, wood: 80, water: 50, food: 40 }, 600),
             tier('Moulin à eau', 'Moulin à eau', { stone: 180, wood: 130, water: 90, food: 80 }, 1000),
             tier('Fontaine de jouvence', 'Élixir', { stone: 300, wood: 220, water: 150, food: 130 }, 1800)
@@ -106,19 +108,19 @@ const SITES = {
             tier('Potager', 'Plante', { water: 8 }),
             tier('Serre', 'Serre', { wood: 20, water: 25, food: 10 }),
             tier('Verger', 'Pomme', { wood: 35, water: 35, stone: 20 }, 150),
-            tier('Ferme', 'Ferme', { wood: 55, water: 55, stone: 30, food: 20 }, 300),
-            tier('Moulin', 'Moulin', { wood: 95, water: 90, stone: 55, food: 40 }, 600),
+            tier('Ferme', 'Moulin', { wood: 55, water: 55, stone: 30, food: 20 }, 300),
+            tier('Moulin', 'Ferme', { wood: 95, water: 90, stone: 55, food: 40 }, 600),
             tier('Domaine', 'Tracteur', { wood: 160, water: 150, stone: 100, food: 70 }, 1000),
             tier('Jardin de la Licorne', 'Licorne', { wood: 270, water: 250, stone: 160, food: 120 }, 1800)
         ]
     },
     atelier: {
         levels: [
-            tier('Atelier', 'Four', { stone: 15, wood: 10 }),
+            tier('Atelier', 'Fer', { stone: 15, wood: 10 }),
             tier('Forge', 'Forge', { stone: 35, wood: 25 }),
             tier('Fonderie', 'Bronze', { stone: 45, wood: 35, water: 10 }, 150),
             tier('Grande forge', 'Acier', { stone: 70, wood: 55, water: 20, food: 15 }, 300),
-            tier('Manufacture', 'Forgeron', { stone: 120, wood: 90, water: 40, food: 30 }, 600),
+            tier('Manufacture', 'Horloge', { stone: 120, wood: 90, water: 40, food: 30 }, 600),
             tier('Usine', 'Usine', { stone: 200, wood: 150, water: 70, food: 60 }, 1000),
             tier('Atelier de l’Alchimiste', 'Alchimie', { stone: 330, wood: 250, water: 120, food: 100 }, 1800)
         ]
@@ -126,11 +128,11 @@ const SITES = {
     ponton: {
         produce: 'food',
         levels: [
-            tier('Ponton', 'Bateau', { wood: 25 }),
-            tier('Port de pêche', 'Port', { wood: 40, stone: 15 }),
+            tier('Ponton', 'Vague', { wood: 25 }),
+            tier('Port de pêche', 'Bateau', { wood: 40, stone: 15 }),
             tier('Chantier naval', 'Voile', { wood: 50, stone: 25, water: 15 }, 150),
-            tier('Grand port', 'Phare', { wood: 80, stone: 45, water: 20, food: 15 }, 300),
-            tier('Criée', 'Pêcheur', { wood: 130, stone: 80, water: 40, food: 30 }, 600),
+            tier('Grand port', 'Port', { wood: 80, stone: 45, water: 20, food: 15 }, 300),
+            tier('Criée', 'Boussole', { wood: 130, stone: 80, water: 40, food: 30 }, 600),
             tier('Port à vapeur', 'Bateau à vapeur', { wood: 220, stone: 130, water: 70, food: 60 }, 1000),
             tier('Port du Kraken', 'Kraken', { wood: 360, stone: 220, water: 120, food: 100 }, 1800)
         ]

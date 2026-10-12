@@ -13,8 +13,8 @@ const { ZONE_BY_ID } = require('../src/services/worldMap');
 const crafts = require('../src/services/crafts');
 const db = require('../src/config/db');
 
-// Les actes vérifiés (les autres suivent au lot 4, avec le reste des clés)
-const ACTS = ['T', 'I', 'II'];
+// La chaîne, du tutoriel à l'acte V (les actes VI et VII attendent les sceaux de leurs chapitres : à décider)
+const ACTS = ['T', 'I', 'II', 'III', 'IV', 'V'];
 // L'Athanor grandit avec l'histoire (services/world.js : ATHANOR)
 const ATHANOR = [['eveil-sylve', 4], ['puits-ondin', 3]];
 // Le palier I du Ponton se bâtit sans plan pendant le tutoriel (world.tutorialPonton)
@@ -24,7 +24,7 @@ const TUTORIAL_CRAFT = (quest, craft) => quest.act === 'T' && craft === 'lantern
 
 test.after(() => db.pool.end());
 
-test('jamais d’impasse : tutoriel et actes I et II, chaque clé dans un chapitre ouvert, chaque recette dans l’Athanor', async () => {
+test('jamais d’impasse : du tutoriel à l’acte V, chaque clé dans un chapitre ouvert, chaque recette dans l’Athanor', async () => {
   const b = await recipeBook.load();
   const owned = new Set(recipeBook.BASE_ELEMENTS);
   const done = new Set();
@@ -32,6 +32,9 @@ test('jamais d’impasse : tutoriel et actes I et II, chaque clé dans un chapit
   const chapterById = id => bookPages.CHAPTERS.find(c => c.id === id);
   const stars = () => bookPages.starsOf(b, [...owned]);
   const open = id => bookPages.isOpen(chapterById(id), stars(), owned);
+  const closest = names => names.filter(n => b.meta.has(n))
+    .map(n => [n, bookPages.arianeOf(bookPages.withSlots(b, slots()), [...owned], [n])?.remaining ?? Infinity])
+    .sort((x, y) => x[1] - y[1])[0][0];
   const slots = () => {
     const story = (ATHANOR.find(([id]) => done.has(id)) || [null, 2])[1];
     return bookPages.slotsFor(bookPages.withSlots(b, story), [...owned]);
@@ -58,7 +61,8 @@ test('jamais d’impasse : tutoriel et actes I et II, chaque clé dans un chapit
   for (const quest of QUESTS.filter(q => ACTS.includes(q.act))) {
     const { goal } = quest;
     const why = `quête ${quest.id} (acte ${quest.act})`;
-    if (goal.kind === 'element') write(goal.element, why);
+    // (une bête du Bestiaire au choix : la plus proche, comme le ruban)
+    if (goal.kind === 'element') write(goal.element || closest(goal.any), why);
     if (goal.kind === 'level') {
       const tier = SITES[goal.site].levels[goal.need - 1];
       const chapter = CHAPTER_OF_LEVEL[goal.need - 1];

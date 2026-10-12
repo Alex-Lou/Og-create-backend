@@ -157,7 +157,7 @@ const QUEST_TEXTS = {
     },
     atelier: {
         label: 'Bâtis l’Atelier',
-        say: 'La Brique et le Feu font un Four. Bâtis l’Atelier : Rivet forgera les outils de tous.'
+        say: 'Le Métal et la Terre font le Fer. Bâtis l’Atelier : Rivet forgera les outils de tous.'
     },
     etoile: {
         label: 'Fais naître l’Étoile',
@@ -228,12 +228,12 @@ const QUEST_TEXTS = {
         say: 'Des toits dorment sous la brume, à l’est. Achète Le Hameau : une baleine passe parfois au large.'
     },
     potion: {
-        label: 'Fais naître la Potion',
+        label: 'Fais naître le Remède',
         say: 'Cannelle ne sent plus le goût de rien. L’Eau, la Magie, la Plante… Une potion le lui rendra peut-être.'
     },
     alchimiste: {
         label: 'Bâtis la Maison de l’alchimiste',
-        say: 'La Potion est le plan d’une maison très ancienne. Bâtis-la : quelqu’un y a laissé son bureau.'
+        say: 'Le Remède est le plan d’une maison très ancienne. Bâtis-la : quelqu’un y a laissé son bureau.'
     },
     peuple: {
         label: 'Donne un nom au peuple',

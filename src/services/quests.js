@@ -110,7 +110,8 @@ const QUESTS = [
     q('une-maison', 'V', { kind: 'house', need: 1 }, 100),
     q('installe', 'V', { kind: 'settle', need: 1 }, 120),
     q('hameau', 'V', { kind: 'zone', zone: 'hameau' }, 220),
-    q('potion', 'V', { kind: 'element', element: 'Potion' }, 80),
+    // (le Remède, et non la Potion des Légendes : la clé de la Maison de l'alchimiste, choix de l'auteur, 12 oct.)
+    q('potion', 'V', { kind: 'element', element: 'Remède' }, 80),
     q('alchimiste', 'V', { kind: 'level', site: 'foyer', need: 4 }, 200),
     q('peuple', 'V', { kind: 'name' }, 100, 'legendaire'),
     // Acte VI : les âges, se souvenir (les Anciens, la clé du phare, le Phénix)

@@ -1336,7 +1336,7 @@ test('le Monde : un chantier demande son quartier, son plan du Livre et ses ress
   assert.equal((await api('POST', '/play/world/build', { site: 'carriere' }, player)).status, 403);
   await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'colline'), ($1, 'est')`, [player.userId]);
   assert.equal((await api('POST', '/play/world/build', { site: 'carriere' }, player)).status, 403);
-  await sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Pierre", "Four", "Marteau"]'::jsonb WHERE user_id = $1`, [player.userId]);
+  await sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Pierre", "Fer", "Métal"]'::jsonb WHERE user_id = $1`, [player.userId]);
   assert.equal((await api('POST', '/play/world/build', { site: 'carriere' }, player)).status, 400);
   assert.equal((await api('POST', '/play/world/build', { site: 'nimporte' }, player)).status, 404);
 
@@ -1347,7 +1347,7 @@ test('le Monde : un chantier demande son quartier, son plan du Livre et ses ress
   assert.equal(built.data.world.stock.wood, 2);
   assert.equal(siteOf(built.data.world, 'carriere').level, 1);
   assert.deepEqual(built.data.world.harvest.boosts, { stone: 2 });
-  // Niveau 2 : la Carrière (plan « Marteau »), pierre ×3
+  // Niveau 2 : la Carrière (plan « Métal »), pierre ×3
   assert.equal(siteOf(built.data.world, 'carriere').next.name, 'Carrière');
   await sql('UPDATE world_stock SET stone = 30, wood = 20 WHERE user_id = $1', [player.userId]);
   const mine = await api('POST', '/play/world/build', { site: 'carriere' }, player);
@@ -1384,7 +1384,7 @@ test('le Monde : les paliers III à VII demandent chapitre et écus, le palier I
   const build = () => api('POST', '/play/world/build', { site: 'carriere' }, player);
   // Assez de découvertes pour ouvrir les chapitres III et IV (pas le V), avec les plans des paliers III et IV
   const names = (await sql(`SELECT DISTINCT r.value AS name FROM game_data g, jsonb_each_text(g.rules->'rules') r WHERE g.active`)).map(r => r.name.trim());
-  const plans = ['Pierre', 'Marteau', 'Rails', 'Poulie', 'Bronze'];
+  const plans = ['Pierre', 'Métal', 'Granite', 'Marteau', 'Bronze'];
   const owned = [...new Set([...BASE, ...plans, ...names.filter(n => !BASE.includes(n) && !plans.includes(n)).slice(0, 15)])];
   await sql('UPDATE progress SET infinite_elements = $1 WHERE user_id = $2', [JSON.stringify(owned), player.userId]);
   await api('GET', '/play/world', null, player);
@@ -1850,7 +1850,7 @@ test('ramassage sans perte : les fractions sont gardées d’un ramassage au sui
   assert.equal(await coinsOf(player), 2);
   assert.equal((await api('GET', '/play/world', null, player)).data.stock.stone, 3);
   // La Carrière (palier II) demande 30 pierres et 20 bois : 27 pierres en stock et 3 en attente (une heure) suffisent
-  await sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Marteau"]'::jsonb WHERE user_id = $1`, [player.userId]);
+  await sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Métal"]'::jsonb WHERE user_id = $1`, [player.userId]);
   await sql(`UPDATE world_stock SET stone = 26, wood = 20, collected_at = NOW() - INTERVAL '1 hour' WHERE user_id = $1`, [player.userId]);
   const build = () => api('POST', '/play/world/build', { site: 'carriere' }, player);
   assert.equal((await build()).status, 400);
@@ -2543,7 +2543,7 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Aster ouvre s
   assert.deepEqual([pier.status, pier.data.world.stock.wood, pier.data.world.brume.quest.done], [200, 0, true]);
   // (le palier II, lui, attend La Crique et son plan, à l'acte IV)
   const built2 = pier.data.world.sites.find(s => s.id === 'ponton');
-  assert.deepEqual([built2.level, built2.locked, built2.next.plan], [1, false, 'Port']);
+  assert.deepEqual([built2.level, built2.locked, built2.next.plan], [1, false, 'Bateau']);
   assert.equal((await api('POST', '/play/world/build', { site: 'ponton' }, player)).status, 403);
   assert.equal((await claim('premier-ponton')).status, 200);
   // Le chemin entre son camp et le nôtre : du Ponton (contre l'épave) jusqu'au sentier du Feu (cases tracées, offertes)
