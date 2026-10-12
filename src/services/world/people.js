@@ -33,9 +33,11 @@ function decosNear(tiles, siteId, level, reach, places = STATIC) {
 // Identifiant d'un visiteur installé, parmi les habitants : 'v<numéro de sa visite>'
 const SETTLER_ID = /^v\d{1,9}$/;
 const knownResident = id => Object.hasOwn(villagers.VILLAGERS, id) || SETTLER_ID.test(id);
-// La troupe est là dès sa rencontre (bible, § 6.6), un personnage à la fois. Pour une île neuve, Aster arrive après le
-// feu et ouvre la Récolte ; Cannelle attend la deuxième nuit (un personnage par jour), puis Rivet arrive après les poules. Avant la
-// v6 : Aster dès le compte, Cannelle après la Récolte, Rivet après la soupe, gardés tels quels. Les quatre dormeurs
+// La troupe est là dès sa rencontre (bible, § 6.6), un personnage à la fois. Aster arrive après le feu et ouvre la
+// Récolte ; Cannelle attend la deuxième nuit (un personnage par jour), puis Rivet la troisième, après les poules. Un
+// compte d'avant la v6 suit le même jour par jour tant qu'il est au tutoriel (choix de l'auteur, 13 oct. : Rivet ne
+// paraît plus au milieu des poules) ; qui avait déjà fait la soupe de Cannelle, ou la lanterne de Rivet (ou bâti son
+// Atelier), les garde. Aster, dès le compte. Les quatre dormeurs
 // (SLEEPERS) apparaissent dès que leur quartier
 // est à soi ; un joueur d'avant la bible garde aussi chaque habitant dont le bâtiment est bâti. presence : { veteran,
 // fresh, done (quêtes faites, quests.doneOf) }
@@ -43,10 +45,10 @@ const SLEEPERS = ['puits', 'bosquet', 'carriere', 'potager'];
 function metOf(id, levels, zones, presence) {
     if (presence.veteran && livesHere(id, levels, zones)) return true;
     if (id === 'ponton') return !presence.fresh || presence.done.has('nuit');
-    // (une île neuve : Cannelle arrive au matin du troisième jour, après la deuxième nuit)
-    if (id === 'foyer') return presence.done.has(presence.fresh ? 'veille' : 'recolte');
-    // (une île neuve : Rivet au matin du quatrième jour, après la troisième nuit, celle du jour de Cannelle)
-    if (id === 'atelier') return presence.done.has(presence.fresh ? 'nuit-cannelle' : 'soupe');
+    // (Cannelle au matin du troisième jour, après la deuxième nuit)
+    if (id === 'foyer') return presence.done.has('veille') || (!presence.fresh && presence.done.has('soupe'));
+    // (Rivet au matin du quatrième jour, après la troisième nuit, celle du jour de Cannelle)
+    if (id === 'atelier') return presence.done.has('nuit-cannelle') || (!presence.fresh && (presence.done.has('deco') || Boolean(levels.atelier)));
     if (id === 'puits') return presence.done.has('deco');
     return zones.has(map.siteZone(id));
 }

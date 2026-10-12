@@ -97,14 +97,19 @@ test('un ancien compte incomplet reprend sur la plage de Brumelune, puis retrouv
   // Au milieu du prologue (les pages réclamées) : la plage s'offre aussi, rien n'est perdu
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'pages')`, [id]);
   assert.equal((await view(player)).brume.quest.id, 'ramasser');
-  // La Récolte réclamée valide la reprise : les anciennes règles redeviennent actives sans perdre l'avancée.
-  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'ramasser'), ($1, 'recolte'), ($1, 'veille')`, [id]);
+  // La Récolte réclamée valide la reprise : les anciennes règles redeviennent actives sans perdre l'avancée ; Cannelle
+  // attend sa deuxième nuit, comme sur une île neuve (un personnage par jour)
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'ramasser'), ($1, 'recolte')`, [id]);
+  assert.equal(met(await view(player)).includes('foyer'), false);
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'veille')`, [id]);
   const cannelle = await view(player);
   assert.deepEqual([met(cannelle).includes('foyer'), cannelle.brume.quest.id], [true, 'soupe']);
-  // La soupe réclamée : Rivet, sans attendre les poules
+  // La soupe réclamée : pas encore Rivet (choix de l'auteur, 13 oct. : jamais au milieu des poules) ; sa troisième nuit, si
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'soupe')`, [id]);
   const rivet = await view(player);
-  assert.deepEqual([met(rivet).includes('atelier'), rivet.brume.quest.id], [true, 'cage']);
+  assert.deepEqual([met(rivet).includes('atelier'), rivet.brume.quest.id], [false, 'cage']);
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'cage'), ($1, 'poules'), ($1, 'poulailler'), ($1, 'nuit-cannelle')`, [id]);
+  assert.equal(met(await view(player)).includes('atelier'), true);
   // Le feu bâti ensuite (Abri) passe au palier II comme avant
   assert.equal(foyerOf(rivet), 1);
 });
