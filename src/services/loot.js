@@ -74,6 +74,8 @@ const itemPrize = (kind, item) => ({ kind, item: item.id, site: item.site, name:
 // Le lot d'un coffre : { kind: 'coins', amount } | { kind: 'stock', stock: { ressource: n } } |
 // { kind: 'tint' | 'rare', item, site, name }. state = { levels, owned: Set des articles } ; wanted : pièce rare promise
 function prizeOf(rarity, state, rand, wanted = null) {
+    // (les ressources qu'un coffre peut donner : sans l'eau douce avant la clé du Puits, world/rules.js : withWater)
+    const resources = state.resources || RESOURCES;
     if (rarity === 'legendaire') {
         const rare = rareFor(state, rand, wanted);
         return rare ? itemPrize('rare', rare) : { kind: 'coins', amount: LEGEND_COINS };
@@ -84,12 +86,12 @@ function prizeOf(rarity, state, rand, wanted = null) {
     }
     if (rarity === 'rare') {
         if (rand() < 0.5) return { kind: 'coins', amount: between(rand, 50, 90) };
-        const first = pick(rand, RESOURCES);
-        const second = pick(rand, RESOURCES.filter(r => r !== first));
+        const first = pick(rand, resources);
+        const second = pick(rand, resources.filter(r => r !== first));
         return { kind: 'stock', stock: { [first]: between(rand, 25, 40), [second]: between(rand, 25, 40) } };
     }
     if (rand() < 0.5) return { kind: 'coins', amount: between(rand, 15, 30) };
-    return { kind: 'stock', stock: { [pick(rand, RESOURCES)]: between(rand, 15, 30) } };
+    return { kind: 'stock', stock: { [pick(rand, resources)]: between(rand, 15, 30) } };
 }
 
 // Jour et tranche de la bouteille à l'heure de Paris : { day: 'AAAA-MM-JJ', slot: 0..3 }

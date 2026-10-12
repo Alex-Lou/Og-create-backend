@@ -50,8 +50,7 @@ async function worldViewNow(owner, common) {
         // Les pages qui restent jusqu'à une clé du Grimoire (le verrou parlant : « Écrire « Fer » · 3 pages »), ou null
         pagesTo: name => bookPages.arianeOf(b, owned, [name])?.remaining || null,
         needOf: bookPages.needOfChapter,
-        ariane: bookPages.arianeOf(b, owned, await world.arianeTargets(owner.id)),
-        finished: bookPages.finishedChapters(b, owned)
+        ariane: bookPages.arianeOf(b, owned, await world.arianeTargets(owner.id))
     });
     return refund.count ? { ...view, refund } : view;
 }
@@ -76,7 +75,7 @@ router.post('/world/craft/start', withAccount(async (req, res, owner, b) => {
     const craft = craftId(req.body);
     if (!/^[a-z]{1,20}$/.test(craft)) return res.status(400).json({ message: 'Création invalide' });
     const owned = await players.elements(owner);
-    const done = await world.startCraft(owner.id, craft, owned, bookPages.finishedChapters(b, owned), bookPages.starsOf(b, owned));
+    const done = await world.startCraft(owner.id, craft, owned, bookPages.openChapters(b, owned), bookPages.starsOf(b, owned));
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ run: done.run, ...coinsOf(done) });
 }));
@@ -84,7 +83,7 @@ router.post('/world/craft/finish', withAccount(async (req, res, owner, b) => {
     const run = Number(req.body.run);
     if (!Number.isSafeInteger(run) || run <= 0 || !Array.isArray(req.body.layout) || req.body.layout.length > 40) return res.status(400).json({ message: 'Assemblage invalide' });
     const owned = await players.elements(owner);
-    const done = await world.finishCraft(owner.id, run, req.body.layout, owned, bookPages.finishedChapters(b, owned), bookPages.starsOf(b, owned));
+    const done = await world.finishCraft(owner.id, run, req.body.layout, owned, bookPages.openChapters(b, owned), bookPages.starsOf(b, owned));
     await craftDone(res, owner, b, done, { made: done.made, craft: done.craft });
 }));
 router.post('/world/craft/place', withAccount(async (req, res, owner, b) => {

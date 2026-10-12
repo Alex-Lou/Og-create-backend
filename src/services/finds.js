@@ -4,14 +4,15 @@
 // quelques-unes, puis le gisement repousse. Fonctions pures.
 const map = require('./worldMap');
 
-// grounds : sols où pousse son gisement
+// grounds : sols où pousse son gisement ; key : l'élément du Grimoire à connaître avant de ramasser (choix de l'auteur,
+// 12 oct. : le Grimoire, clé de l'île ; la Falaise pour les landes, la Laine étant trop loin dans le Livre)
 const FINDS = [
-    { id: 'glace', name: 'Glace', climate: 'cimes', grounds: 'n' },
-    { id: 'laine', name: 'Laine', climate: 'landes', grounds: 'l' },
-    { id: 'roseau', name: 'Roseau', climate: 'marais', grounds: 'x' },
-    { id: 'sel', name: 'Sel', climate: 'dunes', grounds: 's' },
-    { id: 'fruits', name: 'Fruits', climate: 'jungle', grounds: 'j' },
-    { id: 'obsidienne', name: 'Obsidienne', climate: 'volcan', grounds: 'ar' }
+    { id: 'glace', name: 'Glace', climate: 'cimes', grounds: 'n', key: 'Glace' },
+    { id: 'laine', name: 'Laine', climate: 'landes', grounds: 'l', key: 'Falaise' },
+    { id: 'roseau', name: 'Roseau', climate: 'marais', grounds: 'x', key: 'Marais' },
+    { id: 'sel', name: 'Sel', climate: 'dunes', grounds: 's', key: 'Sel' },
+    { id: 'fruits', name: 'Fruits', climate: 'jungle', grounds: 'j', key: 'Jungle' },
+    { id: 'obsidienne', name: 'Obsidienne', climate: 'volcan', grounds: 'ar', key: 'Obsidienne' }
 ];
 const FIND_BY_ID = Object.fromEntries(FINDS.map(f => [f.id, f]));
 

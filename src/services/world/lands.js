@@ -9,7 +9,7 @@ const finds = require('../finds');
 const pickups = require('../pickups');
 const anya = require('../anya');
 const { EXPEDITION_COST, chargesAt, effectsOf } = require('./rules');
-const { levelsOf, stockOf, zonesOf, depositsOf, foundOf, discoveredOf, craftsOf, placedOf } = require('./reads');
+const { levelsOf, stockOf, zonesOf, depositsOf, foundOf, discoveredOf, craftsOf, placedOf, writtenOf } = require('./reads');
 const { migrate } = require('./migrate');
 const { presenceOf } = require('./people');
 const { bonusesFor, gather, payWith } = require('./produce');
@@ -82,7 +82,7 @@ async function findLandmark(userId, landmarkId, now = Date.now()) {
 const craftBonusOf = (placed, zoneId) => Math.min(finds.CRAFT_BONUS_MAX,
     placed.filter(r => crafts.CRAFT_BY_ID[r.craft]?.place.climate && map.zoneAt(r.x, r.y) === zoneId).length);
 
-// Ramasse un gisement d'un quartier à soi, s'il a repoussé : quelques trouvailles de son climat (plus une par création
+// Ramasse un gisement d'un quartier à soi, sa clé écrite au Grimoire (finds.FINDS : key), s'il a repoussé : quelques trouvailles de son climat (plus une par création
 // de climat posée dans le quartier), versées une seule fois (même en double clic : la ligne de stock est verrouillée).
 // { find, amount } ou { status, message }
 async function gatherDeposit(userId, depositId, now = Date.now()) {
@@ -92,6 +92,8 @@ async function gatherDeposit(userId, depositId, now = Date.now()) {
     return db.transaction(async conn => {
         await stockOf(userId, conn, true);
         if (!(await zonesOf(userId, conn)).has(deposit.zone)) return db.rollback({ status: 403, message: 'Achète d’abord ce quartier de l’île.' });
+        const find = finds.FIND_BY_ID[deposit.find];
+        if (!(await writtenOf(userId, find.key, conn))) return db.rollback({ status: 403, message: `${find.name} : il faut d’abord connaître « ${find.key} » — à écrire au Grimoire.` });
         const { blessed } = await presenceOf(userId, conn, now);
         const wait = finds.readyIn((await depositsOf(userId, conn)).get(deposit.id), now, blessed ? anya.BLESSING.regrowMs : finds.REGROW_MS);
         if (wait > 0) return db.rollback({ status: 409, message: `Ce gisement repousse : reviens dans ${Math.ceil(wait / 60000)} min.` });

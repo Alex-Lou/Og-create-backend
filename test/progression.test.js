@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
 const recipeBook = require('../src/services/recipeBook');
 const bookPages = require('../src/services/bookPages');
 const { QUESTS } = require('../src/services/quests');
-const { SITES, CHAPTER_OF_LEVEL } = require('../src/services/world/rules');
+const { SITES, CHAPTER_OF_LEVEL, WATER_KEY } = require('../src/services/world/rules');
 const { ZONE_BY_ID } = require('../src/services/worldMap');
 const crafts = require('../src/services/crafts');
 const db = require('../src/config/db');
@@ -66,9 +66,16 @@ test('jamais d’impasse : tutoriel et actes I et II, chaque clé dans un chapit
         write(tier.plan, why);
         assert.ok(open(chapter), `${why} : le palier ${goal.need} demande le chapitre ${chapter}, encore scellé`);
       }
+      // (l'eau douce vient avec la clé du Puits : un palier qui en coûte arrive après elle)
+      assert.ok(!tier.cost.water || owned.has(WATER_KEY), `${why} : le palier ${goal.need} coûte de l'eau, avant « ${WATER_KEY} »`);
     }
     if (goal.kind === 'craft' && !TUTORIAL_CRAFT(quest, goal.craft)) {
-      for (const element of crafts.CRAFT_BY_ID[goal.craft].elements || []) write(element, why);
+      const c = crafts.CRAFT_BY_ID[goal.craft];
+      for (const element of c.elements || []) write(element, why);
+      // (son palier ouvert sans l'Épreuve : en cascade, par les découvertes et les chapitres ouverts)
+      const chapters = new Set(bookPages.CHAPTERS.filter(ch => open(ch.id)).map(ch => ch.id));
+      assert.ok(crafts.tiersOpen(chapters, 0, stars()).has(c.tier), `${why} : la création « ${c.name} » est au palier ${c.tier}, encore fermé (${stars()} découvertes)`);
+      assert.ok(!c.cost.water || owned.has(WATER_KEY), `${why} : la création « ${c.name} » coûte de l'eau, avant « ${WATER_KEY} »`);
     }
     if (goal.kind === 'zone') {
       const chapter = ZONE_BY_ID[goal.zone].chapter;

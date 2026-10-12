@@ -16,6 +16,7 @@
 // Fonctions pures, sans base de données.
 const map = require('./worldMap');
 const finds = require('./finds');
+const { needOfChapter } = require('./bookPages');
 
 const EPREUVES = 10;
 const STARS = 10;
@@ -33,7 +34,8 @@ const ofPlace = name => name.replace(/^Les /, 'des ').replace(/^Le /, 'du ').rep
 const craft = (id, name, tier, cost, elements, after, place, shape, spent = {}) => ({ id, name, tier, cost, elements, after, place, shape, finds: spent });
 const CRAFTS = [
     craft('cloture', 'Clôture', 'start', { wood: 8 }, [], [], {}, ['x.x', 'xxx', 'x.x']),
-    craft('massif', 'Massif de fleurs', 'start', { water: 6, food: 4 }, ['Terre'], [], { ground: 'gm' }, ['.x.', 'xxx', 'xxx']),
+    // (des fleurs sans pluie, non : la Pluie, clé du Puits, apporte l'eau qu'il coûte, choix de l'auteur, 12 oct.)
+    craft('massif', 'Massif de fleurs', 'start', { water: 6, food: 4 }, ['Pluie'], [], { ground: 'gm' }, ['.x.', 'xxx', 'xxx']),
     craft('muret', 'Muret de pierre', 'I', { stone: 12 }, ['Terre'], ['cloture'], {}, ['xxxx', 'xxxx']),
     craft('lanterne', 'Lanterne', 'I', { wood: 6, stone: 6 }, ['Feu', 'Lumière'], [], { path: true }, ['xxx', 'xxx', '.x.', '.x.']),
     craft('banc', 'Banc', 'I', { wood: 14 }, [], ['cloture'], { nearCraft: { id: 'lanterne', reach: 3 } }, ['xxxx', 'xxxx', 'x..x']),
@@ -161,14 +163,26 @@ function check(shape, pieces, layout) {
     return filled.size === goal.size ? { ok: true } : { ok: false, error: 'le gabarit n’est pas rempli' };
 }
 
-// Paliers ouverts : finished = Set des chapitres du Grimoire entièrement trouvés ; epreuves = questions réussies ;
-// stars = découvertes du Grimoire (le palier des climats est toujours ouvert : ses trouvailles le gardent)
-function tiersOpen(finished, epreuves, stars = 0) {
+// Paliers ouverts : chapters = Set des chapitres ouverts du Grimoire ; epreuves = questions réussies ; stars =
+// découvertes du Grimoire (le palier des climats est toujours ouvert : ses trouvailles le gardent). En cascade (choix de
+// l'auteur, 12 oct.) : le palier I à 10 découvertes (ou 10 questions de l'Épreuve) ; le II, son chapitre ouvert et le
+// palier I ouvert ; le III, son chapitre ouvert et le palier II ouvert. Leurs savoir-faire sont les vraies clés
+const CASCADE = [['II', 'I'], ['III', 'II']];
+function tiersOpen(chapters, epreuves, stars = 0) {
     const open = new Set(['start']);
-    if (stars >= STARS || finished.has('I') || epreuves >= EPREUVES) open.add('I');
-    for (const t of ['II', 'III']) if (finished.has(t)) open.add(t);
+    if (stars >= STARS || epreuves >= EPREUVES) open.add('I');
+    for (const [t, before] of CASCADE) if (open.has(before) && chapters.has(t)) open.add(t);
     open.add('climat');
     return open;
+}
+// Ce qui ouvre un palier fermé (texte), ou null s'il est ouvert
+function tierLock(tier, open, stars = 0) {
+    if (open.has(tier)) return null;
+    if (tier === 'I') return `Palier I : inscris ${STARS} découvertes au Grimoire, ou réussis ${EPREUVES} questions de l’Épreuve.`;
+    const before = CASCADE.find(([t]) => t === tier)[1];
+    if (!open.has(before)) return `S’ouvre avec le palier ${before}.`;
+    const missing = Math.max(1, needOfChapter(tier) - stars);
+    return `Ouvre le chapitre ${tier} du Grimoire : encore ${missing} découverte${missing > 1 ? 's' : ''}.`;
 }
 
 // Les créations que le tutoriel fait fabriquer avant leur palier et leurs éléments (la lanterne de Rivet, sa première
@@ -178,9 +192,9 @@ const TUTORIAL_CRAFTS = new Set(['lanterne']);
 
 // Ce qui empêche de fabriquer une création (texte), ou null. made : { création: nombre fabriqué } ; owned : Set des
 // éléments du Livre ; stock : ressources ; open : paliers ouverts ; have : trouvailles de climat ; tutorial : le
-// tutoriel la fait fabriquer (ni palier ni éléments)
-function blockOf(c, { made, owned, stock, open, have = {}, tutorial = false }) {
-    if (!tutorial && !open.has(c.tier)) return c.tier === 'I' ? `Palier I : inscris ${STARS} découvertes au Grimoire, ou réussis ${EPREUVES} questions de l’Épreuve.` : `Palier ${c.tier} : finis le chapitre ${c.tier} du Grimoire.`;
+// tutoriel la fait fabriquer (ni palier ni éléments) ; stars : découvertes (ce qui manque au chapitre du palier)
+function blockOf(c, { made, owned, stock, open, have = {}, tutorial = false, stars = 0 }) {
+    if (!tutorial && !open.has(c.tier)) return tierLock(c.tier, open, stars);
     const before = c.after.filter(id => !made[id]);
     if (before.length) return `Fabrique d’abord : ${before.map(id => CRAFT_BY_ID[id].name).join(', ')}.`;
     const unknown = tutorial ? [] : c.elements.filter(e => !owned.has(e));
@@ -249,6 +263,6 @@ function leaveBlock(row, x, y, placed) {
 }
 
 module.exports = {
-    EPREUVES, STARS, TIERS, TUTORIAL_CRAFTS, PIECE_MAX, TURNED, CRAFTS, CRAFT_BY_ID, cellsOf, mulberry32, normal, turn, piecesOf, check, tiersOpen, blockOf, placeText, gapTo, spotBlock,
+    EPREUVES, STARS, TIERS, TUTORIAL_CRAFTS, PIECE_MAX, TURNED, CRAFTS, CRAFT_BY_ID, cellsOf, mulberry32, normal, turn, piecesOf, check, tiersOpen, tierLock, blockOf, placeText, gapTo, spotBlock,
     strandedBy, leaveBlock
 };

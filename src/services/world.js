@@ -29,12 +29,13 @@ const beastRules = require('./beasts');
 const {
     SIZE, CAP_HOURS, REGEN_MS, RUN_TTL_MS, RENAME_LEVEL, GAME_TTL_MS, GAME_SLACK_MS, SHORT_RUNS, SHORT_MOVES, FIRST_RUN_KINDS,
     RESOURCES, DECO_PRICES, HARVEST_COIN_EVERY, UNDO_SECONDS, random, CHAPTER_OF_LEVEL, PRODUCE_PER_LEVEL,
-    COINS_PER_LEVEL, SITES, MAP_VERSION, effectOf, keyOf, pendingOf, chargesAt, effectsOf, productionOf, fullInOf, perHourOf, productionAll, cashOf
+    COINS_PER_LEVEL, SITES, MAP_VERSION, effectOf, keyOf, pendingOf, chargesAt, effectsOf, productionOf, fullInOf, perHourOf, productionAll, cashOf,
+    WATER_KEY, withWater
 } = require('./world/rules');
 const {
     itemsOf, skinsOf, signsOf, namesOf, avatarOf, friendsOf, needRowsOf, settlersOf, gamesOf, annexesOf, levelsOf, stockOf,
     zonesOf, findsOf, depositsOf, blightsOf, foundOf, claimedOf, helianeOfUser, runsOf, countOf, discoveredOf, craftsOf,
-    placedOf, madeOf, addStock, balanceOf
+    placedOf, madeOf, addStock, balanceOf, writtenOf
 } = require('./world/reads');
 const { migrate } = require('./world/migrate');
 const { openedOf, chestsView, grant, openChest, openAll } = require('./world/chests');
@@ -457,8 +458,13 @@ async function view(userId, owned, book) {
             id: l.id, name: l.name, zone: l.zone, x: l.x, y: l.y, text: l.text, effect: landmarks.effectText(l), chest: l.chest,
             found: found.has(l.id), foundAt: found.get(l.id) || null
         } : { id: l.id, zone: l.zone, known: false })),
-        // Trouvailles de climat (réserve à part) : nom, climat, nombre
-        finds: finds.FINDS.map(f => ({ id: f.id, name: f.name, climate: f.climate, amount: stockFinds[f.id] })),
+        // Trouvailles de climat (réserve à part) : nom, climat, nombre ; leur clé du Grimoire, connue ou non, et les pages
+        // jusqu'à elle (le verrou parlant), pour un climat dont un quartier est connu
+        finds: finds.FINDS.map(f => {
+            const known = have.has(f.key);
+            const near = !known && book.pagesTo && finds.DEPOSITS.some(d => d.find === f.id && isKnown(map.ZONE_BY_ID[d.zone], discovered));
+            return { id: f.id, name: f.name, climate: f.climate, amount: stockFinds[f.id], key: f.key, known, ...(near ? { pages: book.pagesTo(f.key) } : {}) };
+        }),
         // Gisements des quartiers connus : case, trouvaille, temps avant de repousser (ms, 0 : prêt), trouvailles de plus
         // grâce aux créations de climat de leur quartier
         deposits: finds.DEPOSITS.filter(d => isKnown(map.ZONE_BY_ID[d.zone], discovered))
@@ -472,7 +478,7 @@ async function view(userId, owned, book) {
         sites,
         stock: Object.fromEntries(RESOURCES.map(r => [r, stock[r]])),
         charges: { count: charges.count, max: effects.maxCharges, nextIn: charges.count < effects.maxCharges ? Math.max(0, charges.since + effects.regenMs - Date.now()) : null },
-        harvest: { maxMoves: effects.maxMoves, kinds: effects.kinds, boosts: effects.boosts, coinEvery: HARVEST_COIN_EVERY },
+        harvest: { maxMoves: effects.maxMoves, kinds: withWater(effects.kinds, have.has(WATER_KEY)), boosts: effects.boosts, coinEvery: HARVEST_COIN_EVERY },
         rates: { produce: PRODUCE_PER_LEVEL, coins: COINS_PER_LEVEL },
         capHours: CAP_HOURS,
         pending: cash.coins,
@@ -485,7 +491,8 @@ async function view(userId, owned, book) {
             max: paths.MAX_CELLS
         },
         crafts: craftsView(craftRows, craftCtx({ levels, zones, annexRows, rows: craftRows, blocked: campCells, ground: roads.ground, places }), {
-            owned: have, stock: paidStock, open: crafts.tiersOpen(book.finished || new Set(), epreuves, book.stars ?? 0), epreuves, stars: book.stars ?? 0, have: stockFinds, presence
+            owned: have, stock: paidStock, open: crafts.tiersOpen(book.openChapters || new Set(), epreuves, book.stars ?? 0), epreuves, stars: book.stars ?? 0, have: stockFinds, presence,
+            pagesTo: book.pagesTo
         }, id => sites.find(site => site.id === id)?.name || id),
         // Habitants (la troupe rencontrée, les visiteurs installés) : prénom, goûts, amitié, déjà vus ou gâtés
         // aujourd'hui ; leurs besoins, leur humeur et ce qu'elle fait ; built : son bâtiment est bâti (sinon il vit au
@@ -701,7 +708,8 @@ function startRun(userId, asked = null) {
         const seed = crypto.randomInt(1, 2147483647);
         const before = (await conn.query('SELECT 1 FROM world_runs WHERE user_id = $1 LIMIT $2', [userId, SHORT_RUNS])).rows.length;
         const { boosts } = effects;
-        const kinds = before === 0 ? FIRST_RUN_KINDS : effects.kinds;
+        // (pas d'eau douce avant la clé du Puits : rules.js, WATER_KEY)
+        const kinds = withWater(before === 0 ? FIRST_RUN_KINDS : effects.kinds, await writtenOf(userId, WATER_KEY, conn));
         // (les premières parties sont courtes)
         const maxMoves = before < SHORT_RUNS ? SHORT_MOVES : effects.maxMoves;
         // Heure prise après le verrou de la réserve (et non au début de la transaction) : un achat passé avant ce

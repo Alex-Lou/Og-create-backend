@@ -50,16 +50,27 @@ test('un assemblage se vérifie : pièces toutes posées, dans le gabarit, sans 
   assert.match(crafts.check(shape, pieces, 'rien').error, /manque/);
 });
 
-test('paliers : I par le chapitre I fini ou 10 questions de l’Épreuve ; II et III par leur chapitre fini', () => {
-  assert.deepEqual([...crafts.tiersOpen(new Set(), 9)], ['start', 'climat']);
-  assert.deepEqual([...crafts.tiersOpen(new Set(), 10)], ['start', 'I', 'climat']);
-  assert.deepEqual([...crafts.tiersOpen(new Set(['I', 'II']), 0)], ['start', 'I', 'II', 'climat']);
+test('paliers en cascade : I à 10 découvertes ou 10 questions ; II et III, leur chapitre ouvert et le palier d’avant', () => {
+  const chapters = new Set(['I', 'II', 'III']);
+  assert.deepEqual([...crafts.tiersOpen(new Set(['I']), 9)], ['start', 'climat']);
+  assert.deepEqual([...crafts.tiersOpen(new Set(['I']), 10)], ['start', 'I', 'climat']);
+  // (les chapitres II et III s'ouvrent avant le palier I : ils attendent lui)
+  assert.deepEqual([...crafts.tiersOpen(chapters, 0, 9)], ['start', 'climat']);
+  assert.deepEqual([...crafts.tiersOpen(chapters, 0, 10)], ['start', 'I', 'II', 'III', 'climat']);
+  assert.deepEqual([...crafts.tiersOpen(new Set(['I', 'II']), 10)], ['start', 'I', 'II', 'climat']);
+  // Ce qui ouvre un palier fermé : le palier d'avant, ou les découvertes qui manquent à son chapitre
+  assert.equal(crafts.tierLock('II', crafts.tiersOpen(chapters, 0, 9), 9), 'S’ouvre avec le palier I.');
+  assert.equal(crafts.tierLock('III', crafts.tiersOpen(new Set(['I', 'II']), 0, 3), 3), 'S’ouvre avec le palier II.');
+  assert.equal(crafts.tierLock('III', crafts.tiersOpen(new Set(['I', 'II']), 10, 3), 3), 'Ouvre le chapitre III du Grimoire : encore 2 découvertes.');
+  assert.equal(crafts.tierLock('II', crafts.tiersOpen(chapters, 0, 10), 10), null);
   const ctx = (over = {}) => ({ made: {}, owned: new Set(['Feu']), stock: { wood: 50, stone: 50 }, open: new Set(['start', 'I']), ...over });
   const lanterne = crafts.CRAFT_BY_ID.lanterne;
   assert.match(crafts.blockOf(lanterne, ctx()), /Lumière/);
   assert.equal(crafts.blockOf(lanterne, ctx({ owned: new Set(['Feu', 'Lumière']) })), null);
   assert.match(crafts.blockOf(crafts.CRAFT_BY_ID.banc, ctx()), /Clôture/);
-  assert.match(crafts.blockOf(crafts.CRAFT_BY_ID.fontaine, ctx()), /chapitre II/);
+  assert.match(crafts.blockOf(crafts.CRAFT_BY_ID.fontaine, ctx()), /chapitre II du Grimoire/);
+  // (le Massif de fleurs demande la Pluie : l'eau qu'il coûte vient avec elle)
+  assert.match(crafts.blockOf(crafts.CRAFT_BY_ID.massif, ctx({ stock: { water: 6, food: 4 } })), /Pluie/);
   assert.match(crafts.blockOf(crafts.CRAFT_BY_ID.cloture, ctx({ stock: {} })), /ressources/);
 });
 

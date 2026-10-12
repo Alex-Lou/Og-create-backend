@@ -76,7 +76,8 @@ async function epreuvesOf(userId, conn = db) {
 // où poser ou déplacer une création déjà fabriquée), créations posées. Une création posée dont d'autres ont besoin
 // (règle « près de ») dit lesquelles : keeps = leurs cases et leur portée (elle ne se déplace qu'à portée de chacune),
 // keepText = pourquoi elle ne se range pas (crafts.leaveBlock)
-function craftsView(rows, ctx, { owned, stock, open, epreuves, stars = 0, have, presence = null }, siteName) {
+// pagesTo(nom) : pages jusqu'à un savoir-faire pas encore écrit (le verrou parlant, comme pour un bâtiment), ou rien
+function craftsView(rows, ctx, { owned, stock, open, epreuves, stars = 0, have, presence = null, pagesTo = null }, siteName) {
     const tutorial = presence ? tutorialOf(presence) : new Set();
     const made = madeOf(rows);
     const placed = placedOf(rows);
@@ -91,13 +92,15 @@ function craftsView(rows, ctx, { owned, stock, open, epreuves, stars = 0, have, 
         // Découvertes du Grimoire qui ouvrent le palier I (l'autre clé : les questions de l'Épreuve)
         stars: { have: stars, need: crafts.STARS },
         open: crafts.TIERS.filter(t => open.has(t)),
+        // Ce qui ouvre chaque palier fermé (crafts.tierLock : le palier d'avant, ou les découvertes qui manquent au chapitre)
+        locks: Object.fromEntries(crafts.TIERS.map(t => [t, crafts.tierLock(t, open, stars)]).filter(([, text]) => text)),
         catalog: crafts.CRAFTS.map(c => {
             const reserve = rows.filter(r => r.craft === c.id && r.x === null).length;
             return {
-                id: c.id, name: c.name, tier: c.tier, cost: c.cost, finds: c.finds, elements: c.elements.map(name => ({ name, have: owned.has(name) })),
+                id: c.id, name: c.name, tier: c.tier, cost: c.cost, finds: c.finds, elements: c.elements.map(name => ({ name, have: owned.has(name), ...(!owned.has(name) && pagesTo ? { pages: pagesTo(name) } : {}) })),
                 // (tutorial : la leçon du tutoriel la fait fabriquer avant son palier ; le front ouvre l'établi sur elle)
                 after: c.after, open: open.has(c.tier) || tutorial.has(c.id), tutorial: tutorial.has(c.id), made: made[c.id] || 0, reserve, climate: c.place.climate || null,
-                block: crafts.blockOf(c, { made, owned, stock, open, have, tutorial: tutorial.has(c.id) }), place: crafts.placeText(c, siteName),
+                block: crafts.blockOf(c, { made, owned, stock, open, have, tutorial: tutorial.has(c.id), stars }), place: crafts.placeText(c, siteName),
                 spots: made[c.id] ? craftSpots(c, ctx) : []
             };
         }),
@@ -106,18 +109,18 @@ function craftsView(rows, ctx, { owned, stock, open, epreuves, stars = 0, have, 
 }
 
 // Assemblage d'une création : palier ouvert, celles d'avant déjà fabriquées, savoir-faire du Livre, ressources. Une
-// graine, les pièces à poser (rien n'est payé avant la réussite). owned : éléments du Livre ; finished : chapitres
-// finis. { run: { id, craft, shape, pieces, turned } } ou { status, message }
-async function startCraft(userId, craftId, owned, finished, stars = 0) {
+// graine, les pièces à poser (rien n'est payé avant la réussite). owned : éléments du Livre ; chapters : chapitres
+// ouverts. { run: { id, craft, shape, pieces, turned } } ou { status, message }
+async function startCraft(userId, craftId, owned, chapters, stars = 0) {
     if (!Object.hasOwn(crafts.CRAFT_BY_ID, craftId)) return { status: 404, message: 'Création inconnue.' };
     const c = crafts.CRAFT_BY_ID[craftId];
     await migrate(userId);
     return db.transaction(async conn => {
         // Ce qui attend dans les bâtiments est encaissé d'abord : cela compte pour les matériaux
         const { stock, balance } = await payWith(userId, conn, await stockOf(userId, conn, true));
-        const open = crafts.tiersOpen(finished, await epreuvesOf(userId, conn), stars);
+        const open = crafts.tiersOpen(chapters, await epreuvesOf(userId, conn), stars);
         const tutorial = tutorialOf(await presenceOf(userId, conn)).has(c.id);
-        const block = crafts.blockOf(c, { made: madeOf(await craftsOf(userId, conn)), owned: new Set(owned), stock, open, have: await findsOf(userId, conn), tutorial });
+        const block = crafts.blockOf(c, { made: madeOf(await craftsOf(userId, conn)), owned: new Set(owned), stock, open, have: await findsOf(userId, conn), tutorial, stars });
         if (block) return db.rollback({ status: 403, message: block });
         const seed = crypto.randomInt(1, 2147483647);
         const { rows } = await conn.query('INSERT INTO world_craft_runs (user_id, craft, seed) VALUES ($1, $2, $3) RETURNING id', [userId, craftId, seed]);
@@ -130,7 +133,7 @@ async function startCraft(userId, craftId, owned, finished, stars = 0) {
 
 // Fin d'un assemblage : le serveur vérifie que les pièces couvrent le gabarit, puis prend les ressources et met la
 // création en réserve. L'assemblage ne se rend qu'une fois, même refusé. { made, craft } ou { status, message }
-function finishCraft(userId, runId, layout, owned, finished, stars = 0) {
+function finishCraft(userId, runId, layout, owned, chapters, stars = 0) {
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
         const { rows } = await conn.query(
@@ -144,9 +147,9 @@ function finishCraft(userId, runId, layout, owned, finished, stars = 0) {
         if (!done.ok) return { status: 400, message: `Assemblage refusé : ${done.error}.` };
         // Entre le début et la fin, le stock ou le Livre ont pu changer ; ce qui attend dans les bâtiments compte encore
         const { stock: paid, balance } = await payWith(userId, conn, stock);
-        const open = crafts.tiersOpen(finished, await epreuvesOf(userId, conn), stars);
+        const open = crafts.tiersOpen(chapters, await epreuvesOf(userId, conn), stars);
         const tutorial = tutorialOf(await presenceOf(userId, conn)).has(c.id);
-        const block = crafts.blockOf(c, { made: madeOf(await craftsOf(userId, conn)), owned: new Set(owned), stock: paid, open, have: await findsOf(userId, conn), tutorial });
+        const block = crafts.blockOf(c, { made: madeOf(await craftsOf(userId, conn)), owned: new Set(owned), stock: paid, open, have: await findsOf(userId, conn), tutorial, stars });
         if (block) return { status: 409, message: block };
         const n = r => c.cost[r] || 0;
         await conn.query('UPDATE world_stock SET stone = stone - $2, wood = wood - $3, water = water - $4, food = food - $5 WHERE user_id = $1',

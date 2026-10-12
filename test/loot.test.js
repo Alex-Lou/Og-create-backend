@@ -78,6 +78,18 @@ test('commun et rare : des écus ou des ressources, dans leurs bornes', () => {
   assert.deepEqual(two, { kind: 'stock', stock: { stone: 25, wood: 25 } });
 });
 
+test('avant la clé du Puits, un coffre ne donne pas d’eau douce : ses ressources sont celles de l’île', () => {
+  const dry = ['stone', 'wood', 'food'];
+  // (tirages qui tomberaient sur l'eau parmi les quatre ressources : 0,5 → la troisième, l'eau)
+  for (const r of [0.5, 0.55, 0.74]) {
+    const commun = loot.prizeOf('commun', { levels: {}, owned: new Set(), resources: dry }, seq(0.9, r, 0));
+    assert.ok(!('water' in commun.stock), JSON.stringify(commun));
+    const rare = loot.prizeOf('rare', { levels: {}, owned: new Set(), resources: dry }, seq(0.9, r, r, 0));
+    assert.ok(!('water' in rare.stock), JSON.stringify(rare));
+  }
+  assert.ok('water' in loot.prizeOf('commun', { levels: {}, owned: new Set() }, seq(0.9, 0.5, 0)).stock);
+});
+
 test('jour de Paris : changement d’heure, minuit et veille', () => {
   // Été (UTC+2) et hiver (UTC+1)
   assert.deepEqual(loot.parisOf(Date.parse('2026-07-01T21:59:00Z')), { day: '2026-07-01', slot: 3 });

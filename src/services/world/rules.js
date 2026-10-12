@@ -136,6 +136,10 @@ const SITES = {
         ]
     }
 };
+// L'eau douce vient avec la clé du Puits (choix de l'auteur, 12 oct. : le Grimoire, clé de l'île) : la Pluie écrite, la
+// Récolte a ses tuiles d'eau et les coffres peuvent en donner ; avant, ni l'une ni les autres
+const WATER_KEY = SITES.puits.levels[0].plan;
+const withWater = (list, rain) => (rain ? list : list.filter(r => r !== 'water'));
 const BOOSTED = { carriere: 'stone', bosquet: 'wood', puits: 'water', potager: 'food' };
 
 // Ce que fait un palier (texte de la fiche), calculé depuis les règles : jamais en désaccord avec elles
@@ -307,5 +311,5 @@ module.exports = {
     SHORT_RUNS, SHORT_MOVES, FIRST_RUN_KINDS, RESOURCES, MAP_VERSION, EXPEDITION_COST, OLD_DECO_RATE, DECO_PRICES,
     HARVEST_COIN_EVERY, UNDO_SECONDS, random, CHAPTER_OF_LEVEL, BOOST_BY_LEVEL, ATELIER_MOVES, PRODUCE_PER_LEVEL,
     COINS_PER_LEVEL, WORDS, tier, SITES, BOOSTED, effectOf, keyOf, pendingOf, chargesAt, NO_BONUS, NO_ANNEX, effectsOf,
-    productionOf, boostedHours, fullInOf, perHourOf, productionAll, cashOf
+    productionOf, boostedHours, fullInOf, perHourOf, productionAll, cashOf, WATER_KEY, withWater
 };

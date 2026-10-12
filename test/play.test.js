@@ -569,6 +569,9 @@ test('créations d’île : assembler (pièces vérifiées), payer à la réussi
   const cat = (world, id) => world.crafts.catalog.find(c => c.id === id);
   // Palier de départ ouvert ; palier I fermé (ni chapitre I fini, ni 10 questions de l'Épreuve)
   assert.deepEqual(first.crafts.open, ['start', 'climat']);
+  // (les paliers en cascade : chacun dit ce qui l'ouvre)
+  assert.deepEqual(Object.keys(first.crafts.locks), ['I', 'II', 'III']);
+  assert.equal(first.crafts.locks.II, 'S’ouvre avec le palier I.');
   assert.deepEqual(first.crafts.epreuves, { have: 0, need: 10 });
   assert.equal(first.crafts.catalog.length, 30);
   assert.match(cat(first, 'muret').block, /Palier I/);
@@ -611,7 +614,11 @@ test('créations d’île : assembler (pièces vérifiées), payer à la réussi
   await sql(`UPDATE progress SET timer_progress = jsonb_set(timer_progress, '{completedQuestions}', '{"Facile":{"A":[1,2,3,4,5,6,7,8,9,10]}}') WHERE user_id = $1`, [player.userId]);
   const opened = await view();
   assert.deepEqual(opened.crafts.open, ['start', 'I', 'climat']);
+  assert.match(opened.crafts.locks.II, /^Ouvre le chapitre II du Grimoire : encore \d+ découvertes?\.$/);
   assert.match(cat(opened, 'lanterne').block, /Lumière/);
+  // (le savoir-faire qui manque dit ses pages jusqu'à lui : le verrou parlant)
+  const lumiere = cat(opened, 'lanterne').elements.find(e => e.name === 'Lumière');
+  assert.deepEqual([lumiere.have, lumiere.pages > 0], [false, true]);
   await sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Lumière"]'::jsonb WHERE user_id = $1`, [player.userId]);
   assert.equal((await make('lanterne')).status, 200);
   assert.equal((await place('lanterne', X(30), Y(30))).status, 400);
@@ -1023,6 +1030,14 @@ test('trouvailles de climat : gisements des quartiers connus, ramassés une fois
   const deposit = known.deposits.find(d => d.id === 'menhirs-1');
   assert.deepEqual([deposit.find, deposit.readyIn], ['laine', 0]);
   assert.match((await gather('falaises-1')).data.message, /Achète d’abord/);
+  // La laine des landes a sa clé au Grimoire (la Falaise) : la vue la dit, avec les pages jusqu'à elle (le verrou parlant)
+  const laine = known.finds.find(f => f.id === 'laine');
+  assert.deepEqual([laine.key, laine.known, laine.pages > 0], ['Falaise', false, true]);
+  assert.equal(known.finds.find(f => f.id === 'glace').pages, undefined, 'pas de pages pour un climat encore inconnu');
+  const locked = await gather('menhirs-1');
+  assert.deepEqual([locked.status, locked.data.message], [403, 'Laine : il faut d’abord connaître « Falaise » — à écrire au Grimoire.']);
+  await sql(`UPDATE progress SET infinite_elements = '["Falaise"]'::jsonb WHERE user_id = $1`, [player.userId]);
+  assert.deepEqual((await view()).finds.find(f => f.id === 'laine').known, true);
   // Un ramassage, une seule fois (même en double clic) : 2 à 4 laines
   const twice = await Promise.all([gather('menhirs-1'), gather('menhirs-1')]);
   assert.deepEqual(twice.map(r => r.status).sort(), [200, 409]);
@@ -1059,7 +1074,8 @@ test('créations et annexes de climat : payées en trouvailles, posées dans leu
   const before = (await view()).crafts.catalog.find(c => c.id === 'igloo');
   assert.deepEqual([before.tier, before.finds, before.climate, before.place], ['climat', { glace: 8 }, 'cimes', 'Se pose dans Les Cimes, sur la neige.']);
   assert.match(before.block, /Neige|glace/);
-  await sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Neige"]'::jsonb WHERE user_id = $1`, [player.userId]);
+  // (la Glace : la clé de ses gisements)
+  await sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Neige", "Glace"]'::jsonb WHERE user_id = $1`, [player.userId]);
   assert.match((await start('igloo')).data.message, /8 glace/);
   await sql(`INSERT INTO world_finds (user_id, find, amount) VALUES ($1, 'glace', 20), ($1, 'laine', 20)`, [player.userId]);
   const { run } = (await start('igloo')).data;
@@ -1259,9 +1275,10 @@ test('le Monde : la Récolte se joue contre une partie de la réserve, rejouée 
   for (let i = 0; i < 3; i++) runs.push((await api('POST', '/play/world/harvest/start', {}, player)).data);
   assert.equal((await api('POST', '/play/world/harvest/start', {}, player)).status, 409);
   assert.ok(Number.isInteger(runs[0].seed));
-  // La toute première Récolte n'a pas d'eau (bible, § 9) ; les deux premières sont courtes (8 coups), puis normales
+  // Pas d'eau douce avant la clé du Puits (la Pluie au Grimoire) ; les deux premières sont courtes (8 coups), puis normales
   assert.deepEqual([runs[0].kinds, runs[0].maxMoves], [['stone', 'wood', 'food'], 8]);
-  assert.deepEqual([runs[1].kinds.length, runs[1].maxMoves, runs[2].maxMoves], [4, 8, 15]);
+  assert.deepEqual([runs[1].kinds, runs[1].maxMoves, runs[2].maxMoves], [['stone', 'wood', 'food'], 8, 15]);
+  assert.deepEqual(view.harvest.kinds, ['stone', 'wood', 'food']);
 
   // Partie jouée : le gain est celui que le serveur recalcule ; la rendre deux fois ne paie qu'une fois
   const { moves, expected } = playRun(runs[0], 6);
@@ -1294,6 +1311,10 @@ test('le Monde : la Récolte se joue contre une partie de la réserve, rejouée 
   // Réserve : une partie revient toutes les 30 minutes
   await sql(`UPDATE world_stock SET charges = 0, charges_at = NOW() - INTERVAL '65 minutes' WHERE user_id = $1`, [player.userId]);
   assert.equal((await api('GET', '/play/world', null, player)).data.charges.count, 2);
+  // La Pluie écrite : les tuiles d'eau paraissent
+  await sql(`UPDATE progress SET infinite_elements = '["Vent", "Pluie"]'::jsonb WHERE user_id = $1`, [player.userId]);
+  assert.deepEqual((await api('GET', '/play/world', null, player)).data.harvest.kinds, ['stone', 'wood', 'water', 'food']);
+  assert.deepEqual((await api('POST', '/play/world/harvest/start', {}, player)).data.kinds, ['stone', 'wood', 'water', 'food']);
 });
 
 test('le Monde : un chantier demande son quartier, son plan du Livre et ses ressources, puis évolue', async () => {

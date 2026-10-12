@@ -5,8 +5,8 @@ const ledger = require('../ledger');
 const quests = require('../quests');
 const loot = require('../loot');
 const landmarks = require('../landmarks');
-const { random } = require('./rules');
-const { itemsOf, levelsOf, stockOf, foundOf, claimedOf, helianeOfUser, addStock, balanceOf } = require('./reads');
+const { random, RESOURCES, WATER_KEY, withWater } = require('./rules');
+const { itemsOf, levelsOf, stockOf, foundOf, claimedOf, helianeOfUser, addStock, balanceOf, writtenOf } = require('./reads');
 const { migrate } = require('./migrate');
 
 // Coffres déjà ouverts parmi les sources à surveiller : chapitres, quêtes, lieux, jour (et veille), bouteille. Map source → ligne
@@ -57,7 +57,8 @@ function chestsView({ day, slot, opened }, openChapters, claimed, found) {
 // grand livre, ressources au stock, teinte ou pièce rare à la collection) et l'inscrit. Dans la transaction de
 // l'appelant, ligne de stock verrouillée. { source, rarity, prize }, ou null si ce coffre est déjà ouvert
 async function grant(userId, source, rarity, conn, { wanted = null, streak = null } = {}) {
-    const prize = loot.prizeOf(rarity, { levels: (await levelsOf(userId, conn)).levels, owned: await itemsOf(userId, conn) }, random, wanted);
+    const resources = withWater(RESOURCES, await writtenOf(userId, WATER_KEY, conn));
+    const prize = loot.prizeOf(rarity, { levels: (await levelsOf(userId, conn)).levels, owned: await itemsOf(userId, conn), resources }, random, wanted);
     const added = await conn.query(
         `INSERT INTO world_chests (user_id, source, rarity, prize, streak) VALUES ($1, $2, $3, $4, $5)
          ON CONFLICT DO NOTHING RETURNING source`, [userId, source, rarity, JSON.stringify(prize), streak]);

@@ -137,6 +137,11 @@ async function foundOf(userId, conn = db) {
     return new Map(rows.map(r => [r.landmark, r.found_at]));
 }
 
+// Un élément écrit au Grimoire (hors éléments de base, jamais écrits), sans charger tout le Livre
+async function writtenOf(userId, name, conn = db) {
+    const { rows } = await conn.query('SELECT infinite_elements ? $2 AS written FROM progress WHERE user_id = $1', [userId, name]);
+    return Boolean(rows[0]?.written);
+}
 // Quêtes de Brume réclamées, et récoltes terminées (objectifs des quêtes)
 async function claimedOf(userId, conn = db) {
     const { rows } = await conn.query('SELECT quest FROM world_quests WHERE user_id = $1', [userId]);
@@ -195,5 +200,5 @@ async function balanceOf(userId, conn) {
 module.exports = {
     itemsOf, skinsOf, signsOf, namesOf, avatarOf, friendsOf, needRowsOf, settlersOf, gamesOf, annexesOf, levelsOf, stockOf,
     tilesOf, zonesOf, findsOf, spendFinds, depositsOf, blightsOf, foundOf, claimedOf, helianeOfUser, runsOf, countOf,
-    discoveredOf, exploredOf, craftsOf, placedOf, madeOf, addStock, balanceOf, PLAYED
+    discoveredOf, exploredOf, craftsOf, placedOf, madeOf, addStock, balanceOf, writtenOf, PLAYED
 };
