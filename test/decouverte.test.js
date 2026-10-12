@@ -75,7 +75,7 @@ test('« Recommencer l’île » : confirmé en toutes lettres ; tout repart de 
 });
 
 test('dormir : la première nuit se passe seul, sans écus ; Aster n’arrive qu’au matin', async () => {
-    const player = await newPlayer({ veteran: false });
+    const player = await newPlayer();
     const id = player.userId;
     const view = async () => (await api('GET', '/play/world', null, player)).data;
     // Avant le feu : pas encore l'heure de dormir

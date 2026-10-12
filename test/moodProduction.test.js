@@ -117,7 +117,7 @@ test('prodSteps : la part du Potager à chaque échéance ; un visiteur install�
   const lm = landmarks.bonusesOf([]);
   const island = {
     levels: { foyer: 1, potager: 1 }, zones: new Set(['coeur', 'jardins']), settlers: [],
-    presence: { veteran: true, done: new Set(), blessed: false }, decor: [], filled: { potager: { manger: new Date(at(30)) } }
+    presence: { done: new Set(['puits-ondin']), blessed: false }, decor: [], filled: { potager: { manger: new Date(at(30)) } }
   };
   // Mélisse : contente (sans créations autour), puis triste quand son repas échoit, il y a 6 h
   const steps = prodSteps(island, base, lm, new Date(at(10)), T);

@@ -6,8 +6,7 @@ const { BASE_ELEMENTS } = require('./recipeBook');
 const hangman = require('./hangman');
 
 // Les 15 familles regroupées en 7 chapitres ; « need » = découvertes requises (hors 4 éléments de base),
-// « verse » = la phrase de la page de garde du chapitre. Le chapitre II s'ouvre à 3 découvertes (bible, D4), sauf pour
-// un joueur d'avant la bible : il l'avait ouvert d'emblée et le garde (needOf)
+// « verse » = la phrase de la page de garde du chapitre. Le chapitre II s'ouvre à 3 découvertes (bible, D4)
 const CHAPTERS = [
     { id: 'I', name: 'Les Premiers Souffles', families: ['Elements Fondamentaux', 'Phénomènes Naturels'], need: 0, verse: 'Au commencement, quatre souffles et une étincelle de curiosité.' },
     { id: 'II', name: 'La Matière', families: ['Matériaux', 'Chimie', 'Physique'], need: 3, verse: 'Ce qui se pétrit, se fond, se forge : le monde a des mains.' },
@@ -30,8 +29,8 @@ const DIFFICULTY = {
     VII: { decoys: 12, open: 3, letter: false, freeInkAfter: 5, size: 4 }
 };
 const chapterOf = family => CHAPTERS.find(c => c.families.includes(family)) || CHAPTERS[0];
-// Découvertes qui ouvrent ce chapitre pour ce joueur (veteran : compte d'avant la bible, players.isVeteran)
-const needOf = (chapter, veteran) => (veteran && chapter.id === 'II' ? 0 : chapter.need);
+// Découvertes qui ouvrent ce chapitre
+const needOf = chapter => chapter.need;
 const difficultyOf = family => DIFFICULTY[chapterOf(family).id];
 
 const hmac = text => crypto.createHmac('sha256', process.env.JWT_SECRET || 'og-create-book').update(text);
@@ -149,10 +148,10 @@ function arianeOf(b, owned, targets) {
 }
 
 // misses : essais ratés par page (compte seulement), pour l'encre offerte ; letters : parties de pendu par page ;
-// veteran : compte d'avant la bible (le chapitre II lui reste ouvert d'emblée) ; ariane : le fil d'Ariane (arianeOf)
+// ariane : le fil d'Ariane (arianeOf)
 // ou null ; inked : pages où l'Encre a déjà servi (compte), dont l'ingrédient révélé est rendu. La page marquée
 // s'ajoute aux pages ouvertes de son chapitre, même scellé ; elle ne dit rien de plus qu'une autre page
-function view(b, owned, misses = {}, letters = {}, veteran = false, ariane = null, inked = new Set(), guided = false) {
+function view(b, owned, misses = {}, letters = {}, ariane = null, inked = new Set(), guided = false) {
     const have = new Set(owned);
     const within = recipesWithin(b, have);
     const slots = slotsFor(b, owned);
@@ -166,7 +165,7 @@ function view(b, owned, misses = {}, letters = {}, veteran = false, ariane = nul
     }
     const chapters = CHAPTERS.map(chapter => {
         const names = chapter.families.flatMap(family => byFamily.get(family) || []);
-        const need = needOf(chapter, veteran);
+        const need = needOf(chapter);
         const open = stars >= need;
         const rules = DIFFICULTY[chapter.id];
         const recipeOf = new Map(names
@@ -268,9 +267,9 @@ function aim(b, owned, id, tried) {
 // sur une page à énigme pas encore essayée (ailleurs, les familles sont déjà écrites sur la page). known : pages dont
 // l'appareil a déjà un ingrédient ; heard : pages dont il a déjà une famille. Rien n'est gardé ici.
 // { page, chapter, ingredient } ou { page, chapter, family }, ou null (aucune page de son Art à portée)
-function savoir(b, owned, families, { strong = false, known = [], heard = [], misses = {}, veteran = false, ariane = null } = {}) {
+function savoir(b, owned, families, { strong = false, known = [], heard = [], misses = {}, ariane = null } = {}) {
     const skip = new Set(strong ? known : [...known, ...heard]);
-    const pages = view(b, owned, misses, {}, veteran, ariane).chapters
+    const pages = view(b, owned, misses, {}, ariane).chapters
         .flatMap(chapter => chapter.pages.map(page => ({ ...page, chapter: chapter.id })))
         .filter(page => page.status === 'reach' && families.includes(page.family) && !skip.has(page.id) && (strong || (page.riddle && !page.misses)));
     const page = pages.find(p => p.marked) || pages[0];
@@ -283,9 +282,9 @@ function savoir(b, owned, families, { strong = false, known = [], heard = [], mi
 // Découvertes inscrites au Livre (les éléments de base n'en sont pas)
 const starsOf = (b, owned) => owned.filter(name => !BASE_ELEMENTS.includes(name) && b.meta.has(name)).length;
 
-function openChapters(b, owned, veteran = false) {
+function openChapters(b, owned) {
     const stars = starsOf(b, owned);
-    return new Set(CHAPTERS.filter(c => stars >= needOf(c, veteran)).map(c => c.id));
+    return new Set(CHAPTERS.filter(c => stars >= needOf(c)).map(c => c.id));
 }
 // Chapitres dont toutes les pages sont trouvées (créations d'île, lot 8)
 function finishedChapters(b, owned) {

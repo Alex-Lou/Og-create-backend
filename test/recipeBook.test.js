@@ -60,16 +60,19 @@ test('le Livre : pages trouvées, pages à portée sans nom, chapitres scellés'
     ['Eau', { emoji: '💧', family: 'Elements Fondamentaux' }], ['Feu', { emoji: '🔥', family: 'Elements Fondamentaux' }],
     ['Terre', { emoji: '🌱', family: 'Elements Fondamentaux' }], ['Air', { emoji: '💨', family: 'Elements Fondamentaux' }],
     ['Vapeur', { emoji: '♨️', family: 'Matériaux', riddle: 'Je m’élève en soupirant.' }], ['Nuage', { emoji: '☁️', family: 'Phénomènes Naturels' }],
-    ['Pluie', { emoji: '🌧️', family: 'Phénomènes Naturels' }], ['Lave', { emoji: '🌋', family: 'Matériaux' }]
+    ['Pluie', { emoji: '🌧️', family: 'Phénomènes Naturels' }], ['Lave', { emoji: '🌋', family: 'Matériaux' }],
+    // (trois découvertes sans recette ici, qui ouvrent le chapitre II)
+    ['Sel', { emoji: '🧂', family: 'Chimie' }], ['Soufre', { emoji: '🟡', family: 'Chimie' }], ['Verre', { emoji: '🪟', family: 'Chimie' }]
   ]);
   const b = { ...BOOK, meta };
-  // Nouveau joueur : le chapitre II s'ouvre à 3 découvertes (bible, D4) ; un joueur d'avant la bible l'a d'emblée
+  const THREE = ['Sel', 'Soufre', 'Verre'];
+  // Le chapitre II s'ouvre à 3 découvertes (bible, D4)
   const fresh = view(b, BASE).chapters[1];
   assert.deepEqual([fresh.need, fresh.open, fresh.pages], [3, false, []]);
-  const start = view(b, BASE, {}, {}, true);
-  assert.equal(start.stars, 0);
+  const start = view(b, [...BASE, ...THREE]);
+  assert.equal(start.stars, 3);
   const [one, two, three] = start.chapters;
-  assert.deepEqual([two.need, two.open], [0, true]);
+  assert.deepEqual([two.need, two.open], [3, true]);
   assert.equal(one.pages.filter(p => p.status === 'found').length, 4);
   assert.equal(one.far, 2);
   const reach = two.pages.filter(p => p.status === 'reach');
@@ -90,11 +93,11 @@ test('le Livre : pages trouvées, pages à portée sans nom, chapitres scellés'
   assert.equal(reachableById(b, BASE, pageId('Vapeur')).name, 'Vapeur');
   assert.equal(reachableById(b, BASE, pageId('Pluie')), null);
   // Une page trouvée montre sa recette
-  const after = view(b, [...BASE, 'Vapeur'], {}, {}, true);
+  const after = view(b, [...BASE, ...THREE, 'Vapeur']);
   const vapeur = after.chapters[1].pages.find(p => p.name === 'Vapeur');
   assert.deepEqual(vapeur.recipe, ['Eau', 'Feu']);
   assert.equal(vapeur.riddle, 'Je m’élève en soupirant.');
-  assert.equal(after.stars, 1);
+  assert.equal(after.stars, 4);
 });
 
 test('le Livre : difficulté par chapitre (pages ouvertes, profondeur, plateau, aides)', () => {
@@ -133,9 +136,9 @@ test('le Livre : difficulté par chapitre (pages ouvertes, profondeur, plateau, 
   // La page marquée pendant le tutoriel : sans leurre, on ne mélange que ses vrais ingrédients (Feu et Feu pour le
   // Brasier, jamais un leurre « Air »)
   const brasier = { target: 'Phéno3', next: 'Phéno3', remaining: 1 };
-  const markedGuided = view(b, BASE, {}, {}, false, brasier, new Set(), true).chapters[0].pages.find(p => p.marked);
+  const markedGuided = view(b, BASE, {}, {}, brasier, new Set(), true).chapters[0].pages.find(p => p.marked);
   assert.deepEqual(markedGuided.tray, ['Feu']);
-  const markedFree = view(b, BASE, {}, {}, false, brasier, new Set(), false).chapters[0].pages.find(p => p.marked);
+  const markedFree = view(b, BASE, {}, {}, brasier, new Set(), false).chapters[0].pages.find(p => p.marked);
   assert.equal(markedFree.tray.length, 1 + DIFFICULTY.I.decoys);
   assert.ok(markedFree.tray.includes('Feu'));
 

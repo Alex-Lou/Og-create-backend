@@ -90,7 +90,7 @@ function spotOf(place, size, taken, places) {
 
 // Le camp d'un joueur : [{ id, art, x, y, w, h }] (ce qui se voit maintenant). acts : actes finis ; levels : paliers
 // des bâtiments ; taken : clés (y × SIZE + x) des cases occupées par ses annexes et ses créations posées ; cage : la
-// cage aux poules ; met : ids des bâtiments dont le personnage est là (null : tous, un compte d'avant la bible) ;
+// cage aux poules ; met : ids des bâtiments dont le personnage est là (null : tous) ;
 // places, beach : où sont les bâtiments, île à la plage (world/places.js)
 function campOf({ acts = [], levels = {}, taken = new Set(), cage = null, met = null, places = STATIC, beach = false }) {
     const at = { acts, levels, cage, here: site => !met || met.has(site) };
@@ -122,10 +122,10 @@ async function campOfUser(userId, conn, { levels, annexRows, craftRows } = {}) {
     // (les chemins tracés, et le sentier d'une île neuve)
     for (const k of (await roadsOf(userId, conn)).added) taken.add(k);
     const { places, beach } = await placesOf(userId, conn);
-    // Qui est là (un compte d'avant la bible : tout le monde, comme avant)
+    // Qui est là
     const presence = await presenceOf(userId, conn);
     const zones = await zonesOf(userId, conn);
-    const met = presence.veteran ? null : new Set(['ponton', 'foyer', 'atelier'].filter(id => metOf(id, lv, zones, presence)));
+    const met = new Set(['ponton', 'foyer', 'atelier'].filter(id => metOf(id, lv, zones, presence)));
     return campOf({ acts, levels: lv, taken, cage: await cageOf(userId, conn), met, places, beach });
 }
 

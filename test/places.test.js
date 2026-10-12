@@ -81,7 +81,7 @@ test.describe('île', () => {
   test.after(() => server?.kill());
 
   test('une île neuve : le Feu sur la plage ; les chantiers et le camp paraissent avec leurs personnages', async () => {
-    const player = await newPlayer({ veteran: false });
+    const player = await newPlayer();
     const view = async () => (await api('GET', '/play/world', null, player)).data;
     const start = await view();
     const foyer = start.sites.find(s => s.id === 'foyer');
@@ -100,11 +100,6 @@ test.describe('île', () => {
     assert.deepEqual(after.sites.filter(s => !s.hidden).map(s => s.id).sort(), ['foyer', 'ponton']);
     assert.ok(after.camp.some(c => c.id === 'aster') && !after.camp.some(c => c.id === 'cannelle'));
     assert.deepEqual(after.brume.steps.filter(st => st.done).map(st => st.id), ['pages', 'ramasser', 'feu', 'nuit']);
-    // Un compte d'avant la bible voit tout, comme avant
-    const old = await newPlayer();
-    const oldView = (await api('GET', '/play/world', null, old)).data;
-    assert.equal(oldView.sites.filter(s => s.hidden).length, 0);
-    assert.equal(oldView.brume.steps, undefined);
   });
 
   test('déplacer un bâtiment : ses places possibles, puis la pose ; refusée ailleurs ; « Recommencer » la défait', async () => {

@@ -5,7 +5,6 @@ const net = require('node:net');
 const path = require('node:path');
 const { Client } = require('pg');
 const crypto = require('node:crypto');
-const { SHORE_TUTORIAL_MARK } = require('../src/services/quests');
 
 // Mots de passe de test tirés au hasard à chaque exécution : aucun secret écrit en dur dans le dépôt
 const randomPassword = () => crypto.randomBytes(18).toString('base64url');
@@ -99,21 +98,31 @@ async function sql(query, params) {
   }
 }
 
+const { QUESTS } = require('../src/services/quests');
+
 let counter = 0;
-// Compte de test. veteran : créé avant la bible (players.VETERAN_BEFORE : les anciennes règles lui restent dues) ;
-// sinon créé après. La date est fixée ici, pour que les tests ne dépendent pas de l'horloge.
-async function newPlayer({ coins = 0, veteran = true } = {}) {
+// Compte de test : une île neuve, au début du tutoriel (comme tout compte). La date est fixée ici, pour que les tests
+// ne dépendent pas de l'horloge.
+// settled : le tutoriel joué (ses quêtes faites, en base, comme un vrai joueur) : la troupe est arrivée, le feu brûle
+async function newPlayer({ coins = 0, settled = false } = {}) {
   const email = `test-${process.pid}-${Date.now()}-${counter++}@exemple.fr`;
   const player = { email, password: randomPassword(), cookies: {} };
   const { data } = await api('POST', '/auth/register', { email, password: player.password }, player);
   player.userId = data.userId;
-  await sql('UPDATE users SET created_at = $2 WHERE id = $1', [player.userId, veteran ? '2026-01-01T00:00:00Z' : '2030-01-01T00:00:00Z']);
-  // Par défaut, un « vétéran » de test a réellement dépassé la première nuit. Le marqueur explicite évite de lui
-  // injecter une quête métier et laisse les tests d'anciens comptes incomplets utiliser veteran: false puis antidater.
-  if (veteran) await sql(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'tutoriel')`, [player.userId, SHORE_TUTORIAL_MARK]);
+  await sql('UPDATE users SET created_at = $2 WHERE id = $1', [player.userId, '2030-01-01T00:00:00Z']);
   await api('POST', '/progress/save', { discoveredElements: ['Eau', 'Feu', 'Terre', 'Air'], discoveredCategories: [] }, player);
   if (coins) await sql('UPDATE progress SET coins = $1 WHERE user_id = $2', [coins, player.userId]);
+  if (settled) await sql('INSERT INTO world_quests (user_id, quest) SELECT $1, unnest($2::text[])', [player.userId, QUESTS.filter(q => q.act === 'T').map(q => q.id)]);
   return player;
+}
+
+// Des découvertes du Grimoire (count éléments du livre, hors éléments de base), pour ouvrir ses chapitres : 3 ouvrent
+// le chapitre II (bible, D4)
+async function discover(player, count) {
+  const base = ['Eau', 'Feu', 'Terre', 'Air'];
+  const names = (await sql(`SELECT DISTINCT r.value AS name FROM game_data g, jsonb_each_text(g.rules->'rules') r WHERE g.active`))
+    .map(r => r.name.trim()).filter(n => !base.includes(n)).sort().slice(0, count);
+  await sql('UPDATE progress SET infinite_elements = infinite_elements || $2::jsonb WHERE user_id = $1', [player.userId, JSON.stringify(names)]);
 }
 
 // Course entre deux requêtes, rejouée à coup sûr : `hold` ouvre une transaction et y fait ses écritures (verrous
@@ -157,4 +166,4 @@ async function coinsOf(player) {
   return (await api('GET', '/coins/balance', null, player)).data.coins;
 }
 
-module.exports = { startServer, api, sql, whileHeld, newPlayer, ownCore, coinsOf, randomPassword };
+module.exports = { startServer, api, sql, whileHeld, newPlayer, discover, ownCore, coinsOf, randomPassword };

@@ -31,7 +31,7 @@ const PLACES = { foyer: { x: 95, y: 86 }, puits: { x: 87, y: 84 } };
 const ISLAND = { owned: new Set(['coeur', 'source']), sites: [{ id: 'foyer', level: 1 }, { id: 'puits', level: 1 }], acts: 0, places: PLACES };
 const FIRE = nights.defenseOf([], { foyer: 1 });
 async function islandPlayer() {
-  const player = await newPlayer();
+  const player = await newPlayer({ settled: true });
   await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'source')`, [player.userId]);
   await sql(`INSERT INTO world_buildings (user_id, site, level, built_at) VALUES ($1, 'puits', 1, NOW() - INTERVAL '30 days')`, [player.userId]);
   // Le Feu et le Puits aux places de PLACES (le Puits loin du Feu) : les nuits se testent sur un bâtiment qu'elles

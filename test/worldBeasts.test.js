@@ -16,7 +16,7 @@ const cageOf = async player => ((await api('GET', '/play/world', null, player)).
 
 test('la cage de Cannelle : échouée au bout de la plage une fois sa soupe faite, ouverte une fois ; Paprika, Brioche et Madame en sortent', async () => {
   // Un compte d'après la bible (un ancien compte a déjà Cannelle, et la cage à ouvrir)
-  const player = await newPlayer({ veteran: false });
+  const player = await newPlayer();
   const id = player.userId;
   const open = () => api('POST', '/play/world/beasts/cage', {}, player);
   // Avant Cannelle : ni cage ni poules
@@ -46,7 +46,7 @@ test('la cage de Cannelle : échouée au bout de la plage une fois sa soupe fait
 });
 
 test('nourrir une poule, voir sa bulle se remplir, ramasser les œufs ; Madame juge', async () => {
-  const player = await newPlayer();
+  const player = await newPlayer({ settled: true });
   const id = player.userId;
   const feed = beast => api('POST', '/play/world/beast/feed', { beast }, player);
   await withCannelle(id);

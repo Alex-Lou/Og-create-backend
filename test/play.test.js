@@ -1,7 +1,7 @@
 // Serveur de jeu : les recettes ne sortent jamais, seul un mélange réussi enrichit un carnet
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { startServer, api, sql, whileHeld, newPlayer, ownCore, coinsOf, randomPassword } = require('./helpers');
+const { startServer, api, sql, whileHeld, newPlayer, discover, ownCore, coinsOf, randomPassword } = require('./helpers');
 const loot = require('../src/services/loot');
 const minigames = require('../src/services/minigames');
 // Cases du cœur : coordonnées de la grande île (v3) + décalage dans la très grande île (v4), passées à la grande carte
@@ -653,7 +653,8 @@ test('créations d’île : assembler (pièces vérifiées), payer à la réussi
 });
 
 test('le Monde : un quartier s’achète avec des écus et un chapitre ouvert, une seule fois', async () => {
-  const player = await newPlayer();
+  const player = await newPlayer({ settled: true });
+  await discover(player, 3);
   const zone = id => api('POST', '/play/world/zone', { zone: id }, player);
   assert.equal((await zone('coeur')).status, 404);
   assert.equal((await zone('nimporte')).status, 404);
@@ -696,7 +697,7 @@ test('le Monde : les bâtiments produisent ressources et écus, encaissés une s
 });
 
 test('le Monde : la boutique d’un atelier vend outils, objets et skins, une seule fois, avec leurs effets', async () => {
-  const player = await newPlayer({ coins: 0 });
+  const player = await newPlayer({ coins: 0, settled: true });
   const buy = item => api('POST', '/play/world/item', { item }, player);
   const skin = (site, value) => api('POST', '/play/world/skin', { site, skin: value }, player);
   await api('GET', '/play/world', null, player);
@@ -778,7 +779,7 @@ test('le Monde : un article de production ne vaut que pour la suite ; l’achete
 });
 
 test('le Monde : un article de la Récolte qui a servi ne se rend plus ; un skin dont l’achat s’annule n’est plus porté', async () => {
-  const player = await newPlayer({ coins: 3000 });
+  const player = await newPlayer({ coins: 3000, settled: true });
   const buy = item => api('POST', '/play/world/item', { item }, player);
   const undo = item => api('POST', '/play/world/item/undo', { item }, player);
   await api('GET', '/play/world', null, player);
@@ -893,7 +894,8 @@ test('le Monde : une île de l’ancienne carte passe à la nouvelle sans rien p
 });
 
 test('terres nouvelles : quartier inconnu masqué, expédition (voisinage, coût, une à la fois), découvert au retour', async () => {
-  const player = await newPlayer();
+  const player = await newPlayer({ settled: true });
+  await discover(player, 3);
   const view = async () => (await api('GET', '/play/world', null, player)).data;
   const explore = zone => api('POST', '/play/world/expedition', { zone }, player);
   const zoneOf = (world, id) => world.map.zones.find(z => z.id === id);
@@ -942,7 +944,7 @@ test('terres nouvelles : quartier inconnu masqué, expédition (voisinage, coût
   assert.deepEqual([found.known, found.name, found.climate, found.price, found.chapter], [true, 'Les Roselières', 'marais', 400, 'II']);
   assert.notEqual(groundAt(back, found.anchor), 'u');
   assert.equal(back.expedition, null);
-  // (le chapitre II est déjà ouvert pour ce joueur : il manque les écus)
+  // (le chapitre II est ouvert, trois découvertes : il manque les écus)
   assert.match((await api('POST', '/play/world/zone', { zone: 'roselieres' }, player)).data.message, /400 écus/);
   assert.match((await explore('roselieres')).data.message, /déjà découvert/);
   // Le Bayou, voisin des Roselières (pas encore à soi) : pas d'expédition
@@ -1295,7 +1297,7 @@ test('le Monde : la Récolte se joue contre une partie de la réserve, rejouée 
 });
 
 test('le Monde : un chantier demande son quartier, son plan du Livre et ses ressources, puis évolue', async () => {
-  const player = await newPlayer();
+  const player = await newPlayer({ settled: true });
   const siteOf = (world, id) => world.sites.find(s => s.id === id);
   const start = (await api('GET', '/play/world', null, player)).data;
   assert.equal(siteOf(start, 'foyer').level, 1);
@@ -1442,13 +1444,14 @@ test('noms : un bâtiment se renomme dès son palier III, un quartier dès qu’
 });
 
 test('habitants : on leur parle et on les gâte une fois par jour ; chaque cœur est récompensé une seule fois', async () => {
-  const player = await newPlayer();
+  const player = await newPlayer({ settled: true });
   const talk = villager => api('POST', '/play/world/villager/talk', { villager }, player);
   const gift = (villager, resource) => api('POST', '/play/world/villager/gift', { villager, resource }, player);
   const view = (await api('GET', '/play/world', null, player)).data;
-  // Cannelle (Foyer) vit déjà sur l'île ; Aster aussi, dès le compte (bible, § 6.6), au camp tant que le Ponton n'est pas là
+  // Le tutoriel joué, la troupe vit sur l'île (bible, § 6.6) : Ondin, Aster et Rivet au camp tant que leur bâtiment n'est
+  // pas là ; Cannelle au Foyer
   assert.deepEqual(view.villagers.map(w => [w.id, w.name, w.hearts, w.talked, w.gifted, w.built]),
-    [['ponton', 'Aster', 0, false, false, false], ['foyer', 'Cannelle', 0, false, false, true]]);
+    [['puits', 'Ondin', 0, false, false, false], ['ponton', 'Aster', 0, false, false, false], ['atelier', 'Rivet', 0, false, false, false], ['foyer', 'Cannelle', 0, false, false, true]]);
   assert.deepEqual(view.friendship.hearts, [30, 80, 150, 250, 400]);
   assert.equal((await talk('potager')).status, 403);
   // Bavarder : +8, une fois par jour
@@ -1496,7 +1499,7 @@ test('habitants : on leur parle et on les gâte une fois par jour ; chaque cœur
 });
 
 test('Savoirs des maîtres : un indice par jour en bavardant, la famille puis l’ingrédient de l’Encre (bible, § 6.4)', async () => {
-  const player = await newPlayer({ coins: 500 });
+  const player = await newPlayer({ coins: 500, settled: true });
   const talk = (villager, body = {}) => api('POST', '/play/world/villager/talk', { villager, ...body }, player);
   const reach = (await api('GET', '/play/book', null, player)).data.chapters[0].pages.filter(p => p.status === 'reach');
   // Aster (moins de deux cœurs) : la famille d'un ingrédient, sur une page à énigme de son Art (chapitre I)
@@ -1538,8 +1541,8 @@ test('Anya : la Révélation une seule fois, le Souffle une fois par passage, la
   // Anya passe deux ou trois jours par semaine, tirés du joueur : un joueur qu'elle visite aujourd'hui (un sur trois en
   // moyenne ; vingt essais au plus)
   const today = loot.parisOf(Date.now()).day;
-  let player = await newPlayer();
-  for (let i = 0; i < 20 && !anyaRules.visitsOn(player.userId, today); i++) player = await newPlayer();
+  let player = await newPlayer({ settled: true });
+  for (let i = 0; i < 20 && !anyaRules.visitsOn(player.userId, today); i++) player = await newPlayer({ settled: true });
   assert.ok(anyaRules.visitsOn(player.userId, today), 'aucun joueur qu’Anya visite aujourd’hui');
   const talk = (body = {}) => api('POST', '/play/world/villager/talk', { villager: 'anya', ...body }, player);
   const reveal = () => api('POST', '/play/world/anya/reveal', {}, player);
@@ -1584,7 +1587,7 @@ test('Anya : la Révélation une seule fois, le Souffle une fois par passage, la
   const owned = await players.elements(owner);
   const ariane = bookPages.arianeOf(book, owned, await require('../src/services/world').arianeTargets(player.userId));
   const misses = await require('../src/services/bookTries').missesByPage(player.userId);
-  const reach = bookPages.view(book, owned, misses, {}, await players.isVeteran(owner), ariane).chapters
+  const reach = bookPages.view(book, owned, misses, {}, ariane).chapters
     .flatMap(chapter => chapter.pages).filter(page => page.status === 'reach').map(page => page.id);
   assert.ok(reach.length > 0);
   const nothing = await talk({ known: reach });
@@ -1648,7 +1651,7 @@ test('le Savoir de Brume : après le Phare, un indice par jour sur les Légendes
 });
 
 test('besoins des habitants : manger, travailler, se distraire ; l’humeur change la production', async () => {
-  const player = await newPlayer();
+  const player = await newPlayer({ settled: true });
   const view = async () => (await api('GET', '/play/world', null, player)).data;
   const fill = (villager, need) => api('POST', '/play/world/villager/need', { villager, need }, player);
   const fillAll = () => api('POST', '/play/world/villagers/needs', {}, player);
@@ -1666,8 +1669,8 @@ test('besoins des habitants : manger, travailler, se distraire ; l’humeur chan
   assert.deepEqual([paulette.mood, paulette.moodEffect, paulette.happyEffect], ['content', null, 'Une partie de Récolte revient 3 min plus vite']);
   assert.deepEqual(first.needs.kinds.manger, { label: 'Manger', hours: 24, cost: { food: 10 } });
   assert.deepEqual(first.needs.kinds.deco, { label: 'Se distraire', decos: 3, reach: 6 });
-  // Cannelle et Aster (là dès le compte) arrivent comblées
-  assert.equal((await sql('SELECT COUNT(*)::int AS n FROM world_needs WHERE user_id = $1', [player.userId]))[0].n, 2);
+  // La troupe (Ondin, Aster, Rivet, Cannelle) arrive comblée
+  assert.equal((await sql('SELECT COUNT(*)::int AS n FROM world_needs WHERE user_id = $1', [player.userId]))[0].n, 4);
   // Pas encore faim ; à mi-chemin, on peut la nourrir : 10 vivres
   assert.equal((await fill('foyer', 'manger')).status, 409);
   await ago('foyer', 'manger', 13);
@@ -1752,7 +1755,7 @@ test('besoins des habitants : manger, travailler, se distraire ; l’humeur chan
 });
 
 test('production juste : combler un besoin, poser, déplacer ou ranger une création encaisse d’abord si l’humeur en change', async () => {
-  const player = await newPlayer();
+  const player = await newPlayer({ settled: true });
   const view = async () => (await api('GET', '/play/world', null, player)).data;
   const potager = world => world.sites.find(s => s.id === 'potager');
   const since = hours => sql('UPDATE world_stock SET collected_at = NOW() - make_interval(hours => $2::int) WHERE user_id = $1', [player.userId, hours]);
@@ -1809,7 +1812,8 @@ test('production juste : combler un besoin, poser, déplacer ou ranger une créa
 });
 
 test('ramassage sans perte : les fractions sont gardées d’un ramassage au suivant, et ce qui attend paie un chantier', async () => {
-  const player = await newPlayer({ coins: 0 });
+  const player = await newPlayer({ coins: 0, settled: true });
+  await discover(player, 3);
   await api('GET', '/play/world', null, player);
   await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'colline')`, [player.userId]);
   await sql(`INSERT INTO world_buildings (user_id, site, level, built_at) VALUES ($1, 'carriere', 1, NOW() - INTERVAL '1 day')`, [player.userId]);
@@ -1836,7 +1840,8 @@ test('ramassage sans perte : les fractions sont gardées d’un ramassage au sui
 });
 
 test('ce qui attend dans les bâtiments paie tout : expédition, établi, bête, cadeau, voyageur, quartier', async () => {
-  const player = await newPlayer({ coins: 0 });
+  const player = await newPlayer({ coins: 0, settled: true });
+  await discover(player, 3);
   const id = player.userId;
   const view = async () => (await api('GET', '/play/world', null, player)).data;
   // Réserves vides, huit heures de production en attente ; ce que « Tout ramasser » donnerait
@@ -1896,7 +1901,7 @@ test('ce qui attend dans les bâtiments paie tout : expédition, établi, bête,
 });
 
 test('une Récolte quittée sans jouer ne compte pas ; Cannelle nourrie, la soupe reste faite même si elle a de nouveau faim', async () => {
-  const player = await newPlayer({ veteran: false });
+  const player = await newPlayer();
   const claim = id => api('POST', '/play/world/quest', { id }, player);
   const start = async () => (await api('POST', '/play/world/harvest/start', {}, player)).data;
   const finish = (run, moves) => api('POST', '/play/world/harvest/finish', { run: run.id, moves }, player);
@@ -1986,7 +1991,7 @@ test('visiteurs : un voyageur débarque au Ponton avec une demande, la comble un
 });
 
 test('maisons : un visiteur comblé reste dans une maison libre et devient habitant (amitié, besoins)', async () => {
-  const player = await newPlayer();
+  const player = await newPlayer({ settled: true });
   const view = async () => (await api('GET', '/play/world', null, player)).data;
   const settle = id => api('POST', '/play/world/visitor/settle', { id }, player);
   await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'crique')`, [player.userId]);
@@ -2129,7 +2134,7 @@ test('enseignes : dès le palier V, au nom choisi, un style par bâtiment, achet
 });
 
 test('annexes : posées autour du bâtiment au palier voulu, payées une fois, déplacées gratuitement, elles produisent', async () => {
-  const player = await newPlayer({ coins: 0 });
+  const player = await newPlayer({ coins: 0, settled: true });
   const potagerOf = world => world.sites.find(s => s.id === 'potager');
   const place = (annex, cell) => api('POST', '/play/world/annex', { annex, ...cell }, player);
   await api('GET', '/play/world', null, player);
@@ -2308,9 +2313,10 @@ test('butins : le coffre du jour s’ouvre une fois par jour, sa série monte et
 
 test('butins : chapitres ouverts, quêtes réclamées et bouteille donnent leur coffre une seule fois', async () => {
   const player = await newPlayer();
+  await discover(player, 3);
   const open = source => api('POST', '/play/world/chest', { source }, player);
   const view = (await api('GET', '/play/world', null, player)).data;
-  // Chapitres I et II ouverts d'emblée : le II offre sa pièce rare
+  // Chapitres I et II ouverts (trois découvertes) : le II offre sa pièce rare
   assert.deepEqual(view.chests.pending, [{ source: 'chapitre:II', rarity: 'legendaire', label: 'Chapitre II du Grimoire' }]);
   const chapter = await open('chapitre:II');
   assert.equal(chapter.status, 200);
@@ -2369,6 +2375,7 @@ test('les mots d’Héliane : la première bouteille ouverte pendant un acte por
 
 test('butins : « Tout ouvrir » ouvre d’un coup le coffre du jour, les chapitres, les quêtes et la bouteille, une seule fois', async () => {
   const player = await newPlayer();
+  await discover(player, 3);
   await api('GET', '/play/world', null, player);
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'deco'), ($1, 'source')`, [player.userId]);
   const all = () => api('POST', '/play/world/chests/all', {}, player);
@@ -2444,16 +2451,14 @@ test('quêtes de Brume : la quête active se réclame une fois, son objectif att
 
 // Lot H1 (la colonne vertébrale de la bible) : un nouveau compte suit le prologue, chaque objectif se lit dans l'état
 test('le prologue d’un nouveau compte : Brume mène au feu, puis Aster ouvre sa Récolte', async () => {
-  const player = await newPlayer({ veteran: false });
+  const player = await newPlayer();
   const view = async () => (await api('GET', '/play/world', null, player)).data;
   const claim = id => api('POST', '/play/world/quest', { id }, player);
   const talk = villager => api('POST', '/play/world/villager/talk', { villager }, player);
   const write = names => sql('UPDATE progress SET infinite_elements = infinite_elements || $2::jsonb WHERE user_id = $1', [player.userId, JSON.stringify(names)]);
   const who = (world, id) => world.villagers.find(v => v.id === id);
-  // Le chapitre II est scellé jusqu'à la 3e découverte (un joueur d'avant la bible l'a d'emblée)
+  // Le chapitre II est scellé jusqu'à la 3e découverte
   assert.deepEqual((await api('GET', '/play/book', null, player)).data.chapters.slice(0, 2).map(c => [c.need, c.open]), [[0, true], [3, false]]);
-  const veteran = await newPlayer();
-  assert.deepEqual((await api('GET', '/play/book', null, veteran)).data.chapters[1].open, true);
   // Au compte : Brume seule ; Aster et Cannelle ne sont pas encore rencontrées.
   const first = await view();
   assert.deepEqual(first.villagers.map(v => [v.id, v.built, v.asleep]), []);
@@ -2608,7 +2613,7 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Aster ouvre s
 });
 
 test('chaque objectif de la chaîne se lit dans l’état (création, annexe, expédition, lieu, bête, voyageur, cœur, trouvaille, maison, nom)', async () => {
-  const player = await newPlayer({ veteran: false });
+  const player = await newPlayer();
   // La quête active juste après celle-ci (les quêtes d'avant comptent comme faites)
   const after = async id => {
     await sql('DELETE FROM world_quests WHERE user_id = $1', [player.userId]);
@@ -2669,27 +2674,10 @@ test('chaque objectif de la chaîne se lit dans l’état (création, annexe, ex
   assert.ok(BEASTS.every(name => results.has(name)));
 });
 
-test('un joueur d’avant la bible ne recule jamais : quêtes rangées, coffres dus, habitants et chapitre II gardés', async () => {
-  const player = await newPlayer();
-  await api('GET', '/play/world', null, player);
-  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'deco'), ($1, 'recolte'), ($1, 'source')`, [player.userId]);
-  const world = (await api('GET', '/play/world', null, player)).data;
-  // Plus loin que l'ancienne « Achète La Source » : réveiller Ondin ; le coffre de l'ancienne quête attend toujours
-  assert.deepEqual([world.brume.quest.id, world.brume.done], ['eveil-ondin', 16]);
-  assert.ok(world.chests.pending.some(c => c.source === 'quete:source' && c.rarity === 'rare'));
-  // Cannelle est là d'emblée, comblée, et se distrait comme avant ; Aster, Rivet (la soupe compte comme faite) et
-  // Ondin (la Clôture posée) sont arrivés
-  const cannelle = world.villagers.find(v => v.id === 'foyer');
-  assert.deepEqual(cannelle.needs.map(n => [n.id, n.met]), [['manger', true], ['deco', false]]);
-  assert.deepEqual(world.villagers.map(v => v.id), ['puits', 'ponton', 'atelier', 'foyer']);
-  // Chapitre II ouvert sans aucune découverte : La Colline s'achète (zone d'un chapitre II)
-  assert.equal(world.map.zones.find(z => z.id === 'colline').open, true);
-});
-
 // Lot H2 : le fil d'Ariane (bible, § 6.1)
 test('le fil d’Ariane marque la bonne étape suivante : Puits, Arbre, Bateau, Livre, Feu follet', async () => {
   const { pageId } = require('../src/services/bookPages');
-  const player = await newPlayer({ veteran: false });
+  const player = await newPlayer();
   await api('GET', '/play/world', null, player);
   const T = ['Vent', 'Pluie', 'Brasier'];
   const afterT = [...T, 'Boue', 'Brique', 'Puits'];

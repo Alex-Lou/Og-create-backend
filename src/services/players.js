@@ -4,7 +4,6 @@ const db = require('../config/db');
 const { newToken, isToken, digest } = require('../utils/crypto');
 const { checkAccess, readCookie } = require('./authSession');
 const { BASE_ELEMENTS } = require('./recipeBook');
-const quests = require('./quests');
 
 const GUEST_COOKIE = 'oc_guest';
 const GUEST_DAYS = 30;
@@ -51,59 +50,9 @@ async function createGuest(res) {
 
 const asList = value => (Array.isArray(value) ? value.filter(v => typeof v === 'string') : []);
 
-// Joueurs d'avant la bible (lot H1, HISTOIRE.md du dépôt front) : comptes créés avant le déploiement du lot. Rien ne
-// recule pour eux : le chapitre II leur reste ouvert d'emblée, chaque habitant dont le bâtiment est bâti reste là,
-// Cannelle arrive comblée. Un invité n'en est jamais un : le prologue est fait pour lui.
-// Le lot H1 a été fusionné le 2026-10-05 à 21:40:27 UTC (PR #80) ; cette date-ci l'accompagne depuis. Ne pas
-// l'avancer : un compte créé entre les deux a reçu les anciennes règles dès sa création, et les lui retirer le ferait
-// reculer.
-const VETERAN_BEFORE = new Date('2026-10-06T06:00:00Z');
-async function veteranOf(userId, conn = db) {
-    const { rows } = await conn.query('SELECT created_at < $2 AS veteran FROM users WHERE id = $1', [userId, VETERAN_BEFORE]);
-    return Boolean(rows[0]?.veteran);
-}
-const isVeteran = async owner => owner.kind === 'user' && veteranOf(owner.id);
-// Le tutoriel de l'île neuve (bible, § 9 : ramasser, bâtir le feu, accueillir Aster, puis les autres compagnons) vaut
-// pour les comptes créés à partir de V6_SINCE. Ne pas la reculer : un compte
-// créé avant a reçu les anciennes règles (le feu allumé d'office), et les lui retirer le ferait reculer.
-const V6_SINCE = new Date('2026-10-08T12:00:00Z');
-async function freshOf(userId, conn = db) {
-    const { rows } = await conn.query('SELECT created_at >= $2 AS fresh FROM users WHERE id = $1', [userId, V6_SINCE]);
-    return Boolean(rows[0]?.fresh);
-}
-// Une île recommencée (world.restartIsland, une fois par compte) suit les règles de l'île d'un compte neuf, quel que
-// soit l'âge du compte : tutoriel de la v6, habitants un à un. Le Grimoire, lui, garde les siennes (isVeteran : le
-// chapitre II ouvert d'emblée reste ouvert). Une ligne de world_items, sans donnée nouvelle
+// « Recommencer l'île » (world.restartIsland) : une ligne de world_items, sans donnée nouvelle ; elle retient aussi
+// l'instant du dernier recommencement (deux demandes coup sur coup : une seule recommence)
 const RESTARTED = 'ile:recommencee';
-// Une première nuit inachevée prime sur l'âge du compte : même un ancien compte reprend la séquence de la plage.
-// Dès qu'elle est validée, il retrouve exactement ses règles historiques. Fonction pure exportée pour verrouiller la
-// matrice ancien/nouveau/recommencé/incomplet sans dépendre d'une base de test.
-function islandModeOf({ createdAt, restarted = false, claimed = [], marked = false }) {
-    const firstNightDone = marked || quests.firstNightDoneOf(new Set(claimed));
-    const born = new Date(createdAt).getTime();
-    return {
-        firstNightDone,
-        veteran: born < VETERAN_BEFORE.getTime() && !restarted && firstNightDone,
-        fresh: born >= V6_SINCE.getTime() || restarted || !firstNightDone
-    };
-}
-async function islandModeFor(userId, conn = db) {
-    const { rows } = await conn.query(
-        `SELECT u.created_at,
-                EXISTS (SELECT 1 FROM world_items i WHERE i.user_id = u.id AND i.item = $2) AS restarted,
-                EXISTS (SELECT 1 FROM world_items i WHERE i.user_id = u.id AND i.item = $3) AS marked,
-                ARRAY(SELECT quest FROM world_quests q WHERE q.user_id = u.id) AS claimed
-         FROM users u WHERE u.id = $1`, [userId, RESTARTED, quests.SHORE_TUTORIAL_MARK]);
-    return rows[0] ? islandModeOf({
-        createdAt: rows[0].created_at,
-        restarted: rows[0].restarted,
-        claimed: rows[0].claimed,
-        marked: rows[0].marked
-    })
-        : { firstNightDone: false, veteran: false, fresh: true };
-}
-const islandVeteranOf = (userId, conn = db) => islandModeFor(userId, conn).then(mode => mode.veteran);
-const islandFreshOf = (userId, conn = db) => islandModeFor(userId, conn).then(mode => mode.fresh);
 
 // Carnet de l'Infini
 async function elements(owner) {
@@ -168,7 +117,6 @@ async function adoptGuest(req, res, userId) {
 }
 
 module.exports = {
-    VETERAN_BEFORE, veteranOf, isVeteran, V6_SINCE, freshOf, RESTARTED,
-    islandModeOf, islandModeFor, islandVeteranOf, islandFreshOf,
+    RESTARTED,
     resolve, createGuest, elements, addElement, getRun, addToRun, takeFreeJoker, adoptGuest
 };

@@ -32,7 +32,7 @@ async function cageOf(userId, conn = db) {
     if (freedOf(await rowsOf(userId, conn))) return 'ouverte';
     const { levels } = await levelsOf(userId, conn);
     const presence = await presenceOf(userId, conn);
-    if (presence.fresh && !presence.veteran && !presence.done.has('soupe')) return null;
+    if (!presence.done.has('soupe')) return null;
     return metOf('foyer', levels, await zonesOf(userId, conn), presence) ? 'coincee' : null;
 }
 

@@ -3,7 +3,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { QUESTS, LEGACY, QUEST_CHESTS, BEASTS, doneOf, firstNightDoneOf, progressOf, active, boardOf, actsDoneOf } = require('../src/services/quests');
-const { islandModeOf } = require('../src/services/players');
 const map = require('../src/services/worldMap');
 const { SITES } = require('../src/services/world');
 const { CRAFT_BY_ID } = require('../src/services/crafts');
@@ -169,18 +168,10 @@ test('un joueur d’avant la bible ne recule jamais : ses anciennes quêtes se r
   assert.deepEqual(['cabane', 'serre'].map(id => chests.get(id)), ['rare', 'epique']);
 });
 
-test('tout compte dont la première nuit est incomplète reprend la séquence de la plage de Brumelune', () => {
-  const old = '2026-01-01T00:00:00Z';
-  const recent = '2026-12-01T00:00:00Z';
+test('la première nuit est faite une fois la Récolte d’Aster réclamée (passer le tutoriel n’est permis qu’ensuite)', () => {
   assert.equal(firstNightDoneOf(new Set()), false);
   assert.equal(firstNightDoneOf(new Set(['feu'])), false);
   assert.equal(firstNightDoneOf(new Set(['recolte'])), true);
   // Une ancienne quête située après la Récolte confirme aussi que le joueur a dépassé cette étape.
   assert.equal(firstNightDoneOf(new Set(['source'])), true);
-  assert.deepEqual(islandModeOf({ createdAt: old, claimed: [] }), { firstNightDone: false, veteran: false, fresh: true });
-  assert.deepEqual(islandModeOf({ createdAt: old, claimed: ['feu'] }), { firstNightDone: false, veteran: false, fresh: true });
-  assert.deepEqual(islandModeOf({ createdAt: old, claimed: ['recolte'] }), { firstNightDone: true, veteran: true, fresh: false });
-  assert.deepEqual(islandModeOf({ createdAt: old, marked: true }), { firstNightDone: true, veteran: true, fresh: false });
-  assert.deepEqual(islandModeOf({ createdAt: recent, claimed: ['recolte'] }), { firstNightDone: true, veteran: false, fresh: true });
-  assert.deepEqual(islandModeOf({ createdAt: old, restarted: true, claimed: [] }), { firstNightDone: false, veteran: false, fresh: true });
 });

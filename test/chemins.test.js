@@ -85,7 +85,7 @@ test('une création au bord d’un chemin le garde ; « Recommencer l’île » 
 });
 
 test('la quête du premier chemin : relier le Puits au Feu', async () => {
-    const player = await newPlayer({ veteran: false });
+    const player = await newPlayer();
     await view(player);
   const done = ['pages', 'ramasser', 'feu', 'nuit', 'recolte', 'veille', 'soupe', 'poules', 'deco', 'eveil-ondin', 'souvenir-ondin', 'puits-ondin'];
   await sql(`INSERT INTO world_quests (user_id, quest) SELECT $1, unnest($2::text[])`, [player.userId, done]);

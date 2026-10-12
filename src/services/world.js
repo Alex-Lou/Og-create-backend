@@ -155,21 +155,15 @@ async function guidedInkOf(userId) {
 // Vent écrit et jusqu'au chantier du feu, le ruban mène au Brasier (son plan), Encre offerte
 const BRASIER_FIRST = new Set(['pages', 'ramasser']);
 async function brasierFirst(userId, quest) {
-    if (!BRASIER_FIRST.has(quest.id) || await players.islandVeteranOf(userId)) return false;
+    if (!BRASIER_FIRST.has(quest.id)) return false;
     return quest.id !== 'pages' || (await players.elements({ kind: 'user', id: userId })).includes('Vent');
 }
-// Au tutoriel (une île qui n'est pas d'avant la bible), un quartier du prologue se découvre en écrivant son élément,
-// sans écus (choix de l'auteur : découvrir, pas acheter ; les achats viennent après le prologue)
-const ZONE_PLANS = {};
-// Ce que Brume en dit alors (plus de quartier du prologue à découvrir ainsi : La Source est devenue le Puits)
-const ZONE_QUESTS = {};
 async function arianeTargets(userId) {
     const quest = quests.currentOf(await claimedOf(userId));
     const goal = quest && quest.goal;
     if (!goal) return [];
     if (await brasierFirst(userId, quest)) return [SITES.foyer.levels[0].plan];
     if (goal.kind === 'element') return goal.any || [goal.element];
-    if (goal.kind === 'zone') return ZONE_PLANS[goal.zone] && !(await players.islandVeteranOf(userId)) ? [ZONE_PLANS[goal.zone]] : [];
     if (goal.kind === 'craft') return crafts.CRAFT_BY_ID[goal.craft].elements;
     if (goal.kind !== 'level') return [];
     const level = (await levelsOf(userId)).levels[goal.site] || 0;
@@ -186,10 +180,9 @@ async function elementHintOf(userId) {
 
 // Le tableau de Brume, avec le chapitre encore fermé qu'attend la quête active (un quartier ou un palier d'un
 // chapitre pas encore ouvert : le joueur doit d'abord écrire des découvertes). openChapters : Set des chapitres ouverts
-function boardWith(claimed, facts, openChapters, tutorial = false) {
+function boardWith(claimed, facts, openChapters) {
     const out = quests.boardOf(claimed, facts);
     const quest = out.quest;
-    if (quest && tutorial && ZONE_QUESTS[quest.id]) Object.assign(quest, ZONE_QUESTS[quest.id]);
     if (!quest || quest.done) return out;
     const { goal } = quests.QUESTS[quest.step - 1];
     const next = goal.kind === 'level' && (facts.levels[goal.site] || 0) === goal.need - 1 ? SITES[goal.site].levels[goal.need - 1] : null;
@@ -200,23 +193,21 @@ function boardWith(claimed, facts, openChapters, tutorial = false) {
 // Brume seule (quête active), sans le reste de l'île : le Grimoire la consulte après une découverte ; avec le nom du
 // peuple, pour l'étape de civilisation (l'Ex libris du Grimoire)
 async function board(userId, owned, stars, openChapters) {
-    const out = boardWith(await claimedOf(userId), await factsOf(userId, owned, stars), openChapters, !(await players.islandVeteranOf(userId)));
-    // Anya : le Grimoire allume sa gemme une fois la Révélation vue ; le tutoriel (un compte d'après la bible, s'il ne
-    // l'a pas passé : le jeu le reprend à son étape, sur tout appareil)
+    const out = boardWith(await claimedOf(userId), await factsOf(userId, owned, stars), openChapters);
+    // Anya : le Grimoire allume sa gemme une fois la Révélation vue ; le tutoriel (s'il n'a pas été passé : le jeu le
+    // reprend à son étape, sur tout appareil)
     return { ...out, people: (await namesOf(userId)).peuple || null, anya: await anyaOf(userId), ...await tutorialOf(userId) };
 }
 
 // « Passer le tutoriel » : retenu sur le compte, pour tous ses appareils (une ligne de world_items, sans donnée nouvelle)
 const PROLOGUE_SKIP = 'prologue:passe';
-// Le tutoriel du compte : un ancien compte dont la première nuit manque est repris par le serveur. Un ancien choix
-// « Passer » ne peut pas masquer cette reprise obligatoire ; il ne vaut qu'une fois la Récolte d'Aster validée.
+// Le tutoriel du compte (chaque île le suit) : « Passer » ne vaut qu'une fois la Récolte d'Aster validée
 async function tutorialOf(userId, conn = db) {
-    const mode = await players.islandModeFor(userId, conn);
     const items = await itemsOf(userId, conn);
-    return { tutorial: !mode.veteran, skipped: mode.firstNightDone && items.has(PROLOGUE_SKIP) };
+    return { tutorial: true, skipped: quests.firstNightDoneOf(await claimedOf(userId, conn)) && items.has(PROLOGUE_SKIP) };
 }
 async function skipPrologue(userId) {
-    if (!(await players.islandModeFor(userId)).firstNightDone) {
+    if (!quests.firstNightDoneOf(await claimedOf(userId))) {
         return { status: 409, message: 'Bâtis d’abord le camp et termine la première Récolte avec Aster.' };
     }
     await db.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'tutoriel') ON CONFLICT DO NOTHING`, [userId, PROLOGUE_SKIP]);
@@ -338,18 +329,18 @@ async function view(userId, owned, book) {
         const zone = map.siteZone(id);
         const made = production.find(p => p.site === id);
         // (le Ponton I d'une île du tutoriel : ni plan ni quartier, tutorialPonton)
-        const waived = tutorialPonton(id, level, presence);
+        const waived = tutorialPonton(id, level);
         const step = l => ({
             name: l.name, plan: waived ? null : l.plan, planOwned: waived || !l.plan || have.has(l.plan), planEmoji: !waived && l.plan ? known[l.plan]?.emoji || null : null,
             cost: l.cost, coins: l.coins, chapter: l.chapter, chapterOpen: book.openChapters.has(l.chapter), effect: l.effect
         });
         return {
             id, x: place.x, y: place.y, w: place.w, h: place.h, level, maxLevel: site.levels.length, zone,
-            // (le Ponton d'une île du tutoriel, bâti hors de son quartier, n'est pas fermé : le palier II demande La Crique)
-            locked: !zones.has(zone) && !(id === 'ponton' && level <= 1 && !presence.veteran),
+            // (le Ponton du tutoriel, bâti hors de son quartier, n'est pas fermé : le palier II demande La Crique)
+            locked: !zones.has(zone) && !(id === 'ponton' && level <= 1),
             // Un chantier dont le personnage n'est pas encore là ne se voit pas (choix de l'auteur, 9 oct. : rien avant
-            // son personnage ; le Feu de camp, celui de Brume, toujours) ; un compte d'avant la bible voit tout, comme avant
-            hidden: !presence.veteran && !level && id !== 'foyer' && !metOf(id, levels, zones, presence),
+            // son personnage ; le Feu de camp, celui de Brume, toujours)
+            hidden: !level && id !== 'foyer' && !metOf(id, levels, zones, presence),
             // Nom choisi par le joueur (dès le palier III), sinon celui du palier
             name: named[`site:${id}`] || (level ? site.levels[level - 1].name : site.levels[0].name),
             baseName: level ? site.levels[level - 1].name : site.levels[0].name,
@@ -424,9 +415,7 @@ async function view(userId, owned, book) {
             zones: map.ZONES.map(z => (isKnown(z, discovered) ? {
                 id: z.id, name: named[`zone:${z.id}`] || z.name, baseName: z.name, renamed: Boolean(named[`zone:${z.id}`]),
                 price: z.price, chapter: z.chapter, code: z.code, anchor: map.ANCHORS[z.id], climate: z.climate, known: true,
-                owned: zones.has(z.id), open: !z.chapter || book.openChapters.has(z.chapter),
-                // (au tutoriel, il se découvre en écrivant son élément, sans écus)
-                ...(!presence.veteran && ZONE_PLANS[z.id] ? { price: 0, plan: ZONE_PLANS[z.id], planOwned: have.has(ZONE_PLANS[z.id]) } : {})
+                owned: zones.has(z.id), open: !z.chapter || book.openChapters.has(z.chapter)
             } : {
                 id: z.id, name: null, code: z.code, anchor: map.ANCHORS[z.id], known: false, owned: false, open: false,
                 // closed : le cœur de l'île n'est pas encore à soi (les terres alentour s'ouvrent après)
@@ -531,8 +520,8 @@ async function view(userId, owned, book) {
         brume: (() => {
             const firstNightDone = quests.firstNightDoneOf(claimed);
             const out = {
-                ...boardWith(claimed, facts, book.openChapters, !presence.veteran),
-                tutorial: !presence.veteran,
+                ...boardWith(claimed, facts, book.openChapters),
+                tutorial: true,
                 skipped: firstNightDone && items.has(PROLOGUE_SKIP)
             };
             // Le fil d'Ariane de la quête active : la cible et les pages qui restent (le Grimoire montre la page marquée)
@@ -586,32 +575,29 @@ async function sleep(userId) {
 }
 
 // Achat d'un quartier : chapitre ouvert, écus débités une fois (même en double clic) ; { status, message } si refus
-async function buyZone(userId, zoneId, openChapters, owned = []) {
+async function buyZone(userId, zoneId, openChapters) {
     const zone = map.ZONE_BY_ID[zoneId];
     if (!zone || zone.id === 'coeur') return { status: 404, message: 'Quartier inconnu.' };
     await migrate(userId);
     // Inconnu : rien n'en est dit (pas même son chapitre)
     if (!isKnown(zone, await discoveredOf(userId))) return { status: 403, message: 'Envoie d’abord une expédition découvrir ce quartier.' };
     if (zone.chapter && !openChapters.has(zone.chapter)) return { status: 403, message: `Ouvre d’abord le chapitre ${zone.chapter} du Grimoire.` };
-    // Au tutoriel, la Source se découvre en écrivant son élément : sans écus
-    const plan = ZONE_PLANS[zone.id] && !(await players.islandVeteranOf(userId)) ? ZONE_PLANS[zone.id] : null;
-    if (plan && !owned.includes(plan)) return { status: 403, message: `Fais d’abord naître « ${plan} » dans l’Athanor : la brume se lèvera.` };
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
         const added = await conn.query('INSERT INTO world_zones (user_id, zone) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING zone', [userId, zone.id]);
         if (!added.rows.length) return db.rollback({ status: 409, message: 'Ce quartier est déjà à toi.' });
         // Les écus qui attendent dans les bâtiments sont encaissés d'abord : ils comptent pour payer
         await payWith(userId, conn, stock);
-        const coins = plan ? await balanceOf(userId, conn) : await ledger.debit(userId, zone.price, `quartier:${zone.id}`, conn);
+        const coins = await ledger.debit(userId, zone.price, `quartier:${zone.id}`, conn);
         if (coins === null) return db.rollback({ status: 400, message: `Il te faut ${zone.price} écus.` });
         return { bought: zone.name, coins };
     });
 }
 
-// Le Ponton I d'une île du tutoriel (choix de l'auteur, 11 oct.) : Aster le bâtit à son premier jour, avec le bois de
-// la Récolte seul ; son carnet de quart (dans sa caisse) tient lieu de plan, et son quartier (La Crique, acte IV) n'est
-// pas encore à soi. Les paliers suivants suivent la règle
-const tutorialPonton = (siteId, level, presence) => siteId === 'ponton' && !level && !presence.veteran;
+// Le Ponton I (choix de l'auteur, 11 oct.) : Aster le bâtit à son premier jour, avec le bois de la Récolte seul ; son
+// carnet de quart (dans sa caisse) tient lieu de plan, et son quartier (La Crique, acte IV) n'est pas encore à soi. Les
+// paliers suivants suivent la règle
+const tutorialPonton = (siteId, level) => siteId === 'ponton' && !level;
 
 // Les chemins tracés dans l'emprise f { x, y, w, h } s'effacent ; leurs pierres (pas celles des cases offertes) reviennent
 async function clearGrown(userId, conn, f) {
@@ -633,7 +619,7 @@ async function build(userId, owned, siteId, openChapters = new Set()) {
         const stock = await stockOf(userId, conn, true);
         const { levels } = await levelsOf(userId, conn);
         const level = levels[siteId] || 0;
-        const waived = tutorialPonton(siteId, level, await presenceOf(userId, conn));
+        const waived = tutorialPonton(siteId, level);
         if (!waived && !(await zonesOf(userId, conn)).has(map.siteZone(siteId))) return db.rollback({ status: 403, message: 'Achète d’abord ce quartier de l’île.' });
         const next = site.levels[level];
         if (!next) return db.rollback({ status: 409, message: 'Ce chantier est déjà achevé.' });

@@ -32,8 +32,8 @@ router.use('/world', (req, res, next) => {
     next();
 });
 
-// Chapitres ouverts du joueur (un joueur d'avant la bible garde le chapitre II ouvert d'emblée)
-const chaptersOf = async (owner, b, owned) => bookPages.openChapters(b, owned, await players.isVeteran(owner));
+// Chapitres ouverts du joueur
+const chaptersOf = async (owner, b, owned) => bookPages.openChapters(b, owned);
 
 // Vue de l'île. Les décorations de l'ancienne règle sont remboursées au premier passage (lot 8) : refund { count,
 // coins } accompagne alors la vue, une fois. Ses lectures sont mémorisées le temps de la calculer (db.cached : une même
@@ -255,7 +255,7 @@ router.post('/world/zone', withAccount(async (req, res, owner, b) => {
     const zone = String(req.body.zone || '');
     if (!/^[a-z]{1,20}$/.test(zone)) return res.status(400).json({ message: 'Quartier invalide' });
     const owned = await players.elements(owner);
-    const done = await world.buyZone(owner.id, zone, await chaptersOf(owner, b, owned), owned);
+    const done = await world.buyZone(owner.id, zone, await chaptersOf(owner, b, owned));
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ bought: done.bought, coins: done.coins, world: await worldView(owner, b) });
 }));
@@ -383,7 +383,7 @@ const pagesOf = list => (Array.isArray(list) ? list.slice(-400).filter(id => typ
 // Ce qu'il faut pour le Savoir d'un maître : éléments écrits, essais ratés par page, fil d'Ariane
 async function savoirInputs(owner, b) {
     const owned = await players.elements(owner);
-    return { owned, misses: await bookTries.missesByPage(owner.id), veteran: await players.isVeteran(owner), ariane: bookPages.arianeOf(b, owned, await world.arianeTargets(owner.id)) };
+    return { owned, misses: await bookTries.missesByPage(owner.id), ariane: bookPages.arianeOf(b, owned, await world.arianeTargets(owner.id)) };
 }
 // Bavarder avec un maître (bible, § 6.4) : son Savoir n'est soufflé que si le bavardage compte (une fois par jour).
 // Anya, une fois éveillée (§ 6.14) : son Souffle, une fois par jour, un ingrédient sur n'importe quelle page à portée

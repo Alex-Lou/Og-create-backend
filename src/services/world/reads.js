@@ -5,7 +5,6 @@ const quests = require('../quests');
 const loot = require('../loot');
 const signs = require('../signs');
 const finds = require('../finds');
-const players = require('../players');
 
 async function itemsOf(userId, conn = db) {
     const { rows } = await conn.query('SELECT item FROM world_items WHERE user_id = $1', [userId]);
@@ -65,8 +64,8 @@ async function annexesOf(userId, conn = db) {
     return rows;
 }
 
-// Paliers des bâtiments. Le feu de camp (le Foyer au palier I) est allumé d'office, sans ligne, pour un compte d'avant
-// la v6 et pour qui a déjà passé sa quête ; un nouveau compte le bâtit (bible, § 9, étape 5 : quête « feu »)
+// Paliers des bâtiments. Le feu de camp (le Foyer au palier I) est allumé d'office, sans ligne, pour qui a déjà passé
+// sa quête ; un nouveau compte le bâtit (bible, § 9, étape 5 : quête « feu »)
 async function levelsOf(userId, conn = db) {
     const { rows } = await conn.query('SELECT site, level, built_at FROM world_buildings WHERE user_id = $1', [userId]);
     const levels = { foyer: 0 };
@@ -79,8 +78,6 @@ async function levelsOf(userId, conn = db) {
     return { levels, builtAt };
 }
 async function fireLitOf(userId, conn) {
-    const mode = await players.islandModeFor(userId, conn);
-    if (!mode.fresh) return true;
     const { rows } = await conn.query('SELECT quest FROM world_quests WHERE user_id = $1', [userId]);
     return quests.doneOf(new Set(rows.map(row => row.quest))).has('feu');
 }

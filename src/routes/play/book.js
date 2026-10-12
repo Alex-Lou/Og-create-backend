@@ -23,7 +23,7 @@ router.get('/book', playLimiter, withPlayer(async (req, res, owner, b) => {
     // Pages où l'Encre a déjà servi : leur ingrédient se revoit sur tout appareil
     const inked = owner.kind === 'user' ? await ledger.refsOf(owner.id, 'encre') : new Set();
     const guided = owner.kind === 'user' && await world.guidedInkOf(owner.id);
-    res.json(bookPages.view(b, owned, misses, await bookLetters.byPage(owner), await players.isVeteran(owner), ariane, inked, guided));
+    res.json(bookPages.view(b, owned, misses, await bookLetters.byPage(owner), ariane, inked, guided));
 }));
 
 // Encre : révèle un ingrédient (déjà possédé) d'une page à portée ; offerte à un compte

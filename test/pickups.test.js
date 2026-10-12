@@ -4,7 +4,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { startServer, api, sql, newPlayer } = require('./helpers');
-const { V6_SINCE } = require('../src/services/players');
 
 let server;
 test.before(async () => { server = await startServer(); });
@@ -16,7 +15,7 @@ const foyerOf = world => world.sites.find(s => s.id === 'foyer').level;
 const met = world => world.villagers.map(v => v.id);
 
 test('ramasser sur la plage de Brumelune : une fois, puis la mer en rapporte ; cases inconnues, mal écrites ou recouvertes refusées', async () => {
-  const player = await newPlayer({ veteran: false });
+  const player = await newPlayer();
   const id = player.userId;
   assert.equal((await pick(player, 'greve-bois-9')).status, 404);
   for (const bad of ['', 'cratere-1', 'greve-BOIS-1', 'greve-bois-12']) assert.equal((await pick(player, bad)).status, 400, JSON.stringify(bad));
@@ -56,7 +55,7 @@ test('les trouvailles de la plage paient chacune leur leçon : deux bois et un g
 });
 
 test('un nouveau compte bâtit son feu ; Aster vient au matin, Cannelle après sa Récolte, Rivet après la troisième nuit', async () => {
-  const player = await newPlayer({ veteran: false });
+  const player = await newPlayer();
   const id = player.userId;
   const first = await view(player);
   assert.equal(foyerOf(first), 0);
@@ -87,35 +86,8 @@ test('un nouveau compte bâtit son feu ; Aster vient au matin, Cannelle après s
   assert.equal(met(await view(player)).includes('atelier'), true);
 });
 
-test('un ancien compte incomplet reprend sur la plage de Brumelune, puis retrouve ses règles dès la première nuit validée', async () => {
-  const player = await newPlayer({ veteran: false });
-  const id = player.userId;
-  // Créé juste avant la v6 (après la bible : pas un vétéran)
-  await sql('UPDATE users SET created_at = $2 WHERE id = $1', [id, new Date(V6_SINCE.getTime() - 60000)]);
-  const first = await view(player);
-  assert.deepEqual([foyerOf(first), met(first), first.brume.quest.id], [0, [], 'pages']);
-  // Au milieu du prologue (les pages réclamées) : la plage s'offre aussi, rien n'est perdu
-  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'pages')`, [id]);
-  assert.equal((await view(player)).brume.quest.id, 'ramasser');
-  // La Récolte réclamée valide la reprise : les anciennes règles redeviennent actives sans perdre l'avancée ; Cannelle
-  // attend sa deuxième nuit, comme sur une île neuve (un personnage par jour)
-  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'ramasser'), ($1, 'recolte')`, [id]);
-  assert.equal(met(await view(player)).includes('foyer'), false);
-  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'veille')`, [id]);
-  const cannelle = await view(player);
-  assert.deepEqual([met(cannelle).includes('foyer'), cannelle.brume.quest.id], [true, 'soupe']);
-  // La soupe réclamée : pas encore Rivet (choix de l'auteur, 13 oct. : jamais au milieu des poules) ; sa troisième nuit, si
-  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'soupe')`, [id]);
-  const rivet = await view(player);
-  assert.deepEqual([met(rivet).includes('atelier'), rivet.brume.quest.id], [false, 'cage']);
-  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'cage'), ($1, 'poules'), ($1, 'poulailler'), ($1, 'nuit-cannelle')`, [id]);
-  assert.equal(met(await view(player)).includes('atelier'), true);
-  // Le feu bâti ensuite (Abri) passe au palier II comme avant
-  assert.equal(foyerOf(rivet), 1);
-});
-
 test('au Grimoire, pendant la quête d’Ondin : la page que marque le ruban a son Encre offerte, elle seule', async () => {
-  const player = await newPlayer({ veteran: false });
+  const player = await newPlayer();
   const id = player.userId;
   await sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Vent", "Pluie", "Brasier"]'::jsonb WHERE user_id = $1`, [id]);
   const pages = async () => (await api('GET', '/play/book', null, player)).data.chapters.flatMap(c => c.pages);
@@ -137,8 +109,8 @@ test('au Grimoire, pendant la quête d’Ondin : la page que marque le ruban a s
   assert.equal((await pages()).some(p => p.guidedInk), false);
 });
 
-test('le Brasier dans la même visite du Grimoire que le Vent : le ruban y mène dès le Vent écrit, Encre offerte ; pas pour un ancien compte', async () => {
-  const player = await newPlayer({ veteran: false });
+test('le Brasier dans la même visite du Grimoire que le Vent : le ruban y mène dès le Vent écrit, Encre offerte', async () => {
+  const player = await newPlayer();
   const marked = async who => (await api('GET', '/play/book', null, who)).data.chapters.flatMap(c => c.pages).find(p => p.marked);
   // Avant le Vent : le ruban mène au Vent
   assert.equal((await api('GET', '/play/book', null, player)).data.ariane.target, 'Vent');
@@ -150,18 +122,12 @@ test('le Brasier dans la même visite du Grimoire que le Vent : le ruban y mène
   // (encore pendant « ramasser » ; plus une fois le Brasier écrit)
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'pages')`, [player.userId]);
   assert.equal((await api('GET', '/play/book', null, player)).data.ariane.target, 'Brasier');
-  const veteran = await newPlayer();
-  await sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Vent"]'::jsonb WHERE user_id = $1`, [veteran.userId]);
-  assert.notEqual((await api('GET', '/play/book', null, veteran)).data.ariane?.target, 'Brasier');
 });
 
 test('la première nuit ne se passe pas ; ensuite le choix se retient sur le compte', async () => {
-  const player = await newPlayer({ veteran: false });
+  const player = await newPlayer();
   const brume = async () => (await api('GET', '/play/world/brume', null, player)).data;
   assert.deepEqual([(await brume()).tutorial, (await brume()).skipped], [true, false]);
-  const veteran = await newPlayer();
-  assert.equal((await api('GET', '/play/world/brume', null, veteran)).data.tutorial, false);
-  assert.equal((await view(veteran)).brume.tutorial, false);
   assert.equal((await api('POST', '/play/world/prologue/skip', {}, { cookies: {} })).status, 401);
   assert.equal((await api('POST', '/play/world/prologue/skip', {}, player)).status, 409);
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'recolte'), ($1, 'veille')`, [player.userId]);

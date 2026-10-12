@@ -59,11 +59,11 @@ async function stowCrafts(userId, rows, levels, zones, annexRows, places = STATI
     return craftsOf(userId);
 }
 // Ce que le tutoriel fait fabriquer sans palier ni éléments (crafts.TUTORIAL_CRAFTS), pendant sa leçon seulement (la
-// lanterne de Rivet : la quête « deco » en cours) ; rien pour un compte d'avant la bible. presence : people.presenceOf
+// lanterne de Rivet : la quête « deco » en cours). presence : people.presenceOf
 const LESSON = 'deco';
 const tutorialOf = presence => {
     const current = quests.QUESTS.find(q => !presence.done.has(q.id));
-    return !presence.veteran && current && current.id === LESSON ? crafts.TUTORIAL_CRAFTS : new Set();
+    return current && current.id === LESSON ? crafts.TUTORIAL_CRAFTS : new Set();
 };
 
 // Questions de l'Épreuve réussies (progress.timer_progress : niveau → catégorie → identifiants)
