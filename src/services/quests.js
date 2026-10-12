@@ -178,8 +178,9 @@ function currentOf(claimed) {
 // depuis la dernière quête réclamée), awake: Set, hearts (cœurs du meilleur ami), expeditions, landmarks: Set,
 // gathered, visitors, settled, named, links: Set ('puits-foyer' : bâtiments reliés par un chemin) }
 // Quêtes du tutoriel qui passent par le Grimoire : la page que marque le ruban a son Encre offerte (le joueur, qui a
-// peu d'écus, n'est jamais bloqué devant une énigme) : le Brasier du feu de camp, la Source, le Puits d'Ondin
-const GUIDED_INK = new Set(['feu', 'souvenir-ondin']);
+// peu d'écus, n'est jamais bloqué devant une énigme) : le Puits d'Ondin, dont la Boue (Eau + Terre), la première
+// recette à deux ingrédients différents. Pas le Brasier (Feu + Feu : l'énigme suffit, choix de l'auteur, 12 oct.)
+const GUIDED_INK = new Set(['souvenir-ondin']);
 
 const HAVE = {
     crafts: (goal, facts) => facts.crafts,

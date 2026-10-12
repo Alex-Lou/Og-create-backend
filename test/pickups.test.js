@@ -109,7 +109,7 @@ test('au Grimoire, pendant la quête d’Ondin : la page que marque le ruban a s
   assert.equal((await pages()).some(p => p.guidedInk), false);
 });
 
-test('le Brasier dans la même visite du Grimoire que le Vent : le ruban y mène dès le Vent écrit, Encre offerte', async () => {
+test('le Brasier dans la même visite du Grimoire que le Vent : le ruban y mène dès le Vent écrit, sans leurre et sans Encre offerte', async () => {
   const player = await newPlayer();
   const marked = async who => (await api('GET', '/play/book', null, who)).data.chapters.flatMap(c => c.pages).find(p => p.marked);
   // Avant le Vent : le ruban mène au Vent
@@ -118,7 +118,9 @@ test('le Brasier dans la même visite du Grimoire que le Vent : le ruban y mène
   const book = (await api('GET', '/play/book', null, player)).data;
   assert.equal(book.ariane.target, 'Brasier');
   const page = await marked(player);
-  assert.equal(page.guidedInk, true);
+  // (Feu + Feu : l'énigme suffit, pas d'Encre offerte ; ses seuls vrais ingrédients, sans leurre)
+  assert.equal(page.guidedInk, undefined);
+  assert.deepEqual(page.tray, ['Feu']);
   // (encore pendant « ramasser » ; plus une fois le Brasier écrit)
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'pages')`, [player.userId]);
   assert.equal((await api('GET', '/play/book', null, player)).data.ariane.target, 'Brasier');

@@ -149,10 +149,17 @@ async function linksOf(userId, levels, places, conn = db) {
 // Le tutoriel guide jusqu'au bout (quests.GUIDED_INK) : la page que marque le ruban a son Encre offerte
 async function guidedInkOf(userId) {
     const quest = quests.currentOf(await claimedOf(userId));
-    return Boolean(quest && (quests.GUIDED_INK.has(quest.id) || await brasierFirst(userId, quest)));
+    return Boolean(quest && quests.GUIDED_INK.has(quest.id));
+}
+// La page que marque le ruban pendant le tutoriel n'a pas de leurre (choix de l'auteur, 9 oct.) : les quêtes à Encre
+// offerte, et le Brasier du feu de camp (sans Encre : Feu + Feu, l'énigme suffit)
+async function guidedPageOf(userId) {
+    const quest = quests.currentOf(await claimedOf(userId));
+    return Boolean(quest && (quests.GUIDED_INK.has(quest.id) || quest.id === 'feu' || await brasierFirst(userId, quest)));
 }
 // Le Brasier dans la même visite du Grimoire que le Vent (choix de l'auteur, 11 oct.) : sur une île du tutoriel, dès le
-// Vent écrit et jusqu'au chantier du feu, le ruban mène au Brasier (son plan), Encre offerte
+// Vent écrit et jusqu'au chantier du feu, le ruban mène au Brasier (son plan) ; sans Encre offerte (Feu + Feu : l'énigme
+// suffit, choix de l'auteur, 12 oct.)
 const BRASIER_FIRST = new Set(['pages', 'ramasser']);
 async function brasierFirst(userId, quest) {
     if (!BRASIER_FIRST.has(quest.id)) return false;
@@ -1003,7 +1010,7 @@ async function chooseSign(userId, siteId, styleId) {
 module.exports = {
     SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, pendingOf, chargesAt, effectsOf, productionOf,
     view, build, buyZone, buyItem, undoItem, harvestCap, chooseSkin, startRun, finishRun, collect, migrate, claimQuest, sleep, board, openChest, openAll,
-    placeAnnex, moveAnnex, poseAnnex, annexSpotOk, siteSpots, moveSite, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople, namePlayer, chooseAvatar, arianeTargets, elementHintOf, guidedInkOf, restartIsland,
+    placeAnnex, moveAnnex, poseAnnex, annexSpotOk, siteSpots, moveSite, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople, namePlayer, chooseAvatar, arianeTargets, elementHintOf, guidedInkOf, guidedPageOf, restartIsland,
     refundDecorations, startCraft, finishCraft, placeCraft, moveCraft, storeCraft, turnCraft, startExpedition, findLandmark, gatherDeposit, pickUp,
     anyaOf, breathRefused, revealAnya, breatheAnya, brumeSavoirOf, talkBrume, startNights, repelCreature, repairSite, skipPrologue, layPaths,
     feedBeast, collectBeasts, openCage
