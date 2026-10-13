@@ -55,8 +55,9 @@ const CRAFTS = [
     // Créations de climat (lot 9d) : deux par climat, la seconde après la première
     craft('igloo', 'Igloo', 'climat', { wood: 10 }, ['Neige'], [], { climate: 'cimes', ground: 'n' }, ['.xxx.', 'xxxxx', 'xx.xx'], { glace: 8 }),
     craft('sculpture', 'Sculpture de glace', 'climat', { stone: 10 }, ['Glace'], ['igloo'], { climate: 'cimes', ground: 'n' }, ['..x..', '.xxx.', '..x..', '.xxx.', 'xxxxx'], { glace: 12 }),
-    craft('parc', 'Enclos à moutons', 'climat', { wood: 24 }, ['Mouton'], [], { climate: 'landes', ground: 'lg' }, ['xxxx', 'x..x', 'x..x', 'xxxx'], { laine: 8 }),
-    craft('cairn', 'Cairn aux rubans', 'climat', { stone: 20 }, ['Vent'], ['parc'], { climate: 'landes', ground: 'lg' }, ['..x..', '.xxx.', '.xxx.', 'xxxxx'], { laine: 12 }),
+    // (les landes : le Cairn d'abord, le Vent est connu ; l'Enclos ensuite, le Mouton est loin, choix de l'auteur, 12 oct.)
+    craft('cairn', 'Cairn aux rubans', 'climat', { stone: 20 }, ['Vent'], [], { climate: 'landes', ground: 'lg' }, ['..x..', '.xxx.', '.xxx.', 'xxxxx'], { laine: 8 }),
+    craft('parc', 'Enclos à moutons', 'climat', { wood: 24 }, ['Mouton'], ['cairn'], { climate: 'landes', ground: 'lg' }, ['xxxx', 'x..x', 'x..x', 'xxxx'], { laine: 12 }),
     craft('passerelle', 'Passerelle de roseaux', 'climat', { wood: 16 }, ['Marais'], [], { climate: 'marais', ground: 'x' }, ['xxxxx', 'xxxxx', '.x.x.'], { roseau: 8 }),
     craft('heron', 'Héron de bois', 'climat', { wood: 14 }, ['Oiseau'], ['passerelle'], { climate: 'marais', ground: 'x' }, ['xx...', '.x...', '.xxxx', '..xx.', '..xx.'], { roseau: 12 }),
     craft('tente', 'Tente nomade', 'climat', { wood: 12, food: 10 }, ['Tissu'], [], { climate: 'dunes', ground: 's' }, ['..x..', '.xxx.', 'xxxxx', 'xx.xx'], { sel: 8 }),

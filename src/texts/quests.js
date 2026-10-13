@@ -228,8 +228,8 @@ const QUEST_TEXTS = {
         say: 'Des toits dorment sous la brume, à l’est. Achète Le Hameau : une baleine passe parfois au large.'
     },
     potion: {
-        label: 'Fais naître le Remède',
-        say: 'Cannelle ne sent plus le goût de rien. L’Eau, la Magie, la Plante… Une potion le lui rendra peut-être.'
+        label: 'Rends le goût à Cannelle : fais naître le Remède',
+        say: 'Cannelle repose sa cuillère. « Plus rien n’a de goût… Ce n’est pas la brume, c’est moi. » Le Grimoire se souvient du Remède : écris-le.'
     },
     alchimiste: {
         label: 'Bâtis la Maison de l’alchimiste',

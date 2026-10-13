@@ -141,9 +141,3 @@ test('créations de climat : deux par climat, payées aussi en trouvailles, pos�
   assert.equal(map.CLIMATES.cimes, 'Les Cimes');
 });
 
-test('un chapitre est fini quand toutes ses pages sont trouvées', () => {
-  const b = { meta: new Map([['Air', { family: 'Elements Fondamentaux' }], ['Eau', { family: 'Elements Fondamentaux' }], ['Pluie', { family: 'Phénomènes Naturels' }], ['Or', { family: 'Matériaux' }]]) };
-  assert.deepEqual([...bookPages.finishedChapters(b, ['Air', 'Eau'])], []);
-  assert.deepEqual([...bookPages.finishedChapters(b, ['Air', 'Eau', 'Pluie'])], ['I']);
-  assert.deepEqual([...bookPages.finishedChapters(b, ['Air', 'Eau', 'Pluie', 'Or'])], ['I', 'II']);
-});

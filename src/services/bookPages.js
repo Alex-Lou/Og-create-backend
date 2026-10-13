@@ -9,15 +9,16 @@ const hangman = require('./hangman');
 // « verse » = la phrase de la page de garde du chapitre. Le chapitre II s'ouvre à 3 découvertes (bible, D4)
 // seal : la page-sceau d'un chapitre (choix de l'auteur, 12 oct.) : l'écrire l'ouvre d'un coup, quel que soit le compte
 // de découvertes (la Vie, la grande scène de l'acte I, ouvre « Le Vivant » ; le Village, à la fin de l'acte III, ouvre
-// « Le Foyer », où l'acte IV trouve le Bateau d'Aster)
+// « Le Foyer », où l'acte IV trouve le Bateau d'Aster ; la Civilisation, le défi de l'acte VI, ouvre « Les Âges » ; le
+// Phénix, la flamme rendue à Brume, ouvre « Les Légendes »)
 const CHAPTERS = [
     { id: 'I', name: 'Les Premiers Souffles', families: ['Elements Fondamentaux', 'Phénomènes Naturels'], need: 0, verse: 'Au commencement, quatre souffles et une étincelle de curiosité.' },
     { id: 'II', name: 'La Matière', families: ['Matériaux', 'Chimie', 'Physique'], need: 3, verse: 'Ce qui se pétrit, se fond, se forge : le monde a des mains.' },
     { id: 'III', name: 'Ciel et Terre', families: ['Cosmos', 'Formations Naturelles'], need: 5, verse: 'Lève les yeux vers les astres, puis baisse-les vers les montagnes.' },
     { id: 'IV', name: 'Le Vivant', families: ['Flore', 'Biologie', 'Vie et Créatures'], need: 12, seal: 'Vie', verse: 'Une graine, un souffle, un battement : tout ce qui pousse et respire.' },
     { id: 'V', name: 'Le Foyer', families: ['Corps et Esprit', 'Créations Humaines'], need: 25, seal: 'Village', verse: 'Autour du feu, l’humain invente, rêve et bâtit sa maison.' },
-    { id: 'VI', name: 'Les Âges', families: ['Histoire', 'Technologie'], need: 45, verse: 'Des silex aux étoiles : les siècles tournent leurs pages.' },
-    { id: 'VII', name: 'Les Légendes', families: ['Légendes'], need: 70, verse: 'Ici s’écrit ce que nul n’a vu, et que tout le monde connaît.' }
+    { id: 'VI', name: 'Les Âges', families: ['Histoire', 'Technologie'], need: 45, seal: 'Civilisation', verse: 'Des silex aux étoiles : les siècles tournent leurs pages.' },
+    { id: 'VII', name: 'Les Légendes', families: ['Légendes'], need: 70, seal: 'Phénix', verse: 'Ici s’écrit ce que nul n’a vu, et que tout le monde connaît.' }
 ];
 
 // Difficulté de chaque chapitre : leurres du plateau, pages ouvertes à la fois, première lettre,
@@ -298,19 +299,6 @@ function openChapters(b, owned) {
     const have = new Set(owned);
     return new Set(CHAPTERS.filter(c => isOpen(c, stars, have)).map(c => c.id));
 }
-// Chapitres dont toutes les pages sont trouvées (créations d'île, lot 8)
-function finishedChapters(b, owned) {
-    const have = new Set(owned);
-    const byFamily = new Map();
-    for (const [name, info] of b.meta) {
-        if (!byFamily.has(info.family)) byFamily.set(info.family, []);
-        byFamily.get(info.family).push(name);
-    }
-    return new Set(CHAPTERS.filter(c => {
-        const names = c.families.flatMap(family => byFamily.get(family) || []);
-        return names.length > 0 && names.every(name => have.has(name));
-    }).map(c => c.id));
-}
 
 // Toutes les familles du Grimoire (le Souffle d'Anya porte sur n'importe quelle page)
 const FAMILIES = CHAPTERS.flatMap(chapter => chapter.families);
@@ -318,4 +306,4 @@ const FAMILIES = CHAPTERS.flatMap(chapter => chapter.families);
 // Découvertes qu'il faut pour ouvrir un chapitre (id : 'I'…'VII'), ou 0
 const needOfChapter = id => CHAPTERS.find(c => c.id === id)?.need || 0;
 
-module.exports = { CHAPTERS, DIFFICULTY, FAMILIES, needOfChapter, withSlots, slotsFor, isOpen, view, arianeOf, reachableById, pageId, aim, telling, savoir, difficultyOf, chapterOf, openChapters, finishedChapters, starsOf };
+module.exports = { CHAPTERS, DIFFICULTY, FAMILIES, needOfChapter, withSlots, slotsFor, isOpen, view, arianeOf, reachableById, pageId, aim, telling, savoir, difficultyOf, chapterOf, openChapters, starsOf };

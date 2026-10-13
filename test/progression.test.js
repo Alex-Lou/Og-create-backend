@@ -13,8 +13,8 @@ const { ZONE_BY_ID } = require('../src/services/worldMap');
 const crafts = require('../src/services/crafts');
 const db = require('../src/config/db');
 
-// La chaîne, du tutoriel à l'acte V (les actes VI et VII attendent les sceaux de leurs chapitres : à décider)
-const ACTS = ['T', 'I', 'II', 'III', 'IV', 'V'];
+// Toute la chaîne : le tutoriel et les sept actes
+const ACTS = [...new Set(QUESTS.map(q => q.act))];
 // L'Athanor grandit avec l'histoire (services/world.js : ATHANOR)
 const ATHANOR = [['eveil-sylve', 4], ['puits-ondin', 3]];
 // Le palier I du Ponton se bâtit sans plan pendant le tutoriel (world.tutorialPonton)
@@ -24,7 +24,7 @@ const TUTORIAL_CRAFT = (quest, craft) => quest.act === 'T' && craft === 'lantern
 
 test.after(() => db.pool.end());
 
-test('jamais d’impasse : du tutoriel à l’acte V, chaque clé dans un chapitre ouvert, chaque recette dans l’Athanor', async () => {
+test('jamais d’impasse : toute la chaîne des quêtes, chaque clé dans un chapitre ouvert, chaque recette dans l’Athanor', async () => {
   const b = await recipeBook.load();
   const owned = new Set(recipeBook.BASE_ELEMENTS);
   const done = new Set();

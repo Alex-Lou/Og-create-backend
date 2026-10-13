@@ -28,7 +28,8 @@ const ZONES = [
     { id: 'crique', name: 'La Crique', price: 900, chapter: 'IV', code: 'h' },
     { id: 'foret', name: 'La Grande Forêt', price: 1200, chapter: 'IV', code: 'i' },
     { id: 'hameau', name: 'Le Hameau', price: 1800, chapter: 'V', code: 'j' },
-    { id: 'phare', name: 'L’Îlot aux Mouettes', price: 2800, chapter: 'VI', code: 'k' },
+    // (au chapitre V, et non VI : l'acte VI commence ici, avant que la Civilisation ouvre « Les Âges », choix de l'auteur, 12 oct.)
+    { id: 'phare', name: 'L’Îlot aux Mouettes', price: 2800, chapter: 'V', code: 'k' },
     { id: 'legendes', name: 'L’Île des Légendes', price: 4500, chapter: 'VII', code: 'l' },
     { id: 'menhirs', name: 'La Lande aux Menhirs', price: 350, chapter: 'II', code: 'o', climate: 'landes', trip: 2 },
     { id: 'roselieres', name: 'Les Roselières', price: 400, chapter: 'II', code: 'q', climate: 'marais', trip: 2 },
