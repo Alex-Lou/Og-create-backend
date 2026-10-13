@@ -20,6 +20,7 @@ const { cageOf } = require('./beasts');
 const { roadsOf } = require('./paths');
 const { STATIC, inSiteAt, placesOf } = require('./places');
 const { presenceOf, metOf } = require('./people');
+const { sheltersOf } = require('./shelters');
 
 const ZONE = 'coeur';
 // Le Foyer à l'Abri (palier II) : Cannelle quitte la cuisine de l'épave, les cabanons peuvent venir
@@ -51,7 +52,8 @@ const corner = (who, site) => at => {
 };
 const PLACES = [
     { id: 'hirondelle', x: 96, y: 96, size: 2, art: () => 'hirondelle' },
-    { id: 'cannelle', x: 99, y: 96, size: 2, art: at => (foyer(at) < ABRI && at.here('foyer') ? 'cannelle_debris' : null) },
+    // (sa cuisine de l'épave, puis son abri, bâti par le joueur : world/shelters.js)
+    { id: 'cannelle', x: 99, y: 96, size: 2, art: at => (foyer(at) < ABRI && at.here('foyer') ? (at.shelters.has('cannelle') ? 'cannelle_abri' : 'cannelle_debris') : null) },
     // (son coin, à côté de son Ponton : elle y plante son camp en débarquant, choix de l'auteur, 11 oct.)
     { id: 'aster', x: 87, y: 96, size: 2, art: corner('aster', 'ponton') },
     { id: 'rivet', x: 91, y: 94, size: 2, art: corner('rivet', 'atelier') },
@@ -92,8 +94,8 @@ function spotOf(place, size, taken, places) {
 // des bâtiments ; taken : clés (y × SIZE + x) des cases occupées par ses annexes et ses créations posées ; cage : la
 // cage aux poules ; met : ids des bâtiments dont le personnage est là (null : tous) ;
 // places, beach : où sont les bâtiments, île à la plage (world/places.js)
-function campOf({ acts = [], levels = {}, taken = new Set(), cage = null, met = null, places = STATIC, beach = false }) {
-    const at = { acts, levels, cage, here: site => !met || met.has(site) };
+function campOf({ acts = [], levels = {}, taken = new Set(), cage = null, met = null, places = STATIC, beach = false, shelters = new Set() }) {
+    const at = { acts, levels, cage, shelters, here: site => !met || met.has(site) };
     const busy = new Set(taken);
     const out = [];
     for (const place of PLACES) {
@@ -126,7 +128,7 @@ async function campOfUser(userId, conn, { levels, annexRows, craftRows } = {}) {
     const presence = await presenceOf(userId, conn);
     const zones = await zonesOf(userId, conn);
     const met = new Set(['ponton', 'foyer', 'atelier'].filter(id => metOf(id, lv, zones, presence)));
-    return campOf({ acts, levels: lv, taken, cage: await cageOf(userId, conn), met, places, beach });
+    return campOf({ acts, levels: lv, taken, cage: await cageOf(userId, conn), met, places, beach, shelters: await sheltersOf(userId, conn) });
 }
 
 module.exports = { PLACES, campOf, cellsOfCamp, campOfUser };

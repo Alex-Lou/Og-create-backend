@@ -256,6 +256,36 @@ async function placeLine(userId, craftId, cells, owned, chapters, stars = 0) {
     });
 }
 
+// L'anneau d'un coin du camp (l'enclos de Cannelle, choix de l'auteur, 13 oct.) : les cases à une case de son coin, sauf
+// celles qui bordent le Feu (son enclos à lui, autour de sa grande emprise) ; have : celles qui ont déjà leur clôture,
+// need : have et celles où une clôture peut encore se poser (rien d'impossible n'est demandé). { have, need }
+async function fenceRingOf(userId, conn, who) {
+    const rows = await craftsOf(userId, conn);
+    const { levels } = await levelsOf(userId, conn);
+    const annexRows = await annexesOf(userId, conn);
+    const camp = await campOfUser(userId, conn, { levels, annexRows, craftRows: rows });
+    const corner = camp.find(c => c.id === who);
+    if (!corner) return { have: 0, need: 0 };
+    const { places } = await placesOf(userId, conn);
+    const feu = places.foyer;
+    const gap = (v, a, w) => Math.max(a - v, 0, v - (a + w - 1));
+    const ring = [];
+    for (let y = corner.y - 1; y <= corner.y + corner.h; y++) {
+        for (let x = corner.x - 1; x <= corner.x + corner.w; x++) {
+            if (Math.max(gap(x, corner.x, corner.w), gap(y, corner.y, corner.h)) !== 1) continue;
+            if (feu && Math.max(gap(x, feu.x, 3), gap(y, feu.y, 3)) <= 1) continue;
+            ring.push({ x, y });
+        }
+    }
+    const fenced = new Set(placedOf(rows).filter(r => r.craft === 'cloture').map(keyOf));
+    const { ground } = await roadsOf(userId, conn);
+    const ctx = craftCtx({ levels, zones: await zonesOf(userId, conn), annexRows, rows, blocked: cellsOfCamp(camp), ground, places });
+    const fence = crafts.CRAFT_BY_ID.cloture;
+    const have = ring.filter(c => fenced.has(keyOf(c))).length;
+    const free = ring.filter(c => !fenced.has(keyOf(c)) && !crafts.spotBlock(fence, c.x, c.y, ctx)).length;
+    return { have, need: have + free };
+}
+
 // Déplace une création posée vers une autre case permise (gratuit). { coins? } ou { status, message }
 async function moveCraft(userId, x, y, toX, toY) {
     await migrate(userId);
@@ -300,6 +330,6 @@ async function turnCraft(userId, x, y, flip) {
 }
 
 module.exports = {
-    craftCtx, craftSpots, stowCrafts, epreuvesOf, craftsView, startCraft, finishCraft, placeCraft, placeLine, moveCraft,
+    craftCtx, craftSpots, stowCrafts, epreuvesOf, craftsView, startCraft, finishCraft, placeCraft, placeLine, fenceRingOf, moveCraft,
     storeCraft, turnCraft
 };

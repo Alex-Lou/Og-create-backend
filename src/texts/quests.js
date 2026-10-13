@@ -59,6 +59,14 @@ const QUEST_TEXTS = {
         label: 'Pose le poulailler de Cannelle',
         say: 'Il leur faut un toit : touche le Feu de camp, puis « Annexes », et pose le poulailler dans l’herbe, près de la cuisine de Cannelle.'
     },
+    'abri-cannelle': {
+        label: 'Un abri pour Cannelle',
+        say: 'Cannelle dort sur la cuisine de l’épave. Touche son coin : vingt bois, dix pierres, et elle a un toit.'
+    },
+    'enclos-cannelle': {
+        label: 'Entoure le coin de Cannelle',
+        say: 'Ses piquets, cette fois, c’est toi qui les fais : glisse autour de son abri, huit bois le piquet.'
+    },
     'nuit-cannelle': {
         label: 'Passe ta troisième nuit',
         say: 'Trois, ce soir, autour du feu. Dors : je veille.'

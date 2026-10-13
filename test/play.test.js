@@ -2448,7 +2448,7 @@ test('quêtes de Brume : la quête active se réclame une fois, son objectif att
   assert.equal(start.status, 200);
   assert.deepEqual([start.data.brume.quest.id, start.data.brume.quest.kind, start.data.brume.quest.done], ['pages', 'element', false]);
   assert.equal(start.data.brume.done, 0);
-  assert.equal(start.data.brume.total, 68);
+  assert.equal(start.data.brume.total, 70);
   // Objectif pas encore atteint ; quête qui n'est pas l'active ; identifiant invalide
   assert.equal((await api('POST', '/play/world/quest', { id: 'pages' }, player)).status, 403);
   assert.equal((await api('POST', '/play/world/quest', { id: 'recolte' }, player)).status, 409);
@@ -2613,6 +2613,30 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Aster ouvre s
   const coop = await api('POST', '/play/world/annex', { annex: 'poulailler', x: coopSpots[0].x, y: coopSpots[0].y }, player);
   assert.deepEqual([coop.status, coop.data.world.brume.quest.id, coop.data.world.brume.quest.done], [200, 'poulailler', true], JSON.stringify(coop.data));
   assert.equal((await claim('poulailler')).status, 200);
+  // L'abri de Cannelle : refusé sans de quoi le payer ; payé, son coin devient un abri (une seule fois)
+  const [kept] = await sql('SELECT wood, stone FROM world_stock WHERE user_id = $1', [player.userId]);
+  await sql('UPDATE world_stock SET wood = 0, stone = 0 WHERE user_id = $1', [player.userId]);
+  assert.equal((await api('POST', '/play/world/shelter', { who: 'cannelle' }, player)).status, 409);
+  // (ce qu'il avait, et de quoi payer l'abri et son enclos)
+  await sql('UPDATE world_stock SET wood = $2, stone = $3 WHERE user_id = $1', [player.userId, kept.wood + 200, kept.stone + 10]);
+  const roof = await api('POST', '/play/world/shelter', { who: 'cannelle' }, player);
+  const roofed = roof.data.world;
+  assert.deepEqual([roof.status, roofed.brume.quest.id, roofed.brume.quest.done, roofed.camp.find(c => c.id === 'cannelle').art, roofed.shelters.cannelle.built, roofed.stock.wood],
+    [200, 'abri-cannelle', true, 'cannelle_abri', true, kept.wood + 180], JSON.stringify(roof.data.message || ''));
+  assert.equal((await api('POST', '/play/world/shelter', { who: 'cannelle' }, player)).status, 409);
+  assert.equal((await claim('abri-cannelle')).status, 200);
+  // Son enclos : les cases à une case de son coin, sauf celles qui bordent le Feu (son enclos à lui) ; les piquets
+  // fabriqués et payés en passant, d'un trait
+  const yard = await view();
+  const corner = yard.camp.find(c => c.id === 'cannelle');
+  const gap = (v, a, w) => Math.max(a - v, 0, v - (a + w - 1));
+  const yardRing = yard.crafts.catalog.find(c => c.id === 'cloture').spots
+    .filter(c => Math.max(gap(c.x, corner.x, corner.w), gap(c.y, corner.y, corner.h)) === 1 && Math.max(gap(c.x, 98, 3), gap(c.y, 92, 3)) > 1);
+  assert.deepEqual([yard.brume.quest.id, yard.brume.quest.have, yard.brume.quest.need], ['enclos-cannelle', 0, yardRing.length]);
+  assert.ok(yardRing.length >= 6, String(yardRing.length));
+  const fenced = await api('POST', '/play/world/craft/line', { craft: 'cloture', cells: yardRing.map(c => [c.x, c.y]) }, player);
+  assert.deepEqual([fenced.status, fenced.data.placed, fenced.data.world.brume.quest.done, fenced.data.world.stock.wood], [200, yardRing.length, true, kept.wood + 180 - 8 * yardRing.length]);
+  assert.equal((await claim('enclos-cannelle')).status, 200);
   assert.equal(who(await view(), 'atelier'), undefined);
   assert.equal((await api('POST', '/play/world/sleep', {}, player)).status, 200);
   // Rivet est là ; sa lanterne (au tutoriel, sans palier ni éléments) posée, Ondin attend déjà au Puits (plus de
@@ -2623,7 +2647,7 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Aster ouvre s
   assert.ok(!/Palier|savoir faire/.test(lantern.block || ''), lantern.block);
   await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'lanterne', $2, $3)`, [player.userId, X(31), Y(35)]);
   assert.equal((await claim('deco')).status, 200);
-  assert.equal(await coinsOf(player), 180);
+  assert.equal(await coinsOf(player), 210);
   // Ondin dort au Puits : on le réveille en lui parlant
   const sleeping = await view();
   assert.deepEqual([who(sleeping, 'puits').asleep, who(sleeping, 'puits').built], [true, false]);
@@ -2644,7 +2668,7 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Aster ouvre s
   assert.deepEqual(who(built.data.world, 'foyer').needs.map(n => n.id), ['manger', 'deco']);
   // (puis le premier chemin, du Puits au Feu : l'île neuve n'a que son sentier)
   assert.deepEqual([who(built.data.world, 'puits').built, built.data.world.brume.quest.id], [true, 'chemin']);
-  assert.equal(await coinsOf(player), 180 + 10 + 20 + 40);
+  assert.equal(await coinsOf(player), 210 + 10 + 20 + 40);
   // Aster est là depuis le matin qui suit le premier feu ; le chemin ne conditionne plus son arrivée (son Ponton bâti
   // hors de La Crique ne l'y installe pas encore : people.livesHere)
   assert.equal(who(built.data.world, 'ponton').built, false);

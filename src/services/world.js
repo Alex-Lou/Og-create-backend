@@ -49,8 +49,9 @@ const {
     isKnown, coreMissing, expeditionCost, expeditionOf, startExpedition, findLandmark, craftBonusOf, gatherDeposit, pickUp
 } = require('./world/lands');
 const {
-    craftCtx, stowCrafts, epreuvesOf, craftsView, startCraft, finishCraft, placeCraft, placeLine, moveCraft, storeCraft, turnCraft
+    craftCtx, stowCrafts, epreuvesOf, craftsView, startCraft, finishCraft, placeCraft, placeLine, fenceRingOf, moveCraft, storeCraft, turnCraft
 } = require('./world/creations');
+const { sheltersOf, sheltersView, buildShelter } = require('./world/shelters');
 const { annexSpotOk, annexSpots, annexesView, placeAnnex, moveAnnex, poseAnnex } = require('./world/annexPlots');
 const { campOfUser, cellsOfCamp } = require('./world/camp');
 const paths = require('./world/paths');
@@ -103,6 +104,7 @@ async function factsOf(userId, owned, stars, conn = db, moods = null) {
     ]);
     const placed = placedOf(craftRows);
     const { places } = await placesOf(userId, conn);
+    const shelters = await sheltersOf(userId, conn);
     if (!moods) {
         const presence = await presenceOf(userId, conn);
         const residents = residentsOf(levels, zones, await settlersOf(userId, conn), presence);
@@ -130,6 +132,9 @@ async function factsOf(userId, owned, stars, conn = db, moods = null) {
         hensFreed,
         coops,
         crates: new Set(crateRows.rows.map(r => r.source.slice('caisse:'.length))),
+        // Les abris bâtis (world/shelters.js) ; l'enclos autour d'un coin, une fois son abri bâti
+        shelters,
+        fences: shelters.has('cannelle') ? { cannelle: await fenceRingOf(userId, conn, 'cannelle') } : {},
         visitors,
         settled,
         named: Boolean(names.peuple),
@@ -550,6 +555,8 @@ async function view(userId, owned, book) {
         annexes: annexRows.filter(r => annexes.ANNEX_BY_ID[r.annex]).map(r => ({ x: r.x, y: r.y, annex: r.annex, site: annexes.ANNEX_BY_ID[r.annex].site, flip: r.flip, look: r.look })),
         // Le camp des naufragés : [{ id, art (dessin de camp.json), x, y, w, h }]
         camp,
+        // Les abris des coins du camp : { qui: { cost, open, built } } (world/shelters.js)
+        shelters: sheltersView(facts.shelters, quests.doneOf(claimed)),
         // Le nom du peuple (bible, § 6.11), une fois choisi ; le nom du joueur (§ 9, étape 2) et son avatar (§ 6.17)
         people: named.peuple || null,
         player: named.joueur || null,
@@ -1045,7 +1052,7 @@ module.exports = {
     SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, pendingOf, chargesAt, effectsOf, productionOf,
     view, build, buyZone, buyItem, undoItem, harvestCap, chooseSkin, startRun, finishRun, collect, migrate, claimQuest, sleep, board, openChest, openAll,
     placeAnnex, moveAnnex, poseAnnex, annexSpotOk, siteSpots, moveSite, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople, namePlayer, chooseAvatar, arianeTargets, elementHintOf, guidedInkOf, guidedPageOf, athanorOf, bookFor, restartIsland,
-    refundDecorations, startCraft, finishCraft, placeCraft, placeLine, moveCraft, storeCraft, turnCraft, startExpedition, findLandmark, gatherDeposit, pickUp,
+    refundDecorations, startCraft, finishCraft, placeCraft, placeLine, buildShelter, moveCraft, storeCraft, turnCraft, startExpedition, findLandmark, gatherDeposit, pickUp,
     anyaOf, breathRefused, revealAnya, breatheAnya, brumeSavoirOf, talkBrume, startNights, repelCreature, repairSite, skipPrologue, layPaths,
     feedBeast, collectBeasts, openCage
 };

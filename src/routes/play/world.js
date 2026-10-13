@@ -104,6 +104,12 @@ router.post('/world/craft/line', withAccount(async (req, res, owner, b) => {
     const done = await world.placeLine(owner.id, craft, cells.map(([x, y]) => [Number(x), Number(y)]), owned, bookPages.openChapters(b, owned), bookPages.starsOf(b, owned));
     await craftDone(res, owner, b, done, { placed: done.placed, ...(done.stopped ? { stopped: done.stopped } : {}) });
 }));
+// L'abri d'un coin du camp (celui de Cannelle) : bâti et payé
+router.post('/world/shelter', withAccount(async (req, res, owner, b) => {
+    const who = String(req.body.who || '');
+    if (!/^[a-z]{1,20}$/.test(who)) return res.status(400).json({ message: 'Abri invalide' });
+    await craftDone(res, owner, b, await world.buildShelter(owner.id, who));
+}));
 // Création posée : pivoter (miroir)
 router.post('/world/craft/turn', withAccount(async (req, res, owner, b) => {
     const x = Number(req.body.x), y = Number(req.body.y);
