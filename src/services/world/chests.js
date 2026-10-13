@@ -72,12 +72,12 @@ async function grant(userId, source, rarity, conn, { wanted = null, streak = nul
 // La caisse d'un personnage, échouée près du camp (choix de l'auteur, 11 oct.) : elle s'ouvre une fois, le jour de son
 // arrivée (after : la quête faite avant), et donne toujours la même chose : des ressources, et ce qu'elle garde (keepsakes,
 // ce que le coffre montre). Celle d'Aster : sa longue-vue, son filet, son carnet de quart (le plan de son Ponton)
-// crafts : des créations prêtes, mises en réserve (les quatre piquets de son camp : la quête des clôtures)
+// crafts : des créations prêtes, mises en réserve (les piquets de l'enclos du camp : la quête des clôtures)
 const CRATES = {
     aster: {
         after: 'nuit',
-        prize: { kind: 'stock', stock: { wood: 5 }, keepsakes: ['Longue-vue', 'Filet', 'Carnet de quart (le plan du Ponton)', 'Quatre piquets de clôture'] },
-        crafts: { cloture: 4 }
+        prize: { kind: 'stock', stock: { wood: 5 }, keepsakes: ['Longue-vue', 'Filet', 'Carnet de quart (le plan du Ponton)', `${quests.ENCLOS} piquets de clôture`] },
+        crafts: { cloture: quests.ENCLOS }
     }
 };
 async function openCrate(userId, id) {

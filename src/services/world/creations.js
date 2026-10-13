@@ -100,6 +100,7 @@ function craftsView(rows, ctx, { owned, stock, open, epreuves, stars = 0, have, 
                 id: c.id, name: c.name, tier: c.tier, cost: c.cost, finds: c.finds, elements: c.elements.map(name => ({ name, have: owned.has(name), ...(!owned.has(name) && pagesTo ? { pages: pagesTo(name) } : {}) })),
                 // (tutorial : la leçon du tutoriel la fait fabriquer avant son palier ; le front ouvre l'établi sur elle)
                 after: c.after, open: open.has(c.tier) || tutorial.has(c.id), tutorial: tutorial.has(c.id), made: made[c.id] || 0, reserve, climate: c.place.climate || null,
+                ...(crafts.LINE_CRAFTS.has(c.id) ? { line: true } : {}),
                 block: crafts.blockOf(c, { made, owned, stock, open, have, tutorial: tutorial.has(c.id), stars }), place: crafts.placeText(c, siteName),
                 spots: made[c.id] ? craftSpots(c, ctx) : []
             };
@@ -193,6 +194,68 @@ async function placeCraft(userId, craftId, x, y, flip = false) {
     });
 }
 
+// Pose en ligne (un glisser, choix de l'auteur, 13 oct.) : une création « en ligne » (clôture, muret) sur chaque case de
+// cells, dans l'ordre. La réserve d'abord, puis chaque pièce fabriquée et payée en passant, sans assemblage (la première
+// l'a été à la main). S'arrête à la première case refusée, ou quand il manque de quoi la payer : ce qui est posé reste.
+// owned, chapters, stars : comme startCraft. { placed, stopped?, coins? } ou { status, message }
+async function placeLine(userId, craftId, cells, owned, chapters, stars = 0) {
+    if (!crafts.LINE_CRAFTS.has(craftId)) return { status: 400, message: 'Cette création ne se pose pas d’un trait.' };
+    const c = crafts.CRAFT_BY_ID[craftId];
+    await migrate(userId);
+    return db.transaction(async conn => {
+        // (ce qui attend dans les bâtiments compte pour payer ; le stock relu ensuite, à jour)
+        const { balance } = await payWith(userId, conn, await stockOf(userId, conn, true));
+        let stock = await stockOf(userId, conn, true);
+        const rows = await craftsOf(userId, conn);
+        const made = madeOf(rows);
+        if (!made[craftId]) return db.rollback({ status: 409, message: `Fabrique d’abord « ${c.name} » à l’établi.` });
+        const { levels } = await levelsOf(userId, conn);
+        const annexRows = await annexesOf(userId, conn);
+        const campCells = cellsOfCamp(await campOfUser(userId, conn, { levels, annexRows, craftRows: rows }));
+        const { ground } = await roadsOf(userId, conn);
+        const { places } = await placesOf(userId, conn);
+        const ctx = craftCtx({ levels, zones: await zonesOf(userId, conn), annexRows, rows, blocked: campCells, ground, places });
+        const open = crafts.tiersOpen(chapters, await epreuvesOf(userId, conn), stars);
+        const tutorial = tutorialOf(await presenceOf(userId, conn)).has(c.id);
+        const known = new Set(owned);
+        const reserve = rows.filter(r => r.craft === craftId && r.x === null);
+        const taken = new Set();
+        let placed = 0;
+        let stopped = null;
+        let coins = balance;
+        for (const [x, y] of cells) {
+            const block = taken.has(y * SIZE + x) ? 'Case déjà prise.' : crafts.spotBlock(c, x, y, ctx);
+            if (block) {
+                stopped = block;
+                break;
+            }
+            let row = reserve.shift();
+            if (!row) {
+                const lack = crafts.blockOf(c, { made, owned: known, stock, open, have: await findsOf(userId, conn), tutorial, stars });
+                if (lack) {
+                    stopped = lack;
+                    break;
+                }
+                const n = r => c.cost[r] || 0;
+                await conn.query('UPDATE world_stock SET stone = stone - $2, wood = wood - $3, water = water - $4, food = food - $5 WHERE user_id = $1',
+                    [userId, n('stone'), n('wood'), n('water'), n('food')]);
+                await spendFinds(userId, c.finds, conn);
+                const { rows: added } = await conn.query('INSERT INTO world_crafts (user_id, craft) VALUES ($1, $2) RETURNING id', [userId, craftId]);
+                row = { id: added[0].id, craft: craftId, x: null, y: null, flip: false };
+                stock = await stockOf(userId, conn, true);
+            }
+            const done = await setSpot(userId, conn, stock, row, x, y);
+            if (done.coins !== undefined) coins = done.coins;
+            // (une récolte a pu passer : le stock relu, à jour)
+            stock = await stockOf(userId, conn, true);
+            taken.add(y * SIZE + x);
+            placed++;
+        }
+        if (!placed) return db.rollback({ status: 400, message: stopped || 'Rien à poser.' });
+        return { placed, ...(stopped ? { stopped } : {}), ...(coins !== undefined ? { coins } : {}) };
+    });
+}
+
 // Déplace une création posée vers une autre case permise (gratuit). { coins? } ou { status, message }
 async function moveCraft(userId, x, y, toX, toY) {
     await migrate(userId);
@@ -237,6 +300,6 @@ async function turnCraft(userId, x, y, flip) {
 }
 
 module.exports = {
-    craftCtx, craftSpots, stowCrafts, epreuvesOf, craftsView, startCraft, finishCraft, placeCraft, moveCraft,
+    craftCtx, craftSpots, stowCrafts, epreuvesOf, craftsView, startCraft, finishCraft, placeCraft, placeLine, moveCraft,
     storeCraft, turnCraft
 };

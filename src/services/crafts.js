@@ -190,6 +190,10 @@ function tierLock(tier, open, stars = 0) {
 // leçon à l'établi, choix de l'auteur, 11 oct.) : world/creations.js les passe à blockOf (tutorial) tant qu'elle n'est
 // pas faite
 const TUTORIAL_CRAFTS = new Set(['lanterne']);
+// Ce qui se pose en ligne, d'un glisser (choix de l'auteur, 13 oct.) : une pièce par case traversée, fabriquée et payée
+// en passant, une fois la première assemblée à la main ; au plus LINE_MAX cases d'un trait
+const LINE_CRAFTS = new Set(['cloture', 'muret']);
+const LINE_MAX = 40;
 
 // Ce qui empêche de fabriquer une création (texte), ou null. made : { création: nombre fabriqué } ; owned : Set des
 // éléments du Livre ; stock : ressources ; open : paliers ouverts ; have : trouvailles de climat ; tutorial : le
@@ -264,6 +268,6 @@ function leaveBlock(row, x, y, placed) {
 }
 
 module.exports = {
-    EPREUVES, STARS, TIERS, TUTORIAL_CRAFTS, PIECE_MAX, TURNED, CRAFTS, CRAFT_BY_ID, cellsOf, mulberry32, normal, turn, piecesOf, check, tiersOpen, tierLock, blockOf, placeText, gapTo, spotBlock,
+    EPREUVES, STARS, TIERS, TUTORIAL_CRAFTS, LINE_CRAFTS, LINE_MAX, PIECE_MAX, TURNED, CRAFTS, CRAFT_BY_ID, cellsOf, mulberry32, normal, turn, piecesOf, check, tiersOpen, tierLock, blockOf, placeText, gapTo, spotBlock,
     strandedBy, leaveBlock
 };

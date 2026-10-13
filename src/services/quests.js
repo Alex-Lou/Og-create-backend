@@ -27,6 +27,8 @@ const BEASTS = ['Poisson', 'Méduse', 'Grenouille', 'Oiseau', 'Tortue', 'Papillo
 
 // (son titre et ce qu'en dit Brume : texts/quests.js)
 const q = (id, act, goal, coins, chest) => ({ id, act, goal, coins, ...QUEST_TEXTS[id], ...(chest ? { chest } : {}) });
+// Les piquets de l'enclos d'Aster, autour du Feu (quête des clôtures)
+const ENCLOS = 13;
 const QUESTS = [
     // Prologue : Brume accompagne une action à la fois jusqu'à la première nuit. Aster ouvre ensuite sa propre leçon
     // par la Récolte.
@@ -46,8 +48,9 @@ const QUESTS = [
     // (le premier chemin, entre son camp et le nôtre : se rapprocher pour s'entraider ; les premières pierres offertes,
     // world/paths.js : FREE)
     q('chemin-aster', 'T', { kind: 'link', from: 'ponton', to: 'foyer' }, 15),
-    // (ses quatre piquets, dans sa caisse : world/chests.js, CRATES ; une clôture barre la route d'un égaré, nights.js)
-    q('clotures', 'T', { kind: 'craft', craft: 'cloture', need: 4 }, 15),
+    // (l'enclos du camp, choix de l'auteur, 13 oct. : ses piquets, dans sa caisse (world/chests.js, CRATES), un par case
+    // autour de la grande emprise du Feu, le sentier d'Aster laissé libre ; une clôture barre la route d'un égaré, nights.js)
+    q('clotures', 'T', { kind: 'craft', craft: 'cloture', need: ENCLOS }, 15),
     // La deuxième nuit (choix de l'auteur, 10 oct. : un personnage par jour) : la journée d'Aster finit autour du feu ;
     // Cannelle arrivera au matin
     q('veille', 'T', { kind: 'sleep', site: 'foyer' }, 0),
@@ -283,6 +286,6 @@ function actStartsOf(rows) {
 const RESTED = 'La brume s’est levée sur toute l’île. Merci, alchimiste : elle est de nouveau vivante.';
 
 module.exports = {
-    QUESTS, LEGACY, QUEST_CHESTS, BEASTS, GUIDED_INK, FIRST_NIGHT_DONE,
+    QUESTS, ENCLOS, LEGACY, QUEST_CHESTS, BEASTS, GUIDED_INK, FIRST_NIGHT_DONE,
     reachOf, doneOf, firstNightDoneOf, currentOf, progressOf, active, boardOf, actsDoneOf, actStartsOf, tutorialStepsOf, inTutorial
 };

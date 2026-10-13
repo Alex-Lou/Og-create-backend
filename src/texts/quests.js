@@ -36,8 +36,8 @@ const QUEST_TEXTS = {
         say: 'Deux camps, un seul chemin : trace-le du Ponton jusqu’au Feu. Les premières pierres sont offertes.'
     },
     clotures: {
-        label: 'Barre le passage des égarés',
-        say: 'Brume l’a dit : ils viendront du nord. Plante les quatre piquets en travers de leur passage.'
+        label: 'Entoure le feu d’un enclos',
+        say: 'Brume l’a dit : les égarés rôdent la nuit. Plante les piquets tout autour du feu, jusqu’à boucler l’enclos.'
     },
     veille: {
         label: 'Passe ta deuxième nuit',

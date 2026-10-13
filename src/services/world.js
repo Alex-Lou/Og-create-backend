@@ -49,7 +49,7 @@ const {
     isKnown, coreMissing, expeditionCost, expeditionOf, startExpedition, findLandmark, craftBonusOf, gatherDeposit, pickUp
 } = require('./world/lands');
 const {
-    craftCtx, stowCrafts, epreuvesOf, craftsView, startCraft, finishCraft, placeCraft, moveCraft, storeCraft, turnCraft
+    craftCtx, stowCrafts, epreuvesOf, craftsView, startCraft, finishCraft, placeCraft, placeLine, moveCraft, storeCraft, turnCraft
 } = require('./world/creations');
 const { annexSpotOk, annexSpots, annexesView, placeAnnex, moveAnnex, poseAnnex } = require('./world/annexPlots');
 const { campOfUser, cellsOfCamp } = require('./world/camp');
@@ -1045,7 +1045,7 @@ module.exports = {
     SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, pendingOf, chargesAt, effectsOf, productionOf,
     view, build, buyZone, buyItem, undoItem, harvestCap, chooseSkin, startRun, finishRun, collect, migrate, claimQuest, sleep, board, openChest, openAll,
     placeAnnex, moveAnnex, poseAnnex, annexSpotOk, siteSpots, moveSite, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople, namePlayer, chooseAvatar, arianeTargets, elementHintOf, guidedInkOf, guidedPageOf, athanorOf, bookFor, restartIsland,
-    refundDecorations, startCraft, finishCraft, placeCraft, moveCraft, storeCraft, turnCraft, startExpedition, findLandmark, gatherDeposit, pickUp,
+    refundDecorations, startCraft, finishCraft, placeCraft, placeLine, moveCraft, storeCraft, turnCraft, startExpedition, findLandmark, gatherDeposit, pickUp,
     anyaOf, breathRefused, revealAnya, breatheAnya, brumeSavoirOf, talkBrume, startNights, repelCreature, repairSite, skipPrologue, layPaths,
     feedBeast, collectBeasts, openCage
 };

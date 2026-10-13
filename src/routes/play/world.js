@@ -5,6 +5,7 @@ const book = require('../../services/recipeBook');
 const players = require('../../services/players');
 const world = require('../../services/world');
 const bookPages = require('../../services/bookPages');
+const crafts = require('../../services/crafts');
 const bookTries = require('../../services/bookTries');
 const villagers = require('../../services/villagers');
 const anya = require('../../services/anya');
@@ -92,6 +93,16 @@ router.post('/world/craft/place', withAccount(async (req, res, owner, b) => {
     const { flip = false } = req.body;
     if (!/^[a-z]{1,20}$/.test(craft) || !cellOk(x, y) || typeof flip !== 'boolean') return res.status(400).json({ message: 'Pose invalide' });
     await craftDone(res, owner, b, await world.placeCraft(owner.id, craft, x, y, flip));
+}));
+// Une création qui se pose d'un trait (clôture, muret) : sur chaque case, dans l'ordre (cells : [[x, y], …])
+router.post('/world/craft/line', withAccount(async (req, res, owner, b) => {
+    const craft = craftId(req.body);
+    const { cells } = req.body;
+    if (!/^[a-z]{1,20}$/.test(craft) || !Array.isArray(cells) || !cells.length || cells.length > crafts.LINE_MAX
+        || !cells.every(c => Array.isArray(c) && c.length === 2 && cellOk(Number(c[0]), Number(c[1])))) return res.status(400).json({ message: 'Tracé invalide' });
+    const owned = await players.elements(owner);
+    const done = await world.placeLine(owner.id, craft, cells.map(([x, y]) => [Number(x), Number(y)]), owned, bookPages.openChapters(b, owned), bookPages.starsOf(b, owned));
+    await craftDone(res, owner, b, done, { placed: done.placed, ...(done.stopped ? { stopped: done.stopped } : {}) });
 }));
 // Création posée : pivoter (miroir)
 router.post('/world/craft/turn', withAccount(async (req, res, owner, b) => {
