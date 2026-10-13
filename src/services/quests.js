@@ -70,6 +70,9 @@ const QUESTS = [
     // (sa première création : une lanterne, la suite des clôtures ; au tutoriel, sans palier ni éléments : crafts.js,
     // TUTORIAL_CRAFTS)
     q('deco', 'T', { kind: 'craft', craft: 'lanterne' }, 15),
+    // La quatrième nuit (choix de l'auteur, 13 oct. : chaque personnage son jour, le suivant quand le joueur choisit de
+    // dormir) : le jour de Rivet finit autour du feu ; Ondin sera trouvé au matin
+    q('nuit-rivet', 'T', { kind: 'sleep', site: 'foyer' }, 0),
     q('eveil-ondin', 'T', { kind: 'wake', villager: 'puits' }, 10),
     q('souvenir-ondin', 'T', { kind: 'element', element: 'Pluie' }, 20),
     q('puits-ondin', 'T', { kind: 'level', site: 'puits', need: 1 }, 40, 'rare'),
@@ -139,7 +142,8 @@ const INDEX = new Map(QUESTS.map((quest, i) => [quest.id, i]));
 // Anciennes quêtes (avant la chaîne de la bible) : où elles se rangent dans la nouvelle chaîne (les mêmes identifiants
 // s'y rangent tout seuls), et leurs coffres. Une ancienne quête réclamée vaut celle-ci comme « plus avancée ».
 const LEGACY = {
-    source: { at: 'deco', label: LEGACY_LABELS.source, chest: 'rare' },
+    // (à la quatrième nuit, ajoutée après elle le 13 oct. : ces comptes trouvent Ondin comme avant, sans dormir de plus)
+    source: { at: 'nuit-rivet', label: LEGACY_LABELS.source, chest: 'rare' },
     puits: { at: 'puits-ondin', label: LEGACY_LABELS.puits },
     livre5: { at: 'cabane', label: LEGACY_LABELS.livre5 },
     mine: { at: 'cabane', label: LEGACY_LABELS.mine, chest: 'epique' },

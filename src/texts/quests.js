@@ -75,6 +75,10 @@ const QUEST_TEXTS = {
         label: 'Fabrique ta première lanterne',
         say: 'Rivet a monté un établi près du feu. Assemble une Lanterne, puis pose-la au bord d’un chemin, là où l’île brille d’or.'
     },
+    'nuit-rivet': {
+        label: 'Passe ta quatrième nuit',
+        say: 'Quatre, ce soir, autour du feu. Dors : je veille.'
+    },
     'eveil-ondin': {
         label: 'Réveille Ondin',
         say: 'Un petit dort contre un rocher, sa baguette à la main. Parle-lui doucement : la brume endort, sans faire de mal.'

@@ -33,14 +33,15 @@ function decosNear(tiles, siteId, level, reach, places = STATIC) {
 const SETTLER_ID = /^v\d{1,9}$/;
 const knownResident = id => Object.hasOwn(villagers.VILLAGERS, id) || SETTLER_ID.test(id);
 // La troupe est là dès sa rencontre (bible, § 6.6), un personnage par jour : Aster après la première nuit, Cannelle
-// après la deuxième, Rivet après la troisième (après les poules), Ondin après la lanterne de Rivet. Les quatre dormeurs
+// après la deuxième, Rivet après la troisième (après les poules), Ondin après la quatrième (choix de l'auteur, 13 oct. :
+// jamais le même jour que Rivet). Les quatre dormeurs
 // (SLEEPERS) apparaissent dès que leur quartier est à soi. presence : { done (quêtes faites, quests.doneOf), blessed }
 const SLEEPERS = ['puits', 'bosquet', 'carriere', 'potager'];
 function metOf(id, levels, zones, presence) {
     if (id === 'ponton') return presence.done.has('nuit');
     if (id === 'foyer') return presence.done.has('veille');
     if (id === 'atelier') return presence.done.has('nuit-cannelle');
-    if (id === 'puits') return presence.done.has('deco');
+    if (id === 'puits') return presence.done.has('nuit-rivet');
     return zones.has(map.siteZone(id));
 }
 // Ce qu'il faut pour savoir qui est là : les quêtes faites ; et la Bénédiction d'Anya (le cœur de l'île libéré :

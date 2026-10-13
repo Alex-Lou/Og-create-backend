@@ -84,6 +84,11 @@ test('un nouveau compte bâtit son feu ; Aster vient au matin, Cannelle après s
   assert.equal(met(await view(player)).includes('atelier'), false);
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'nuit-cannelle')`, [id]);
   assert.equal(met(await view(player)).includes('atelier'), true);
+  // Le jour de Rivet (sa lanterne) ne fait pas encore venir Ondin : sa quatrième nuit, si (choix de l'auteur, 13 oct.)
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'deco')`, [id]);
+  assert.equal(met(await view(player)).includes('puits'), false);
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'nuit-rivet')`, [id]);
+  assert.equal(met(await view(player)).includes('puits'), true);
 });
 
 test('au Grimoire, pendant la quête d’Ondin : la page que marque le ruban a son Encre offerte, elle seule', async () => {

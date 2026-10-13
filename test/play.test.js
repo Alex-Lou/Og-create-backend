@@ -2448,7 +2448,7 @@ test('quêtes de Brume : la quête active se réclame une fois, son objectif att
   assert.equal(start.status, 200);
   assert.deepEqual([start.data.brume.quest.id, start.data.brume.quest.kind, start.data.brume.quest.done], ['pages', 'element', false]);
   assert.equal(start.data.brume.done, 0);
-  assert.equal(start.data.brume.total, 70);
+  assert.equal(start.data.brume.total, 71);
   // Objectif pas encore atteint ; quête qui n'est pas l'active ; identifiant invalide
   assert.equal((await api('POST', '/play/world/quest', { id: 'pages' }, player)).status, 403);
   assert.equal((await api('POST', '/play/world/quest', { id: 'recolte' }, player)).status, 409);
@@ -2639,8 +2639,7 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Aster ouvre s
   assert.equal((await claim('enclos-cannelle')).status, 200);
   assert.equal(who(await view(), 'atelier'), undefined);
   assert.equal((await api('POST', '/play/world/sleep', {}, player)).status, 200);
-  // Rivet est là ; sa lanterne (au tutoriel, sans palier ni éléments) posée, Ondin attend déjà au Puits (plus de
-  // quartier à acheter)
+  // Rivet est là ; sa lanterne (au tutoriel, sans palier ni éléments) posée
   const rivet = await view();
   assert.deepEqual(who(rivet, 'atelier').built, false);
   const lantern = rivet.crafts.catalog.find(c => c.id === 'lanterne');
@@ -2648,7 +2647,11 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Aster ouvre s
   await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'lanterne', $2, $3)`, [player.userId, X(31), Y(35)]);
   assert.equal((await claim('deco')).status, 200);
   assert.equal(await coinsOf(player), 210);
-  // Ondin dort au Puits : on le réveille en lui parlant
+  // Le jour de Rivet finit : Ondin n'est pas encore là ; la quatrième nuit (choix de l'auteur, 13 oct. : chaque
+  // personnage son jour), puis Ondin dort au Puits (plus de quartier à acheter) : on le réveille en lui parlant
+  const rivetNight = await view();
+  assert.deepEqual([rivetNight.brume.quest.id, who(rivetNight, 'puits')], ['nuit-rivet', undefined]);
+  assert.equal((await api('POST', '/play/world/sleep', {}, player)).status, 200);
   const sleeping = await view();
   assert.deepEqual([who(sleeping, 'puits').asleep, who(sleeping, 'puits').built], [true, false]);
   assert.deepEqual([sleeping.brume.quest.id, sleeping.brume.quest.done], ['eveil-ondin', false]);
