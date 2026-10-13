@@ -573,7 +573,7 @@ test('créations d’île : assembler (pièces vérifiées), payer à la réussi
   assert.deepEqual(Object.keys(first.crafts.locks), ['I', 'II', 'III']);
   assert.equal(first.crafts.locks.II, 'S’ouvre avec le palier I.');
   assert.deepEqual(first.crafts.epreuves, { have: 0, need: 10 });
-  assert.equal(first.crafts.catalog.length, 30);
+  assert.equal(first.crafts.catalog.length, 31);
   assert.match(cat(first, 'muret').block, /Palier I/);
   assert.match(cat(first, 'cloture').block, /ressources/);
   assert.equal((await start('cloture')).status, 403);
@@ -2468,7 +2468,7 @@ test('quêtes de Brume : la quête active se réclame une fois, son objectif att
   assert.equal(start.status, 200);
   assert.deepEqual([start.data.brume.quest.id, start.data.brume.quest.kind, start.data.brume.quest.done], ['pages', 'element', false]);
   assert.equal(start.data.brume.done, 0);
-  assert.equal(start.data.brume.total, 71);
+  assert.equal(start.data.brume.total, 72);
   // Objectif pas encore atteint ; quête qui n'est pas l'active ; identifiant invalide
   assert.equal((await api('POST', '/play/world/quest', { id: 'pages' }, player)).status, 403);
   assert.equal((await api('POST', '/play/world/quest', { id: 'recolte' }, player)).status, 409);
@@ -2667,6 +2667,11 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Aster ouvre s
   await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'lanterne', $2, $3)`, [player.userId, X(31), Y(35)]);
   assert.equal((await claim('deco')).status, 200);
   assert.equal(await coinsOf(player), 210);
+  // Ses trois torches (choix de l'auteur, 13 oct.) : une création « de début », 2 bois, le Feu suffit
+  const torch = (await view()).crafts.catalog.find(c => c.id === 'torche');
+  assert.deepEqual([torch.open, torch.cost, torch.block], [true, { wood: 2 }, null]);
+  for (const x of [X(20), X(21), X(22)]) await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'torche', $2, $3)`, [player.userId, x, Y(20)]);
+  assert.equal((await claim('torches-rivet')).status, 200);
   // Le jour de Rivet finit : Ondin n'est pas encore là ; la quatrième nuit (choix de l'auteur, 13 oct. : chaque
   // personnage son jour), puis Ondin dort au Puits (plus de quartier à acheter) : on le réveille en lui parlant
   const rivetNight = await view();
@@ -2691,7 +2696,8 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Aster ouvre s
   assert.deepEqual(who(built.data.world, 'foyer').needs.map(n => n.id), ['manger', 'deco']);
   // (puis le premier chemin, du Puits au Feu : l'île neuve n'a que son sentier)
   assert.deepEqual([who(built.data.world, 'puits').built, built.data.world.brume.quest.id], [true, 'chemin']);
-  assert.equal(await coinsOf(player), 210 + 10 + 20 + 40);
+  // (210 à la lanterne, les torches de Rivet 15, puis Ondin : son réveil, sa Pluie, son Puits)
+  assert.equal(await coinsOf(player), 210 + 15 + 10 + 20 + 40);
   // Aster est là depuis le matin qui suit le premier feu ; le chemin ne conditionne plus son arrivée (son Ponton bâti
   // hors de La Crique ne l'y installe pas encore : people.livesHere)
   assert.equal(who(built.data.world, 'ponton').built, false);

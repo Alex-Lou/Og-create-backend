@@ -1,8 +1,10 @@
 // Les nuits de créatures (HISTOIRE.md du dépôt front, § 6.15, v6 ; décisions du 6 octobre 2026) : règles pures, sans
 // base. Chaque nuit (21 h à 6 h, heure de Paris), des égarés sortent de la brume voisine, au bord de l'île à soi, et
 // marchent vers le bâtiment le plus proche :
-// - une lumière (le feu du Foyer, une lanterne, un brasero) change en luciole celui qui passe à 2 cases ou moins ;
-// - une clôture ou un muret barre sa case ;
+// - une clôture ou un muret barre sa case, même dans la lumière (choix de l'auteur, 13 oct. : la barrière d'abord, l'enclos
+//   du Feu sert vraiment) ;
+// - une lumière (le feu du Foyer, une lanterne, un brasero : 3 cases ; une torche : 2) change en luciole celui qui passe
+//   à sa portée ;
 // - un camarade content repousse celui qui vise son bâtiment, une fois par nuit ;
 // - un toucher du joueur en repousse un.
 // Au plus une panne par nuit (le premier égaré arrivé embrume son bâtiment). Tout se tire d'une graine (le joueur, la
@@ -14,12 +16,14 @@ const { STATIC, footprintAt } = require('./world/places');
 const START_HOUR = 21;
 const END_HOUR = 6;
 const LIGHT_REACH = 3;
-const LIGHTS = new Set(['lanterne', 'brasero']);
+const LIGHTS = new Set(['lanterne', 'brasero', 'torche']);
+// La portée d'une lumière, en cases (LIGHT_REACH, sinon)
+const REACH = { torche: 2 };
 const FENCES = new Set(['cloture', 'muret']);
 // Un égaré marche une case toutes les 2 minutes (3 avant la grande carte : les chemins y sont 1,5 fois plus longs)
 const MS_PER_CELL = 2 * 60 * 1000;
-// Une nuit à la fois : de 2 égarés (avant l'acte I fini) à 6
-const countOf = acts => Math.min(6, 2 + Math.floor(acts / 2));
+// Une nuit à la fois : 3 égarés avant l'acte I fini, un de plus par acte, 8 au plus (choix de l'auteur, 13 oct.)
+const countOf = acts => Math.min(8, 3 + acts);
 
 // Heure de Paris → instant : midi d'un jour 'AAAA-MM-JJ' + heures (changements d'heure compris)
 const PARIS = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -132,18 +136,21 @@ function planOf(userId, night, island) {
     });
 }
 
-// Les défenses de l'île : lumières (le feu du Foyer, lanternes, braseros) et barrières (clôtures, murets).
-// crafts : [{ craft, x, y }] posées ; levels : { site: palier } ; places : où sont les bâtiments
+// Les défenses de l'île : lumières (le feu du Foyer, lanternes, braseros, torches ; reach : leur portée) et barrières
+// (clôtures, murets). crafts : [{ craft, x, y }] posées ; levels : { site: palier } ; places : où sont les bâtiments
 function defenseOf(crafts, levels, places = STATIC) {
-    const lights = crafts.filter(c => LIGHTS.has(c.craft)).map(c => ({ x: c.x, y: c.y }));
-    if (levels.foyer) lights.push(...cellsOf('foyer', levels.foyer, places));
+    const lights = crafts.filter(c => LIGHTS.has(c.craft)).map(c => ({ x: c.x, y: c.y, reach: REACH[c.craft] || LIGHT_REACH }));
+    if (levels.foyer) lights.push(...cellsOf('foyer', levels.foyer, places).map(c => ({ ...c, reach: LIGHT_REACH })));
     return { lights, fences: new Set(crafts.filter(c => FENCES.has(c.craft)).map(key)) };
 }
-// Le sort d'un égaré sur son chemin : { end: 'luciole' | 'barre' | 'arrive', step } (step : la case où il s'arrête)
+// Le sort d'un égaré sur son chemin : { end: 'luciole' | 'barre' | 'arrive', step } (step : la case où il s'arrête). La
+// barrière d'abord : une clôture sur son chemin l'arrête, même s'il passe avant dans une lumière ; sinon, la première
+// lumière à portée le change en luciole
 function fateOf(creature, defense) {
+    const barred = creature.path.findIndex(cell => defense.fences.has(key(cell)));
+    if (barred >= 0) return { end: 'barre', step: barred };
     for (const [step, cell] of creature.path.entries()) {
-        if (defense.lights.some(light => distance(light, cell) <= LIGHT_REACH)) return { end: 'luciole', step };
-        if (defense.fences.has(key(cell))) return { end: 'barre', step };
+        if (defense.lights.some(light => distance(light, cell) <= light.reach)) return { end: 'luciole', step };
     }
     return { end: 'arrive', step: creature.path.length - 1 };
 }
@@ -180,6 +187,6 @@ const STONE_SITES = new Set(['carriere', 'puits', 'atelier', 'foyer']);
 const repairOf = (site, level) => ({ resource: STONE_SITES.has(site) ? 'stone' : 'wood', amount: 3 + 2 * (Math.max(1, level) - 1) });
 
 module.exports = {
-    START_HOUR, END_HOUR, LIGHT_REACH, MS_PER_CELL, LIGHTS, FENCES, ANYA_HOURS, countOf,
+    START_HOUR, END_HOUR, LIGHT_REACH, REACH, MS_PER_CELL, LIGHTS, FENCES, ANYA_HOURS, countOf,
     parisAt, dayOf, nextDay, boundsOf, nightAt, nightNear, endedBetween, borderOf, lineOf, planOf, defenseOf, fateOf, outcomeOf, repairOf
 };

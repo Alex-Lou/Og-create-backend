@@ -30,7 +30,8 @@ async function islandOf(userId, conn) {
     const { levels } = await levelsOf(userId, conn);
     const zones = await zonesOf(userId, conn);
     const sites = Object.entries(levels).filter(([id, level]) => level > 0 && SITES[id] && zones.has(map.siteZone(id))).map(([id, level]) => ({ id, level }));
-    const acts = quests.actsDoneOf(quests.doneOf(await claimedOf(userId, conn))).length;
+    // (les actes de l'histoire finis, I à VII : le tutoriel ne compte pas, les nuits de l'acte I ont leurs 3 égarés)
+    const acts = quests.actsDoneOf(quests.doneOf(await claimedOf(userId, conn))).filter(act => act !== 'T').length;
     const decor = placedOf(await craftsOf(userId, conn));
     const presence = await presenceOf(userId, conn);
     const residents = residentsOf(levels, zones, await settlersOf(userId, conn), presence);

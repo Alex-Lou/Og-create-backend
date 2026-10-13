@@ -70,6 +70,8 @@ const QUESTS = [
     // (sa première création : une lanterne, la suite des clôtures ; au tutoriel, sans palier ni éléments : crafts.js,
     // TUTORIAL_CRAFTS)
     q('deco', 'T', { kind: 'craft', craft: 'lanterne' }, 15),
+    // (ses trois torches, une par côté d'où venaient les égarés de la veillée : choix de l'auteur, 13 oct.)
+    q('torches-rivet', 'T', { kind: 'craft', craft: 'torche', need: 3 }, 15),
     // La quatrième nuit (choix de l'auteur, 13 oct. : chaque personnage son jour, le suivant quand le joueur choisit de
     // dormir) : le jour de Rivet finit autour du feu ; Ondin sera trouvé au matin
     q('nuit-rivet', 'T', { kind: 'sleep', site: 'foyer' }, 0),

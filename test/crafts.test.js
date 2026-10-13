@@ -4,10 +4,10 @@ const assert = require('node:assert/strict');
 const crafts = require('../src/services/crafts');
 const bookPages = require('../src/services/bookPages');
 
-test('30 créations sur cinq paliers (dont 12 de climat), chacune après des créations existantes, gabarit d’un seul tenant', () => {
-  assert.equal(crafts.CRAFTS.length, 30);
-  assert.equal(new Set(crafts.CRAFTS.map(c => c.id)).size, 30);
-  assert.deepEqual(crafts.TIERS.map(t => crafts.CRAFTS.filter(c => c.tier === t).length), [2, 6, 6, 4, 12]);
+test('31 créations sur cinq paliers (dont 12 de climat), chacune après des créations existantes, gabarit d’un seul tenant', () => {
+  assert.equal(crafts.CRAFTS.length, 31);
+  assert.equal(new Set(crafts.CRAFTS.map(c => c.id)).size, 31);
+  assert.deepEqual(crafts.TIERS.map(t => crafts.CRAFTS.filter(c => c.tier === t).length), [3, 6, 6, 4, 12]);
   const rank = t => crafts.TIERS.indexOf(t);
   for (const c of crafts.CRAFTS) {
     for (const id of c.after) assert.ok(crafts.CRAFT_BY_ID[id] && rank(crafts.CRAFT_BY_ID[id].tier) <= rank(c.tier), `${c.id} après ${id}`);

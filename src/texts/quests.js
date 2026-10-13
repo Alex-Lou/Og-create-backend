@@ -75,6 +75,10 @@ const QUEST_TEXTS = {
         label: 'Fabrique ta première lanterne',
         say: 'Rivet a monté un établi près du feu. Assemble une Lanterne, puis pose-la au bord d’un chemin, là où l’île brille d’or.'
     },
+    'torches-rivet': {
+        label: 'Plante les trois torches de Rivet',
+        say: 'Rivet a une idée pour la nuit : trois torches, une par côté d’où venaient les égarés. Assemble-les à l’établi, puis plante-les.'
+    },
     'nuit-rivet': {
         label: 'Passe ta quatrième nuit',
         say: 'Quatre, ce soir, autour du feu. Dors : je veille.'

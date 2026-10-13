@@ -67,13 +67,13 @@ test('ils sortent du bord de la brume et marchent droit vers le bâtiment le plu
     assert.ok(c.at >= start && c.at <= start + (end - start) / 2);
     assert.equal(c.arrives - c.at, (c.path.length - 1) * nights.MS_PER_CELL);
   }
-  // Plus coriaces à chaque acte : de 2 à 6
-  assert.deepEqual([0, 1, 2, 4, 8, 12].map(nights.countOf), [2, 2, 3, 4, 6, 6]);
+  // Plus nombreux à chaque acte : 3, un de plus par acte, 8 au plus (choix de l'auteur, 13 oct.)
+  assert.deepEqual([0, 1, 2, 4, 5, 8, 12].map(nights.countOf), [3, 4, 5, 7, 8, 8, 8]);
   // Ni bâtiment ni bord : personne
   assert.deepEqual(nights.planOf(42, '2026-10-06', { ...island, sites: [] }), []);
 });
 
-test('la lumière les change en lucioles (3 cases), la clôture barre sa case, le feu du Foyer éclaire', () => {
+test('la lumière les change en lucioles (3 cases, la torche 2), la clôture barre sa case d’abord, le feu du Foyer éclaire', () => {
   const walker = { id: 'n:0', site: 'puits', path: nights.lineOf({ x: 10, y: 10 }, { x: 20, y: 10 }), at: 0, arrives: 10 * nights.MS_PER_CELL };
   const none = nights.defenseOf([], {});
   assert.deepEqual(nights.fateOf(walker, none), { end: 'arrive', step: 10 });
@@ -89,6 +89,12 @@ test('la lumière les change en lucioles (3 cases), la clôture barre sa case, l
   const foyer = map.footprintOf('foyer', 1);
   const toFoyer = { ...walker, path: nights.lineOf({ x: foyer.x - 6, y: foyer.y }, { x: foyer.x, y: foyer.y }) };
   assert.deepEqual(nights.fateOf(toFoyer, nights.defenseOf([], { foyer: 1 })), { end: 'luciole', step: 3 });
+  // La barrière d'abord (choix de l'auteur, 13 oct.) : l'enclos du Feu, dans sa lumière, l'arrête
+  const ring = { craft: 'cloture', x: foyer.x - 1, y: foyer.y };
+  assert.deepEqual(nights.fateOf(toFoyer, nights.defenseOf([ring], { foyer: 1 })), { end: 'barre', step: 5 });
+  // Une torche éclaire à 2 cases ; à 3, rien
+  assert.deepEqual(nights.fateOf(walker, nights.defenseOf([{ craft: 'torche', x: 15, y: 12 }], {})), { end: 'luciole', step: 3 });
+  assert.deepEqual(nights.fateOf(walker, nights.defenseOf([{ craft: 'torche', x: 15, y: 13 }], {})), { end: 'arrive', step: 10 });
 });
 
 test('une nuit embrume au plus un bâtiment : le premier arrivé ; un camarade content en repousse un, le toucher aussi', () => {

@@ -34,6 +34,9 @@ const ofPlace = name => name.replace(/^Les /, 'des ').replace(/^Le /, 'du ').rep
 const craft = (id, name, tier, cost, elements, after, place, shape, spent = {}) => ({ id, name, tier, cost, elements, after, place, shape, finds: spent });
 const CRAFTS = [
     craft('cloture', 'Clôture', 'start', { wood: 8 }, [], [], {}, ['x.x', 'xxx', 'x.x']),
+    // (la torche de bois flotté, choix de l'auteur, 13 oct. : les trois de Rivet, au jour 4 ; une lumière de la nuit,
+    // nights.js)
+    craft('torche', 'Torche', 'start', { wood: 2 }, ['Feu'], [], {}, ['x', 'x', 'x', 'x']),
     // (des fleurs sans pluie, non : la Pluie, clé du Puits, apporte l'eau qu'il coûte, choix de l'auteur, 12 oct.)
     craft('massif', 'Massif de fleurs', 'start', { water: 6, food: 4 }, ['Pluie'], [], { ground: 'gm' }, ['.x.', 'xxx', 'xxx']),
     craft('muret', 'Muret de pierre', 'I', { stone: 12 }, ['Terre'], ['cloture'], {}, ['xxxx', 'xxxx']),
