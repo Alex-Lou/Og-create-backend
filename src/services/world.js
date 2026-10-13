@@ -363,6 +363,8 @@ async function view(userId, owned, book) {
                 ...(ahead && !chapterOpen && book.needOf ? { chapterMissing: Math.max(0, book.needOf(l.chapter) - (book.stars || 0)) } : {})
             };
         };
+        // (ses annexes s'ouvrent : le palier II, le Feu dès le palier I)
+        const open = level && level >= annexes.openLevelOf(id) && zones.has(zone);
         return {
             id, x: place.x, y: place.y, w: place.w, h: place.h, level, maxLevel: site.levels.length, zone,
             // (le Ponton du tutoriel, bâti hors de son quartier, n'est pas fermé : le palier II demande La Crique)
@@ -401,8 +403,9 @@ async function view(userId, owned, book) {
             fullIn: site.produce && level ? fullInOf(builtAt[id], stock.collected_at, CAP_HOURS + (extra.cap[id] || 0), now) : null,
             // Annexes : catalogue du bâtiment et cases libres où en poser une (dès que la première s'ouvre : le palier II,
             // le Feu dès le palier I)
-            annexes: annexesView(id, annexRows),
-            spots: level && level >= annexes.openLevelOf(id) && zones.has(zone) ? annexSpots(id, taken, places) : [],
+            // (une annexe qui demande son sol a ses propres cases : le poulailler, sur l'herbe)
+            annexes: annexesView(id, annexRows).map(a => (annexes.ANNEX_BY_ID[a.id].ground ? { ...a, spots: open ? annexSpots(id, taken, places, annexes.ANNEX_BY_ID[a.id].ground) : [] } : a)),
+            spots: open ? annexSpots(id, taken, places) : [],
             next: next ? step(next, level) : null
         };
     });

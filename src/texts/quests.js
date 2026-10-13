@@ -57,7 +57,7 @@ const QUEST_TEXTS = {
     },
     poulailler: {
         label: 'Pose le poulailler de Cannelle',
-        say: 'Il leur faut un toit : touche le Feu de camp, puis « Annexes », et pose le poulailler près de la cuisine de Cannelle.'
+        say: 'Il leur faut un toit : touche le Feu de camp, puis « Annexes », et pose le poulailler dans l’herbe, près de la cuisine de Cannelle.'
     },
     'nuit-cannelle': {
         label: 'Passe ta troisième nuit',

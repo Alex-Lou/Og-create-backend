@@ -49,7 +49,8 @@ const ANNEXES = [
     annex('four', 'foyer', 'reserve', 'Four à pain', { stone: 90, wood: 60 }, { regenCut: 5 * 60 * 1000 }),
     annex('belvedere', 'foyer', 'grand', 'Belvédère', { stone: 150, wood: 150 }, { charges: 1 }),
     annex('maison', 'foyer', 'house', 'Maison', { wood: 30, stone: 20 }, { house: 1 }),
-    annex('poulailler', 'foyer', 'coop', 'Poulailler', {}, { hens: 1 }),
+    // (sur l'herbe, jamais sur le sable de la plage : choix de l'auteur, 13 oct.)
+    { ...annex('poulailler', 'foyer', 'coop', 'Poulailler', {}, { hens: 1 }), ground: ['g'] },
     annex('charbon', 'atelier', 'small', 'Tas de charbon', { wood: 40, stone: 20 }, { moves: 1 }),
     annex('hangar', 'atelier', 'reserve', 'Hangar', { wood: 90, stone: 60 }, { moves: 1 }),
     annex('fourneau', 'atelier', 'grand', 'Haut fourneau', { stone: 180, wood: 80, water: 40 }, { moves: 2 }),

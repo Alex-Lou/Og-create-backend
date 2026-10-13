@@ -16,10 +16,10 @@ const { roadsOf } = require('./paths');
 
 // Case où une annexe de ce bâtiment peut se poser (sans compter ce qui l'occupe) : sol constructible du quartier du
 // bâtiment, n'importe où dans ce quartier, hors des grandes emprises des bâtiments (où qu'ils soient : places) et des
-// lieux remarquables
-function annexSpotOk(siteId, x, y, places = STATIC) {
+// lieux remarquables ; sur son sol à elle si elle en demande un (ground : le poulailler, sur l'herbe)
+function annexSpotOk(siteId, x, y, places = STATIC, ground = null) {
     return Boolean(places[siteId]) && Number.isInteger(x) && Number.isInteger(y) && map.buildable(x, y) && !inSiteAt(places, x, y)
-        && !landmarks.isLandmark(x, y) && map.zoneAt(x, y) === map.siteZone(siteId);
+        && !landmarks.isLandmark(x, y) && map.zoneAt(x, y) === map.siteZone(siteId) && (!ground || ground.includes(map.groundAt(x, y)));
 }
 // Cases où une annexe de chaque bâtiment peut se poser, des plus proches de lui aux plus lointaines (gardées par
 // disposition des bâtiments : elles ne changent qu'avec elle)
@@ -36,9 +36,10 @@ function spotsOf(siteId, places) {
     }
     return SPOTS.get(key);
 }
-// Cases libres où poser une annexe de ce bâtiment (taken : clés des cases occupées), des plus proches aux plus lointaines
-function annexSpots(siteId, taken, places = STATIC) {
-    return spotsOf(siteId, places).filter(({ x, y }) => !taken.has(y * SIZE + x));
+// Cases libres où poser une annexe de ce bâtiment (taken : clés des cases occupées), des plus proches aux plus lointaines ;
+// ground : seulement sur ce sol
+function annexSpots(siteId, taken, places = STATIC, ground = null) {
+    return spotsOf(siteId, places).filter(({ x, y }) => !taken.has(y * SIZE + x) && (!ground || ground.includes(map.groundAt(x, y))));
 }
 // Ce que la fiche d'un bâtiment montre de ses annexes : posées, prochain exemplaire (palier, prix), effet
 function annexesView(siteId, rows) {
@@ -83,7 +84,7 @@ async function placeAnnex(userId, annexId, x, y, { flip = false, look = null } =
     await migrate(userId);
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
-        if (!annexSpotOk(a.site, x, y, (await placesOf(userId, conn)).places)) return db.rollback({ status: 400, message: SPOT_MESSAGE });
+        if (!annexSpotOk(a.site, x, y, (await placesOf(userId, conn)).places, a.ground)) return db.rollback({ status: 400, message: SPOT_MESSAGE });
         const { levels } = await levelsOf(userId, conn);
         const level = levels[a.site] || 0;
         if (!level || !(await zonesOf(userId, conn)).has(map.siteZone(a.site))) return db.rollback({ status: 403, message: 'Bâtis d’abord ce bâtiment.' });
@@ -118,7 +119,7 @@ async function moveAnnex(userId, x, y, toX, toY) {
         const found = await annexAt(userId, x, y, conn);
         if (!found) return db.rollback({ status: 404, message: 'Aucune annexe sur cette case.' });
         const a = annexes.ANNEX_BY_ID[found.annex];
-        if (!a || !annexSpotOk(a.site, toX, toY, (await placesOf(userId, conn)).places)) return db.rollback({ status: 400, message: SPOT_MESSAGE });
+        if (!a || !annexSpotOk(a.site, toX, toY, (await placesOf(userId, conn)).places, a.ground)) return db.rollback({ status: 400, message: SPOT_MESSAGE });
         if (x === toX && y === toY) return {};
         if (await cellTaken(userId, toX, toY, conn)) return db.rollback({ status: 409, message: 'Cette case est déjà occupée.' });
         if (cellsOfCamp(await campOfUser(userId, conn)).has(toY * SIZE + toX)) return db.rollback({ status: 409, message: CAMP_MESSAGE });

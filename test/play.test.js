@@ -2590,14 +2590,15 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Aster ouvre s
   const hens = await api('POST', '/play/world/beast/feed', { beast: 'poule-noire' }, player);
   assert.deepEqual([hens.status, hens.data.world.brume.quest.done], [200, true]);
   assert.equal((await claim('poules')).status, 200);
-  // Le poulailler : sur une case libre près du Feu, sans rien payer (ses cases dorées s'offrent dès le palier I du Feu)
+  // Le poulailler : sur une case libre près du Feu, sans rien payer (ses cases dorées s'offrent dès le palier I du Feu),
+  // sur l'herbe seulement (ses propres cases ; le sable de la plage est refusé)
   const foyer = (await view()).sites.find(s => s.id === 'foyer');
-  assert.deepEqual([foyer.level, foyer.spots.length > 0], [1, true]);
-  let coop = null;
-  for (const [x, y] of [[101, 94], [101, 95], [97, 95], [101, 93], [102, 94], [97, 92]]) {
-    coop = await api('POST', '/play/world/annex', { annex: 'poulailler', x, y }, player);
-    if (coop.status === 200) break;
-  }
+  const coopSpots = foyer.annexes.find(a => a.id === 'poulailler').spots;
+  assert.deepEqual([foyer.level, coopSpots.length > 0, coopSpots.every(c => worldMap.groundAt(c.x, c.y) === 'g')], [1, true, true]);
+  const sand = foyer.spots.find(c => worldMap.groundAt(c.x, c.y) === 's');
+  assert.ok(sand, 'une case de sable parmi les cases du Feu');
+  assert.equal((await api('POST', '/play/world/annex', { annex: 'poulailler', x: sand.x, y: sand.y }, player)).status, 400);
+  const coop = await api('POST', '/play/world/annex', { annex: 'poulailler', x: coopSpots[0].x, y: coopSpots[0].y }, player);
   assert.deepEqual([coop.status, coop.data.world.brume.quest.id, coop.data.world.brume.quest.done], [200, 'poulailler', true], JSON.stringify(coop.data));
   assert.equal((await claim('poulailler')).status, 200);
   assert.equal(who(await view(), 'atelier'), undefined);
