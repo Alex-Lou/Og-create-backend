@@ -2376,6 +2376,26 @@ test('butins : chapitres ouverts, quêtes réclamées et bouteille donnent leur 
   assert.equal((await api('POST', '/play/world/chest', { source: 'jour' }, await guest())).status, 402);
 });
 
+test('l’enclos de Cannelle se trace même sans clôture jamais assemblée (un compte d’avant les clôtures d’Aster n’est pas lâché)', async () => {
+  const player = await newPlayer();
+  const view = async () => (await api('GET', '/play/world', null, player)).data;
+  await view();
+  await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'foyer', 1) ON CONFLICT (user_id, site) DO UPDATE SET level = 1`, [player.userId]);
+  await sql('UPDATE world_stock SET wood = 200 WHERE user_id = $1', [player.userId]);
+  // Avant l'enclos (la cage) : sans clôture assemblée, pas de trait
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'soupe')`, [player.userId]);
+  const before = (await view()).crafts.catalog.find(c => c.id === 'cloture');
+  assert.deepEqual([before.made, before.traceable, before.spots.length], [0, false, 0]);
+  assert.equal((await api('POST', '/play/world/craft/line', { craft: 'cloture', cells: [[93, 93]] }, player)).status, 409);
+  // À l'enclos de Cannelle : le trait est permis, ses piquets fabriqués et payés en passant
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'abri-cannelle')`, [player.userId]);
+  const yard = await view();
+  const fence = yard.crafts.catalog.find(c => c.id === 'cloture');
+  assert.deepEqual([yard.brume.quest.id, fence.made, fence.traceable, fence.spots.length > 0], ['enclos-cannelle', 0, true, true]);
+  const line = await api('POST', '/play/world/craft/line', { craft: 'cloture', cells: [[fence.spots[0].x, fence.spots[0].y]] }, player);
+  assert.deepEqual([line.status, line.data.placed, line.data.world.stock.wood], [200, 1, 192], JSON.stringify(line.data));
+});
+
 test('les mots d’Héliane : la première bouteille ouverte pendant un acte porte son mot (bible, § 6.13)', async () => {
   const player = await newPlayer();
   const open = () => api('POST', '/play/world/chest', { source: 'bouteille' }, player);

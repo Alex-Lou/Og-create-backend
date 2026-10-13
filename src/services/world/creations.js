@@ -61,10 +61,14 @@ async function stowCrafts(userId, rows, levels, zones, annexRows, places = STATI
 // Ce que le tutoriel fait fabriquer sans palier ni éléments (crafts.TUTORIAL_CRAFTS), pendant sa leçon seulement (la
 // lanterne de Rivet : la quête « deco » en cours). presence : people.presenceOf
 const LESSON = 'deco';
-const tutorialOf = presence => {
-    const current = quests.QUESTS.find(q => !presence.done.has(q.id));
-    return current && current.id === LESSON ? crafts.TUTORIAL_CRAFTS : new Set();
-};
+const questNow = presence => quests.QUESTS.find(q => !presence.done.has(q.id))?.id;
+const tutorialOf = presence => (questNow(presence) === LESSON ? crafts.TUTORIAL_CRAFTS : new Set());
+// L'enclos de Cannelle (choix de l'auteur, 13 oct.) : sa clôture se trace même sans en avoir jamais assemblé une (un
+// compte d'avant les clôtures d'Aster y arrive sans piquet : il n'est jamais lâché)
+const FENCE_LESSON = 'enclos-cannelle';
+const freeTraceOf = presence => (questNow(presence) === FENCE_LESSON ? new Set(['cloture']) : new Set());
+// Une création en ligne se trace-t-elle ? (la première assemblée à la main, ou la leçon de l'enclos de Cannelle)
+const traceable = (id, made, free) => Boolean(made[id] || free.has(id));
 
 // Questions de l'Épreuve réussies (progress.timer_progress : niveau → catégorie → identifiants)
 async function epreuvesOf(userId, conn = db) {
@@ -79,6 +83,7 @@ async function epreuvesOf(userId, conn = db) {
 // pagesTo(nom) : pages jusqu'à un savoir-faire pas encore écrit (le verrou parlant, comme pour un bâtiment), ou rien
 function craftsView(rows, ctx, { owned, stock, open, epreuves, stars = 0, have, presence = null, pagesTo = null }, siteName) {
     const tutorial = presence ? tutorialOf(presence) : new Set();
+    const free = presence ? freeTraceOf(presence) : new Set();
     const made = madeOf(rows);
     const placed = placedOf(rows);
     const keepsOf = r => {
@@ -100,9 +105,9 @@ function craftsView(rows, ctx, { owned, stock, open, epreuves, stars = 0, have, 
                 id: c.id, name: c.name, tier: c.tier, cost: c.cost, finds: c.finds, elements: c.elements.map(name => ({ name, have: owned.has(name), ...(!owned.has(name) && pagesTo ? { pages: pagesTo(name) } : {}) })),
                 // (tutorial : la leçon du tutoriel la fait fabriquer avant son palier ; le front ouvre l'établi sur elle)
                 after: c.after, open: open.has(c.tier) || tutorial.has(c.id), tutorial: tutorial.has(c.id), made: made[c.id] || 0, reserve, climate: c.place.climate || null,
-                ...(crafts.LINE_CRAFTS.has(c.id) ? { line: true } : {}),
+                ...(crafts.LINE_CRAFTS.has(c.id) ? { line: true, traceable: traceable(c.id, made, free) } : {}),
                 block: crafts.blockOf(c, { made, owned, stock, open, have, tutorial: tutorial.has(c.id), stars }), place: crafts.placeText(c, siteName),
-                spots: made[c.id] ? craftSpots(c, ctx) : []
+                spots: made[c.id] || free.has(c.id) ? craftSpots(c, ctx) : []
             };
         }),
         placed: placed.map(r => ({ x: r.x, y: r.y, craft: r.craft, flip: r.flip, ...keepsOf(r) }))
@@ -208,7 +213,8 @@ async function placeLine(userId, craftId, cells, owned, chapters, stars = 0) {
         let stock = await stockOf(userId, conn, true);
         const rows = await craftsOf(userId, conn);
         const made = madeOf(rows);
-        if (!made[craftId]) return db.rollback({ status: 409, message: `Fabrique d’abord « ${c.name} » à l’établi.` });
+        const presence = await presenceOf(userId, conn);
+        if (!traceable(craftId, made, freeTraceOf(presence))) return db.rollback({ status: 409, message: `Fabrique d’abord « ${c.name} » à l’établi.` });
         const { levels } = await levelsOf(userId, conn);
         const annexRows = await annexesOf(userId, conn);
         const campCells = cellsOfCamp(await campOfUser(userId, conn, { levels, annexRows, craftRows: rows }));
@@ -216,7 +222,7 @@ async function placeLine(userId, craftId, cells, owned, chapters, stars = 0) {
         const { places } = await placesOf(userId, conn);
         const ctx = craftCtx({ levels, zones: await zonesOf(userId, conn), annexRows, rows, blocked: campCells, ground, places });
         const open = crafts.tiersOpen(chapters, await epreuvesOf(userId, conn), stars);
-        const tutorial = tutorialOf(await presenceOf(userId, conn)).has(c.id);
+        const tutorial = tutorialOf(presence).has(c.id);
         const known = new Set(owned);
         const reserve = rows.filter(r => r.craft === craftId && r.x === null);
         const taken = new Set();
