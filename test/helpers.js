@@ -31,8 +31,13 @@ async function startServer() {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [path.join(__dirname, '..', 'src', 'server.js')], {
       // Fenêtre de tolérance des rafraîchissements concurrents à 0 : la réutilisation d'un jeton se teste sans attendre.
-      // Tous les joueurs d'un fichier de tests viennent de la même adresse : sa limite de requêtes de jeu est relevée
-      env: { ...process.env, PORT: String(port), NODE_ENV: 'test', LOG_LEVEL: 'error', AUTH_RACE_SECONDS: '0', REGISTER_RATE_LIMIT: '200', PLAY_ADDRESS_RATE_LIMIT: '5000' },
+      // Tous les joueurs d'un fichier de tests viennent de la même adresse : sa limite de requêtes de jeu est relevée, et
+      // sa limite globale aussi (play.test.js en envoie près de 1000 à son serveur, la limite de la production : au-delà,
+      // ses derniers tests prenaient un 429), sauf si le fichier la fixe lui-même (limits.test.js la teste)
+      env: {
+        ...process.env, PORT: String(port), NODE_ENV: 'test', LOG_LEVEL: 'error', AUTH_RACE_SECONDS: '0', REGISTER_RATE_LIMIT: '200', PLAY_ADDRESS_RATE_LIMIT: '5000',
+        RATE_LIMIT_MAX_REQUESTS: process.env.RATE_LIMIT_MAX_REQUESTS || '10000'
+      },
       stdio: ['ignore', 'pipe', 'pipe']
     });
     let output = '';
