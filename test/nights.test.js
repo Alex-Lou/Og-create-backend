@@ -97,6 +97,26 @@ test('la lumière les change en lucioles (3 cases, la torche 2), la clôture bar
   assert.deepEqual(nights.fateOf(walker, nights.defenseOf([{ craft: 'torche', x: 15, y: 13 }], {})), { end: 'arrive', step: 10 });
 });
 
+test('sous la pluie, le feu de camp ne porte qu’à une case ; le Foyer à l’Abri le couvre ; les lanternes ne changent pas', () => {
+  const foyer = map.footprintOf('foyer', 1);
+  const toFoyer = { id: 'n:0', site: 'foyer', path: nights.lineOf({ x: foyer.x - 6, y: foyer.y }, { x: foyer.x, y: foyer.y }), at: 0, arrives: 0 };
+  const wet = () => true;
+  assert.deepEqual(nights.fateOf(toFoyer, nights.defenseOf([], { foyer: 1 }, undefined, wet)), { end: 'luciole', step: 5 });
+  // (il ne pleut qu'à partir de la 2e case : à la 3e, le feu crachote déjà)
+  assert.deepEqual(nights.fateOf(toFoyer, nights.defenseOf([], { foyer: 1 }, undefined, at => at >= 2 * nights.MS_PER_CELL)), { end: 'luciole', step: 5 });
+  assert.deepEqual(nights.fateOf(toFoyer, nights.defenseOf([], { foyer: 2 }, undefined, wet)), { end: 'luciole', step: 3 });
+  const walker = { id: 'n:1', site: 'puits', path: nights.lineOf({ x: 10, y: 10 }, { x: 20, y: 10 }), at: 0, arrives: 0 };
+  assert.deepEqual(nights.fateOf(walker, nights.defenseOf([{ craft: 'lanterne', x: 15, y: 13 }], {}, undefined, wet)), { end: 'luciole', step: 2 });
+});
+
+test('la météo du serveur est celle du jeu (même vecteur que tests/sky.test.js) ; la pluie et l’orage mouillent', () => {
+  const weather = require('../src/services/weather');
+  const days = Array.from({ length: 12 }, (_, i) => [0, 1, 2, 3].map(slot => weather.slotKind(280 + i, slot)[0]).join(''));
+  assert.deepEqual(days.join(' '), 'ccbc vccc cvvc vvvv vvvv pppv vccv bcbb vccc vpvv cccc bccb');
+  // Le 13 octobre 2026 (jour 285), de 0 h à 18 h à Paris : la pluie ; à 18 h, le ciel se voile
+  assert.deepEqual([weather.kindAt(Date.parse('2026-10-13T08:00:00Z')), weather.rainAt(Date.parse('2026-10-13T08:00:00Z')), weather.rainAt(Date.parse('2026-10-13T17:00:00Z'))], ['pluie', true, false]);
+});
+
 test('une nuit embrume au plus un bâtiment : le premier arrivé ; un camarade content en repousse un, le toucher aussi', () => {
   const walk = (id, site, at) => ({ id, site, path: nights.lineOf({ x: 0, y: 0 }, { x: 4, y: 0 }), at, arrives: at + 4 * nights.MS_PER_CELL });
   const plan = [walk('n:0', 'bosquet', 2000), walk('n:1', 'puits', 1000), walk('n:2', 'puits', 3000)];

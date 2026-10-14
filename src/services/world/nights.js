@@ -18,6 +18,7 @@ const { payWith } = require('./produce');
 const { presenceOf, residentsOf, moodsOf } = require('./people');
 const { placesOf } = require('./places');
 const { coqSinceOf } = require('./beasts');
+const { rainAt } = require('../weather');
 const { campOfUser } = require('./camp');
 
 // Un jour de grâce entre la présentation et la première nuit
@@ -52,7 +53,7 @@ async function islandOf(userId, conn) {
     const coqSince = await coqSinceOf(userId, conn);
     const home = coqSince === null ? null : await coopOf(userId, conn);
     const watchAt = at => (home && coqSince <= at ? home : null);
-    return { island: { owned: zones, sites, acts, places }, defense: nights.defenseOf(decor, levels, places), levels, helpersAt, watchAt };
+    return { island: { owned: zones, sites, acts, places }, defense: nights.defenseOf(decor, levels, places, rainAt), levels, helpersAt, watchAt };
 }
 
 // Anya révélée : le cœur de l'île libéré, et la Révélation vue (sa ligne world_friends)

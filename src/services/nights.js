@@ -4,7 +4,8 @@
 // - une clôture ou un muret barre sa case, même dans la lumière (choix de l'auteur, 13 oct. : la barrière d'abord, l'enclos
 //   du Feu sert vraiment) ;
 // - une lumière (le feu du Foyer, une lanterne, un brasero : 3 cases ; une torche : 2) change en luciole celui qui passe
-//   à sa portée ;
+//   à sa portée ; sous la pluie (services/weather.js), le feu de camp ne porte qu'à RAIN_REACH case, sauf le Foyer à
+//   l'Abri (palier II) qui le couvre (choix de l'auteur, 14 oct.) ;
 // - le coq (choix de l'auteur, 14 oct.) voit à COQ_SIGHT cases de son poulailler : le premier qui passerait (ni barré, ni
 //   luciole), il chante, le camp s'éveille et le chasse, une fois par nuit ;
 // - un camarade content repousse celui qui vise son bâtiment, une fois par nuit ;
@@ -24,6 +25,9 @@ const REACH = { torche: 2 };
 const FENCES = new Set(['cloture', 'muret']);
 // Le coq voit à tant de cases (de sa place : le poulailler, sinon la cage)
 const COQ_SIGHT = 4;
+// Sous la pluie, le feu de camp à découvert ne porte qu'à tant de cases ; le Foyer l'abrite dès ce palier
+const RAIN_REACH = 1;
+const SHELTER_LEVEL = 2;
 // Un égaré marche une case toutes les 2 minutes (3 avant la grande carte : les chemins y sont 1,5 fois plus longs)
 const MS_PER_CELL = 2 * 60 * 1000;
 // Une nuit à la fois : 3 égarés avant l'acte I fini, un de plus par acte, 8 au plus (choix de l'auteur, 13 oct.)
@@ -140,13 +144,17 @@ function planOf(userId, night, island) {
     });
 }
 
-// Les défenses de l'île : lumières (le feu du Foyer, lanternes, braseros, torches ; reach : leur portée) et barrières
-// (clôtures, murets). crafts : [{ craft, x, y }] posées ; levels : { site: palier } ; places : où sont les bâtiments
-function defenseOf(crafts, levels, places = STATIC) {
+// Les défenses de l'île : lumières (le feu du Foyer, lanternes, braseros, torches ; reach : leur portée ; camp : le feu
+// de camp à découvert, que la pluie affaiblit) et barrières (clôtures, murets). crafts : [{ craft, x, y }] posées ;
+// levels : { site: palier } ; places : où sont les bâtiments ; rainAt : pleut-il à cet instant (ms) ? (weather.js)
+function defenseOf(crafts, levels, places = STATIC, rainAt = () => false) {
     const lights = crafts.filter(c => LIGHTS.has(c.craft)).map(c => ({ x: c.x, y: c.y, reach: REACH[c.craft] || LIGHT_REACH }));
-    if (levels.foyer) lights.push(...cellsOf('foyer', levels.foyer, places).map(c => ({ ...c, reach: LIGHT_REACH })));
-    return { lights, fences: new Set(crafts.filter(c => FENCES.has(c.craft)).map(key)) };
+    const camp = (levels.foyer || 0) < SHELTER_LEVEL;
+    if (levels.foyer) lights.push(...cellsOf('foyer', levels.foyer, places).map(c => ({ ...c, reach: LIGHT_REACH, camp })));
+    return { lights, fences: new Set(crafts.filter(c => FENCES.has(c.craft)).map(key)), rainAt };
 }
+// La portée d'une lumière à l'instant at : le feu de camp à découvert, sous la pluie, ne porte qu'à RAIN_REACH
+const reachAt = (light, defense, at) => (light.camp && defense.rainAt && defense.rainAt(at) ? RAIN_REACH : light.reach);
 // Le sort d'un égaré sur son chemin : { end: 'luciole' | 'barre' | 'arrive', step } (step : la case où il s'arrête). La
 // barrière d'abord : une clôture sur son chemin l'arrête, même s'il passe avant dans une lumière ; sinon, la première
 // lumière à portée le change en luciole
@@ -154,7 +162,8 @@ function fateOf(creature, defense) {
     const barred = creature.path.findIndex(cell => defense.fences.has(key(cell)));
     if (barred >= 0) return { end: 'barre', step: barred };
     for (const [step, cell] of creature.path.entries()) {
-        if (defense.lights.some(light => distance(light, cell) <= light.reach)) return { end: 'luciole', step };
+        const at = creature.at + step * MS_PER_CELL;
+        if (defense.lights.some(light => distance(light, cell) <= reachAt(light, defense, at))) return { end: 'luciole', step };
     }
     return { end: 'arrive', step: creature.path.length - 1 };
 }
@@ -207,6 +216,6 @@ const STONE_SITES = new Set(['carriere', 'puits', 'atelier', 'foyer']);
 const repairOf = (site, level) => ({ resource: STONE_SITES.has(site) ? 'stone' : 'wood', amount: 3 + 2 * (Math.max(1, level) - 1) });
 
 module.exports = {
-    START_HOUR, END_HOUR, LIGHT_REACH, REACH, COQ_SIGHT, MS_PER_CELL, LIGHTS, FENCES, ANYA_HOURS, countOf,
+    START_HOUR, END_HOUR, LIGHT_REACH, REACH, COQ_SIGHT, RAIN_REACH, SHELTER_LEVEL, MS_PER_CELL, LIGHTS, FENCES, ANYA_HOURS, countOf,
     parisAt, dayOf, nextDay, boundsOf, nightAt, nightNear, endedBetween, borderOf, lineOf, planOf, defenseOf, fateOf, outcomeOf, repairOf
 };

@@ -29,7 +29,8 @@ const countsOf = ({ fates }) => Object.values(fates).reduce((out, f) => ({ ...ou
 // Feu (un quartier à part) : c'est ainsi que les nuits se testent, quelle que soit la disposition du campement.
 const PLACES = { foyer: { x: 95, y: 86 }, puits: { x: 87, y: 84 } };
 const ISLAND = { owned: new Set(['coeur', 'source']), sites: [{ id: 'foyer', level: 1 }, { id: 'puits', level: 1 }], acts: 0, places: PLACES };
-const FIRE = nights.defenseOf([], { foyer: 1 });
+// (la même météo que le serveur : sous la pluie, le feu de camp porte moins loin ; services/weather.js)
+const FIRE = nights.defenseOf([], { foyer: 1 }, undefined, require('../src/services/weather').rainAt);
 async function islandPlayer() {
   const player = await newPlayer({ settled: true });
   await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'source')`, [player.userId]);
