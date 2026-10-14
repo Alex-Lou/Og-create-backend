@@ -3,6 +3,7 @@
 const db = require('../config/db');
 const players = require('./players');
 const timerProgress = require('./timerProgress');
+const { SAVED } = require('../texts/progress');
 
 async function load(userId) {
     const discoveredElements = await players.elements({ kind: 'user', id: userId });
@@ -19,7 +20,7 @@ async function load(userId) {
 async function save(userId, data) {
     await db.query('INSERT INTO progress (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING', [userId]);
     if (data.timerProgress && typeof data.timerProgress === 'object') await timerProgress.update(userId, data.timerProgress);
-    return { message: 'Progression sauvegardée avec succès', lastSaved: new Date().toISOString() };
+    return { message: SAVED, lastSaved: new Date().toISOString() };
 }
 
 module.exports = { load, save };

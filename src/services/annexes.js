@@ -13,6 +13,8 @@
 // charges, regenCut, moves : réserve, retour d'une partie, coups de Récolte (comme la boutique) ; house : un logement.
 // Fonctions pures, sans base de données.
 
+const { CHARGES, MOVES, REGEN_CUT, ANNEX_EFFECTS } = require('../texts/effects');
+
 const SMALL_LEVELS = [2, 3, 5, 6, 7, 7]; // palier du bâtiment qui ouvre chaque exemplaire d'une petite annexe
 const SMALL_COINS = [100, 250, 600, 1200, 2000, 3000];
 const KIND_LEVEL = { reserve: 4, grand: 6, climate: 3, coop: 1 };
@@ -105,13 +107,13 @@ const regenWith = (regenMs, cut) => Math.max(REGEN_FLOOR_MS, regenMs - cut);
 // Texte d'effet d'une annexe ; words = [pluriel de la ressource du bâtiment] ; capHours = heures gardées sans réserve
 function effectText(a, words, capHours) {
     const e = a.effect;
-    if (e.rate) return `+${e.rate} ${words[0]} et +${e.earn} écus par heure`;
-    if (e.cap) return `Garde ${capHours + e.cap} h de production au lieu de ${capHours}`;
-    if (e.charges) return `+${e.charges} partie de Récolte en réserve`;
-    if (e.regenCut) return `Une partie revient ${Math.round(e.regenCut / 60000)} min plus vite`;
-    if (e.moves) return `+${e.moves} coup${e.moves > 1 ? 's' : ''} par Récolte`;
-    if (e.house) return 'Loge un visiteur qui veut rester sur l’île';
-    if (e.hens) return 'Un toit pour les poules de Marcelle';
+    if (e.rate) return ANNEX_EFFECTS.rate(e.rate, words[0], e.earn);
+    if (e.cap) return ANNEX_EFFECTS.cap(capHours + e.cap, capHours);
+    if (e.charges) return CHARGES(e.charges);
+    if (e.regenCut) return REGEN_CUT(Math.round(e.regenCut / 60000));
+    if (e.moves) return MOVES(e.moves);
+    if (e.house) return ANNEX_EFFECTS.house;
+    if (e.hens) return ANNEX_EFFECTS.hens;
     return '';
 }
 

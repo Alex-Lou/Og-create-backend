@@ -11,6 +11,7 @@ const landmarks = require('../landmarks');
 const finds = require('../finds');
 const { SIZE } = require('./rules');
 const { STATIC, inFootprintAt, footprintAt, placesOf, PLAGE } = require('./places');
+const T = require('../../texts/paths');
 
 const MARK = 'ile:sentiers';
 const PREFIX = 'chemin:';
@@ -152,12 +153,12 @@ function linked(ground, a, b) {
 // (leurs paliers) }. Un bâtiment ne prend que son emprise du moment (choix de l'auteur, 11 oct. : le chemin touche le
 // bâtiment, sans case d'écart) : sa place réservée peut porter un chemin, effacé quand il grandit (world.js, build)
 function layBlock(x, y, ctx) {
-    if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= SIZE || y >= SIZE) return 'Case hors de l’île.';
-    if (!ctx.zones.has(map.zoneAt(x, y))) return 'Trace tes chemins dans tes quartiers.';
+    if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= SIZE || y >= SIZE) return T.OUTSIDE;
+    if (!ctx.zones.has(map.zoneAt(x, y))) return T.OWN_ZONES;
     const g = ctx.ground(x, y);
-    if (isPath(g)) return 'Il y a déjà un chemin ici.';
-    if (!['g', 's', 'm'].includes(g)) return 'Un chemin se trace sur l’herbe, le sable ou la prairie.';
-    if (inFootprintAt(ctx.places || STATIC, x, y, ctx.levels || {}) || landmarks.isLandmark(x, y) || finds.isDeposit(x, y) || ctx.taken.has(y * SIZE + x)) return 'Cette case est occupée.';
+    if (isPath(g)) return T.ALREADY_PATH;
+    if (!['g', 's', 'm'].includes(g)) return T.GROUND;
+    if (inFootprintAt(ctx.places || STATIC, x, y, ctx.levels || {}) || landmarks.isLandmark(x, y) || finds.isDeposit(x, y) || ctx.taken.has(y * SIZE + x)) return T.CELL_TAKEN;
     return null;
 }
 
@@ -166,17 +167,17 @@ function layBlock(x, y, ctx) {
 // { add: [{ x, y, free }], remove: [{ x, y }], stone (pierres prises, moins celles rendues) } ou { status, message }
 function planOf(lay, erase, laid, stock, ctx) {
     const cells = list => (Array.isArray(list) ? list : []);
-    if (cells(lay).length + cells(erase).length === 0) return { status: 400, message: 'Aucune case à tracer ni à effacer.' };
-    if (cells(lay).length > MAX_CELLS || cells(erase).length > MAX_CELLS) return { status: 400, message: `Pas plus de ${MAX_CELLS} cases à la fois.` };
+    if (cells(lay).length + cells(erase).length === 0) return { status: 400, message: T.NOTHING };
+    if (cells(lay).length > MAX_CELLS || cells(erase).length > MAX_CELLS) return { status: 400, message: T.TOO_MANY(MAX_CELLS) };
     const ok = c => Array.isArray(c) && c.length === 2 && c.every(Number.isInteger);
-    if (![...cells(lay), ...cells(erase)].every(ok)) return { status: 400, message: 'Case invalide.' };
+    if (![...cells(lay), ...cells(erase)].every(ok)) return { status: 400, message: T.CELL_INVALID };
     const mine = new Map(laid.map(c => [c.y * SIZE + c.x, c]));
     const remove = [];
     const gone = new Set();
     for (const [x, y] of cells(erase)) {
         const k = y * SIZE + x;
         if (gone.has(k)) continue;
-        if (!mine.has(k)) return { status: 400, message: 'Seuls les chemins que tu as tracés s’effacent.' };
+        if (!mine.has(k)) return { status: 400, message: T.ONLY_YOURS };
         gone.add(k);
         remove.push(mine.get(k));
     }
@@ -195,12 +196,12 @@ function planOf(lay, erase, laid, stock, ctx) {
     // Une création qui doit rester au bord d'un chemin le garde
     const after = (x, y) => (seen.has(y * SIZE + x) ? 'p' : under(x, y));
     const stranded = (ctx.placedNeedingPath || []).find(c => !DIRS.some(([dx, dy]) => isPath(after(c.x + dx, c.y + dy))));
-    if (stranded) return { status: 409, message: `« ${stranded.name} » s’appuie sur ce chemin : déplace-la d’abord.` };
+    if (stranded) return { status: 409, message: T.LEANS_ON(stranded.name) };
     const offered = Math.max(0, FREE - laid.filter(c => c.free && !gone.has(c.y * SIZE + c.x)).length);
     add.forEach((c, i) => { c.free = i < offered; });
     const pay = add.filter(c => !c.free).length;
     const back = remove.filter(c => !c.free).length;
-    if (pay > stock.stone + back) return { status: 409, message: `Il te faut ${pay} pierre${pay > 1 ? 's' : ''} pour ce chemin (tu en as ${stock.stone}).` };
+    if (pay > stock.stone + back) return { status: 409, message: T.STONE_COST(pay, stock.stone) };
     return { add, remove, stone: pay - back };
 }
 

@@ -4,13 +4,14 @@ const express = require('express');
 const { clean } = require('../services/clientErrors');
 const { limiter } = require('../middleware/rateLimit');
 const { log } = require('../utils/logger');
+const { CLIENT_ERRORS_TOO_MANY, CLIENT_ERROR_INVALID } = require('../texts/errors');
 
 const router = express.Router();
-const reportLimiter = limiter({ minutes: 1, max: 10, message: 'Trop de rapports d’erreur.' });
+const reportLimiter = limiter({ minutes: 1, max: 10, message: CLIENT_ERRORS_TOO_MANY });
 
 router.post('/', reportLimiter, (req, res) => {
     const report = clean(req.body);
-    if (!report) return res.status(400).json({ message: 'Rapport d’erreur invalide' });
+    if (!report) return res.status(400).json({ message: CLIENT_ERROR_INVALID });
     log('warn', 'Erreur du jeu', report);
     res.status(204).end();
 });

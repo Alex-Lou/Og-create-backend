@@ -1,5 +1,6 @@
 // Le Cabinet : pièces de sceau (cadres, emblèmes) par défaut, achetées en écus ou méritées par un succès.
 const db = require('../config/db');
+const T = require('../texts/customization');
 
 const DEFAULT_SELECTIONS = { selectedFrame: 'basicCadre.png', selectedAvatar: 'coin.png' };
 
@@ -30,7 +31,7 @@ async function selections(userId) {
 async function select(userId, selectedFrame, selectedAvatar) {
     const paths = (await owned(userId)).map(item => item.image_path);
     if (!paths.includes(selectedFrame) || !paths.includes(selectedAvatar)) {
-        return { status: 403, message: 'Vous n\'avez pas déverrouillé ces items' };
+        return { status: 403, message: T.NOT_UNLOCKED };
     }
     await db.query('UPDATE progress SET user_customization = $1 WHERE user_id = $2', [{ selectedFrame, selectedAvatar }, userId]);
     return { selectedFrame, selectedAvatar };
@@ -41,18 +42,18 @@ async function select(userId, selectedFrame, selectedAvatar) {
 async function purchase(userId, itemId) {
     const { rows } = await db.query('SELECT * FROM customization_items WHERE id = $1', [itemId]);
     const item = rows[0];
-    if (!item) return { status: 404, message: 'Item non trouvé' };
+    if (!item) return { status: 404, message: T.ITEM_NOT_FOUND };
     // Une pièce méritée ne s'achète pas
-    if (item.achievement) return { status: 403, message: `Cette pièce se mérite : succès « ${item.achievement} »` };
+    if (item.achievement) return { status: 403, message: T.EARNED_ONLY(item.achievement) };
     return db.transaction(async conn => {
         const added = await conn.query(
             'INSERT INTO user_items (user_id, item_id) VALUES ($1, $2) ON CONFLICT (user_id, item_id) DO NOTHING RETURNING id',
             [userId, itemId]);
-        if (!added.rows.length) return db.rollback({ status: 400, message: 'Vous possédez déjà cet item' });
+        if (!added.rows.length) return db.rollback({ status: 400, message: T.ALREADY_OWNED });
         const debit = await conn.query(
             'UPDATE progress SET coins = coins - $1 WHERE user_id = $2 AND coins >= $1 RETURNING coins',
             [item.price, userId]);
-        if (!debit.rows.length) return db.rollback({ status: 400, message: 'Vous n\'avez pas assez de pièces', required: item.price });
+        if (!debit.rows.length) return db.rollback({ status: 400, message: T.NOT_ENOUGH_COINS, required: item.price });
         // Inscrit au grand livre, comme tout mouvement d'écus (ref vide : l'unicité est tenue par user_items)
         await conn.query('INSERT INTO coin_ledger (user_id, amount, reason) VALUES ($1, $2, $3)', [userId, -item.price, `cabinet:${item.id}`]);
         return { item, remainingCoins: debit.rows[0].coins };

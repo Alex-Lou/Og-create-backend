@@ -2,6 +2,7 @@
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const db = require('../config/db');
+const T = require('../texts/account');
 
 const BCRYPT_COST = 12;
 // Empreinte sans compte associé (même coût), comparée quand l'adresse est inconnue
@@ -14,8 +15,8 @@ const hashPassword = password => bcrypt.hash(password, BCRYPT_COST);
 // (texte), ou null
 const PASSWORD_MAX_BYTES = 72;
 function passwordProblem(password) {
-    if (typeof password !== 'string' || !/^.{8,}$/.test(password)) return 'Le mot de passe doit contenir au moins 8 caractères.';
-    if (Buffer.byteLength(password, 'utf8') > PASSWORD_MAX_BYTES) return 'Mot de passe trop long : 72 caractères au plus (moins avec des accents ou des emojis).';
+    if (typeof password !== 'string' || !/^.{8,}$/.test(password)) return T.PASSWORD_TOO_SHORT;
+    if (Buffer.byteLength(password, 'utf8') > PASSWORD_MAX_BYTES) return T.PASSWORD_TOO_LONG;
     return null;
 }
 
@@ -78,11 +79,11 @@ async function provisionalOf(userId) {
 async function claim(userId, email, password) {
     return db.transaction(async conn => {
         const { rows } = await conn.query('SELECT email FROM users WHERE id = $1 FOR UPDATE', [userId]);
-        if (!rows.length) return db.rollback({ status: 404, message: 'Compte introuvable.' });
-        if (!isProvisional(rows[0].email)) return db.rollback({ status: 409, message: 'Ce compte a déjà son adresse.' });
+        if (!rows.length) return db.rollback({ status: 404, message: T.ACCOUNT_NOT_FOUND });
+        if (!isProvisional(rows[0].email)) return db.rollback({ status: 409, message: T.ALREADY_CLAIMED });
         const username = usernameFor(email);
         const taken = await conn.query('SELECT 1 FROM users WHERE (LOWER(email) = LOWER($1) OR username = $2) AND id <> $3', [email, username, userId]);
-        if (taken.rows.length) return db.rollback({ status: 400, message: 'Email ou username déjà utilisé' });
+        if (taken.rows.length) return db.rollback({ status: 400, message: T.EMAIL_TAKEN });
         const updated = await conn.query(
             'UPDATE users SET email = $1, password_hash = $2, username = $3 WHERE id = $4 RETURNING id, email, username',
             [email, await hashPassword(password), username, userId]);

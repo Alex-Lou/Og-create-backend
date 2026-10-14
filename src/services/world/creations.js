@@ -15,6 +15,7 @@ const { STATIC, footprintAt, inFootprintAt, placesOf } = require('./places');
 const { campOfUser, cellsOfCamp } = require('./camp');
 const { gatherBefore, payWith } = require('./produce');
 const { roadsOf } = require('./paths');
+const T = require('../../texts/crafts');
 
 // Contexte des règles de pose (crafts.spotBlock) : sol, case libre (sur l'île, hors chantier, quartier à soi, ni annexe,
 // ni autre création, ni lieu remarquable, ni gisement), emprise d'un bâtiment bâti, créations posées (sauf skip : celle qu'on déplace)
@@ -118,7 +119,7 @@ function craftsView(rows, ctx, { owned, stock, open, epreuves, stars = 0, have, 
 // graine, les pièces à poser (rien n'est payé avant la réussite). owned : éléments du Livre ; chapters : chapitres
 // ouverts. { run: { id, craft, shape, pieces, turned } } ou { status, message }
 async function startCraft(userId, craftId, owned, chapters, stars = 0) {
-    if (!Object.hasOwn(crafts.CRAFT_BY_ID, craftId)) return { status: 404, message: 'Création inconnue.' };
+    if (!Object.hasOwn(crafts.CRAFT_BY_ID, craftId)) return { status: 404, message: T.CRAFT_UNKNOWN };
     const c = crafts.CRAFT_BY_ID[craftId];
     await migrate(userId);
     return db.transaction(async conn => {
@@ -144,13 +145,13 @@ function finishCraft(userId, runId, layout, owned, chapters, stars = 0) {
         const stock = await stockOf(userId, conn, true);
         const { rows } = await conn.query(
             'SELECT craft, seed, created_at FROM world_craft_runs WHERE id = $1 AND user_id = $2 AND finished_at IS NULL FOR UPDATE', [runId, userId]);
-        if (!rows.length) return db.rollback({ status: 404, message: 'Cet assemblage est déjà rendu.' });
+        if (!rows.length) return db.rollback({ status: 404, message: T.ASSEMBLY_RETURNED });
         await conn.query('UPDATE world_craft_runs SET finished_at = NOW() WHERE id = $1', [runId]);
         const { craft: craftId, seed, created_at: createdAt } = rows[0];
         const c = crafts.CRAFT_BY_ID[craftId];
-        if (Date.now() - new Date(createdAt).getTime() > CRAFT_TTL_MS) return { status: 400, message: 'Assemblage refusé : temps écoulé.' };
+        if (Date.now() - new Date(createdAt).getTime() > CRAFT_TTL_MS) return { status: 400, message: T.ASSEMBLY_LATE };
         const done = crafts.check(c.shape, crafts.piecesOf(c.shape, seed, c.tier), layout);
-        if (!done.ok) return { status: 400, message: `Assemblage refusé : ${done.error}.` };
+        if (!done.ok) return { status: 400, message: T.ASSEMBLY_REFUSED(done.error) };
         // Entre le début et la fin, le stock ou le Livre ont pu changer ; ce qui attend dans les bâtiments compte encore
         const { stock: paid, balance } = await payWith(userId, conn, stock);
         const open = crafts.tiersOpen(chapters, await epreuvesOf(userId, conn), stars);
@@ -179,14 +180,14 @@ async function setSpot(userId, conn, stock, row, x, y) {
 // Pose une création de la réserve sur une case permise par sa règle, en miroir ou non (flip). { coins? } ou
 // { status, message }
 async function placeCraft(userId, craftId, x, y, flip = false) {
-    if (!Object.hasOwn(crafts.CRAFT_BY_ID, craftId)) return { status: 404, message: 'Création inconnue.' };
+    if (!Object.hasOwn(crafts.CRAFT_BY_ID, craftId)) return { status: 404, message: T.CRAFT_UNKNOWN };
     const c = crafts.CRAFT_BY_ID[craftId];
     await migrate(userId);
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
         const rows = await craftsOf(userId, conn);
         const row = rows.find(r => r.craft === craftId && r.x === null);
-        if (!row) return db.rollback({ status: 409, message: `Pas de « ${c.name} » en réserve : fabrique d’abord cette création.` });
+        if (!row) return db.rollback({ status: 409, message: T.NONE_IN_RESERVE(c.name) });
         const { levels } = await levelsOf(userId, conn);
         const annexRows = await annexesOf(userId, conn);
         const campCells = cellsOfCamp(await campOfUser(userId, conn, { levels, annexRows, craftRows: rows }));
@@ -204,7 +205,7 @@ async function placeCraft(userId, craftId, x, y, flip = false) {
 // l'a été à la main). S'arrête à la première case refusée, ou quand il manque de quoi la payer : ce qui est posé reste.
 // owned, chapters, stars : comme startCraft. { placed, stopped?, coins? } ou { status, message }
 async function placeLine(userId, craftId, cells, owned, chapters, stars = 0) {
-    if (!crafts.LINE_CRAFTS.has(craftId)) return { status: 400, message: 'Cette création ne se pose pas d’un trait.' };
+    if (!crafts.LINE_CRAFTS.has(craftId)) return { status: 400, message: T.NOT_A_LINE };
     const c = crafts.CRAFT_BY_ID[craftId];
     await migrate(userId);
     return db.transaction(async conn => {
@@ -214,7 +215,7 @@ async function placeLine(userId, craftId, cells, owned, chapters, stars = 0) {
         const rows = await craftsOf(userId, conn);
         const made = madeOf(rows);
         const presence = await presenceOf(userId, conn);
-        if (!traceable(craftId, made, freeTraceOf(presence))) return db.rollback({ status: 409, message: `Fabrique d’abord « ${c.name} » à l’établi.` });
+        if (!traceable(craftId, made, freeTraceOf(presence))) return db.rollback({ status: 409, message: T.WORKBENCH_FIRST(c.name) });
         const { levels } = await levelsOf(userId, conn);
         const annexRows = await annexesOf(userId, conn);
         const campCells = cellsOfCamp(await campOfUser(userId, conn, { levels, annexRows, craftRows: rows }));
@@ -230,7 +231,7 @@ async function placeLine(userId, craftId, cells, owned, chapters, stars = 0) {
         let stopped = null;
         let coins = balance;
         for (const [x, y] of cells) {
-            const block = taken.has(y * SIZE + x) ? 'Case déjà prise.' : crafts.spotBlock(c, x, y, ctx);
+            const block = taken.has(y * SIZE + x) ? T.CELL_TAKEN : crafts.spotBlock(c, x, y, ctx);
             if (block) {
                 stopped = block;
                 break;
@@ -257,7 +258,7 @@ async function placeLine(userId, craftId, cells, owned, chapters, stars = 0) {
             taken.add(y * SIZE + x);
             placed++;
         }
-        if (!placed) return db.rollback({ status: 400, message: stopped || 'Rien à poser.' });
+        if (!placed) return db.rollback({ status: 400, message: stopped || T.NOTHING_TO_PLACE });
         return { placed, ...(stopped ? { stopped } : {}), ...(coins !== undefined ? { coins } : {}) };
     });
 }
@@ -299,7 +300,7 @@ async function moveCraft(userId, x, y, toX, toY) {
         const stock = await stockOf(userId, conn, true);
         const rows = await craftsOf(userId, conn);
         const row = rows.find(r => r.x === x && r.y === y);
-        if (!row) return db.rollback({ status: 404, message: 'Aucune création sur cette case.' });
+        if (!row) return db.rollback({ status: 404, message: T.NO_CRAFT_HERE });
         const { levels } = await levelsOf(userId, conn);
         const annexRows = await annexesOf(userId, conn);
         const campCells = cellsOfCamp(await campOfUser(userId, conn, { levels, annexRows, craftRows: rows }));
@@ -321,7 +322,7 @@ async function storeCraft(userId, x, y) {
         const stock = await stockOf(userId, conn, true);
         const placed = placedOf(await craftsOf(userId, conn));
         const row = placed.find(r => r.x === x && r.y === y);
-        if (!row) return db.rollback({ status: 404, message: 'Aucune création sur cette case.' });
+        if (!row) return db.rollback({ status: 404, message: T.NO_CRAFT_HERE });
         const needed = crafts.leaveBlock(row, null, null, placed);
         if (needed) return db.rollback({ status: 409, message: needed });
         return setSpot(userId, conn, stock, row, null, null);
@@ -332,7 +333,7 @@ async function storeCraft(userId, x, y) {
 async function turnCraft(userId, x, y, flip) {
     await migrate(userId);
     const { rowCount } = await db.query('UPDATE world_crafts SET flip = $4 WHERE user_id = $1 AND x = $2 AND y = $3', [userId, x, y, flip]);
-    return rowCount ? {} : { status: 404, message: 'Aucune création sur cette case.' };
+    return rowCount ? {} : { status: 404, message: T.NO_CRAFT_HERE };
 }
 
 module.exports = {

@@ -9,13 +9,15 @@ const achievementService = require('../../services/achievementService');
 const { verifyAccess, readCookie } = require('../../services/authSession');
 const { limiter } = require('../../middleware/rateLimit');
 const { log } = require('../../utils/logger');
+const T = require('../../texts/play');
+const { NEED_COINS } = require('../../texts/errors');
 
 const HELP_PRICE = 50; // encre du Livre et joker payant de l'Épreuve
 const NAME = /^[^\u0000-\u001f]{1,60}$/;
 const PAGE = /^[A-Za-z0-9_-]{1,32}$/;
 
 // Limites : par joueur (compte ou cookie invité), et par adresse pour la création de carnets invités
-const SLOW_DOWN = 'Doucement ! Réessaie dans un instant.';
+const SLOW_DOWN = T.SLOW_DOWN;
 const playerKey = req => {
     const user = verifyAccess(req);
     if (user) return `u:${user.id}`;
@@ -28,14 +30,14 @@ const guestLimiter = limiter({ minutes: 60, max: 20, key: req => req.ip, message
 
 const fail = (res, error, what) => {
     log('error', what, { errorMessage: error.message });
-    res.status(500).json({ message: 'Le serveur de jeu ne répond pas, réessaie.' });
+    res.status(500).json({ message: T.SERVER_DOWN });
 };
 
 // Joueur obligatoire : sans compte ni carnet invité, 401 NO_PLAYER (le front crée alors un carnet)
 const withPlayer = handler => async (req, res) => {
     try {
         const owner = await players.resolve(req);
-        if (!owner) return res.status(401).json({ message: 'Aucune partie', code: 'NO_PLAYER' });
+        if (!owner) return res.status(401).json({ message: T.NO_PLAYER, code: 'NO_PLAYER' });
         await handler(req, res, owner, await book.load());
     } catch (error) {
         fail(res, error, `Jeu ${req.path}`);
@@ -43,23 +45,23 @@ const withPlayer = handler => async (req, res) => {
 };
 
 // Compte obligatoire (le Monde : ses ressources et ses écus sont gardés par le serveur)
-const ACCOUNT_ONLY = { message: 'Ton île t’attend : crée un compte pour la bâtir.', code: 'ACCOUNT' };
+const ACCOUNT_ONLY = { message: T.ACCOUNT_ONLY, code: 'ACCOUNT' };
 const withAccount = handler => withPlayer((req, res, owner, b) => (
     owner.kind === 'user' ? handler(req, res, owner, b) : res.status(402).json(ACCOUNT_ONLY)
 ));
 
 // Débit d'une aide : compte seulement (les écus d'un invité n'existent pas côté serveur)
 async function pay(owner, reason) {
-    if (owner.kind !== 'user') return { status: 402, message: 'Les aides payantes demandent un compte.' };
+    if (owner.kind !== 'user') return { status: 402, message: T.PAID_HELP_ACCOUNT };
     const coins = await ledger.debit(owner.id, HELP_PRICE, reason);
-    if (coins === null) return { status: 400, message: `Il te faut ${HELP_PRICE} écus.` };
+    if (coins === null) return { status: 400, message: NEED_COINS(HELP_PRICE) };
     return { coins };
 }
 // Débit d'une aide attachée à une chose précise (ref : une page) : une seule fois, même depuis un autre appareil
 async function payOnce(owner, reason, ref) {
-    if (owner.kind !== 'user') return { status: 402, message: 'Les aides payantes demandent un compte.' };
+    if (owner.kind !== 'user') return { status: 402, message: T.PAID_HELP_ACCOUNT };
     const done = await ledger.debitOnce(owner.id, HELP_PRICE, reason, ref);
-    if (!done) return { status: 400, message: `Il te faut ${HELP_PRICE} écus.` };
+    if (!done) return { status: 400, message: NEED_COINS(HELP_PRICE) };
     return { coins: done.coins };
 }
 

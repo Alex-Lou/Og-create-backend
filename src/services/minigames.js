@@ -4,15 +4,17 @@
 // Moteurs déterministes : à partir d'une graine, le serveur rejoue ce que le joueur a fait et calcule seul le gain.
 // Copie conforme de src/game/minigames.js côté navigateur : les deux suites de tests vérifient les mêmes parties.
 
+const { GAME_TEXTS, REFUSAL } = require('../texts/games');
+
 const GAME_LEVEL = 3;
 const PLAYS = 3;
 const PLAY_REGEN_MS = 2 * 3600 * 1000;
 const CAP = 60; // écus au plus par partie au palier III (× le multiplicateur du palier)
 
 const GAMES = {
-    peche: { site: 'ponton', name: 'Pêche', text: 'Touche le couloir d’eau quand un poisson passe sous l’hameçon.' },
-    filon: { site: 'carriere', name: 'Filon', text: 'Creuse la paroi bloc par bloc : les éclats disent où dort le filon.' },
-    cueillette: { site: 'bosquet', name: 'Cueillette', text: 'Cueille les baies mûres avant qu’elles tombent, sans réveiller les guêpes.' }
+    peche: { site: 'ponton', name: 'Pêche', text: GAME_TEXTS.peche },
+    filon: { site: 'carriere', name: 'Filon', text: GAME_TEXTS.filon },
+    cueillette: { site: 'bosquet', name: 'Cueillette', text: GAME_TEXTS.cueillette }
 };
 
 // Générateur pseudo-aléatoire 32 bits (mulberry32, le même que la Récolte)
@@ -82,16 +84,16 @@ function catchAt(fish, caught, t, lane) {
 }
 // taps : [[t (ms depuis le début), couloir]] dans l'ordre ; un toucher pendant que la ligne est à l'eau ne compte pas
 function replayFishing(seed, taps, duration = FISHING.duration) {
-    if (taps.length > FISHING.maxTaps) return fail('trop de lancers');
+    if (taps.length > FISHING.maxTaps) return fail(REFUSAL.tooManyCasts);
     const fish = fishingOf(seed, duration);
     const caught = new Set();
     const catches = [];
     let free = 0;
     let last = 0;
     for (const tap of taps) {
-        if (!Array.isArray(tap) || tap.length !== 2) return fail('lancer invalide');
+        if (!Array.isArray(tap) || tap.length !== 2) return fail(REFUSAL.badCast);
         const [t, lane] = tap;
-        if (!isInt(t) || !isInt(lane) || t < last || t > duration || lane < 0 || lane >= FISHING.lanes) return fail('lancer invalide');
+        if (!isInt(t) || !isInt(lane) || t < last || t > duration || lane < 0 || lane >= FISHING.lanes) return fail(REFUSAL.badCast);
         last = t;
         if (t < free) continue;
         free = t + FISHING.busy;
@@ -160,7 +162,7 @@ function glintOf(gems, i) {
 }
 // taps : [bloc frappé] dans l'ordre, un coup de pioche chacun (VEIN.strokes au plus)
 function replayVein(seed, taps, limit = VEIN.strokes) {
-    if (taps.length > limit) return fail('trop de coups');
+    if (taps.length > limit) return fail(REFUSAL.tooManyStrokes);
     const { hard, gems } = veinOf(seed);
     const left = hard.slice();
     const broken = Array(hard.length).fill(false);
@@ -169,7 +171,7 @@ function replayVein(seed, taps, limit = VEIN.strokes) {
     const at = [];
     let strokes = 0;
     for (const i of taps) {
-        if (!isInt(i) || i < 0 || i >= hard.length || broken[i] || !reachable(broken, i)) return fail('coup invalide');
+        if (!isInt(i) || i < 0 || i >= hard.length || broken[i] || !reachable(broken, i)) return fail(REFUSAL.badStroke);
         left[i]--;
         strokes++;
         if (left[i] === 0) {
@@ -219,7 +221,7 @@ function ripeAt(events, picked, t, cell) {
 }
 // picks : [[t (ms), buisson]] dans l'ordre. Un buisson vide fait perdre un instant, les guêpes davantage
 function replayPicking(seed, picks, duration = PICKING.duration) {
-    if (picks.length > PICKING.maxPicks) return fail('trop de gestes');
+    if (picks.length > PICKING.maxPicks) return fail(REFUSAL.tooManyPicks);
     const events = pickingOf(seed, duration);
     const picked = new Set();
     const got = [];
@@ -228,9 +230,9 @@ function replayPicking(seed, picks, duration = PICKING.duration) {
     let stunned = 0;
     let last = 0;
     for (const pick of picks) {
-        if (!Array.isArray(pick) || pick.length !== 2) return fail('geste invalide');
+        if (!Array.isArray(pick) || pick.length !== 2) return fail(REFUSAL.badPick);
         const [t, cell] = pick;
-        if (!isInt(t) || !isInt(cell) || t < last || t > duration || cell < 0 || cell >= PICKING.cols * PICKING.rows) return fail('geste invalide');
+        if (!isInt(t) || !isInt(cell) || t < last || t > duration || cell < 0 || cell >= PICKING.cols * PICKING.rows) return fail(REFUSAL.badPick);
         last = t;
         if (t < stunned) continue;
         const e = ripeAt(events, picked, t, cell);
@@ -258,8 +260,8 @@ const limitOf = (game, short = false) => (short ? SHORT[game] : LIMIT[game]);
 // Rejoue une partie : { ok, raw (valeur brute), detail (prises, dans l'ordre), last (instant du dernier geste) }
 // (short : une des premières parties, plus courte)
 function replay(game, seed, input, short = false) {
-    if (!REPLAY[game]) return fail('jeu inconnu');
-    if (!Array.isArray(input)) return fail('partie invalide');
+    if (!REPLAY[game]) return fail(REFUSAL.unknownGame);
+    if (!Array.isArray(input)) return fail(REFUSAL.badRun);
     return REPLAY[game](seed, input, limitOf(game, short));
 }
 // Multiplicateur du palier du bâtiment (III : ×1, puis +0,2 par palier) et écus gagnés, plafonnés

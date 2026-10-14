@@ -298,7 +298,7 @@ function actStartsOf(rows) {
 }
 
 // Quand tout est fait
-const RESTED = 'La brume s’est levée sur toute l’île. Merci, alchimiste : elle est de nouveau vivante.';
+const { RESTED } = require('../texts/brume');
 
 module.exports = {
     QUESTS, ENCLOS, LEGACY, QUEST_CHESTS, BEASTS, GUIDED_INK, FIRST_NIGHT_DONE,

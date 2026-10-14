@@ -6,6 +6,8 @@
 // Effets : prod = part de production en plus (ressources et écus du bâtiment), coins = écus par heure en plus,
 // moves = coups de Récolte en plus, charges = parties en réserve en plus, regenMs = délai de retour d'une partie.
 
+const { CHARGES, MOVES, SHOP_EFFECTS } = require('../texts/effects');
+
 const PROD_CAP = 1; // les bonus de production d'un bâtiment s'additionnent jusqu'à +100 %
 const SITE_IDS = ['potager', 'carriere', 'bosquet', 'puits', 'ponton', 'atelier', 'foyer'];
 
@@ -146,14 +148,14 @@ function bonusesOf(ownedIds) {
 // Texte d'effet d'un article, pour la boutique
 function effectText(item) {
     const e = item.effect;
-    if (item.rare) return item.chapter ? `Pièce rare : offerte par le chapitre ${item.chapter} du Grimoire.` : 'Pièce rare : elle se trouve dans les coffres légendaires.';
-    if (item.tint) return 'Recolore le bâtiment, à tous ses paliers.';
-    if (!e) return item.kind === 'skin' ? 'Change l’apparence du bâtiment.' : 'Vit sur ton île.';
-    if (e.prod) return `+${Math.round(e.prod * 100)} % de production`;
-    if (e.coins) return `+${e.coins} écu${e.coins > 1 ? 's' : ''} par heure`;
-    if (e.moves) return `+${e.moves} coup${e.moves > 1 ? 's' : ''} par Récolte`;
-    if (e.charges) return `+${e.charges} partie de Récolte en réserve`;
-    if (e.regenMs) return `Une partie revient toutes les ${Math.round(e.regenMs / 60000)} min`;
+    if (item.rare) return item.chapter ? SHOP_EFFECTS.rareChapter(item.chapter) : SHOP_EFFECTS.rare;
+    if (item.tint) return SHOP_EFFECTS.tint;
+    if (!e) return item.kind === 'skin' ? SHOP_EFFECTS.skin : SHOP_EFFECTS.deco;
+    if (e.prod) return SHOP_EFFECTS.prod(Math.round(e.prod * 100));
+    if (e.coins) return SHOP_EFFECTS.coins(e.coins);
+    if (e.moves) return MOVES(e.moves);
+    if (e.charges) return CHARGES(e.charges);
+    if (e.regenMs) return SHOP_EFFECTS.regen(Math.round(e.regenMs / 60000));
     return '';
 }
 

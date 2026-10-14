@@ -6,6 +6,8 @@ const quests = require('../quests');
 const { stockOf, claimedOf } = require('./reads');
 const { migrate } = require('./migrate');
 const { payWith } = require('./produce');
+const { SHELTER } = require('../../texts/world');
+const { MISSING_RESOURCES } = require('../../texts/errors');
 
 const PREFIX = 'abri:';
 // Ce que coûte chaque abri, et la quête faite avant laquelle il ne se bâtit pas
@@ -27,15 +29,15 @@ function sheltersView(built, done) {
 // Bâtir l'abri d'un coin : sa quête venue, pas encore bâti, payé (la production en attente compte). { coins? } ou
 // { status, message }
 async function buildShelter(userId, who) {
-    if (!Object.hasOwn(SHELTERS, who)) return { status: 404, message: 'Abri inconnu.' };
+    if (!Object.hasOwn(SHELTERS, who)) return { status: 404, message: SHELTER.unknown };
     const shelter = SHELTERS[who];
     await migrate(userId);
     return db.transaction(async conn => {
         const { stock, balance } = await payWith(userId, conn, await stockOf(userId, conn, true));
-        if (!quests.doneOf(await claimedOf(userId, conn)).has(shelter.after)) return db.rollback({ status: 403, message: 'Pas encore : son coin attend son tour.' });
-        if (Object.entries(shelter.cost).some(([r, n]) => (stock[r] || 0) < n)) return db.rollback({ status: 409, message: 'Il te manque des ressources : joue une Récolte.' });
+        if (!quests.doneOf(await claimedOf(userId, conn)).has(shelter.after)) return db.rollback({ status: 403, message: SHELTER.notYet });
+        if (Object.entries(shelter.cost).some(([r, n]) => (stock[r] || 0) < n)) return db.rollback({ status: 409, message: MISSING_RESOURCES });
         const added = await conn.query('INSERT INTO world_items (user_id, item) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING item', [userId, `${PREFIX}${who}`]);
-        if (!added.rows.length) return db.rollback({ status: 409, message: 'Cet abri est déjà bâti.' });
+        if (!added.rows.length) return db.rollback({ status: 409, message: SHELTER.built });
         const n = r => shelter.cost[r] || 0;
         await conn.query('UPDATE world_stock SET stone = stone - $2, wood = wood - $3, water = water - $4, food = food - $5 WHERE user_id = $1',
             [userId, n('stone'), n('wood'), n('water'), n('food')]);

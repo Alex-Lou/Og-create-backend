@@ -6,6 +6,7 @@ const accounts = require('./accounts');
 const authSession = require('./authSession');
 const { newToken, digest } = require('../utils/crypto');
 const { log } = require('../utils/logger');
+const MAIL = require('../texts/emails').PASSWORD_RESET;
 
 const TOKEN_MINUTES = 30;
 // Adresse du jeu dans le lien : fixée par la configuration, jamais lue dans la requête
@@ -27,8 +28,8 @@ async function request(email) {
     await transporter.sendMail({
         from: process.env.EMAIL_USER,
         to: user.email,
-        subject: 'Brumelune — nouveau mot de passe',
-        text: `Bonjour,\n\nPour choisir un nouveau mot de passe, ouvre ce lien (valable ${TOKEN_MINUTES} minutes, une seule fois) :\n${APP_URL}/?reset=${token}\n\nSi tu n'as rien demandé, ignore ce message : ton mot de passe ne change pas.`
+        subject: MAIL.subject,
+        text: MAIL.text(TOKEN_MINUTES, APP_URL, token)
     });
     log('info', 'Lien de réinitialisation envoyé', { userId: user.id });
 }

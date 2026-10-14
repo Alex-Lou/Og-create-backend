@@ -5,6 +5,7 @@ const harvest = require('../harvest');
 const map = require('../worldMap');
 const shop = require('../worldShop');
 const annexes = require('../annexes');
+const { LEVEL_EFFECTS } = require('../../texts/effects');
 
 const SIZE = map.SIZE;
 const CAP_HOURS = 8;
@@ -149,13 +150,13 @@ const BOOSTED = { carriere: 'stone', bosquet: 'wood', puits: 'water', potager: '
 // Ce que fait un palier (texte de la fiche), calculé depuis les règles : jamais en désaccord avec elles
 function effectOf(siteId, n) {
     const site = SITES[siteId];
-    const grows = n === map.BIG_FROM ? ' Le bâtiment s’agrandit (3 × 3 cases).' : '';
-    if (siteId === 'foyer') return `${2 + n} parties de Récolte en réserve.${grows}`;
-    if (siteId === 'atelier') return `${ATELIER_MOVES[n]} coups de plus par Récolte.${grows}`;
+    const grows = n === map.BIG_FROM ? LEVEL_EFFECTS.grows : '';
+    if (siteId === 'foyer') return LEVEL_EFFECTS.foyer(2 + n, grows);
+    if (siteId === 'atelier') return LEVEL_EFFECTS.atelier(ATELIER_MOVES[n], grows);
     const [many] = WORDS[site.produce];
-    const made = `${PRODUCE_PER_LEVEL * n} ${many} et ${COINS_PER_LEVEL * n} écus par heure`;
-    if (siteId === 'ponton') return `Pêche ${made} ; des poissons à la Récolte${n >= 2 ? ', 2 coups de plus' : ''}.${grows}`;
-    return `Produit ${made} ; ${WORDS[site.produce][1]} rapporte ×${BOOST_BY_LEVEL[n]} à la Récolte.${grows}`;
+    const made = LEVEL_EFFECTS.made(PRODUCE_PER_LEVEL * n, many, COINS_PER_LEVEL * n);
+    if (siteId === 'ponton') return LEVEL_EFFECTS.ponton(made, n >= 2, grows);
+    return LEVEL_EFFECTS.produce(made, WORDS[site.produce][1], BOOST_BY_LEVEL[n], grows);
 }
 for (const [id, site] of Object.entries(SITES)) {
     site.levels.forEach((l, i) => { l.effect = effectOf(id, i + 1); l.chapter = CHAPTER_OF_LEVEL[i]; });

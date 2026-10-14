@@ -2,6 +2,7 @@
 // Un succès n'est débloqué que si sa condition est remplie par le carnet enregistré côté serveur.
 const db = require('../config/db');
 const { isConditionMet } = require('../utils/achievementCondition');
+const { ACHIEVEMENTS_CHECKED } = require('../texts/progress');
 
 const CACHE_MS = 5 * 60 * 1000;
 let cached = null;
@@ -60,7 +61,7 @@ async function syncAchievements(userId, claimed = {}) {
 }
 
 async function updateUserAchievements(userId, claimed) {
-  return { message: 'Succès vérifiés', ...(await syncAchievements(userId, claimed)), timestamp: new Date().toISOString() };
+  return { message: ACHIEVEMENTS_CHECKED, ...(await syncAchievements(userId, claimed)), timestamp: new Date().toISOString() };
 }
 
 module.exports = { getAllAchievements, getUserAchievements, syncAchievements, updateUserAchievements };

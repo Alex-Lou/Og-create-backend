@@ -61,6 +61,12 @@ const gridLevels = require('./levels');
 const stars = require('./world/stars');
 const { startNights, repelCreature, repairSite, nightsView } = require('./world/nights');
 const { feedBeast, collectBeasts, beastsView, openCage } = require('./world/beasts');
+const W = require('../texts/world');
+const G = require('../texts/games');
+const SHOP = require('../texts/shop');
+const SIGN = require('../texts/signs');
+const { AVATAR_UNKNOWN } = require('../texts/avatar');
+const { NEED_COINS, MISSING_RESOURCES } = require('../texts/errors');
 
 // Un habitant arrive comblé (Marcelle, pendant le prologue, affamée : hungryOf) : la première vue de l'île après son
 // arrivée inscrit l'heure de ses besoins (ou de celui qui apparaît, travailler avec l'Atelier), une seule fois
@@ -232,7 +238,7 @@ async function tutorialOf(userId, conn = db) {
 }
 async function skipPrologue(userId) {
     if (!quests.firstNightDoneOf(await claimedOf(userId))) {
-        return { status: 409, message: 'Bâtis d’abord le camp et termine la première Récolte avec Hermine.' };
+        return { status: 409, message: W.SKIP_TOO_EARLY };
     }
     await db.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'tutoriel') ON CONFLICT DO NOTHING`, [userId, PROLOGUE_SKIP]);
     return { skipped: true };
@@ -259,7 +265,7 @@ async function restartIsland(userId) {
         // règle d'une seule fois. Deux demandes coup sur coup (un double toucher) : une seule recommence
         const done = await conn.query(`SELECT bought_at > NOW() - INTERVAL '10 seconds' AS fresh FROM world_items WHERE user_id = $1 AND item = $2`, [userId, players.RESTARTED]);
         if (done.rows.length && (process.env.ISLAND_RESTART_ONCE === '1' || done.rows[0].fresh)) {
-            return db.rollback({ status: 409, message: process.env.ISLAND_RESTART_ONCE === '1' ? 'Ton île a déjà été recommencée une fois.' : 'Ton île vient d’être recommencée.' });
+            return db.rollback({ status: 409, message: process.env.ISLAND_RESTART_ONCE === '1' ? W.RESTARTED_ONCE : W.RESTARTED });
         }
         for (const table of PLAYER_TABLES) await conn.query(`DELETE FROM ${table} WHERE user_id = $1`, [userId]);
         // (le Livre et l'Épreuve rangent leurs parties par joueur : 'u:<id>')
@@ -599,10 +605,10 @@ async function claimQuest(userId, questId, owned, stars) {
     await migrate(userId);
     return db.transaction(async conn => {
         const quest = quests.active(await claimedOf(userId, conn), await factsOf(userId, owned, stars, conn));
-        if (!quest || quest.id !== questId) return db.rollback({ status: 409, message: 'Ce n’est pas la quête en cours.' });
-        if (!quest.done) return db.rollback({ status: 403, message: `Pas encore : ${quest.label.toLowerCase()} (${quest.have}/${quest.need}).` });
+        if (!quest || quest.id !== questId) return db.rollback({ status: 409, message: W.QUEST_NOT_CURRENT });
+        if (!quest.done) return db.rollback({ status: 403, message: W.QUEST_NOT_DONE(quest.label.toLowerCase(), quest.have, quest.need) });
         const added = await conn.query('INSERT INTO world_quests (user_id, quest) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING quest', [userId, questId]);
-        if (!added.rows.length) return db.rollback({ status: 409, message: 'Récompense déjà reçue.' });
+        if (!added.rows.length) return db.rollback({ status: 409, message: W.REWARD_TAKEN });
         const { coins } = await ledger.credit(userId, quest.coins, 'quete', questId, conn);
         return { gained: quest.coins, coins };
     });
@@ -614,9 +620,9 @@ async function sleep(userId) {
     await migrate(userId);
     return db.transaction(async conn => {
         const quest = quests.currentOf(await claimedOf(userId, conn));
-        if (!quest || quest.goal.kind !== 'sleep') return db.rollback({ status: 409, message: 'Ce n’est pas le moment de dormir.' });
+        if (!quest || quest.goal.kind !== 'sleep') return db.rollback({ status: 409, message: W.NOT_SLEEP_TIME });
         const added = await conn.query('INSERT INTO world_quests (user_id, quest) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING quest', [userId, quest.id]);
-        if (!added.rows.length) return db.rollback({ status: 409, message: 'Tu as déjà dormi.' });
+        if (!added.rows.length) return db.rollback({ status: 409, message: W.ALREADY_SLEPT });
         return { slept: true };
     });
 }
@@ -624,19 +630,19 @@ async function sleep(userId) {
 // Achat d'un quartier : chapitre ouvert, écus débités une fois (même en double clic) ; { status, message } si refus
 async function buyZone(userId, zoneId, openChapters) {
     const zone = map.ZONE_BY_ID[zoneId];
-    if (!zone || zone.id === 'coeur') return { status: 404, message: 'Quartier inconnu.' };
+    if (!zone || zone.id === 'coeur') return { status: 404, message: W.ZONE_UNKNOWN };
     await migrate(userId);
     // Inconnu : rien n'en est dit (pas même son chapitre)
-    if (!isKnown(zone, await discoveredOf(userId))) return { status: 403, message: 'Envoie d’abord une expédition découvrir ce quartier.' };
-    if (zone.chapter && !openChapters.has(zone.chapter)) return { status: 403, message: `Ouvre d’abord le chapitre ${zone.chapter} du Grimoire.` };
+    if (!isKnown(zone, await discoveredOf(userId))) return { status: 403, message: W.EXPLORE_FIRST };
+    if (zone.chapter && !openChapters.has(zone.chapter)) return { status: 403, message: W.OPEN_CHAPTER_FIRST(zone.chapter) };
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
         const added = await conn.query('INSERT INTO world_zones (user_id, zone) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING zone', [userId, zone.id]);
-        if (!added.rows.length) return db.rollback({ status: 409, message: 'Ce quartier est déjà à toi.' });
+        if (!added.rows.length) return db.rollback({ status: 409, message: W.ZONE_OWNED });
         // Les écus qui attendent dans les bâtiments sont encaissés d'abord : ils comptent pour payer
         await payWith(userId, conn, stock);
         const coins = await ledger.debit(userId, zone.price, `quartier:${zone.id}`, conn);
-        if (coins === null) return db.rollback({ status: 400, message: `Il te faut ${zone.price} écus.` });
+        if (coins === null) return db.rollback({ status: 400, message: NEED_COINS(zone.price) });
         return { bought: zone.name, coins };
     });
 }
@@ -660,28 +666,28 @@ async function clearGrown(userId, conn, f) {
 // Les décorations prises dans une emprise agrandie sont déplacées au prochain affichage (settle). { status, message } si refus
 async function build(userId, owned, siteId, openChapters = new Set()) {
     const site = SITES[siteId];
-    if (!site) return { status: 404, message: 'Chantier inconnu.' };
+    if (!site) return { status: 404, message: W.WORKSITE_UNKNOWN };
     await migrate(userId);
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
         const { levels } = await levelsOf(userId, conn);
         const level = levels[siteId] || 0;
         const waived = tutorialPonton(siteId, level);
-        if (!waived && !(await zonesOf(userId, conn)).has(map.siteZone(siteId))) return db.rollback({ status: 403, message: 'Achète d’abord ce quartier de l’île.' });
+        if (!waived && !(await zonesOf(userId, conn)).has(map.siteZone(siteId))) return db.rollback({ status: 403, message: W.BUY_ZONE_FIRST });
         const next = site.levels[level];
-        if (!next) return db.rollback({ status: 409, message: 'Ce chantier est déjà achevé.' });
-        if (!openChapters.has(next.chapter)) return db.rollback({ status: 403, message: `Ouvre d’abord le chapitre ${next.chapter} du Grimoire.` });
-        if (!waived && next.plan && !owned.includes(next.plan)) return db.rollback({ status: 403, message: `Il te faut d’abord faire naître « ${next.plan} » dans l’Athanor du Grimoire.` });
+        if (!next) return db.rollback({ status: 409, message: W.WORKSITE_DONE });
+        if (!openChapters.has(next.chapter)) return db.rollback({ status: 403, message: W.OPEN_CHAPTER_FIRST(next.chapter) });
+        if (!waived && next.plan && !owned.includes(next.plan)) return db.rollback({ status: 403, message: W.PLAN_FIRST(next.plan) });
         // Ce que les bâtiments avaient produit est encaissé d'abord : cela compte pour payer (et la production du bâtiment
         // repart de zéro à l'évolution)
         const gathered = await gather(userId, conn, stock);
         const missing = Object.entries(next.cost).filter(([r, n]) => stock[r] + (gathered.stock[r] || 0) < n);
-        if (missing.length) return db.rollback({ status: 400, message: 'Il te manque des ressources : joue une Récolte.' });
+        if (missing.length) return db.rollback({ status: 400, message: MISSING_RESOURCES });
         const costs = RESOURCES.map(r => next.cost[r] || 0);
         let coins;
         if (next.coins) {
             coins = await ledger.debit(userId, next.coins, `chantier:${siteId}:${level + 1}`, conn);
-            if (coins === null) return db.rollback({ status: 400, message: `Il te faut ${next.coins} écus.` });
+            if (coins === null) return db.rollback({ status: 400, message: NEED_COINS(next.coins) });
         }
         await conn.query('UPDATE world_stock SET stone = stone - $2, wood = wood - $3, water = water - $4, food = food - $5 WHERE user_id = $1', [userId, ...costs]);
         // Bâti pour la première fois là où la carte le met aujourd'hui (le Bosquet, rapproché du Puits) : sa place est
@@ -704,7 +710,7 @@ async function build(userId, owned, siteId, openChapters = new Set()) {
 async function levelFor(userId, game, asked, conn) {
     const mine = (await stars.starsOf(userId, conn))[game];
     if (asked === null || asked === undefined) return { level: gridLevels.openOf(mine).max };
-    if (!gridLevels.playable(mine, asked)) return { status: 403, message: 'Ce niveau n’est pas encore ouvert : gagne une étoile au précédent.' };
+    if (!gridLevels.playable(mine, asked)) return { status: 403, message: G.LEVEL_LOCKED };
     return { level: asked };
 }
 
@@ -719,7 +725,7 @@ function startRun(userId, asked = null) {
         const { bonuses, extra } = await bonusesFor(userId, conn);
         const effects = effectsOf(levels, bonuses, extra);
         const charges = chargesAt(stock, effects.maxCharges, Date.now(), effects.regenMs);
-        if (charges.count < 1) return db.rollback({ status: 409, message: 'Plus de partie en réserve : la prochaine revient bientôt.' });
+        if (charges.count < 1) return db.rollback({ status: 409, message: G.NO_CHARGE });
         await conn.query('UPDATE world_stock SET charges = $2, charges_at = $3 WHERE user_id = $1', [userId, charges.count - 1, new Date(charges.since)]);
         const seed = crypto.randomInt(1, 2147483647);
         const before = (await conn.query('SELECT 1 FROM world_runs WHERE user_id = $1 LIMIT $2', [userId, SHORT_RUNS])).rows.length;
@@ -743,15 +749,15 @@ function finishRun(userId, runId, moves) {
     return db.transaction(async conn => {
         const { rows } = await conn.query(
             'SELECT seed, config, created_at FROM world_runs WHERE id = $1 AND user_id = $2 AND finished_at IS NULL FOR UPDATE', [runId, userId]);
-        if (!rows.length) return db.rollback({ status: 404, message: 'Cette partie est déjà rendue.' });
+        if (!rows.length) return db.rollback({ status: 404, message: G.RUN_RETURNED });
         // played : les coups joués ; une partie quittée sans jouer ne compte ni pour les quêtes ni pour les visiteurs
         await conn.query(`UPDATE world_runs SET finished_at = NOW(), config = config || jsonb_build_object('played', $2::int) WHERE id = $1`,
             [runId, Array.isArray(moves) ? moves.length : 0]);
         const { seed, config, created_at: createdAt } = rows[0];
         const played = Date.now() - new Date(createdAt).getTime() > RUN_TTL_MS
-            ? { ok: false, error: 'Partie expirée' }
+            ? { ok: false, error: G.HARVEST_REFUSAL.expired }
             : harvest.replay(seed, config.kinds, moves, config.maxMoves, config.boosts, config.rules || 1);
-        if (!played.ok) return { status: 400, message: `Partie refusée : ${played.error.toLowerCase()}.` };
+        if (!played.ok) return { status: 400, message: G.RUN_REFUSED(played.error.toLowerCase()) };
         await stockOf(userId, conn, true);
         const g = played.gains;
         await addStock(userId, g, conn);
@@ -800,15 +806,15 @@ async function shortGame(userId, game, before, conn) {
 // à grille, son niveau (asked, sinon le plus haut ouvert). { run } ou { status, message }
 async function startGame(userId, gameId, asked = null) {
     const game = minigames.GAMES[gameId];
-    if (!game) return { status: 404, message: 'Mini-jeu inconnu.' };
+    if (!game) return { status: 404, message: G.GAME_UNKNOWN };
     await migrate(userId);
     return db.transaction(async conn => {
         await stockOf(userId, conn, true);
         const level = (await levelsOf(userId, conn)).levels[game.site] || 0;
-        if (level < minigames.GAME_LEVEL) return db.rollback({ status: 403, message: `${game.name} : au palier III du bâtiment.` });
+        if (level < minigames.GAME_LEVEL) return db.rollback({ status: 403, message: G.GAME_LEVEL(game.name) });
         const now = Date.now();
         const plays = playsOf((await gamesOf(userId, conn))[gameId], now);
-        if (plays.count < 1) return db.rollback({ status: 409, message: 'Plus de partie en réserve : la prochaine revient bientôt.' });
+        if (plays.count < 1) return db.rollback({ status: 409, message: G.NO_CHARGE });
         const grid = gridLevels.GAMES.includes(gameId);
         const chosen = grid ? await levelFor(userId, gameId, asked, conn) : { level: 0 };
         if (chosen.status) return db.rollback(chosen);
@@ -830,17 +836,17 @@ function finishGame(userId, runId, input) {
     return db.transaction(async conn => {
         const { rows } = await conn.query(
             'SELECT game, seed, level, created_at FROM world_game_runs WHERE id = $1 AND user_id = $2 AND finished_at IS NULL FOR UPDATE', [runId, userId]);
-        if (!rows.length) return db.rollback({ status: 404, message: 'Cette partie est déjà rendue.' });
+        if (!rows.length) return db.rollback({ status: 404, message: G.RUN_RETURNED });
         await conn.query('UPDATE world_game_runs SET finished_at = NOW() WHERE id = $1', [runId]);
         const { game, seed, created_at: createdAt } = rows[0];
         const level = rows[0].level % RUN_LEVEL;
         const stage = Math.floor(rows[0].level / RUN_LEVEL);
         const elapsed = Date.now() - new Date(createdAt).getTime();
-        if (elapsed > GAME_TTL_MS) return { status: 400, message: 'Partie refusée : partie expirée.' };
+        if (elapsed > GAME_TTL_MS) return { status: 400, message: G.RUN_EXPIRED };
         const short = await shortGame(userId, game, runId, conn);
         const played = minigames.replay(game, seed, input, short);
-        if (!played.ok) return { status: 400, message: `Partie refusée : ${played.error}.` };
-        if (played.last > elapsed + GAME_SLACK_MS) return { status: 400, message: 'Partie refusée : partie trop rapide.' };
+        if (!played.ok) return { status: 400, message: G.RUN_REFUSED(played.error) };
+        if (played.last > elapsed + GAME_SLACK_MS) return { status: 400, message: G.RUN_TOO_FAST };
         const earned = minigames.earnedOf(played.raw, level);
         if (earned > 0) await ledger.credit(userId, earned, `jeu:${game}`, runId, conn);
         // Le niveau : ses étoiles, et leur bonus la première fois, dans le plafond de la partie
@@ -873,21 +879,21 @@ async function refundDecorations(userId, priceOf) {
 // écus débités une seule fois. La production en cours est encaissée d'abord (le bonus ne vaut que pour la suite).
 async function buyItem(userId, itemId) {
     const item = shop.ITEM_BY_ID[itemId];
-    if (!item) return { status: 404, message: 'Article inconnu.' };
-    if (item.rare) return { status: 403, message: 'Cette pièce rare ne s’achète pas : elle se trouve dans les butins.' };
+    if (!item) return { status: 404, message: SHOP.ITEM_UNKNOWN };
+    if (item.rare) return { status: 403, message: SHOP.RARE_NOT_SOLD };
     await migrate(userId);
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
         const { levels } = await levelsOf(userId, conn);
-        if (!(await zonesOf(userId, conn)).has(map.siteZone(item.site)) || !(levels[item.site] || 0)) return db.rollback({ status: 403, message: 'Bâtis d’abord ce bâtiment.' });
-        if (levels[item.site] < item.minLevel) return db.rollback({ status: 403, message: `Il faut le palier ${CHAPTER_OF_LEVEL[item.minLevel - 1]} de ce bâtiment.` });
+        if (!(await zonesOf(userId, conn)).has(map.siteZone(item.site)) || !(levels[item.site] || 0)) return db.rollback({ status: 403, message: W.BUILD_FIRST });
+        if (levels[item.site] < item.minLevel) return db.rollback({ status: 403, message: W.NEED_TIER(CHAPTER_OF_LEVEL[item.minLevel - 1]) });
         // La production en attente est encaissée AVANT que l'article existe : son bonus ne vaut que pour la suite (sinon
         // il s'appliquait à toute la production accumulée, et acheter puis annuler la gonflait sans rien payer)
         await gather(userId, conn, stock);
         const added = await conn.query('INSERT INTO world_items (user_id, item) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING item', [userId, item.id]);
-        if (!added.rows.length) return db.rollback({ status: 409, message: 'Tu l’as déjà.' });
+        if (!added.rows.length) return db.rollback({ status: 409, message: SHOP.ALREADY_YOURS });
         const coins = await ledger.debit(userId, item.price, `boutique:${item.id}`, conn);
-        if (coins === null) return db.rollback({ status: 400, message: `Il te faut ${item.price} écus.` });
+        if (coins === null) return db.rollback({ status: 400, message: NEED_COINS(item.price) });
         // Un skin acheté est porté tout de suite
         if (item.kind === 'skin') {
             await conn.query(`INSERT INTO world_skins (user_id, site, skin) VALUES ($1, $2, $3)
@@ -913,17 +919,17 @@ async function startedSince(userId, conn, since) {
 // réserve ou sa recharge). { status, message } si refus ou trop tard
 async function undoItem(userId, itemId) {
     const item = shop.ITEM_BY_ID[itemId];
-    if (!item) return { status: 404, message: 'Article inconnu.' };
-    if (item.rare) return { status: 409, message: 'Une pièce rare ne se rend pas.' };
+    if (!item) return { status: 404, message: SHOP.ITEM_UNKNOWN };
+    if (item.rare) return { status: 409, message: SHOP.RARE_NOT_RETURNED };
     return db.transaction(async conn => {
         // La production jusqu'ici compte encore avec l'article
         await gather(userId, conn, await stockOf(userId, conn, true));
         const removed = await conn.query(
             `DELETE FROM world_items WHERE user_id = $1 AND item = $2 AND source = 'boutique' AND bought_at > NOW() - make_interval(secs => $3) RETURNING bought_at`,
             [userId, item.id, UNDO_SECONDS]);
-        if (!removed.rows.length) return db.rollback({ status: 409, message: 'Trop tard pour annuler cet achat.' });
+        if (!removed.rows.length) return db.rollback({ status: 409, message: SHOP.TOO_LATE });
         if (RUN_EFFECTS.some(effect => item.effect?.[effect]) && await startedSince(userId, conn, removed.rows[0].bought_at)) {
-            return db.rollback({ status: 409, message: 'Cet article a déjà servi à une partie : il ne se rend plus.' });
+            return db.rollback({ status: 409, message: SHOP.ALREADY_USED });
         }
         await conn.query('DELETE FROM world_skins WHERE user_id = $1 AND site = $2 AND skin = $3', [userId, item.site, item.id]);
         const { coins } = await ledger.credit(userId, item.price, 'boutique-annulee', `${item.id}:${removed.rows[0].bought_at.getTime()}`, conn);
@@ -933,18 +939,18 @@ async function undoItem(userId, itemId) {
 
 // Skin porté par un bâtiment : un skin possédé de ce bâtiment, ou aucun (apparence d'origine)
 async function chooseSkin(userId, siteId, skinId) {
-    if (!SITES[siteId]) return { status: 404, message: 'Bâtiment inconnu.' };
+    if (!SITES[siteId]) return { status: 404, message: W.BUILDING_UNKNOWN };
     if (!skinId) {
         await db.query('DELETE FROM world_skins WHERE user_id = $1 AND site = $2', [userId, siteId]);
         return {};
     }
     const item = shop.ITEM_BY_ID[skinId];
-    if (!item || item.kind !== 'skin' || item.site !== siteId) return { status: 400, message: 'Ce skin ne va pas sur ce bâtiment.' };
+    if (!item || item.kind !== 'skin' || item.site !== siteId) return { status: 400, message: SHOP.SKIN_WRONG_SITE };
     // L'article reste verrouillé le temps de le porter : une annulation de son achat (undoItem) attend, ou se fait
     // attendre puis le retire ; sans ce verrou, un skin remboursé pouvait rester porté
     return db.transaction(async conn => {
         const owned = await conn.query('SELECT 1 FROM world_items WHERE user_id = $1 AND item = $2 FOR SHARE', [userId, skinId]);
-        if (!owned.rows.length) return db.rollback({ status: 403, message: item.rare ? 'Trouve d’abord cette pièce rare dans les butins.' : 'Achète d’abord ce skin.' });
+        if (!owned.rows.length) return db.rollback({ status: 403, message: item.rare ? SHOP.FIND_RARE_FIRST : SHOP.BUY_SKIN_FIRST });
         await conn.query(`INSERT INTO world_skins (user_id, site, skin) VALUES ($1, $2, $3)
             ON CONFLICT (user_id, site) DO UPDATE SET skin = EXCLUDED.skin`, [userId, siteId, skinId]);
         return {};
@@ -955,7 +961,7 @@ async function chooseSkin(userId, siteId, skinId) {
 // world_names sous la cible 'peuple' ; il peut changer, jamais s'effacer. { name } ou { status, message }
 async function namePeople(userId, raw) {
     const name = naming.cleanName(raw);
-    if (!name) return { status: 400, message: `Un nom de 2 à ${naming.NAME_MAX} lettres ou chiffres (espace, tiret ou apostrophe entre deux).` };
+    if (!name) return { status: 400, message: W.NAME_RULE(naming.NAME_MAX) };
     await migrate(userId);
     await db.query(`INSERT INTO world_names (user_id, target, name) VALUES ($1, 'peuple', $2)
         ON CONFLICT (user_id, target) DO UPDATE SET name = EXCLUDED.name`, [userId, name]);
@@ -966,7 +972,7 @@ async function namePeople(userId, raw) {
 // world_names sous la cible 'joueur' ; il peut changer, jamais s'effacer. { name } ou { status, message }
 async function namePlayer(userId, raw) {
     const name = naming.cleanName(raw);
-    if (!name) return { status: 400, message: `Un nom de 2 à ${naming.NAME_MAX} lettres ou chiffres (espace, tiret ou apostrophe entre deux).` };
+    if (!name) return { status: 400, message: W.NAME_RULE(naming.NAME_MAX) };
     await migrate(userId);
     await db.query(`INSERT INTO world_names (user_id, target, name) VALUES ($1, 'joueur', $2)
         ON CONFLICT (user_id, target) DO UPDATE SET name = EXCLUDED.name`, [userId, name]);
@@ -988,7 +994,7 @@ async function chooseAvatar(userId, { look, choices } = {}) {
         [userId, JSON.stringify(done.choices)]);
         return { avatar: done.choices };
     }
-    if (typeof look !== 'string' || !LOOK.test(look)) return { status: 400, message: 'Avatar inconnu.' };
+    if (typeof look !== 'string' || !LOOK.test(look)) return { status: 400, message: AVATAR_UNKNOWN };
     await db.query(`INSERT INTO world_avatars (user_id, look, choices) VALUES ($1, $2, NULL)
         ON CONFLICT (user_id) DO UPDATE SET look = EXCLUDED.look, choices = NULL, chosen_at = NOW()`, [userId, look]);
     return { avatar: look };
@@ -998,19 +1004,19 @@ async function chooseAvatar(userId, { look, choices } = {}) {
 // kind : 'site' | 'zone'. { status, message } si refus
 async function rename(userId, kind, id, raw) {
     const known = kind === 'site' ? Boolean(SITES[id]) : kind === 'zone' && map.ZONES.some(z => z.id === id);
-    if (!known) return { status: 404, message: kind === 'zone' ? 'Quartier inconnu.' : 'Bâtiment inconnu.' };
+    if (!known) return { status: 404, message: kind === 'zone' ? W.ZONE_UNKNOWN : W.BUILDING_UNKNOWN };
     const reset = !String(raw ?? '').trim();
     const name = reset ? null : naming.cleanName(raw);
-    if (!reset && !name) return { status: 400, message: `Un nom de 2 à ${naming.NAME_MAX} lettres ou chiffres (espace, tiret ou apostrophe entre deux).` };
+    if (!reset && !name) return { status: 400, message: W.NAME_RULE(naming.NAME_MAX) };
     await migrate(userId);
     return db.transaction(async conn => {
         await stockOf(userId, conn, true);
         if (kind === 'site') {
             const site = SITES[id];
-            if (((await levelsOf(userId, conn)).levels[id] || 0) < RENAME_LEVEL) return db.rollback({ status: 403, message: 'Un bâtiment se renomme dès son palier III.' });
-            if (!(await zonesOf(userId, conn)).has(map.siteZone(id))) return db.rollback({ status: 403, message: `${site.levels[0].name} : achète d’abord son quartier.` });
+            if (((await levelsOf(userId, conn)).levels[id] || 0) < RENAME_LEVEL) return db.rollback({ status: 403, message: W.RENAME_TOO_EARLY });
+            if (!(await zonesOf(userId, conn)).has(map.siteZone(id))) return db.rollback({ status: 403, message: W.RENAME_BUY_ZONE(site.levels[0].name) });
         } else if (!(await zonesOf(userId, conn)).has(id)) {
-            return db.rollback({ status: 403, message: 'Achète d’abord ce quartier pour le renommer.' });
+            return db.rollback({ status: 403, message: W.RENAME_ZONE_BUY });
         }
         const target = `${kind}:${id}`;
         if (reset) await conn.query('DELETE FROM world_names WHERE user_id = $1 AND target = $2', [userId, target]);
@@ -1023,7 +1029,7 @@ async function rename(userId, kind, id, raw) {
 // Nom écrit sur les enseignes de l'île. { status, message } si le nom ne convient pas
 async function nameSigns(userId, raw) {
     const name = signs.cleanName(raw);
-    if (!name) return { status: 400, message: `Un nom de 2 à ${signs.NAME_MAX} lettres ou chiffres (espace, tiret ou apostrophe entre deux).` };
+    if (!name) return { status: 400, message: W.NAME_RULE(signs.NAME_MAX) };
     await db.query(`INSERT INTO world_sign_names (user_id, name) VALUES ($1, $2)
         ON CONFLICT (user_id) DO UPDATE SET name = EXCLUDED.name`, [userId, name]);
     return {};
@@ -1032,13 +1038,13 @@ async function nameSigns(userId, raw) {
 // Style de l'enseigne d'un bâtiment au palier V ou plus : acheté au passage s'il ne l'est pas encore (payé une seule
 // fois, même en double clic), puis porté. { coins } après un achat, {} sinon, ou { status, message } si refus
 async function chooseSign(userId, siteId, styleId) {
-    if (!SITES[siteId]) return { status: 404, message: 'Bâtiment inconnu.' };
+    if (!SITES[siteId]) return { status: 404, message: W.BUILDING_UNKNOWN };
     const style = signs.STYLE_BY_ID[styleId];
-    if (!style) return { status: 404, message: 'Style d’enseigne inconnu.' };
+    if (!style) return { status: 404, message: SIGN.STYLE_UNKNOWN };
     await migrate(userId);
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
-        if (((await levelsOf(userId, conn)).levels[siteId] || 0) < signs.SIGN_LEVEL) return db.rollback({ status: 403, message: 'L’enseigne vient au palier V du bâtiment.' });
+        if (((await levelsOf(userId, conn)).levels[siteId] || 0) < signs.SIGN_LEVEL) return db.rollback({ status: 403, message: SIGN.SIGN_LEVEL });
         let coins;
         if (style.price) {
             const bought = await conn.query('INSERT INTO world_sign_styles (user_id, style) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING style', [userId, style.id]);
@@ -1046,7 +1052,7 @@ async function chooseSign(userId, siteId, styleId) {
                 // Les écus qui attendent dans les bâtiments sont encaissés d'abord : ils comptent pour payer
                 await payWith(userId, conn, stock);
                 coins = await ledger.debit(userId, style.price, 'enseigne', conn);
-                if (coins === null) return db.rollback({ status: 400, message: `Ce style coûte ${style.price} écus.` });
+                if (coins === null) return db.rollback({ status: 400, message: SIGN.STYLE_PRICE(style.price) });
             }
         }
         await conn.query(`INSERT INTO world_signs (user_id, site, style) VALUES ($1, $2, $3)

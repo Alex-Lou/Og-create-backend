@@ -8,6 +8,8 @@ const accounts = require('./accounts');
 const authSession = require('./authSession');
 const { newToken, digest } = require('../utils/crypto');
 const { log } = require('../utils/logger');
+const T = require('../texts/account');
+const MAIL = require('../texts/emails').EMAIL_CHANGE;
 
 const EMAIL_MINUTES = 60;
 const GRACE_DAYS = 7;
@@ -44,15 +46,15 @@ async function profileOf(userId) {
 }
 
 // Un compte provisoire n'a ni adresse ni mot de passe : il signe d'abord sa page de garde
-const SIGN_FIRST = { status: 403, message: 'Signe d’abord la page de garde du Grimoire : ton compte aura alors une adresse et un mot de passe.' };
-const WRONG_PASSWORD = { status: 403, message: 'Mot de passe incorrect.' };
+const SIGN_FIRST = { status: 403, message: T.SIGN_FIRST };
+const WRONG_PASSWORD = { status: 403, message: T.WRONG_PASSWORD };
 
 // Nouveau mot de passe : l'ancien d'abord ; toutes les sessions sont fermées (l'appelant en rouvre une). { user } ou refus
 async function changePassword(userId, current, next) {
     const problem = accounts.passwordProblem(next);
     if (problem) return { status: 400, message: problem };
     const user = await userOf(userId);
-    if (!user) return { status: 404, message: 'Compte introuvable.' };
+    if (!user) return { status: 404, message: T.ACCOUNT_NOT_FOUND };
     if (accounts.isProvisional(user.email)) return SIGN_FIRST;
     if (!(await passwordOk(user, current))) return WRONG_PASSWORD;
     return db.transaction(async conn => {
@@ -66,12 +68,12 @@ async function changePassword(userId, current, next) {
 // Nouvelle adresse : un lien part vers elle ; elle ne remplace l'ancienne qu'une fois le lien ouvert. {} ou refus
 async function requestEmailChange(userId, password, email) {
     const user = await userOf(userId);
-    if (!user) return { status: 404, message: 'Compte introuvable.' };
+    if (!user) return { status: 404, message: T.ACCOUNT_NOT_FOUND };
     if (accounts.isProvisional(user.email)) return SIGN_FIRST;
     if (!(await passwordOk(user, password))) return WRONG_PASSWORD;
-    if (email.toLowerCase() === user.email.toLowerCase()) return { status: 400, message: 'C’est déjà ton adresse.' };
+    if (email.toLowerCase() === user.email.toLowerCase()) return { status: 400, message: T.SAME_EMAIL };
     const taken = await db.query('SELECT 1 FROM users WHERE LOWER(email) = LOWER($1)', [email]);
-    if (taken.rows.length) return { status: 409, message: 'Cette adresse est déjà prise.' };
+    if (taken.rows.length) return { status: 409, message: T.EMAIL_IN_USE };
     const token = newToken();
     await db.query(
         `INSERT INTO email_changes (user_id, new_email, token_hash, expires_at) VALUES ($1, $2, $3, NOW() + make_interval(mins => $4))
@@ -84,14 +86,14 @@ async function requestEmailChange(userId, password, email) {
         await Promise.race([late, transporter.sendMail({
             from: process.env.EMAIL_USER,
             to: email,
-            subject: 'Brumelune — confirme ta nouvelle adresse',
-            text: `Bonjour,\n\nPour que cette adresse devienne celle de ton compte Brumelune, ouvre ce lien (valable ${EMAIL_MINUTES} minutes, une seule fois) :\n${APP_URL}/?email=${token}\n\nSi tu n'as rien demandé, ignore ce message : rien ne change.`
+            subject: MAIL.subject,
+            text: MAIL.text(EMAIL_MINUTES, APP_URL, token)
         })]).finally(() => clearTimeout(timer));
     } catch (error) {
         // Le lien ne part pas : la demande n'attend pas pour rien
         await db.query('DELETE FROM email_changes WHERE user_id = $1', [userId]);
         log('error', 'Lien de nouvelle adresse non envoyé', { userId, errorMessage: error.message });
-        return { status: 503, message: 'Le mail n’a pas pu partir. Réessaie un peu plus tard.' };
+        return { status: 503, message: T.MAIL_FAILED };
     }
     log('info', 'Lien de nouvelle adresse envoyé', { userId });
     return {};
@@ -102,10 +104,10 @@ function confirmEmailChange(token) {
     return db.transaction(async conn => {
         const { rows } = await conn.query(
             'DELETE FROM email_changes WHERE token_hash = $1 AND expires_at > NOW() RETURNING user_id, new_email', [digest(token)]);
-        if (!rows.length) return db.rollback({ status: 400, message: 'Lien invalide ou expiré.' });
+        if (!rows.length) return db.rollback({ status: 400, message: T.LINK_INVALID });
         const { user_id: userId, new_email: email } = rows[0];
         const taken = await conn.query('SELECT 1 FROM users WHERE LOWER(email) = LOWER($1) AND id <> $2', [email, userId]);
-        if (taken.rows.length) return { status: 409, message: 'Cette adresse a été prise entre-temps.' };
+        if (taken.rows.length) return { status: 409, message: T.EMAIL_TAKEN_MEANWHILE };
         await conn.query('UPDATE users SET email = $1 WHERE id = $2', [email, userId]);
         log('info', 'Adresse changée', { userId });
         return { email };
@@ -115,7 +117,7 @@ function confirmEmailChange(token) {
 // En pause : l'île est gardée telle quelle, aucun mail ne part ; toutes les sessions sont fermées
 async function suspend(userId) {
     const user = await userOf(userId);
-    if (!user) return { status: 404, message: 'Compte introuvable.' };
+    if (!user) return { status: 404, message: T.ACCOUNT_NOT_FOUND };
     if (accounts.isProvisional(user.email)) return SIGN_FIRST;
     await db.transaction(async conn => {
         await conn.query('UPDATE users SET suspended_at = NOW() WHERE id = $1', [userId]);
@@ -128,7 +130,7 @@ async function suspend(userId) {
 // Suppression prévue dans GRACE_DAYS jours (mot de passe d'abord) ; toutes les sessions sont fermées. { deleteAt } ou refus
 async function scheduleDeletion(userId, password) {
     const user = await userOf(userId);
-    if (!user) return { status: 404, message: 'Compte introuvable.' };
+    if (!user) return { status: 404, message: T.ACCOUNT_NOT_FOUND };
     if (accounts.isProvisional(user.email)) return SIGN_FIRST;
     if (!(await passwordOk(user, password))) return WRONG_PASSWORD;
     const deleteAt = await db.transaction(async conn => {

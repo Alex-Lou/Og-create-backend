@@ -9,6 +9,8 @@
 // - la série : les coups d'au moins STREAK_FROM tuiles qui se suivent gagnent +10 % par coup après le premier, +50 %
 //   au plus, après le bâtiment et la lune ; un coup plus court la casse.
 
+const { HARVEST_REFUSAL } = require('../texts/games');
+
 const SIZE = 6;
 const MIN_CHAIN = 3;
 const BASE_KINDS = ['stone', 'wood', 'water', 'food'];
@@ -155,14 +157,14 @@ const streakAfter = (before, length) => (length >= STREAK_FROM ? before + 1 : 0)
 
 // Rejoue une partie entière avec ses règles (1 sans elles) ; { ok, gains, totals } ou { ok: false, error }
 function replay(seed, kinds, moves, maxMoves, boosts = {}, rules = 1) {
-    if (!Array.isArray(moves) || moves.length > maxMoves) return { ok: false, error: 'Trop de coups' };
+    if (!Array.isArray(moves) || moves.length > maxMoves) return { ok: false, error: HARVEST_REFUSAL.tooManyMoves };
     const game = create(seed, kinds);
     const gains = { stone: 0, wood: 0, water: 0, food: 0 };
     // (le total des ressources après chaque coup : l'objectif du niveau, game/levels.js)
     const totals = [];
     let streak = 0;
     for (const path of moves) {
-        if (!chainOk(game.board, path)) return { ok: false, error: 'Coup impossible' };
+        if (!chainOk(game.board, path)) return { ok: false, error: HARVEST_REFUSAL.impossible };
         const kind = play(game, path, rules);
         streak = streakAfter(streak, path.length);
         const { resource, amount } = gainOf(kind, path.length, boosts, { moons: game.moons, streak, rules });

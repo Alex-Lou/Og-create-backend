@@ -3,6 +3,7 @@
 // de jeton.
 const { checkAccess } = require('../services/authSession');
 const { log } = require('../utils/logger');
+const { SESSION_MISSING } = require('../texts/errors');
 
 async function authMiddleware(req, res, next) {
     let user;
@@ -13,7 +14,7 @@ async function authMiddleware(req, res, next) {
     }
     if (!user) {
         log('debug', 'Requête sans session valable');
-        return res.status(401).json({ message: 'Session expirée ou absente', code: 'TOKEN_EXPIRED' });
+        return res.status(401).json({ message: SESSION_MISSING, code: 'TOKEN_EXPIRED' });
     }
     req.user = user;
     next();

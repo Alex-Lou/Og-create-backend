@@ -2,6 +2,7 @@
 const express = require('express');
 const timerQuestions = require('../services/timerQuestions');
 const { failure } = require('../utils/failure');
+const { QUESTIONS_FAILED } = require('../texts/progress');
 
 const router = express.Router();
 
@@ -10,7 +11,7 @@ router.get(['/timer-questions', '/timer_questions'], async (req, res) => {
     try {
         res.json(await timerQuestions.all());
     } catch (error) {
-        failure(res, 'Erreur lors du chargement des questions du timer', error);
+        failure(res, QUESTIONS_FAILED, error);
     }
 });
 

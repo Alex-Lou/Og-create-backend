@@ -9,6 +9,8 @@ const world = require('../../services/world');
 const hangman = require('../../services/hangman');
 const book = require('../../services/recipeBook');
 const { PAGE, playLimiter, withPlayer, payOnce, discovered } = require('./shared');
+const { INVALID } = require('../../texts/errors');
+const T = require('../../texts/book');
 
 const router = express.Router();
 
@@ -42,10 +44,10 @@ router.get('/book', playLimiter, withPlayer(async (req, res, owner, common) => {
 router.post('/ink', playLimiter, withPlayer(async (req, res, owner, common) => {
     const b = await world.bookFor(owner, common);
     const id = String(req.body.page || '');
-    if (!PAGE.test(id)) return res.status(400).json({ message: 'Page invalide' });
+    if (!PAGE.test(id)) return res.status(400).json({ message: INVALID.page });
     const owned = await players.elements(owner);
     const target = bookPages.reachableById(b, owned, id);
-    if (!target) return res.status(404).json({ message: 'Cette page n’est pas à portée.' });
+    if (!target) return res.status(404).json({ message: T.OUT_OF_REACH });
     const rules = bookPages.difficultyOf(b.meta.get(target.name)?.family);
     const guided = owner.kind === 'user' && await world.guidedInkOf(owner.id)
         && bookPages.arianeOf(b, owned, await world.arianeTargets(owner.id))?.next === target.name;
@@ -59,9 +61,9 @@ router.post('/ink', playLimiter, withPlayer(async (req, res, owner, common) => {
 async function letterTarget(req, res, owner, common) {
     const b = await world.bookFor(owner, common);
     const id = String(req.body.page || '');
-    if (!PAGE.test(id)) return res.status(400).json({ message: 'Page invalide' }) && null;
+    if (!PAGE.test(id)) return res.status(400).json({ message: INVALID.page }) && null;
     const target = bookPages.reachableById(b, await players.elements(owner), id);
-    if (!target) return res.status(404).json({ message: 'Cette page n’est pas à portée.' }) && null;
+    if (!target) return res.status(404).json({ message: T.OUT_OF_REACH }) && null;
     const info = b.meta.get(target.name);
     const max = hangman.maxMisses(bookPages.chapterOf(info.family).id);
     const first = bookPages.difficultyOf(info.family).letter;
@@ -73,15 +75,15 @@ async function letterTarget(req, res, owner, common) {
 router.post('/letter', playLimiter, withPlayer(async (req, res, owner, b) => {
     const letter = String(req.body.letter || '').toUpperCase();
     const position = Number(req.body.position);
-    if (!/^[A-Z]$/.test(letter)) return res.status(400).json({ message: 'Lettre invalide' });
+    if (!/^[A-Z]$/.test(letter)) return res.status(400).json({ message: INVALID.letter });
     const target = await letterTarget(req, res, owner, b);
     if (!target) return;
     if (!Number.isInteger(position) || position < 0 || position >= [...target.name].length || !hangman.fold([...target.name][position])) {
-        return res.status(400).json({ message: 'Case invalide' });
+        return res.status(400).json({ message: INVALID.cell });
     }
     const played = await bookLetters.guess(owner, target.id, target.name, position, letter, target.max, target.first);
-    if (played.invalid) return res.status(409).json({ message: 'Cette case est déjà remplie.' });
-    if (played.blocked) return res.status(409).json({ message: 'Partie perdue : reviens demain, ou rejoue contre des écus.', page: target.id, hangman: target.view(played.blocked) });
+    if (played.invalid) return res.status(409).json({ message: T.CELL_FILLED });
+    if (played.blocked) return res.status(409).json({ message: T.GAME_LOST, page: target.id, hangman: target.view(played.blocked) });
     const reply = { page: target.id, verdict: played.verdict, hangman: target.view(played.row) };
     if (played.solved) {
         const owned = await players.elements(owner);
@@ -93,7 +95,7 @@ router.post('/letter', playLimiter, withPlayer(async (req, res, owner, b) => {
 
 // Pendu : rejouer tout de suite une partie perdue, contre des écus (compte)
 router.post('/letter/retry', playLimiter, withPlayer(async (req, res, owner, b) => {
-    if (owner.kind !== 'user') return res.status(402).json({ message: 'Rejouer contre des écus demande un compte.' });
+    if (owner.kind !== 'user') return res.status(402).json({ message: T.RETRY_ACCOUNT });
     const target = await letterTarget(req, res, owner, b);
     if (!target) return;
     const done = await bookLetters.retry(owner, target.id);

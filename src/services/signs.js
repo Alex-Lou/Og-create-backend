@@ -4,15 +4,16 @@
 // identifiants).
 
 const naming = require('./naming');
+const { STYLE_TEXTS } = require('../texts/signs');
 
 const SIGN_LEVEL = 5;
 const STYLES = [
-    { id: 'bois', name: 'Planche de bois', price: 0, text: 'Clouée sur deux piquets, peinte à la main.' },
-    { id: 'ardoise', name: 'Ardoise', price: 150, text: 'Écrite à la craie, sur un chevalet.' },
-    { id: 'fer', name: 'Fer forgé', price: 300, text: 'Suspendue à une potence, elle se balance au vent.' },
-    { id: 'laiton', name: 'Plaque de laiton', price: 300, text: 'Lettres gravées, rivets polis : elle brille au soleil.' },
-    { id: 'fleurie', name: 'Enseigne fleurie', price: 450, text: 'Une couronne de fleurs, et des papillons qui s’y posent.' },
-    { id: 'lanterne', name: 'Enseigne lanterne', price: 600, text: 'Deux lanternes l’éclairent dès la tombée de la nuit.' }
+    { id: 'bois', name: 'Planche de bois', price: 0, text: STYLE_TEXTS.bois },
+    { id: 'ardoise', name: 'Ardoise', price: 150, text: STYLE_TEXTS.ardoise },
+    { id: 'fer', name: 'Fer forgé', price: 300, text: STYLE_TEXTS.fer },
+    { id: 'laiton', name: 'Plaque de laiton', price: 300, text: STYLE_TEXTS.laiton },
+    { id: 'fleurie', name: 'Enseigne fleurie', price: 450, text: STYLE_TEXTS.fleurie },
+    { id: 'lanterne', name: 'Enseigne lanterne', price: 600, text: STYLE_TEXTS.lanterne }
 ];
 const STYLE_BY_ID = Object.fromEntries(STYLES.map(s => [s.id, s]));
 

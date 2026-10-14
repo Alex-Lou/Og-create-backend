@@ -7,12 +7,13 @@ const authMiddleware = require('../middleware/auth');
 const { limiter } = require('../middleware/rateLimit');
 const { isToken } = require('../utils/crypto');
 const { failure } = require('../utils/failure');
+const T = require('../texts/account');
 
 const router = express.Router();
 const isEmail = email => typeof email === 'string' && email.length <= 255 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 // Ce qui demande le mot de passe (ou coûte : mail, export) : 10 essais par quart d'heure et par compte ; le lien de
 // confirmation, sans session : 10 par adresse IP
-const TOO_MANY = 'Trop de tentatives, réessaie dans quelques minutes.';
+const TOO_MANY = T.TOO_MANY_TRIES;
 const guarded = limiter({ minutes: 15, max: 10, key: req => `account:${req.user.id}`, message: TOO_MANY });
 const linkLimiter = limiter({ minutes: 15, max: 10, message: TOO_MANY });
 const refused = (res, done) => res.status(done.status).json({ message: done.message });
@@ -20,10 +21,10 @@ const refused = (res, done) => res.status(done.status).json({ message: done.mess
 router.get('/', authMiddleware, async (req, res) => {
     try {
         const profile = await settings.profileOf(req.user.id);
-        if (!profile) return res.status(404).json({ message: 'Compte introuvable.' });
+        if (!profile) return res.status(404).json({ message: T.ACCOUNT_NOT_FOUND });
         res.json(profile);
     } catch (error) {
-        failure(res, 'Le compte n’a pas pu être lu', error);
+        failure(res, T.PROFILE_FAILED, error);
     }
 });
 
@@ -33,32 +34,32 @@ router.post('/password', authMiddleware, guarded, async (req, res) => {
         const done = await settings.changePassword(req.user.id, req.body.current, req.body.password);
         if (done.status) return refused(res, done);
         await authSession.issue(res, done.user);
-        res.json({ message: 'Mot de passe changé.' });
+        res.json({ message: T.PASSWORD_CHANGED });
     } catch (error) {
-        failure(res, 'Le mot de passe n’a pas pu être changé', error);
+        failure(res, T.PASSWORD_FAILED, error);
     }
 });
 
 router.post('/email', authMiddleware, guarded, async (req, res) => {
     const email = typeof req.body.email === 'string' ? req.body.email.trim() : '';
-    if (!isEmail(email)) return res.status(400).json({ message: 'Adresse e-mail invalide.' });
+    if (!isEmail(email)) return res.status(400).json({ message: T.EMAIL_INVALID });
     try {
         const done = await settings.requestEmailChange(req.user.id, req.body.password, email);
         if (done.status) return refused(res, done);
-        res.json({ message: `Un lien vient de partir vers ${email} : ouvre-le pour confirmer.`, pendingEmail: email });
+        res.json({ message: T.EMAIL_LINK_SENT(email), pendingEmail: email });
     } catch (error) {
-        failure(res, 'L’adresse n’a pas pu être changée', error);
+        failure(res, T.EMAIL_FAILED, error);
     }
 });
 
 router.post('/email/confirm', linkLimiter, async (req, res) => {
-    if (!isToken(req.body.token)) return res.status(400).json({ message: 'Lien invalide ou expiré.' });
+    if (!isToken(req.body.token)) return res.status(400).json({ message: T.LINK_INVALID });
     try {
         const done = await settings.confirmEmailChange(req.body.token);
         if (done.status) return refused(res, done);
-        res.json({ message: 'Ta nouvelle adresse est confirmée.', email: done.email });
+        res.json({ message: T.EMAIL_CONFIRMED, email: done.email });
     } catch (error) {
-        failure(res, 'L’adresse n’a pas pu être confirmée', error);
+        failure(res, T.CONFIRM_FAILED, error);
     }
 });
 
@@ -68,9 +69,9 @@ router.post('/suspend', authMiddleware, async (req, res) => {
         const done = await settings.suspend(req.user.id);
         if (done.status) return refused(res, done);
         await authSession.revoke(req, res);
-        res.json({ message: 'Ton compte est en pause. Reconnecte-toi quand tu veux : ton île t’attend.' });
+        res.json({ message: T.SUSPENDED });
     } catch (error) {
-        failure(res, 'Le compte n’a pas pu être mis en pause', error);
+        failure(res, T.SUSPEND_FAILED, error);
     }
 });
 
@@ -80,9 +81,9 @@ router.post('/delete', authMiddleware, guarded, async (req, res) => {
         const done = await settings.scheduleDeletion(req.user.id, req.body.password);
         if (done.status) return refused(res, done);
         await authSession.revoke(req, res);
-        res.json({ message: `Ton compte sera supprimé dans ${settings.GRACE_DAYS} jours. Reconnecte-toi d’ici là pour l’annuler.`, deleteAt: done.deleteAt });
+        res.json({ message: T.DELETION_PLANNED(settings.GRACE_DAYS), deleteAt: done.deleteAt });
     } catch (error) {
-        failure(res, 'La suppression n’a pas pu être prévue', error);
+        failure(res, T.DELETION_FAILED, error);
     }
 });
 
@@ -90,11 +91,11 @@ router.post('/delete', authMiddleware, guarded, async (req, res) => {
 router.get('/export', authMiddleware, guarded, async (req, res) => {
     try {
         const data = await settings.exportOf(req.user.id);
-        if (!data) return res.status(404).json({ message: 'Compte introuvable.' });
+        if (!data) return res.status(404).json({ message: T.ACCOUNT_NOT_FOUND });
         res.setHeader('Content-Disposition', 'attachment; filename="brumelune-mes-donnees.json"');
         res.json(data);
     } catch (error) {
-        failure(res, 'Les données n’ont pas pu être exportées', error);
+        failure(res, T.EXPORT_FAILED, error);
     }
 });
 

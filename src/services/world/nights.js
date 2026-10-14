@@ -20,6 +20,8 @@ const { placesOf } = require('./places');
 const { coqSinceOf } = require('./beasts');
 const { rainAt } = require('../weather');
 const { campOfUser } = require('./camp');
+const T = require('../../texts/nights');
+const { BUILDING_UNKNOWN } = require('../../texts/world');
 
 // Un jour de grâce entre la présentation et la première nuit
 const GRACE_MS = 24 * 3600 * 1000;
@@ -144,19 +146,19 @@ async function repelCreature(userId, id, now = Date.now()) {
     return db.transaction(async conn => {
         const { rows: [row] } = await conn.query('SELECT started_at, repelled FROM world_nights WHERE user_id = $1 FOR UPDATE', [userId]);
         const night = nights.nightAt(now);
-        if (!night) return db.rollback({ status: 409, message: 'Il fait jour : aucun égaré dehors.' });
-        if (!row || nights.boundsOf(night).start < msOf(row.started_at) + GRACE_MS) return db.rollback({ status: 409, message: 'Aucun égaré cette nuit.' });
+        if (!night) return db.rollback({ status: 409, message: T.DAYTIME });
+        if (!row || nights.boundsOf(night).start < msOf(row.started_at) + GRACE_MS) return db.rollback({ status: 409, message: T.NO_STRAY });
         const { island, defense, helpersAt, watchAt } = await islandOf(userId, conn);
         const plan = nights.planOf(userId, night, { ...island, first: msOf(row.started_at) + GRACE_MS });
         const creature = plan.find(c => c.id === id);
-        if (!creature) return db.rollback({ status: 404, message: 'Égaré introuvable.' });
+        if (!creature) return db.rollback({ status: 404, message: T.STRAY_NOT_FOUND });
         const ids = row.repelled.night === night ? row.repelled.ids : [];
-        if (ids.includes(id)) return db.rollback({ status: 409, message: 'Celui-là boude déjà dans la brume.' });
+        if (ids.includes(id)) return db.rollback({ status: 409, message: T.ALREADY_SULKING });
         // (l'Esprit ne revient que s'il a été repoussé)
         const { start, end } = nights.boundsOf(night);
         const absent = creature.back && nights.outcomeOf(plan, defense, helpersAt(end), new Set(ids), watchAt(start)).fates[id].end === 'absent';
         const { step } = nights.fateOf(creature, defense);
-        if (absent || now < creature.at || now >= creature.at + step * creature.pace) return db.rollback({ status: 409, message: 'Cet égaré n’est pas sur le chemin.' });
+        if (absent || now < creature.at || now >= creature.at + step * creature.pace) return db.rollback({ status: 409, message: T.NOT_ON_PATH });
         await conn.query('UPDATE world_nights SET repelled = $2 WHERE user_id = $1', [userId, JSON.stringify({ night, ids: [...ids, id] })]);
         return { id, night };
     });
@@ -166,19 +168,19 @@ async function repelCreature(userId, id, now = Date.now()) {
 // { site, cost } ou { status, message }
 const NAMES = { stone: 'pierres', wood: 'bois' };
 async function repairSite(userId, site, now = Date.now()) {
-    if (!Object.hasOwn(SITES, site)) return { status: 404, message: 'Bâtiment inconnu.' };
+    if (!Object.hasOwn(SITES, site)) return { status: 404, message: BUILDING_UNKNOWN };
     await migrate(userId);
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
         const { rows: [row] } = await conn.query('SELECT blights FROM world_nights WHERE user_id = $1 FOR UPDATE', [userId]);
         const blights = row ? row.blights : [];
         const blight = blights.find(b => b.site === site && !b.until);
-        if (!blight) return db.rollback({ status: 409, message: 'Ce bâtiment n’est pas embrumé.' });
+        if (!blight) return db.rollback({ status: 409, message: T.NOT_BLIGHTED });
         const { levels } = await levelsOf(userId, conn);
         const cost = nights.repairOf(site, levels[site] || 1);
         // Ce qui attend dans les bâtiments est encaissé d'abord : cela compte pour payer
         const { stock: paid, balance } = await payWith(userId, conn, stock);
-        if (paid[cost.resource] < cost.amount) return db.rollback({ status: 400, message: `Il te faut ${cost.amount} ${NAMES[cost.resource]} pour réparer.` });
+        if (paid[cost.resource] < cost.amount) return db.rollback({ status: 400, message: T.REPAIR_COST(cost.amount, NAMES[cost.resource]) });
         await conn.query(`UPDATE world_stock SET ${cost.resource} = ${cost.resource} - $2 WHERE user_id = $1`, [userId, cost.amount]);
         Object.assign(blight, { until: iso(now), by: 'reparation' });
         await conn.query('UPDATE world_nights SET blights = $2 WHERE user_id = $1', [userId, JSON.stringify(blights)]);

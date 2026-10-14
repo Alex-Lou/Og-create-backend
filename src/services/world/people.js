@@ -20,6 +20,7 @@ const gatherBefore = (...args) => require('./produce').gatherBefore(...args);
 const gather = (...args) => require('./produce').gather(...args);
 const payWith = (...args) => require('./produce').payWith(...args);
 const { STATIC, footprintAt, placesOf } = require('./places');
+const T = require('../../texts/villagers');
 
 // Un habitant vit sur l'île quand son bâtiment est bâti, dans un quartier à soi
 const livesHere = (id, levels, zones) => (levels[id] || 0) >= 1 && zones.has(map.siteZone(id));
@@ -219,8 +220,8 @@ async function friendRewards(userId, villagerId, from, to, conn) {
 // ressources, chacun une fois par jour (heure de Paris). Points d'amitié, puis les récompenses des cœurs gagnés.
 // { gained, points, hearts, rewards, coins } ou { status, message }
 async function befriend(userId, villagerId, resource = null, now = Date.now()) {
-    if (!knownResident(villagerId)) return { status: 404, message: 'Habitant inconnu.' };
-    if (resource !== null && !villagers.RESOURCES.includes(resource)) return { status: 400, message: 'Cadeau invalide.' };
+    if (!knownResident(villagerId)) return { status: 404, message: T.VILLAGER_UNKNOWN };
+    if (resource !== null && !villagers.RESOURCES.includes(resource)) return { status: 400, message: T.GIFT_INVALID };
     await migrate(userId);
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
@@ -228,7 +229,7 @@ async function befriend(userId, villagerId, resource = null, now = Date.now()) {
         const villager = residentsOf(levels, await zonesOf(userId, conn), await settlersOf(userId, conn), await presenceOf(userId, conn, now)).find(r => r.id === villagerId);
         if (!villager) {
             const base = villagers.VILLAGERS[villagerId];
-            return db.rollback(base ? { status: 403, message: `${base.name} n’habite pas encore ton île.` } : { status: 404, message: 'Habitant inconnu.' });
+            return db.rollback(base ? { status: 403, message: T.NOT_HERE_YET(base.name) } : { status: 404, message: T.VILLAGER_UNKNOWN });
         }
         const { day } = loot.parisOf(now);
         const { rows } = await conn.query(
@@ -237,13 +238,13 @@ async function befriend(userId, villagerId, resource = null, now = Date.now()) {
         const friend = rows[0] || { points: 0 };
         let gained;
         if (resource === null) {
-            if (friend.talked === day) return db.rollback({ status: 409, message: `Vous avez déjà bavardé aujourd’hui : ${villager.name} t’attend demain.` });
+            if (friend.talked === day) return db.rollback({ status: 409, message: T.ALREADY_TALKED(villager.name) });
             gained = villagers.TALK;
         } else {
-            if (friend.gifted === day) return db.rollback({ status: 409, message: `${villager.name} a déjà reçu un cadeau aujourd’hui.` });
+            if (friend.gifted === day) return db.rollback({ status: 409, message: T.ALREADY_GIFTED(villager.name) });
             // Ce qui attend dans les bâtiments est encaissé d'abord : cela compte pour le cadeau
             const { stock: paid } = await payWith(userId, conn, stock);
-            if (paid[resource] < villagers.GIFT.cost) return db.rollback({ status: 400, message: `Il te faut ${villagers.GIFT.cost} ${villagers.LABELS[resource]} pour ce cadeau.` });
+            if (paid[resource] < villagers.GIFT.cost) return db.rollback({ status: 400, message: T.GIFT_COST(villagers.GIFT.cost, villagers.LABELS[resource]) });
             // resource est l'une des quatre colonnes du stock (liste fermée ci-dessus)
             await conn.query(`UPDATE world_stock SET ${resource} = ${resource} - $2 WHERE user_id = $1`, [userId, villagers.GIFT.cost]);
             gained = villagers.giftPoints(villager, resource);
@@ -265,8 +266,8 @@ async function befriend(userId, villagerId, resource = null, now = Date.now()) {
 // habitant, tant que le stock suffit. { filled: [{ villager, need }] } ou { status, message }
 async function fillNeeds(userId, targets = null, now = Date.now()) {
     for (const { villager, need } of targets || []) {
-        if (!knownResident(villager)) return { status: 404, message: 'Habitant inconnu.' };
-        if (!villagers.FILLABLE.includes(need)) return { status: 400, message: 'Besoin inconnu.' };
+        if (!knownResident(villager)) return { status: 404, message: T.VILLAGER_UNKNOWN };
+        if (!villagers.FILLABLE.includes(need)) return { status: 400, message: T.NEED_UNKNOWN };
     }
     await migrate(userId);
     return db.transaction(async conn => {
@@ -289,12 +290,12 @@ async function fillNeeds(userId, targets = null, now = Date.now()) {
             const name = who ? who.name : villagers.VILLAGERS[villager]?.name;
             const state = moods[villager]?.needs.find(n => n.id === need);
             let refusal = null;
-            if (!who) refusal = name ? { status: 403, message: `${name} n’habite pas encore ton île.` } : { status: 404, message: 'Habitant inconnu.' };
-            else if (!state) refusal = { status: 403, message: 'Bâtis d’abord l’Atelier : c’est lui qui forge les outils.' };
-            else if (!state.refill) refusal = { status: 409, message: `${name} n’en a pas encore besoin.` };
+            if (!who) refusal = name ? { status: 403, message: T.NOT_HERE_YET(name) } : { status: 404, message: T.VILLAGER_UNKNOWN };
+            else if (!state) refusal = { status: 403, message: T.WORKSHOP_FIRST };
+            else if (!state.refill) refusal = { status: 409, message: T.NO_NEED_YET(name) };
             else if (Object.entries(state.cost).some(([r, n]) => stock[r] - spent[r] < n)) {
                 short = true;
-                refusal = { status: 400, message: `Il te faut ${Object.entries(state.cost).map(([r, n]) => `${n} ${WORDS[r][0]}`).join(' et ')}.` };
+                refusal = { status: 400, message: T.NEED_COST(Object.entries(state.cost).map(([r, n]) => `${n} ${WORDS[r][0]}`)) };
             }
             if (refusal && targets) return db.rollback(refusal);
             if (refusal) continue;
@@ -302,8 +303,8 @@ async function fillNeeds(userId, targets = null, now = Date.now()) {
             filled.push({ villager, need });
         }
         if (!filled.length) {
-            return db.rollback(short ? { status: 400, message: 'Il te manque des ressources pour combler leurs besoins : joue une Récolte.' }
-                : { status: 409, message: 'Personne n’a besoin de rien pour l’instant.' });
+            return db.rollback(short ? { status: 400, message: T.NEEDS_SHORT }
+                : { status: 409, message: T.NOBODY_NEEDS });
         }
         await conn.query('UPDATE world_stock SET stone = stone - $2, wood = wood - $3, water = water - $4, food = food - $5 WHERE user_id = $1',
             [userId, spent.stone, spent.wood, spent.water, spent.food]);
@@ -324,20 +325,20 @@ async function satisfyVisitor(userId, visitorId, now = Date.now()) {
         const stock = await stockOf(userId, conn, true);
         const { rows } = await conn.query('SELECT * FROM world_visitors WHERE id = $1 AND user_id = $2 FOR UPDATE', [visitorId, userId]);
         const row = rows[0];
-        if (!row || now >= new Date(row.leaves_at).getTime()) return db.rollback({ status: 404, message: 'Ce visiteur est déjà reparti.' });
+        if (!row || now >= new Date(row.leaves_at).getTime()) return db.rollback({ status: 404, message: T.VISITOR_GONE });
         const name = visitors.nameOf(row.seed);
-        if (row.satisfied_at) return db.rollback({ status: 409, message: `${name} a déjà ce qu’il lui faut. Merci encore !` });
+        if (row.satisfied_at) return db.rollback({ status: 409, message: T.VISITOR_SATISFIED(name) });
         const r = row.request;
         if (r.kind === 'livrer') {
-            if (!RESOURCES.includes(r.resource)) return db.rollback({ status: 400, message: 'Demande invalide.' });
+            if (!RESOURCES.includes(r.resource)) return db.rollback({ status: 400, message: T.REQUEST_INVALID });
             // Ce qui attend dans les bâtiments est encaissé d'abord : cela compte pour la livraison
             const { stock: paid } = await payWith(userId, conn, stock);
-            if (paid[r.resource] < r.amount) return db.rollback({ status: 400, message: `Il te faut ${r.amount} ${WORDS[r.resource][0]}.` });
+            if (paid[r.resource] < r.amount) return db.rollback({ status: 400, message: T.VISITOR_COST(r.amount, WORDS[r.resource][0]) });
             // r.resource est l'une des quatre colonnes du stock (vérifié ci-dessus)
             await conn.query(`UPDATE world_stock SET ${r.resource} = ${r.resource} - $2 WHERE user_id = $1`, [userId, r.amount]);
         } else {
             const left = r.count - await runsSince(userId, row.arrived_at, conn);
-            if (left > 0) return db.rollback({ status: 403, message: `Encore ${left} Récolte${left > 1 ? 's' : ''} à faire pour ${name}.` });
+            if (left > 0) return db.rollback({ status: 403, message: T.HARVESTS_LEFT(left, name) });
         }
         await conn.query('UPDATE world_visitors SET satisfied_at = $2 WHERE id = $1', [visitorId, new Date(now)]);
         const { coins } = await ledger.credit(userId, r.reward, 'visiteur', String(visitorId), conn);
@@ -360,11 +361,11 @@ async function settleVisitor(userId, visitorId, now = Date.now()) {
         const stock = await stockOf(userId, conn, true);
         const { rows } = await conn.query('SELECT * FROM world_visitors WHERE id = $1 AND user_id = $2 FOR UPDATE', [visitorId, userId]);
         const row = rows[0];
-        if (!row || row.settled_at || now >= new Date(row.leaves_at).getTime()) return db.rollback({ status: 404, message: 'Ce visiteur est déjà reparti.' });
+        if (!row || row.settled_at || now >= new Date(row.leaves_at).getTime()) return db.rollback({ status: 404, message: T.VISITOR_GONE });
         const name = visitors.nameOf(row.seed);
-        if (!row.satisfied_at) return db.rollback({ status: 403, message: `Comble d’abord la demande de ${name}.` });
+        if (!row.satisfied_at) return db.rollback({ status: 403, message: T.SATISFY_FIRST(name) });
         const houses = await housesOf(userId, conn);
-        if (houses.used >= houses.total) return db.rollback({ status: 409, message: 'Aucune maison libre : pose une Maison près du Foyer (annexes du Foyer).' });
+        if (houses.used >= houses.total) return db.rollback({ status: 409, message: T.NO_FREE_HOUSE });
         // Son humeur ne compte qu'à partir d'aujourd'hui : ce qui a été produit avant est encaissé d'abord
         const coins = await gatherBefore(userId, conn, stock, island => ({ ...island, settlers: [...island.settlers, row] }));
         await conn.query('UPDATE world_visitors SET settled_at = $2 WHERE id = $1', [visitorId, new Date(now)]);

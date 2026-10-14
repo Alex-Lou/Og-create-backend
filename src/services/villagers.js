@@ -5,6 +5,8 @@
 // Le navigateur dessine les habitants et leurs paroles (src/world/village.js, src/world/friends.js : mêmes identifiants).
 // Prénoms, rôles et cadeaux : la troupe de la bible (HISTOIRE.md du dépôt front, § 8.1).
 
+const { MOOD_EFFECTS } = require('../texts/effects');
+
 const VILLAGERS = {
     potager: { name: 'Flore', role: 'Jardinière des lunes', loves: 'water', likes: 'food' },
     carriere: { name: 'Saturnin', role: 'Tailleur de runes', loves: 'food', likes: 'stone' },
@@ -88,9 +90,9 @@ function moodEffect(siteId, produces, mood) {
     const sign = moodSign(mood);
     if (!sign) return null;
     const plus = sign > 0 ? '+' : '−';
-    if (produces) return `${plus}${Math.round(MOOD_STEP.prod * 100)} % de production`;
-    if (siteId === 'atelier') return `${plus}${MOOD_STEP.moves} coups par Récolte`;
-    return `Une partie de Récolte revient ${MOOD_STEP.regenMs / 60000} min plus ${sign > 0 ? 'vite' : 'lentement'}`;
+    if (produces) return MOOD_EFFECTS.prod(plus, Math.round(MOOD_STEP.prod * 100));
+    if (siteId === 'atelier') return MOOD_EFFECTS.moves(plus, MOOD_STEP.moves);
+    return MOOD_EFFECTS.regen(MOOD_STEP.regenMs / 60000, sign > 0);
 }
 
 module.exports = {

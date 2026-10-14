@@ -3,27 +3,28 @@ const express = require('express');
 const achievementService = require('../services/achievementService');
 const authMiddleware = require('../middleware/auth');
 const { failure } = require('../utils/failure');
+const T = require('../texts/progress');
 
 const router = express.Router();
 
 router.get('/', async (req, res) => {
     try {
         const achievements = await achievementService.getAllAchievements();
-        if (!achievements.length) return res.status(404).json({ message: 'Aucun achievement trouvé' });
+        if (!achievements.length) return res.status(404).json({ message: T.NO_ACHIEVEMENT });
         res.json(achievements);
     } catch (error) {
-        failure(res, 'Erreur lors de la récupération des achievements', error);
+        failure(res, T.ACHIEVEMENTS_FAILED, error);
     }
 });
 
 // Le client demande une vérification ; seules ses dates de déblocage sont reprises
 router.post('/update', authMiddleware, async (req, res) => {
     const { achievements } = req.body;
-    if (!achievements || !Object.keys(achievements).length) return res.status(400).json({ message: 'Aucun achievement à mettre à jour' });
+    if (!achievements || !Object.keys(achievements).length) return res.status(400).json({ message: T.NOTHING_TO_UPDATE });
     try {
         res.json(await achievementService.updateUserAchievements(req.user.id, achievements));
     } catch (error) {
-        failure(res, 'Erreur lors de la mise à jour des achievements', error);
+        failure(res, T.ACHIEVEMENTS_UPDATE_FAILED, error);
     }
 });
 
@@ -31,7 +32,7 @@ router.get('/user', authMiddleware, async (req, res) => {
     try {
         res.json(await achievementService.getUserAchievements(req.user.id));
     } catch (error) {
-        failure(res, 'Erreur lors de la récupération des achievements', error);
+        failure(res, T.ACHIEVEMENTS_FAILED, error);
     }
 });
 

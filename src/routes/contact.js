@@ -3,6 +3,7 @@ const express = require('express');
 const transporter = require('../config/emailConfig');
 const { limiter } = require('../middleware/rateLimit');
 const { log } = require('../utils/logger');
+const T = require('../texts/contact');
 
 const router = express.Router();
 
@@ -10,7 +11,7 @@ const EMAIL = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
 const MAX_MESSAGE = 5000;
 
 // Chaque message part par e-mail : quelques envois par adresse IP et par heure suffisent
-const contactLimiter = limiter({ minutes: 60, max: 5, message: 'Trop de messages, réessaie plus tard.' });
+const contactLimiter = limiter({ minutes: 60, max: 5, message: T.TOO_MANY_MESSAGES });
 
 // Le message de l'expéditeur est affiché tel quel, jamais interprété comme du HTML
 const escapeHtml = text => text.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -19,10 +20,10 @@ router.post('/send', contactLimiter, async (req, res) => {
     const email = typeof req.body.email === 'string' ? req.body.email.trim() : '';
     const message = typeof req.body.message === 'string' ? req.body.message.trim() : '';
     if (!EMAIL.test(email) || email.length > 255) {
-        return res.status(400).json({ message: 'Adresse e-mail invalide' });
+        return res.status(400).json({ message: T.EMAIL_INVALID });
     }
     if (!message || message.length > MAX_MESSAGE) {
-        return res.status(400).json({ message: `Le message doit faire entre 1 et ${MAX_MESSAGE} caractères` });
+        return res.status(400).json({ message: T.MESSAGE_LENGTH(MAX_MESSAGE) });
     }
 
     try {
@@ -36,10 +37,10 @@ router.post('/send', contactLimiter, async (req, res) => {
 <p><strong>De :</strong> ${escapeHtml(email)}</p>
 <p style="white-space:pre-wrap">${escapeHtml(message)}</p>`
         });
-        res.status(200).json({ message: 'Message envoyé avec succès' });
+        res.status(200).json({ message: T.SENT });
     } catch (error) {
         log('error', 'Envoi du message de contact', { errorMessage: error.message });
-        res.status(500).json({ message: 'Erreur lors de l\'envoi du message' });
+        res.status(500).json({ message: T.SEND_FAILED });
     }
 });
 

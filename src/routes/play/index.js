@@ -7,6 +7,8 @@ const trial = require('../../services/trial');
 const bookPages = require('../../services/bookPages');
 const bookTries = require('../../services/bookTries');
 const world = require('../../services/world');
+const { INVALID } = require('../../texts/errors');
+const T = require('../../texts/play');
 const { NAME, PAGE, playLimiter, addressLimiter, guestLimiter, fail, withPlayer, discovered } = require('./shared');
 
 const router = express.Router();
@@ -49,15 +51,15 @@ async function aimOf(owner, common, inHand, page, ingredients, result) {
 // Un mélange : les ingrédients doivent être en main ; seul le serveur ajoute le résultat
 router.post('/combine', playLimiter, withPlayer(async (req, res, owner, b) => {
     const { mode, ingredients, page } = req.body;
-    if (!MODES.includes(mode)) return res.status(400).json({ message: 'Mode invalide' });
+    if (!MODES.includes(mode)) return res.status(400).json({ message: INVALID.mode });
     if (!Array.isArray(ingredients) || ingredients.length < 2 || ingredients.length > 4
         || !ingredients.every(i => typeof i === 'string' && NAME.test(i))) {
-        return res.status(400).json({ message: 'Mélange invalide' });
+        return res.status(400).json({ message: INVALID.mix });
     }
     const run = mode === 'infinite' ? null : await players.getRun(owner, mode);
-    if (mode !== 'infinite' && !run) return res.status(409).json({ message: 'Aucune partie en cours', code: 'NO_RUN' });
+    if (mode !== 'infinite' && !run) return res.status(409).json({ message: T.NO_RUN, code: 'NO_RUN' });
     const inHand = new Set(run ? run.inventory : await players.elements(owner));
-    if (!ingredients.every(i => inHand.has(i))) return res.status(403).json({ message: 'Ingrédient absent de ton carnet' });
+    if (!ingredients.every(i => inHand.has(i))) return res.status(403).json({ message: T.NOT_IN_HAND });
 
     const result = book.combine(b, ingredients);
     const aim = mode === 'infinite' && typeof page === 'string' && PAGE.test(page)

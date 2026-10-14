@@ -8,6 +8,8 @@ const landmarks = require('../landmarks');
 const { random, RESOURCES, WATER_KEY, withWater } = require('./rules');
 const { itemsOf, levelsOf, stockOf, foundOf, claimedOf, helianeOfUser, addStock, balanceOf, writtenOf } = require('./reads');
 const { migrate } = require('./migrate');
+const T = require('../../texts/chests');
+const { OPEN_CHAPTER_FIRST } = require('../../texts/world');
 
 // Coffres déjà ouverts parmi les sources à surveiller : chapitres, quêtes, lieux, jour (et veille), bouteille. Map source → ligne
 const { QUEST_CHESTS } = quests;
@@ -39,11 +41,11 @@ function chestsView({ day, slot, opened }, openChapters, claimed, found) {
     return {
         pending: [
             ...Object.entries(loot.CHAPTER_RARES).filter(([c]) => openChapters.has(c) && !opened.has(`chapitre:${c}`))
-                .map(([c]) => ({ source: `chapitre:${c}`, rarity: 'legendaire', label: `Chapitre ${c} du Grimoire` })),
+                .map(([c]) => ({ source: `chapitre:${c}`, rarity: 'legendaire', label: T.LABELS.chapter(c) })),
             ...QUEST_CHESTS.filter(q => claimed.has(q.id) && !opened.has(`quete:${q.id}`))
-                .map(q => ({ source: `quete:${q.id}`, rarity: q.chest, label: `Quête : ${q.label}` })),
+                .map(q => ({ source: `quete:${q.id}`, rarity: q.chest, label: T.LABELS.quest(q.label) })),
             ...landmarks.LANDMARKS.filter(l => found.has(l.id) && !opened.has(`lieu:${l.id}`))
-                .map(l => ({ source: `lieu:${l.id}`, rarity: l.chest, label: `Lieu : ${l.name}` }))
+                .map(l => ({ source: `lieu:${l.id}`, rarity: l.chest, label: T.LABELS.landmark(l.name) }))
         ],
         daily: {
             available: !today, streak, rarity: loot.dailyRarity(streak), tomorrow: loot.dailyRarity(streak + 1),
@@ -76,19 +78,19 @@ async function grant(userId, source, rarity, conn, { wanted = null, streak = nul
 const CRATES = {
     aster: {
         after: 'nuit',
-        prize: { kind: 'stock', stock: { wood: 5 }, keepsakes: ['Longue-vue', 'Filet', 'Carnet de quart (le plan du Ponton)', `${quests.ENCLOS} piquets de clôture`] },
+        prize: { kind: 'stock', stock: { wood: 5 }, keepsakes: T.HERMINE_KEEPSAKES(quests.ENCLOS) },
         crafts: { cloture: quests.ENCLOS }
     }
 };
 async function openCrate(userId, id) {
     return db.transaction(async conn => {
         await stockOf(userId, conn, true);
-        if (!quests.doneOf(await claimedOf(userId, conn)).has(CRATES[id].after)) return db.rollback({ status: 403, message: 'Cette caisse n’a pas encore échoué.' });
+        if (!quests.doneOf(await claimedOf(userId, conn)).has(CRATES[id].after)) return db.rollback({ status: 403, message: T.CRATE_NOT_YET });
         const { prize } = CRATES[id];
         const added = await conn.query(
             `INSERT INTO world_chests (user_id, source, rarity, prize) VALUES ($1, $2, 'commun', $3) ON CONFLICT DO NOTHING RETURNING source`,
             [userId, `caisse:${id}`, JSON.stringify(prize)]);
-        if (!added.rows.length) return db.rollback({ status: 409, message: 'Cette caisse est déjà ouverte.' });
+        if (!added.rows.length) return db.rollback({ status: 409, message: T.CRATE_OPEN });
         await addStock(userId, prize.stock, conn);
         for (const [craft, n] of Object.entries(CRATES[id].crafts || {})) {
             for (let i = 0; i < n; i++) await conn.query('INSERT INTO world_crafts (user_id, craft) VALUES ($1, $2)', [userId, craft]);
@@ -104,24 +106,24 @@ async function openCrate(userId, id) {
 async function openChest(userId, source, openChapters, now = Date.now()) {
     const [kind, id] = source.split(':');
     if (kind === 'caisse') {
-        if (!Object.hasOwn(CRATES, id)) return { status: 404, message: 'Coffre inconnu.' };
+        if (!Object.hasOwn(CRATES, id)) return { status: 404, message: T.CHEST_UNKNOWN };
         await migrate(userId);
         return openCrate(userId, id);
     }
     const chapter = kind === 'chapitre' ? loot.CHAPTER_RARES[id] : null;
     const quest = kind === 'quete' ? QUEST_CHESTS.find(q => q.id === id) : null;
     const place = kind === 'lieu' && Object.hasOwn(landmarks.LANDMARK_BY_ID, id) ? landmarks.LANDMARK_BY_ID[id] : null;
-    if (!['jour', 'bouteille'].includes(source) && !chapter && !quest && !place) return { status: 404, message: 'Coffre inconnu.' };
-    if (chapter && !openChapters.has(id)) return { status: 403, message: `Ouvre d’abord le chapitre ${id} du Grimoire.` };
+    if (!['jour', 'bouteille'].includes(source) && !chapter && !quest && !place) return { status: 404, message: T.CHEST_UNKNOWN };
+    if (chapter && !openChapters.has(id)) return { status: 403, message: OPEN_CHAPTER_FIRST(id) };
     await migrate(userId);
     return db.transaction(async conn => {
         await stockOf(userId, conn, true);
         const { day, slot, opened } = await openedOf(userId, now, conn);
-        if (quest && !(await claimedOf(userId, conn)).has(quest.id)) return db.rollback({ status: 403, message: 'Réclame d’abord cette quête de Brume.' });
-        if (place && !(await foundOf(userId, conn)).has(place.id)) return db.rollback({ status: 403, message: 'Découvre d’abord ce lieu sur l’île.' });
-        if (source === 'bouteille' && !ashoreOf(await claimedOf(userId, conn))) return db.rollback({ status: 403, message: 'La mer n’a encore rien rendu.' });
+        if (quest && !(await claimedOf(userId, conn)).has(quest.id)) return db.rollback({ status: 403, message: T.CLAIM_QUEST_FIRST });
+        if (place && !(await foundOf(userId, conn)).has(place.id)) return db.rollback({ status: 403, message: T.FIND_PLACE_FIRST });
+        if (source === 'bouteille' && !ashoreOf(await claimedOf(userId, conn))) return db.rollback({ status: 403, message: T.SEA_EMPTY });
         const chest = await grantSource(userId, source, { day, slot, opened }, conn);
-        if (!chest) return db.rollback({ status: 409, message: source === 'bouteille' ? 'La prochaine bouteille n’est pas encore arrivée.' : 'Ce coffre est déjà ouvert.' });
+        if (!chest) return db.rollback({ status: 409, message: source === 'bouteille' ? T.BOTTLE_NOT_YET : T.CHEST_OPEN });
         return { chest, coins: await balanceOf(userId, conn) };
     });
 }
@@ -162,7 +164,7 @@ async function openAll(userId, openChapters, now = Date.now()) {
             const chest = await grantSource(userId, source, state, conn);
             if (chest) chests.push(chest);
         }
-        if (!chests.length) return db.rollback({ status: 409, message: 'Aucun coffre à ouvrir.' });
+        if (!chests.length) return db.rollback({ status: 409, message: T.NO_CHEST });
         return { chests, coins: await balanceOf(userId, conn) };
     });
 }

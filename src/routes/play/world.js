@@ -10,6 +10,9 @@ const bookTries = require('../../services/bookTries');
 const villagers = require('../../services/villagers');
 const anya = require('../../services/anya');
 const { PAGE, playLimiter, withAccount } = require('./shared');
+const { INVALID } = require('../../texts/errors');
+const { RESTART_CONFIRM } = require('../../texts/world');
+const { SAVOIR_LOCKED, SAVOIR_GIVEN } = require('../../texts/brume');
 
 const router = express.Router();
 router.use('/world', playLimiter);
@@ -74,7 +77,7 @@ const craftDone = async (res, owner, b, done, extra = {}) => {
 };
 router.post('/world/craft/start', withAccount(async (req, res, owner, b) => {
     const craft = craftId(req.body);
-    if (!/^[a-z]{1,20}$/.test(craft)) return res.status(400).json({ message: 'Création invalide' });
+    if (!/^[a-z]{1,20}$/.test(craft)) return res.status(400).json({ message: INVALID.craft });
     const owned = await players.elements(owner);
     const done = await world.startCraft(owner.id, craft, owned, bookPages.openChapters(b, owned), bookPages.starsOf(b, owned));
     if (done.status) return res.status(done.status).json({ message: done.message });
@@ -82,7 +85,7 @@ router.post('/world/craft/start', withAccount(async (req, res, owner, b) => {
 }));
 router.post('/world/craft/finish', withAccount(async (req, res, owner, b) => {
     const run = Number(req.body.run);
-    if (!Number.isSafeInteger(run) || run <= 0 || !Array.isArray(req.body.layout) || req.body.layout.length > 40) return res.status(400).json({ message: 'Assemblage invalide' });
+    if (!Number.isSafeInteger(run) || run <= 0 || !Array.isArray(req.body.layout) || req.body.layout.length > 40) return res.status(400).json({ message: INVALID.layout });
     const owned = await players.elements(owner);
     const done = await world.finishCraft(owner.id, run, req.body.layout, owned, bookPages.openChapters(b, owned), bookPages.starsOf(b, owned));
     await craftDone(res, owner, b, done, { made: done.made, craft: done.craft });
@@ -91,7 +94,7 @@ router.post('/world/craft/place', withAccount(async (req, res, owner, b) => {
     const craft = craftId(req.body);
     const x = Number(req.body.x), y = Number(req.body.y);
     const { flip = false } = req.body;
-    if (!/^[a-z]{1,20}$/.test(craft) || !cellOk(x, y) || typeof flip !== 'boolean') return res.status(400).json({ message: 'Pose invalide' });
+    if (!/^[a-z]{1,20}$/.test(craft) || !cellOk(x, y) || typeof flip !== 'boolean') return res.status(400).json({ message: INVALID.pose });
     await craftDone(res, owner, b, await world.placeCraft(owner.id, craft, x, y, flip));
 }));
 // Une création qui se pose d'un trait (clôture, muret) : sur chaque case, dans l'ordre (cells : [[x, y], …])
@@ -99,7 +102,7 @@ router.post('/world/craft/line', withAccount(async (req, res, owner, b) => {
     const craft = craftId(req.body);
     const { cells } = req.body;
     if (!/^[a-z]{1,20}$/.test(craft) || !Array.isArray(cells) || !cells.length || cells.length > crafts.LINE_MAX
-        || !cells.every(c => Array.isArray(c) && c.length === 2 && cellOk(Number(c[0]), Number(c[1])))) return res.status(400).json({ message: 'Tracé invalide' });
+        || !cells.every(c => Array.isArray(c) && c.length === 2 && cellOk(Number(c[0]), Number(c[1])))) return res.status(400).json({ message: INVALID.trace });
     const owned = await players.elements(owner);
     const done = await world.placeLine(owner.id, craft, cells.map(([x, y]) => [Number(x), Number(y)]), owned, bookPages.openChapters(b, owned), bookPages.starsOf(b, owned));
     await craftDone(res, owner, b, done, { placed: done.placed, ...(done.stopped ? { stopped: done.stopped } : {}) });
@@ -107,30 +110,30 @@ router.post('/world/craft/line', withAccount(async (req, res, owner, b) => {
 // L'abri d'un coin du camp (celui de Marcelle) : bâti et payé
 router.post('/world/shelter', withAccount(async (req, res, owner, b) => {
     const who = String(req.body.who || '');
-    if (!/^[a-z]{1,20}$/.test(who)) return res.status(400).json({ message: 'Abri invalide' });
+    if (!/^[a-z]{1,20}$/.test(who)) return res.status(400).json({ message: INVALID.shelter });
     await craftDone(res, owner, b, await world.buildShelter(owner.id, who));
 }));
 // Création posée : pivoter (miroir)
 router.post('/world/craft/turn', withAccount(async (req, res, owner, b) => {
     const x = Number(req.body.x), y = Number(req.body.y);
-    if (!cellOk(x, y) || typeof req.body.flip !== 'boolean') return res.status(400).json({ message: 'Pose invalide' });
+    if (!cellOk(x, y) || typeof req.body.flip !== 'boolean') return res.status(400).json({ message: INVALID.pose });
     await craftDone(res, owner, b, await world.turnCraft(owner.id, x, y, req.body.flip));
 }));
 router.post('/world/craft/move', withAccount(async (req, res, owner, b) => {
     const [x, y, toX, toY] = ['x', 'y', 'toX', 'toY'].map(k => Number(req.body[k]));
-    if (!cellOk(x, y, toX, toY)) return res.status(400).json({ message: 'Case invalide' });
+    if (!cellOk(x, y, toX, toY)) return res.status(400).json({ message: INVALID.cell });
     await craftDone(res, owner, b, await world.moveCraft(owner.id, x, y, toX, toY));
 }));
 router.post('/world/craft/store', withAccount(async (req, res, owner, b) => {
     const x = Number(req.body.x), y = Number(req.body.y);
-    if (!cellOk(x, y)) return res.status(400).json({ message: 'Case invalide' });
+    if (!cellOk(x, y)) return res.status(400).json({ message: INVALID.cell });
     await craftDone(res, owner, b, await world.storeCraft(owner.id, x, y));
 }));
 
 // Chemins : tracer et effacer des cases ([[x, y]] : world/paths.js)
 router.post('/world/paths', withAccount(async (req, res, owner, b) => {
     const { lay = [], erase = [] } = req.body || {};
-    if (!Array.isArray(lay) || !Array.isArray(erase)) return res.status(400).json({ message: 'Tracé invalide' });
+    if (!Array.isArray(lay) || !Array.isArray(erase)) return res.status(400).json({ message: INVALID.trace });
     const done = await world.layPaths(owner.id, lay, erase);
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ laid: done.laid, erased: done.erased, world: await worldView(owner, b) });
@@ -144,7 +147,7 @@ router.post('/world/collect', withAccount(async (req, res, owner, b) => {
 // Boutique d'un atelier : achat d'un article
 router.post('/world/item', withAccount(async (req, res, owner, b) => {
     const item = String(req.body.item || '');
-    if (!/^[a-z-]{1,30}$/.test(item)) return res.status(400).json({ message: 'Article invalide' });
+    if (!/^[a-z-]{1,30}$/.test(item)) return res.status(400).json({ message: INVALID.item });
     const done = await world.buyItem(owner.id, item);
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ bought: done.bought, coins: done.coins, world: await worldView(owner, b) });
@@ -153,7 +156,7 @@ router.post('/world/item', withAccount(async (req, res, owner, b) => {
 // Boutique : annuler un achat juste après (achat en un toucher)
 router.post('/world/item/undo', withAccount(async (req, res, owner, b) => {
     const item = String(req.body.item || '');
-    if (!/^[a-z-]{1,30}$/.test(item)) return res.status(400).json({ message: 'Article invalide' });
+    if (!/^[a-z-]{1,30}$/.test(item)) return res.status(400).json({ message: INVALID.item });
     const done = await world.undoItem(owner.id, item);
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ undone: done.undone, coins: done.coins, world: await worldView(owner, b) });
@@ -163,7 +166,7 @@ router.post('/world/item/undo', withAccount(async (req, res, owner, b) => {
 router.post('/world/skin', withAccount(async (req, res, owner, b) => {
     const site = String(req.body.site || '');
     const skin = String(req.body.skin || '');
-    if (!/^[a-z]{1,20}$/.test(site) || !/^[a-z-]{0,30}$/.test(skin)) return res.status(400).json({ message: 'Skin invalide' });
+    if (!/^[a-z]{1,20}$/.test(site) || !/^[a-z-]{0,30}$/.test(skin)) return res.status(400).json({ message: INVALID.skin });
     const done = await world.chooseSkin(owner.id, site, skin);
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json(await worldView(owner, b));
@@ -173,7 +176,7 @@ router.post('/world/skin', withAccount(async (req, res, owner, b) => {
 router.post('/world/name', withAccount(async (req, res, owner, b) => {
     const kind = String(req.body.kind || '');
     const id = String(req.body.id || '');
-    if (!['site', 'zone'].includes(kind) || !/^[a-z0-9-]{1,20}$/.test(id) || typeof (req.body.name ?? '') !== 'string') return res.status(400).json({ message: 'Nom invalide' });
+    if (!['site', 'zone'].includes(kind) || !/^[a-z0-9-]{1,20}$/.test(id) || typeof (req.body.name ?? '') !== 'string') return res.status(400).json({ message: INVALID.name });
     const done = await world.rename(owner.id, kind, id, req.body.name);
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json(await worldView(owner, b));
@@ -181,7 +184,7 @@ router.post('/world/name', withAccount(async (req, res, owner, b) => {
 
 // Le nom du peuple (bible, § 6.11)
 router.post('/world/people', withAccount(async (req, res, owner, b) => {
-    if (typeof (req.body.name ?? '') !== 'string') return res.status(400).json({ message: 'Nom invalide' });
+    if (typeof (req.body.name ?? '') !== 'string') return res.status(400).json({ message: INVALID.name });
     const done = await world.namePeople(owner.id, req.body.name);
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json(await worldView(owner, b));
@@ -189,7 +192,7 @@ router.post('/world/people', withAccount(async (req, res, owner, b) => {
 
 // Le nom du joueur, écrit dans le Grimoire au tutoriel (bible, § 9, étape 2)
 router.post('/world/player', withAccount(async (req, res, owner, b) => {
-    if (typeof (req.body.name ?? '') !== 'string') return res.status(400).json({ message: 'Nom invalide' });
+    if (typeof (req.body.name ?? '') !== 'string') return res.status(400).json({ message: INVALID.name });
     const done = await world.namePlayer(owner.id, req.body.name);
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json(await worldView(owner, b));
@@ -212,7 +215,7 @@ router.post('/world/sign/name', withAccount(async (req, res, owner, b) => {
 router.post('/world/sign', withAccount(async (req, res, owner, b) => {
     const site = String(req.body.site || '');
     const style = String(req.body.style || '');
-    if (!/^[a-z]{1,20}$/.test(site) || !/^[a-z]{1,20}$/.test(style)) return res.status(400).json({ message: 'Enseigne invalide' });
+    if (!/^[a-z]{1,20}$/.test(site) || !/^[a-z]{1,20}$/.test(style)) return res.status(400).json({ message: INVALID.sign });
     const done = await world.chooseSign(owner.id, site, style);
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ coins: done.coins, world: await worldView(owner, b) });
@@ -232,7 +235,7 @@ router.post('/world/annex', withAccount(async (req, res, owner, b) => {
     const annex = String(req.body.annex || '');
     const x = Number(req.body.x), y = Number(req.body.y);
     const pose = poseOf(req.body);
-    if (!/^[a-z]{1,20}$/.test(annex) || !cellOk(x, y) || !pose) return res.status(400).json({ message: 'Annexe invalide' });
+    if (!/^[a-z]{1,20}$/.test(annex) || !cellOk(x, y) || !pose) return res.status(400).json({ message: INVALID.annex });
     const done = await world.placeAnnex(owner.id, annex, x, y, { flip: pose.flip ?? false, look: pose.look ?? null });
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ built: done.built, coins: done.coins, world: await worldView(owner, b) });
@@ -247,14 +250,14 @@ router.get('/world/site/spots', withAccount(async (req, res, owner) => {
 }));
 router.post('/world/site/move', withAccount(async (req, res, owner, b) => {
     const x = Number(req.body.x), y = Number(req.body.y);
-    if (!cellOk(x, y) || typeof req.body.site !== 'string') return res.status(400).json({ message: 'Place invalide' });
+    if (!cellOk(x, y) || typeof req.body.site !== 'string') return res.status(400).json({ message: INVALID.place });
     const done = await world.moveSite(owner.id, req.body.site, x, y);
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json(await worldView(owner, b));
 }));
 router.post('/world/annex/move', withAccount(async (req, res, owner, b) => {
     const [x, y, toX, toY] = ['x', 'y', 'toX', 'toY'].map(k => Number(req.body[k]));
-    if (!cellOk(x, y, toX, toY)) return res.status(400).json({ message: 'Case invalide' });
+    if (!cellOk(x, y, toX, toY)) return res.status(400).json({ message: INVALID.cell });
     const done = await world.moveAnnex(owner.id, x, y, toX, toY);
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json(await worldView(owner, b));
@@ -264,7 +267,7 @@ router.post('/world/annex/move', withAccount(async (req, res, owner, b) => {
 router.post('/world/annex/pose', withAccount(async (req, res, owner, b) => {
     const x = Number(req.body.x), y = Number(req.body.y);
     const pose = poseOf(req.body);
-    if (!cellOk(x, y) || !pose || (pose.flip === undefined && pose.look === undefined)) return res.status(400).json({ message: 'Pose invalide' });
+    if (!cellOk(x, y) || !pose || (pose.flip === undefined && pose.look === undefined)) return res.status(400).json({ message: INVALID.pose });
     const done = await world.poseAnnex(owner.id, x, y, pose);
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json(await worldView(owner, b));
@@ -273,7 +276,7 @@ router.post('/world/annex/pose', withAccount(async (req, res, owner, b) => {
 // Quartier : écus et chapitre du Livre ouvert
 router.post('/world/zone', withAccount(async (req, res, owner, b) => {
     const zone = String(req.body.zone || '');
-    if (!/^[a-z]{1,20}$/.test(zone)) return res.status(400).json({ message: 'Quartier invalide' });
+    if (!/^[a-z]{1,20}$/.test(zone)) return res.status(400).json({ message: INVALID.zone });
     const owned = await players.elements(owner);
     const done = await world.buyZone(owner.id, zone, await chaptersOf(owner, b, owned));
     if (done.status) return res.status(done.status).json({ message: done.message });
@@ -283,7 +286,7 @@ router.post('/world/zone', withAccount(async (req, res, owner, b) => {
 // Expédition vers un quartier inconnu des terres nouvelles (lot 9) : { expedition: { zone, endsAt }, coins?, world }
 router.post('/world/expedition', withAccount(async (req, res, owner, b) => {
     const zone = String(req.body.zone || '');
-    if (!/^[a-z]{1,20}$/.test(zone)) return res.status(400).json({ message: 'Quartier invalide' });
+    if (!/^[a-z]{1,20}$/.test(zone)) return res.status(400).json({ message: INVALID.zone });
     const done = await world.startExpedition(owner.id, zone);
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ expedition: { zone: done.zone, endsAt: done.endsAt }, ...coinsOf(done), world: await worldView(owner, b) });
@@ -298,7 +301,7 @@ router.post('/world/nights/start', withAccount(async (req, res, owner, b) => {
 // Repousser un égaré d'un toucher, la nuit, sur son chemin → { id, world }
 router.post('/world/nights/repel', withAccount(async (req, res, owner, b) => {
     const id = String(req.body.id || '');
-    if (!/^\d{4}-\d{2}-\d{2}:\d$/.test(id)) return res.status(400).json({ message: 'Égaré invalide' });
+    if (!/^\d{4}-\d{2}-\d{2}:\d$/.test(id)) return res.status(400).json({ message: INVALID.stray });
     const done = await world.repelCreature(owner.id, id);
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ id: done.id, world: await worldView(owner, b) });
@@ -307,7 +310,7 @@ router.post('/world/nights/repel', withAccount(async (req, res, owner, b) => {
 // Réparer le bâtiment embrumé (un peu de pierre ou de bois) → { site, cost, coins?, world }
 router.post('/world/repair', withAccount(async (req, res, owner, b) => {
     const site = String(req.body.site || '');
-    if (!/^[a-z]{1,20}$/.test(site)) return res.status(400).json({ message: 'Bâtiment invalide' });
+    if (!/^[a-z]{1,20}$/.test(site)) return res.status(400).json({ message: INVALID.site });
     const done = await world.repairSite(owner.id, site);
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ site: done.site, cost: done.cost, ...coinsOf(done), world: await worldView(owner, b) });
@@ -316,7 +319,7 @@ router.post('/world/repair', withAccount(async (req, res, owner, b) => {
 // Lieu remarquable d'un quartier à soi (lot 9c) : le découvrir → { landmark, fresh, world } (fresh : première fois)
 router.post('/world/landmark', withAccount(async (req, res, owner, b) => {
     const id = String(req.body.id || '');
-    if (!/^[a-z]{1,20}$/.test(id)) return res.status(400).json({ message: 'Lieu invalide' });
+    if (!/^[a-z]{1,20}$/.test(id)) return res.status(400).json({ message: INVALID.landmark });
     const done = await world.findLandmark(owner.id, id);
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ landmark: done.landmark, fresh: done.fresh, world: await worldView(owner, b) });
@@ -325,7 +328,7 @@ router.post('/world/landmark', withAccount(async (req, res, owner, b) => {
 // Gisement d'un quartier de climat à soi (lot 9d) : ramasser ses trouvailles → { find, amount, world }
 router.post('/world/deposit', withAccount(async (req, res, owner, b) => {
     const id = String(req.body.id || '');
-    if (!/^[a-z]{1,16}-\d$/.test(id)) return res.status(400).json({ message: 'Gisement invalide' });
+    if (!/^[a-z]{1,16}-\d$/.test(id)) return res.status(400).json({ message: INVALID.deposit });
     const done = await world.gatherDeposit(owner.id, id);
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ find: done.find, amount: done.amount, world: await worldView(owner, b) });
@@ -334,7 +337,7 @@ router.post('/world/deposit', withAccount(async (req, res, owner, b) => {
 // Ce que la mer a rendu sur la plage de Brumelune : un toucher le ramasse (services/pickups.js)
 router.post('/world/pickup', withAccount(async (req, res, owner, b) => {
     const id = String(req.body.id || '');
-    if (!/^greve-[a-z]{1,12}-\d$/.test(id)) return res.status(400).json({ message: 'Trouvaille invalide' });
+    if (!/^greve-[a-z]{1,12}-\d$/.test(id)) return res.status(400).json({ message: INVALID.find });
     const done = await world.pickUp(owner.id, id);
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ kind: done.kind, gives: done.gives, world: await worldView(owner, b) });
@@ -343,7 +346,7 @@ router.post('/world/pickup', withAccount(async (req, res, owner, b) => {
 // Chantier : niveau suivant, avec son plan (élément du Livre) et ses ressources
 router.post('/world/build', withAccount(async (req, res, owner, b) => {
     const site = String(req.body.site || '');
-    if (!/^[a-z]{1,20}$/.test(site)) return res.status(400).json({ message: 'Chantier invalide' });
+    if (!/^[a-z]{1,20}$/.test(site)) return res.status(400).json({ message: INVALID.worksite });
     const owned = await players.elements(owner);
     const done = await world.build(owner.id, owned, site, await chaptersOf(owner, b, owned));
     if (done.status) return res.status(done.status).json({ message: done.message });
@@ -356,7 +359,7 @@ const stageOf = body => (body && body.level !== undefined && body.level !== null
 const stageOk = level => level === null || (Number.isInteger(level) && level >= 1 && level <= 30);
 router.post('/world/harvest/start', withAccount(async (req, res, owner) => {
     const level = stageOf(req.body);
-    if (!stageOk(level)) return res.status(400).json({ message: 'Niveau invalide' });
+    if (!stageOk(level)) return res.status(400).json({ message: INVALID.level });
     const started = await world.startRun(owner.id, level);
     if (started.status) return res.status(started.status).json({ message: started.message });
     res.json(started.run);
@@ -364,7 +367,7 @@ router.post('/world/harvest/start', withAccount(async (req, res, owner) => {
 
 router.post('/world/harvest/finish', withAccount(async (req, res, owner, b) => {
     const run = Number(req.body.run);
-    if (!Number.isSafeInteger(run) || run <= 0 || !Array.isArray(req.body.moves)) return res.status(400).json({ message: 'Partie invalide' });
+    if (!Number.isSafeInteger(run) || run <= 0 || !Array.isArray(req.body.moves)) return res.status(400).json({ message: INVALID.run });
     const done = await world.finishRun(owner.id, run, req.body.moves);
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ gains: done.gains, earned: done.earned, coins: done.coins, chest: done.chest, level: done.level, world: await worldView(owner, b) });
@@ -374,14 +377,14 @@ router.post('/world/harvest/finish', withAccount(async (req, res, owner, b) => {
 router.post('/world/game/start', withAccount(async (req, res, owner, b) => {
     const game = String(req.body.game || '');
     const level = stageOf(req.body);
-    if (!/^[a-z]{1,20}$/.test(game) || !stageOk(level)) return res.status(400).json({ message: 'Mini-jeu invalide' });
+    if (!/^[a-z]{1,20}$/.test(game) || !stageOk(level)) return res.status(400).json({ message: INVALID.game });
     const started = await world.startGame(owner.id, game, level);
     if (started.status) return res.status(started.status).json({ message: started.message });
     res.json({ run: started.run, world: await worldView(owner, b) });
 }));
 router.post('/world/game/finish', withAccount(async (req, res, owner, b) => {
     const run = Number(req.body.run);
-    if (!Number.isSafeInteger(run) || run <= 0 || !Array.isArray(req.body.input)) return res.status(400).json({ message: 'Partie invalide' });
+    if (!Number.isSafeInteger(run) || run <= 0 || !Array.isArray(req.body.input)) return res.status(400).json({ message: INVALID.run });
     const done = await world.finishGame(owner.id, run, req.body.input);
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ earned: done.earned, raw: done.raw, detail: done.detail, coins: done.coins, level: done.level, world: await worldView(owner, b) });
@@ -410,12 +413,12 @@ async function savoirInputs(owner, common) {
 // Anya, une fois éveillée (§ 6.14) : son Souffle, une fois par jour, un ingrédient sur n'importe quelle page à portée
 router.post('/world/villager/talk', withAccount(async (req, res, owner, b) => {
     const villager = String(req.body.villager || '');
-    if (!/^[a-z0-9]{1,20}$/.test(villager)) return res.status(400).json({ message: 'Habitant invalide' });
+    if (!/^[a-z0-9]{1,20}$/.test(villager)) return res.status(400).json({ message: INVALID.villager });
     // Brume, une fois le Phare allumé : un indice par jour sur les Légendes (rien n'est compté s'il n'y a pas de page)
     if (villager === 'brume') {
         const state = await world.brumeSavoirOf(owner.id);
-        if (!state.open) return res.status(403).json({ message: 'Brume garde son Savoir pour la fin : allume d’abord le Phare.' });
-        if (state.talked) return res.status(409).json({ message: 'Brume t’a déjà soufflé un Savoir aujourd’hui.' });
+        if (!state.open) return res.status(403).json({ message: SAVOIR_LOCKED });
+        if (state.talked) return res.status(409).json({ message: SAVOIR_GIVEN });
         const inputs = await savoirInputs(owner, b);
         const savoir = bookPages.savoir(inputs.b, inputs.owned, ['Légendes'], { ...inputs, strong: true, known: pagesOf(req.body.known), heard: pagesOf(req.body.heard) });
         if (savoir) {
@@ -447,7 +450,7 @@ router.post('/world/villager/talk', withAccount(async (req, res, owner, b) => {
 router.post('/world/villager/gift', withAccount(async (req, res, owner, b) => {
     const villager = String(req.body.villager || '');
     const resource = String(req.body.resource || '');
-    if (!/^[a-z0-9]{1,20}$/.test(villager) || !/^[a-z]{1,10}$/.test(resource)) return res.status(400).json({ message: 'Cadeau invalide' });
+    if (!/^[a-z0-9]{1,20}$/.test(villager) || !/^[a-z]{1,10}$/.test(resource)) return res.status(400).json({ message: INVALID.gift });
     await befriended(res, owner, b, await world.befriend(owner.id, villager, resource));
 }));
 // Besoins des habitants : en combler un (manger, travailler), ou tout ce qui peut l'être d'un coup
@@ -458,7 +461,7 @@ const fed = async (res, owner, b, done) => {
 router.post('/world/villager/need', withAccount(async (req, res, owner, b) => {
     const villager = String(req.body.villager || '');
     const need = String(req.body.need || '');
-    if (!/^[a-z0-9]{1,20}$/.test(villager) || !/^[a-z]{1,10}$/.test(need)) return res.status(400).json({ message: 'Besoin invalide' });
+    if (!/^[a-z0-9]{1,20}$/.test(villager) || !/^[a-z]{1,10}$/.test(need)) return res.status(400).json({ message: INVALID.need });
     await fed(res, owner, b, await world.fillNeeds(owner.id, [{ villager, need }]));
 }));
 router.post('/world/villagers/needs', withAccount(async (req, res, owner, b) => {
@@ -467,7 +470,7 @@ router.post('/world/villagers/needs', withAccount(async (req, res, owner, b) => 
 // Bêtes de ferme (v6, § 6.16) : en nourrir une depuis sa fiche (sa bulle est ramassée d'abord) → { beast, collected, coins?, world }
 router.post('/world/beast/feed', withAccount(async (req, res, owner, b) => {
     const id = String(req.body.beast || '');
-    if (!/^[a-z-]{1,20}$/.test(id)) return res.status(400).json({ message: 'Bête invalide' });
+    if (!/^[a-z-]{1,20}$/.test(id)) return res.status(400).json({ message: INVALID.beast });
     const done = await world.feedBeast(owner.id, id);
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ beast: done.beast, collected: done.collected, ...coinsOf(done), world: await worldView(owner, b) });
@@ -486,7 +489,7 @@ router.post('/world/beasts/cage', withAccount(async (req, res, owner, b) => {
 // Visiteur : combler sa demande (livrer, ou ses Récoltes faites) → { reward, coins, world }
 router.post('/world/visitor', withAccount(async (req, res, owner, b) => {
     const id = Number(req.body.id);
-    if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ message: 'Visiteur invalide' });
+    if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ message: INVALID.visitor });
     const done = await world.satisfyVisitor(owner.id, id);
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ reward: done.reward, coins: done.coins, world: await worldView(owner, b) });
@@ -494,7 +497,7 @@ router.post('/world/visitor', withAccount(async (req, res, owner, b) => {
 // Visiteur comblé : il reste, dans une maison libre → { settled, coins?, world }
 router.post('/world/visitor/settle', withAccount(async (req, res, owner, b) => {
     const id = Number(req.body.id);
-    if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ message: 'Visiteur invalide' });
+    if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ message: INVALID.visitor });
     const done = await world.settleVisitor(owner.id, id);
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ settled: done.settled, ...coinsOf(done), world: await worldView(owner, b) });
@@ -504,7 +507,7 @@ router.post('/world/visitor/settle', withAccount(async (req, res, owner, b) => {
 // caisse d'un personnage
 router.post('/world/chest', withAccount(async (req, res, owner, b) => {
     const source = String(req.body.source || '');
-    if (!/^(jour|bouteille|chapitre:[IVX]{1,4}|quete:[a-z0-9-]{1,30}|lieu:[a-z]{1,20}|caisse:[a-z]{1,20})$/.test(source)) return res.status(400).json({ message: 'Coffre invalide' });
+    if (!/^(jour|bouteille|chapitre:[IVX]{1,4}|quete:[a-z0-9-]{1,30}|lieu:[a-z]{1,20}|caisse:[a-z]{1,20})$/.test(source)) return res.status(400).json({ message: INVALID.chest });
     const done = await world.openChest(owner.id, source, await chaptersOf(owner, b, await players.elements(owner)));
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ chest: done.chest, coins: done.coins, world: await worldView(owner, b) });
@@ -532,7 +535,7 @@ router.post('/world/prologue/skip', withAccount(async (req, res, owner) => {
 
 // « Recommencer l'île », une fois par compte : le joueur l'écrit en toutes lettres (RECOMMENCER) → { restarted: true }
 router.post('/world/restart', withAccount(async (req, res, owner) => {
-    if (req.body.confirm !== 'RECOMMENCER') return res.status(400).json({ message: 'Écris RECOMMENCER pour confirmer.' });
+    if (req.body.confirm !== 'RECOMMENCER') return res.status(400).json({ message: RESTART_CONFIRM });
     const done = await world.restartIsland(owner.id);
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json(done);
@@ -541,7 +544,7 @@ router.post('/world/restart', withAccount(async (req, res, owner) => {
 // Quête de Brume : réclamer la récompense de la quête active
 router.post('/world/quest', withAccount(async (req, res, owner, b) => {
     const id = String(req.body.id || '');
-    if (!/^[a-z0-9-]{1,30}$/.test(id)) return res.status(400).json({ message: 'Quête invalide' });
+    if (!/^[a-z0-9-]{1,30}$/.test(id)) return res.status(400).json({ message: INVALID.quest });
     const owned = await players.elements(owner);
     const done = await world.claimQuest(owner.id, id, owned, bookPages.starsOf(b, owned));
     if (done.status) return res.status(done.status).json({ message: done.message });

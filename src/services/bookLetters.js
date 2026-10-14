@@ -3,6 +3,8 @@
 const db = require('../config/db');
 const ledger = require('./ledger');
 const { judge, solvedBy, failedUntil } = require('./hangman');
+const { NOT_LOST } = require('../texts/book');
+const { NEED_COINS } = require('../texts/errors');
 
 const RETRY_PRICE = 20;
 
@@ -45,9 +47,9 @@ function retry(owner, page) {
     return db.transaction(async conn => {
         const { rows: [row] } = await conn.query(
             'SELECT letters, revealed, misses, failed_at FROM book_letters WHERE owner = $1 AND page_id = $2 FOR UPDATE', [owner.key, page]);
-        if (!failedUntil(row)) return { status: 409, message: 'Cette partie n’est pas perdue.' };
+        if (!failedUntil(row)) return { status: 409, message: NOT_LOST };
         const coins = await ledger.debit(owner.id, RETRY_PRICE, 'pendu', conn);
-        if (coins === null) return db.rollback({ status: 400, message: `Il te faut ${RETRY_PRICE} écus.` });
+        if (coins === null) return db.rollback({ status: 400, message: NEED_COINS(RETRY_PRICE) });
         const { rows: [saved] } = await conn.query(
             `UPDATE book_letters SET misses = 0, failed_at = NULL, updated_at = NOW()
              WHERE owner = $1 AND page_id = $2 RETURNING letters, revealed, misses, failed_at`, [owner.key, page]);

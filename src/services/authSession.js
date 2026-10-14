@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
 const { newToken, isToken, digest } = require('../utils/crypto');
+const { SESSION } = require('../texts/account');
 
 const ACCESS_SECONDS = 15 * 60;
 const REFRESH_DAYS = 30;
@@ -108,7 +109,7 @@ function clearCookies(res) {
 // Échange le jeton de rafraîchissement contre un nouveau. Renvoie { user } ou { error, status }.
 async function rotate(req, res) {
     const presented = readCookie(req, REFRESH_COOKIE);
-    if (!isToken(presented)) return { status: 401, error: 'Session absente' };
+    if (!isToken(presented)) return { status: 401, error: SESSION.absent };
 
     return db.transaction(async client => {
         const { rows } = await client.query(
@@ -119,14 +120,14 @@ async function rotate(req, res) {
             [digest(presented), RACE_SECONDS]
         );
         const session = rows[0];
-        if (!session || !session.alive) return db.rollback({ status: 401, error: 'Session expirée' });
+        if (!session || !session.alive) return db.rollback({ status: 401, error: SESSION.expired });
         if (session.revoked_at) {
             // Rafraîchissement concurrent d'un autre onglet : le navigateur a déjà le nouveau cookie
-            if (session.recent) return db.rollback({ status: 409, error: 'Session déjà renouvelée', code: 'REFRESH_RACE' });
+            if (session.recent) return db.rollback({ status: 409, error: SESSION.renewed, code: 'REFRESH_RACE' });
             // Réutilisation d'un ancien jeton : on coupe toute la famille
             await client.query('DELETE FROM auth_sessions WHERE family = $1', [session.family]);
             clearCookies(res);
-            return { status: 401, error: 'Session révoquée' };
+            return { status: 401, error: SESSION.revoked };
         }
         await client.query('UPDATE auth_sessions SET revoked_at = NOW() WHERE id = $1', [session.id]);
         return { user: await issue(res, { id: session.user_id, username: session.username }, session.family, client) };

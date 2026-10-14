@@ -9,6 +9,7 @@ const landmarks = require('../landmarks');
 const { stockOf, zonesOf, claimedOf, exploredOf, levelsOf, foundOf } = require('./reads');
 const { migrate } = require('./migrate');
 const { placesOf: sitePlacesOf, freeSpotsAt } = require('./places');
+const T = require('../../texts/brume');
 
 // Les endroits où Anya peut passer (v6 : n'importe où sur l'île à soi) : quelques cases libres près du panneau de
 // chaque quartier à soi (ni création, ni annexe, ni gisement, ni lieu remarquable), et le Cercle de menhirs une fois
@@ -57,8 +58,8 @@ async function talkBrume(userId, now = Date.now()) {
         // Le verrou du stock (comme pour un maître) : deux bavardages simultanés ne soufflent pas deux Savoirs
         await stockOf(userId, conn, true);
         const state = await brumeSavoirOf(userId, conn, now);
-        if (!state.open) return db.rollback({ status: 403, message: 'Brume garde son Savoir pour la fin : allume d’abord le Phare.' });
-        if (state.talked) return db.rollback({ status: 409, message: 'Brume t’a déjà soufflé un Savoir aujourd’hui.' });
+        if (!state.open) return db.rollback({ status: 403, message: T.SAVOIR_LOCKED });
+        if (state.talked) return db.rollback({ status: 409, message: T.SAVOIR_GIVEN });
         await conn.query(
             `INSERT INTO world_friends (user_id, villager, points, talked_on) VALUES ($1, $2, 0, $3::date)
              ON CONFLICT (user_id, villager) DO UPDATE SET talked_on = EXCLUDED.talked_on`, [userId, BRUME, loot.parisOf(now).day]);
@@ -69,7 +70,7 @@ async function talkBrume(userId, now = Date.now()) {
 async function revealAnya(userId, now = Date.now()) {
     await migrate(userId);
     return db.transaction(async conn => {
-        if (!(await anyaOf(userId, conn, now)).awake) return db.rollback({ status: 403, message: 'Anya dort encore : libère d’abord le cœur de l’île.' });
+        if (!(await anyaOf(userId, conn, now)).awake) return db.rollback({ status: 403, message: T.ANYA_ASLEEP_HEART });
         await conn.query('INSERT INTO world_friends (user_id, villager, points) VALUES ($1, $2, 0) ON CONFLICT DO NOTHING', [userId, anya.TARGET]);
         return { anya: await anyaOf(userId, conn, now) };
     });
@@ -77,9 +78,9 @@ async function revealAnya(userId, now = Date.now()) {
 // Le Souffle d'Anya : un par passage (elle passe au plus une fois par jour, heure de Paris), la Révélation vue. {} ou
 // { status, message } (l'indice est calculé par la route, qui ne compte le Souffle que s'il y a une page)
 const BREATH_REFUSED = {
-    asleep: { status: 403, message: 'Anya dort encore.' },
-    away: { status: 409, message: 'Anya n’est pas là : elle passe à l’aube ou au crépuscule, certains jours.' },
-    breathed: { status: 409, message: 'Anya t’a déjà soufflé un Savoir : elle repassera.' }
+    asleep: { status: 403, message: T.BREATH_REFUSED.asleep },
+    away: { status: 409, message: T.BREATH_REFUSED.away },
+    breathed: { status: 409, message: T.BREATH_REFUSED.breathed }
 };
 const breathRefused = state => (!state.revealed ? BREATH_REFUSED.asleep : !state.visit ? BREATH_REFUSED.away : state.breathed ? BREATH_REFUSED.breathed : null);
 async function breatheAnya(userId, now = Date.now()) {

@@ -13,6 +13,8 @@ const { levelsOf, stockOf, zonesOf, depositsOf, foundOf, discoveredOf, craftsOf,
 const { migrate } = require('./migrate');
 const { presenceOf } = require('./people');
 const { bonusesFor, gather, payWith } = require('./produce');
+const T = require('../../texts/lands');
+const { ZONE_UNKNOWN, BUY_ZONE_FIRST } = require('../../texts/world');
 
 const isKnown = (zone, discovered) => !zone.trip || discovered.has(zone.id);
 // Ce qu'emporte une expédition vers ce quartier : { food, wood }
@@ -32,26 +34,26 @@ const coreMissing = zones => map.CORE.filter(id => !zones.has(id)).map(id => map
 // découvert : on peut l'acheter). { zone, endsAt } ou { status, message }
 async function startExpedition(userId, zoneId, now = Date.now()) {
     const zone = map.ZONE_BY_ID[zoneId];
-    if (!zone || !zone.trip) return { status: 404, message: 'Quartier inconnu.' };
+    if (!zone || !zone.trip) return { status: 404, message: ZONE_UNKNOWN };
     await migrate(userId);
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
-        if ((await discoveredOf(userId, conn, now)).has(zone.id)) return db.rollback({ status: 409, message: 'Ce quartier est déjà découvert.' });
+        if ((await discoveredOf(userId, conn, now)).has(zone.id)) return db.rollback({ status: 409, message: T.ZONE_DISCOVERED });
         const going = await expeditionOf(userId, conn, now);
-        if (going) return db.rollback({ status: 409, message: 'Une expédition est déjà en route : attends son retour.' });
+        if (going) return db.rollback({ status: 409, message: T.EXPEDITION_GOING });
         const zones = await zonesOf(userId, conn);
         const missing = coreMissing(zones);
-        if (missing.length) return db.rollback({ status: 403, message: `Les terres alentour s’ouvrent quand le cœur de l’île est à toi. Il te manque : ${missing.join(', ')}.` });
-        if (!map.NEIGHBORS[zone.id].some(id => zones.has(id))) return db.rollback({ status: 403, message: 'Une expédition part d’un quartier à toi, vers un quartier voisin.' });
+        if (missing.length) return db.rollback({ status: 403, message: T.CORE_MISSING(missing.join(', ')) });
+        if (!map.NEIGHBORS[zone.id].some(id => zones.has(id))) return db.rollback({ status: 403, message: T.NOT_NEIGHBOR });
         const cost = expeditionCost(zone);
         // Ce qui attend dans les bâtiments est encaissé d'abord : cela compte pour les provisions
         const { stock: paid, balance } = await payWith(userId, conn, stock);
-        if (Object.entries(cost).some(([r, n]) => paid[r] < n)) return db.rollback({ status: 400, message: `Il faut emporter ${cost.food} vivres et ${cost.wood} bûches : joue une Récolte.` });
+        if (Object.entries(cost).some(([r, n]) => paid[r] < n)) return db.rollback({ status: 400, message: T.EXPEDITION_COST(cost.food, cost.wood) });
         const { levels } = await levelsOf(userId, conn);
         const { bonuses, extra } = await bonusesFor(userId, conn);
         const effects = effectsOf(levels, bonuses, extra);
         const charges = chargesAt(stock, effects.maxCharges, now, effects.regenMs);
-        if (charges.count < 1) return db.rollback({ status: 409, message: 'Il faut une partie de Récolte en réserve : la prochaine revient bientôt.' });
+        if (charges.count < 1) return db.rollback({ status: 409, message: T.EXPEDITION_CHARGE });
         await conn.query('UPDATE world_stock SET charges = $2, charges_at = $3, food = food - $4, wood = wood - $5 WHERE user_id = $1',
             [userId, charges.count - 1, new Date(charges.since), cost.food, cost.wood]);
         const endsAt = new Date(now + zone.trip * 3600 * 1000);
@@ -66,11 +68,11 @@ async function startExpedition(userId, zoneId, now = Date.now()) {
 // coffres. { landmark, fresh } ou { status, message }
 async function findLandmark(userId, landmarkId, now = Date.now()) {
     const place = Object.hasOwn(landmarks.LANDMARK_BY_ID, landmarkId) ? landmarks.LANDMARK_BY_ID[landmarkId] : null;
-    if (!place) return { status: 404, message: 'Lieu inconnu.' };
+    if (!place) return { status: 404, message: T.LANDMARK_UNKNOWN };
     await migrate(userId);
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
-        if (!(await zonesOf(userId, conn)).has(place.zone)) return db.rollback({ status: 403, message: 'Achète d’abord ce quartier de l’île.' });
+        if (!(await zonesOf(userId, conn)).has(place.zone)) return db.rollback({ status: 403, message: BUY_ZONE_FIRST });
         if ((await foundOf(userId, conn)).has(place.id)) return { landmark: place.id, fresh: false };
         await gather(userId, conn, stock);
         await conn.query('INSERT INTO world_landmarks (user_id, landmark, found_at) VALUES ($1, $2, $3)', [userId, place.id, new Date(now)]);
@@ -87,16 +89,16 @@ const craftBonusOf = (placed, zoneId) => Math.min(finds.CRAFT_BONUS_MAX,
 // { find, amount } ou { status, message }
 async function gatherDeposit(userId, depositId, now = Date.now()) {
     const deposit = Object.hasOwn(finds.DEPOSIT_BY_ID, depositId) ? finds.DEPOSIT_BY_ID[depositId] : null;
-    if (!deposit) return { status: 404, message: 'Gisement inconnu.' };
+    if (!deposit) return { status: 404, message: T.DEPOSIT_UNKNOWN };
     await migrate(userId);
     return db.transaction(async conn => {
         await stockOf(userId, conn, true);
-        if (!(await zonesOf(userId, conn)).has(deposit.zone)) return db.rollback({ status: 403, message: 'Achète d’abord ce quartier de l’île.' });
+        if (!(await zonesOf(userId, conn)).has(deposit.zone)) return db.rollback({ status: 403, message: BUY_ZONE_FIRST });
         const find = finds.FIND_BY_ID[deposit.find];
-        if (!(await writtenOf(userId, find.key, conn))) return db.rollback({ status: 403, message: `${find.name} : il faut d’abord connaître « ${find.key} » — à écrire au Grimoire.` });
+        if (!(await writtenOf(userId, find.key, conn))) return db.rollback({ status: 403, message: T.KNOW_FIRST(find.name, find.key) });
         const { blessed } = await presenceOf(userId, conn, now);
         const wait = finds.readyIn((await depositsOf(userId, conn)).get(deposit.id), now, blessed ? anya.BLESSING.regrowMs : finds.REGROW_MS);
-        if (wait > 0) return db.rollback({ status: 409, message: `Ce gisement repousse : reviens dans ${Math.ceil(wait / 60000)} min.` });
+        if (wait > 0) return db.rollback({ status: 409, message: T.DEPOSIT_REGROWS(Math.ceil(wait / 60000)) });
         const amount = finds.GATHER.min + crypto.randomInt(0, finds.GATHER.max - finds.GATHER.min + 1) + craftBonusOf(placedOf(await craftsOf(userId, conn)), deposit.zone);
         await conn.query(
             `INSERT INTO world_finds (user_id, find, amount) VALUES ($1, $2, $3)
@@ -113,20 +115,20 @@ async function gatherDeposit(userId, depositId, now = Date.now()) {
 // { kind, gives } ou { status, message }
 async function pickUp(userId, spotId, now = Date.now()) {
     const spot = Object.hasOwn(pickups.SPOT_BY_ID, spotId) ? pickups.SPOT_BY_ID[spotId] : null;
-    if (!spot) return { status: 404, message: 'Il n’y a rien à ramasser ici.' };
+    if (!spot) return { status: 404, message: T.NOTHING_HERE };
     await migrate(userId);
     return db.transaction(async conn => {
         await stockOf(userId, conn, true);
         // (pas encore rendue par la mer : les coquillages attendent le jour de Marcelle)
-        if (!pickups.shownFor(spot, (await presenceOf(userId, conn)).done)) return db.rollback({ status: 404, message: 'Il n’y a rien à ramasser ici.' });
-        if (!(await zonesOf(userId, conn)).has(map.zoneAt(spot.x, spot.y))) return db.rollback({ status: 403, message: 'Achète d’abord ce quartier de l’île.' });
+        if (!pickups.shownFor(spot, (await presenceOf(userId, conn)).done)) return db.rollback({ status: 404, message: T.NOTHING_HERE });
+        if (!(await zonesOf(userId, conn)).has(map.zoneAt(spot.x, spot.y))) return db.rollback({ status: 403, message: BUY_ZONE_FIRST });
         // (une annexe ou une création posée sur sa case la cache : rien à ramasser)
         const { rows: covered } = await conn.query(
             `SELECT 1 FROM world_annexes WHERE user_id = $1 AND x = $2 AND y = $3
              UNION ALL SELECT 1 FROM world_crafts WHERE user_id = $1 AND x = $2 AND y = $3 LIMIT 1`, [userId, spot.x, spot.y]);
-        if (covered.length) return db.rollback({ status: 404, message: 'Il n’y a rien à ramasser ici.' });
+        if (covered.length) return db.rollback({ status: 404, message: T.NOTHING_HERE });
         const wait = finds.readyIn((await depositsOf(userId, conn)).get(spot.id), now, pickups.REGROW_MS);
-        if (wait > 0) return db.rollback({ status: 409, message: `La mer en rapportera d’autres : reviens dans ${Math.ceil(wait / 60000)} min.` });
+        if (wait > 0) return db.rollback({ status: 409, message: T.SEA_BRINGS_MORE(Math.ceil(wait / 60000)) });
         const { gives } = pickups.KINDS[spot.kind];
         await conn.query('UPDATE world_stock SET stone = stone + $2, wood = wood + $3, water = water + $4, food = food + $5 WHERE user_id = $1',
             [userId, gives.stone || 0, gives.wood || 0, gives.water || 0, gives.food || 0]);

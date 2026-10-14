@@ -10,6 +10,7 @@ const beasts = require('../beasts');
 const map = require('../worldMap');
 const { stockOf, levelsOf, zonesOf } = require('./reads');
 const { migrate } = require('./migrate');
+const T = require('../../texts/beasts');
 const { payWith } = require('./produce');
 const { metOf, presenceOf } = require('./people');
 
@@ -57,8 +58,8 @@ async function openCage(userId, now = Date.now()) {
     return db.transaction(async conn => {
         await stockOf(userId, conn, true);
         const cage = await cageOf(userId, conn);
-        if (cage === 'ouverte') return db.rollback({ status: 409, message: 'La cage est déjà ouverte.' });
-        if (!cage) return db.rollback({ status: 403, message: 'Pas encore de cage : Marcelle n’est pas arrivée.' });
+        if (cage === 'ouverte') return db.rollback({ status: 409, message: T.CAGE_OPEN });
+        if (!cage) return db.rollback({ status: 403, message: T.NO_CAGE_YET });
         await conn.query(
             `INSERT INTO world_beasts (user_id, beast, fed_at, collected_at) SELECT $1, hen, $2, $3 FROM unnest($4::text[]) AS hen
              ON CONFLICT (user_id, beast) DO NOTHING`,
@@ -71,23 +72,23 @@ async function openCage(userId, now = Date.now()) {
 // { beast, collected } ou { status, message }
 async function feedBeast(userId, id, now = Date.now()) {
     const beast = Object.hasOwn(beasts.BEAST_BY_ID, id) ? beasts.BEAST_BY_ID[id] : null;
-    if (!beast) return { status: 404, message: 'Bête inconnue.' };
+    if (!beast) return { status: 404, message: T.BEAST_UNKNOWN };
     await migrate(userId);
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
         const { level, freed, rows, coqSince, herd } = await herdOf(userId, conn, now);
-        if (beast.camp && !freed) return db.rollback({ status: 403, message: 'Ouvre d’abord la cage des poules, au camp.' });
-        if (beast.camp && !herd.some(b => b.id === id)) return db.rollback({ status: 404, message: 'Bête inconnue.' });
+        if (beast.camp && !freed) return db.rollback({ status: 403, message: T.OPEN_CAGE_FIRST });
+        if (beast.camp && !herd.some(b => b.id === id)) return db.rollback({ status: 404, message: T.BEAST_UNKNOWN });
         // (un poussin ne se nourrit pas : il suit les poules)
-        if (beasts.isChick(beast, coqSince, now)) return db.rollback({ status: 409, message: `${beast.name} n’a pas encore faim.` });
-        if (!beast.camp && !level) return db.rollback({ status: 403, message: 'Bâtis d’abord le Potager : les bêtes vivent autour.' });
-        if (!beast.camp && level < beast.level) return db.rollback({ status: 403, message: `${beast.name} viendra quand le Potager aura grandi.` });
+        if (beasts.isChick(beast, coqSince, now)) return db.rollback({ status: 409, message: T.NOT_HUNGRY(beast.name) });
+        if (!beast.camp && !level) return db.rollback({ status: 403, message: T.GARDEN_FIRST });
+        if (!beast.camp && level < beast.level) return db.rollback({ status: 403, message: T.GARDEN_GROWS(beast.name) });
         const row = rows[id];
-        if (!beasts.stateOf(beast, row, now).refill) return db.rollback({ status: 409, message: `${beast.name} n’a pas encore faim.` });
+        if (!beasts.stateOf(beast, row, now).refill) return db.rollback({ status: 409, message: T.NOT_HUNGRY(beast.name) });
         const { food } = beasts.FEED_COST;
         // Ce qui attend dans les bâtiments est encaissé d'abord : cela compte pour payer
         const { stock: paid, balance } = await payWith(userId, conn, stock);
-        if (paid.food < food) return db.rollback({ status: 400, message: `Il te faut ${food} vivres pour la nourrir.` });
+        if (paid.food < food) return db.rollback({ status: 400, message: T.FEED_COST(food) });
         const fed = beasts.feedOf(beast, row, now);
         await conn.query('UPDATE world_stock SET food = food - $2 + $3 WHERE user_id = $1', [userId, food, fed.amount]);
         await conn.query(

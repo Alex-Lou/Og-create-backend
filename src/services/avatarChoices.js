@@ -7,6 +7,8 @@
 // que s'il est possédé : une ligne de world_items « tenue:<accessoire> » ou « teinture:<teinte> ». Fonctions pures,
 // sans base de données (le possédé est passé par l'appelant).
 
+const T = require('../texts/avatar');
+
 const NUANCIERS = {
     peau: ['nacre', 'porcelaine', 'rosee', 'peche', 'doree', 'miel', 'sable', 'ocre', 'cannelle', 'bronze', 'cuivre', 'cacao', 'acajou', 'ebene', 'ombre', 'nuit'],
     cheveux: ['jais', 'noir', 'chocolat', 'brun', 'auburn', 'roux', 'cuivre', 'chatain', 'venitien', 'blond', 'platine', 'gris', 'blanc', 'nuit', 'bonbon', 'poudre', 'cerise', 'corail', 'lilas', 'violet', 'ciel', 'turquoise', 'menthe', 'sapin'],
@@ -121,33 +123,33 @@ function colorOk(nuancier, key, owned) {
 // Les choix envoyés par le joueur, vérifiés et complétés (les choix absents prennent ceux par défaut) :
 // { choices } ou { status, message }. owned : Set des objets gagnés (world_items)
 function cleanChoices(raw, owned = new Set()) {
-    if (!plain(raw)) return refuse('Avatar invalide.');
+    if (!plain(raw)) return refuse(T.AVATAR_INVALID);
     const out = {};
     for (const key of Object.keys(raw)) {
-        if (key !== 'accessoires' && !own(CHOIX, key)) return refuse('Avatar invalide.');
+        if (key !== 'accessoires' && !own(CHOIX, key)) return refuse(T.AVATAR_INVALID);
     }
     for (const [key, from] of Object.entries(CHOIX)) {
         const value = own(raw, key) ? raw[key] : DEFAUT[key];
         const ok = from === 'formes' ? typeof value === 'string' && FORMES[key].includes(value) : colorOk(from, value, owned);
-        if (!ok) return refuse('Ce choix n’existe pas, ou n’est pas encore à toi.');
+        if (!ok) return refuse(T.CHOICE_NOT_YOURS);
         out[key] = value;
     }
     // La barbe, la moustache et le menton ne vont qu'à l'homme : chez la femme (le défaut), ils s'effacent
     if (out.genre !== 'homme') { out.barbe = 'sans'; out.moustache = 'sans'; out.menton = 'doux'; }
     const worn = own(raw, 'accessoires') ? raw.accessoires : {};
-    if (!plain(worn)) return refuse('Avatar invalide.');
+    if (!plain(worn)) return refuse(T.AVATAR_INVALID);
     out.accessoires = {};
     for (const [place, item] of Object.entries(worn)) {
         if (item === null) continue;
-        if (!plain(item) || typeof item.id !== 'string' || !own(ACCESSOIRES, item.id)) return refuse('Cet objet n’existe pas.');
+        if (!plain(item) || typeof item.id !== 'string' || !own(ACCESSOIRES, item.id)) return refuse(T.ITEM_MISSING);
         const [where, zones, defaults, free] = ACCESSOIRES[item.id];
-        if (where !== place) return refuse('Cet objet ne se porte pas là.');
-        if (!free && !owned.has(`tenue:${item.id}`)) return refuse('Cet objet n’est pas encore à toi.');
+        if (where !== place) return refuse(T.WRONG_PLACE);
+        if (!free && !owned.has(`tenue:${item.id}`)) return refuse(T.ITEM_NOT_YOURS);
         const colors = item.couleurs === undefined ? [] : item.couleurs;
-        if (!Array.isArray(colors) || colors.length > zones.length) return refuse('Avatar invalide.');
+        if (!Array.isArray(colors) || colors.length > zones.length) return refuse(T.AVATAR_INVALID);
         const picked = [...zones].map((zone, i) => (colors[i] === undefined ? defaults[i] : colors[i]));
         if (!picked.every((key, i) => colorOk(zones[i] === 'm' ? 'metaux' : 'tissus', key, owned))) {
-            return refuse('Cette couleur n’existe pas, ou n’est pas encore à toi.');
+            return refuse(T.COLOR_NOT_YOURS);
         }
         out.accessoires[place] = { id: item.id, couleurs: picked };
     }

@@ -17,6 +17,8 @@
 const map = require('./worldMap');
 const finds = require('./finds');
 const { needOfChapter } = require('./bookPages');
+const T = require('../texts/crafts');
+const { MISSING_RESOURCES } = require('../texts/errors');
 
 const EPREUVES = 10;
 const STARS = 10;
@@ -25,7 +27,7 @@ const TIERS = ['start', 'I', 'II', 'III', 'climat'];
 const PIECE_MAX = { start: 3, I: 3, II: 4, III: 4, climat: 4 };
 const TURNED = { start: false, I: false, II: true, III: true, climat: true };
 // Sols des règles de pose, en clair
-const GROUND_TEXT = { gm: 'sur l’herbe', s: 'sur le sable', n: 'sur la neige', lg: 'sur la lande', x: 'dans le marais', jg: 'dans la jungle', ar: 'sur la cendre ou la roche' };
+const { GROUND_TEXT } = T;
 
 // « de » + nom d'un climat, contracté (des Landes, du Marais, de la Jungle)
 const ofPlace = name => name.replace(/^Les /, 'des ').replace(/^Le /, 'du ').replace(/^La /, 'de la ');
@@ -147,24 +149,24 @@ function piecesOf(shape, seed, tier) {
 // Vérifie un assemblage : layout = [{ piece, rot, x, y }] (chaque pièce une fois, tournée rot quarts de tour, coin
 // haut-gauche en (x, y) du gabarit). { ok: true } ou { ok: false, error }
 function check(shape, pieces, layout) {
-    if (!Array.isArray(layout) || layout.length !== pieces.length) return { ok: false, error: 'il manque des pièces' };
+    if (!Array.isArray(layout) || layout.length !== pieces.length) return { ok: false, error: T.ASSEMBLY_ERRORS.missing };
     const goal = new Set(cellsOf(shape).map(([x, y]) => `${x},${y}`));
     const used = new Set();
     const filled = new Set();
     for (const step of layout) {
         const { piece, rot, x, y } = step || {};
         if (![piece, rot, x, y].every(Number.isInteger) || piece < 0 || piece >= pieces.length || used.has(piece) || rot < 0 || rot > 3) {
-            return { ok: false, error: 'pièce invalide' };
+            return { ok: false, error: T.ASSEMBLY_ERRORS.badPiece };
         }
         used.add(piece);
         for (const [cx, cy] of turn(pieces[piece], rot)) {
             const k = `${cx + x},${cy + y}`;
-            if (!goal.has(k)) return { ok: false, error: 'une pièce dépasse du gabarit' };
-            if (filled.has(k)) return { ok: false, error: 'deux pièces se chevauchent' };
+            if (!goal.has(k)) return { ok: false, error: T.ASSEMBLY_ERRORS.overflow };
+            if (filled.has(k)) return { ok: false, error: T.ASSEMBLY_ERRORS.overlap };
             filled.add(k);
         }
     }
-    return filled.size === goal.size ? { ok: true } : { ok: false, error: 'le gabarit n’est pas rempli' };
+    return filled.size === goal.size ? { ok: true } : { ok: false, error: T.ASSEMBLY_ERRORS.unfilled };
 }
 
 // Paliers ouverts : chapters = Set des chapitres ouverts du Grimoire ; epreuves = questions réussies ; stars =
@@ -182,11 +184,11 @@ function tiersOpen(chapters, epreuves, stars = 0) {
 // Ce qui ouvre un palier fermé (texte), ou null s'il est ouvert
 function tierLock(tier, open, stars = 0) {
     if (open.has(tier)) return null;
-    if (tier === 'I') return `Palier I : inscris ${STARS} découvertes au Grimoire, ou réussis ${EPREUVES} questions de l’Épreuve.`;
+    if (tier === 'I') return T.TIER_LOCK.first(STARS, EPREUVES);
     const before = CASCADE.find(([t]) => t === tier)[1];
-    if (!open.has(before)) return `S’ouvre avec le palier ${before}.`;
+    if (!open.has(before)) return T.TIER_LOCK.after(before);
     const missing = Math.max(1, needOfChapter(tier) - stars);
-    return `Ouvre le chapitre ${tier} du Grimoire : encore ${missing} découverte${missing > 1 ? 's' : ''}.`;
+    return T.TIER_LOCK.chapter(tier, missing);
 }
 
 // Les créations que le tutoriel fait fabriquer avant leur palier et leurs éléments (la lanterne de Jovin, sa première
@@ -204,14 +206,14 @@ const LINE_MAX = 40;
 function blockOf(c, { made, owned, stock, open, have = {}, tutorial = false, stars = 0 }) {
     if (!tutorial && !open.has(c.tier)) return tierLock(c.tier, open, stars);
     const before = c.after.filter(id => !made[id]);
-    if (before.length) return `Fabrique d’abord : ${before.map(id => CRAFT_BY_ID[id].name).join(', ')}.`;
+    if (before.length) return T.MAKE_FIRST(before.map(id => CRAFT_BY_ID[id].name).join(', '));
     const unknown = tutorial ? [] : c.elements.filter(e => !owned.has(e));
-    if (unknown.length) return `Il faut savoir faire : ${unknown.join(', ')} (Grimoire).`;
-    if (Object.entries(c.cost).some(([r, n]) => (stock[r] || 0) < n)) return 'Il te manque des ressources : joue une Récolte.';
+    if (unknown.length) return T.KNOW_HOW(unknown.join(', '));
+    if (Object.entries(c.cost).some(([r, n]) => (stock[r] || 0) < n)) return MISSING_RESOURCES;
     const short = Object.entries(c.finds).find(([f, n]) => (have[f] || 0) < n);
     if (short) {
         const find = finds.FIND_BY_ID[short[0]];
-        return `Il te faut ${short[1]} ${find.name.toLowerCase()} : ramasses-en sur les gisements ${ofPlace(map.CLIMATES[find.climate])}.`;
+        return T.NEED_FINDS(short[1], find.name.toLowerCase(), ofPlace(map.CLIMATES[find.climate]));
     }
     return null;
 }
@@ -220,12 +222,12 @@ function blockOf(c, { made, owned, stock, open, have = {}, tutorial = false, sta
 function placeText(c, siteName = id => id) {
     const p = c.place;
     const parts = [];
-    if (p.climate) parts.push(`dans ${map.CLIMATES[p.climate]}`);
+    if (p.climate) parts.push(T.PLACE.climate(map.CLIMATES[p.climate]));
     if (p.ground) parts.push(GROUND_TEXT[p.ground]);
-    if (p.path) parts.push('au bord d’un chemin');
-    if (p.nearSite) parts.push(`à ${p.nearSite.reach} cases au plus de « ${siteName(p.nearSite.id)} »`);
-    if (p.nearCraft) parts.push(`à ${p.nearCraft.reach} cases au plus de « ${CRAFT_BY_ID[p.nearCraft.id].name} »`);
-    return parts.length ? `Se pose ${parts.join(', ')}.` : 'Se pose sur n’importe quelle case libre.';
+    if (p.path) parts.push(T.PLACE.path);
+    if (p.nearSite) parts.push(T.PLACE.near(p.nearSite.reach, siteName(p.nearSite.id)));
+    if (p.nearCraft) parts.push(T.PLACE.near(p.nearCraft.reach, CRAFT_BY_ID[p.nearCraft.id].name));
+    return parts.length ? T.PLACE.rule(parts.join(', ')) : T.PLACE.anywhere;
 }
 
 // Distance (en cases, diagonales comprises) entre une case et un rectangle { x, y, w, h }
@@ -236,16 +238,16 @@ const gapTo = (x, y, r) => Math.max(r.x - x, 0, x - (r.x + r.w - 1), r.y - y, 0,
 // placed : [{ x, y, craft }] (les autres créations posées), climate(x, y) (climat du quartier) }
 function spotBlock(c, x, y, ctx) {
     const p = c.place;
-    if (!ctx.free(x, y)) return 'Case occupée ou hors de tes quartiers.';
-    if (p.climate && ctx.climate(x, y) !== p.climate) return `Se pose dans ${map.CLIMATES[p.climate]}.`;
-    if (!(p.ground || 'gsm').includes(ctx.ground(x, y))) return `Se pose ${GROUND_TEXT[p.ground || 'gm']}.`;
-    if (p.path && !DIRS.some(([dx, dy]) => 'pk'.includes(ctx.ground(x + dx, y + dy)))) return 'Se pose au bord d’un chemin.';
+    if (!ctx.free(x, y)) return T.SPOT.taken;
+    if (p.climate && ctx.climate(x, y) !== p.climate) return T.SPOT.climate(map.CLIMATES[p.climate]);
+    if (!(p.ground || 'gsm').includes(ctx.ground(x, y))) return T.PLACE.rule(GROUND_TEXT[p.ground || 'gm']);
+    if (p.path && !DIRS.some(([dx, dy]) => 'pk'.includes(ctx.ground(x + dx, y + dy)))) return T.SPOT.path;
     if (p.nearSite) {
         const at = ctx.site(p.nearSite.id);
-        if (!at || gapTo(x, y, at) > p.nearSite.reach) return 'Trop loin du bâtiment demandé.';
+        if (!at || gapTo(x, y, at) > p.nearSite.reach) return T.SPOT.far;
     }
     if (p.nearCraft && !ctx.placed.some(o => o.craft === p.nearCraft.id && Math.max(Math.abs(o.x - x), Math.abs(o.y - y)) <= p.nearCraft.reach)) {
-        return `Se pose près de « ${CRAFT_BY_ID[p.nearCraft.id].name} ».`;
+        return T.SPOT.nearCraft(CRAFT_BY_ID[p.nearCraft.id].name);
     }
     return null;
 }
@@ -267,7 +269,7 @@ function leaveBlock(row, x, y, placed) {
     const left = strandedBy(row, x, y, placed)[0];
     if (!left) return null;
     const { name, place } = CRAFT_BY_ID[left.craft];
-    return `« ${name} » a besoin de « ${CRAFT_BY_ID[row.craft].name} » à ${place.nearCraft.reach} cases au plus : déplace ou range d’abord « ${name} ».`;
+    return T.LEAVE_BLOCK(name, CRAFT_BY_ID[row.craft].name, place.nearCraft.reach);
 }
 
 module.exports = {

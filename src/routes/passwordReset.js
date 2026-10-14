@@ -5,18 +5,19 @@ const { passwordProblem } = require('../services/accounts');
 const { limiter } = require('../middleware/rateLimit');
 const { isToken } = require('../utils/crypto');
 const { log } = require('../utils/logger');
+const T = require('../texts/account');
 
 const router = express.Router();
 
-const GENERIC_REPLY = { message: 'Si un compte existe pour cette adresse, un lien vient de lui être envoyé.' };
-const INVALID_LINK = { message: 'Lien invalide ou expiré' };
+const GENERIC_REPLY = { message: T.RESET_GENERIC };
+const INVALID_LINK = { message: T.RESET_LINK_INVALID };
 
 // Compteurs séparés par adresse IP : demandes de lien (5 / 15 min), changements (10 / 15 min)
-const tooMany = max => limiter({ minutes: 15, max, message: 'Trop de demandes, réessaie dans quelques minutes.' });
+const tooMany = max => limiter({ minutes: 15, max, message: T.TOO_MANY_RESETS });
 
 router.post('/forgot-password', tooMany(5), async (req, res) => {
     const email = typeof req.body.email === 'string' ? req.body.email.trim() : '';
-    if (!email || email.length > 255) return res.status(400).json({ message: 'Adresse e-mail requise' });
+    if (!email || email.length > 255) return res.status(400).json({ message: T.EMAIL_REQUIRED });
     try {
         await passwordReset.request(email);
     } catch (error) {
@@ -33,10 +34,10 @@ router.post('/reset-password', tooMany(10), async (req, res) => {
     if (problem) return res.status(400).json({ message: problem });
     try {
         if (!(await passwordReset.reset(token, password))) return res.status(400).json(INVALID_LINK);
-        res.status(200).json({ message: 'Mot de passe changé. Tu peux te connecter.' });
+        res.status(200).json({ message: T.RESET_DONE });
     } catch (error) {
         log('error', 'Échec de la réinitialisation', { errorMessage: error.message });
-        res.status(500).json({ message: 'Le mot de passe n’a pas pu être changé, réessaie plus tard.' });
+        res.status(500).json({ message: T.RESET_FAILED });
     }
 });
 

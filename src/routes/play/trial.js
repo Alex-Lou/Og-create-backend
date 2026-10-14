@@ -4,17 +4,19 @@ const book = require('../../services/recipeBook');
 const players = require('../../services/players');
 const trial = require('../../services/trial');
 const { playLimiter, withPlayer, pay } = require('./shared');
+const { INVALID } = require('../../texts/errors');
+const T = require('../../texts/play');
 
 const router = express.Router();
 const JOKER_TIME = 30; // secondes ajoutées par le joker de temps
 
 // Début d'une question : les éléments en main
 router.post('/run', playLimiter, withPlayer(async (req, res, owner, b) => {
-    if (req.body.mode !== 'timer') return res.status(400).json({ message: 'Mode invalide' });
+    if (req.body.mode !== 'timer') return res.status(400).json({ message: INVALID.mode });
     const questionId = Number(req.body.questionId);
-    if (!Number.isInteger(questionId) || questionId <= 0) return res.status(400).json({ message: 'Question invalide' });
+    if (!Number.isInteger(questionId) || questionId <= 0) return res.status(400).json({ message: INVALID.question });
     const q = await trial.question(questionId);
-    if (!q) return res.status(404).json({ message: 'Question inconnue' });
+    if (!q) return res.status(404).json({ message: T.QUESTION_UNKNOWN });
     const started = await trial.start(owner, q, req.body.launch === true);
     res.json({ elements: started.inventory, known: book.describe(b, started.inventory), freeJokers: started.freeJokers, required: started.required });
 }));
@@ -22,15 +24,15 @@ router.post('/run', playLimiter, withPlayer(async (req, res, owner, b) => {
 // Joker : une étape, un ingrédient, ou du temps ; offert s'il en reste, sinon payé
 router.post('/joker', playLimiter, withPlayer(async (req, res, owner, b) => {
     const { kind } = req.body;
-    if (!['step', 'ingredient', 'time'].includes(kind)) return res.status(400).json({ message: 'Joker inconnu' });
+    if (!['step', 'ingredient', 'time'].includes(kind)) return res.status(400).json({ message: T.JOKER_UNKNOWN });
     const run = await players.getRun(owner, 'timer');
-    if (!run) return res.status(409).json({ message: 'Aucune épreuve en cours', code: 'NO_RUN' });
+    if (!run) return res.status(409).json({ message: T.NO_TRIAL, code: 'NO_RUN' });
 
     let step = null;
     if (kind !== 'time') {
         const q = await trial.question(Number(run.context));
         step = book.nextStep(b, run.inventory, q?.valid_answers || []);
-        if (!step) return res.status(409).json({ message: 'Aucune étape à révéler.' });
+        if (!step) return res.status(409).json({ message: T.NO_STEP });
     }
 
     const reply = {};

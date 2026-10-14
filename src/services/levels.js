@@ -5,6 +5,8 @@
 // seulement (dans le plafond de la partie). Fonctions pures, copie conforme de src/game/levels.js : les deux suites de
 // tests vérifient les mêmes niveaux.
 
+const { GOAL_TEXTS } = require('../texts/games');
+
 const PER_SEASON = 10;
 const SEASONS = 3;
 const LEVELS = PER_SEASON * SEASONS;
@@ -18,9 +20,9 @@ const GAMES = ['recolte', 'filon', 'cueillette'];
 // L'objectif d'un niveau (1 à 30) : { need, text } ; il monte doucement d'un bout à l'autre
 const ramp = (n, from, to) => from + Math.round(((n - 1) * (to - from)) / (LEVELS - 1));
 const GOALS = {
-    recolte: n => ({ need: ramp(n, 30, 90), text: need => `Récolte ${need} ressources` }),
-    filon: n => ({ need: ramp(n, 2, 7), text: need => `Trouve ${need} pierres précieuses` }),
-    cueillette: n => ({ need: ramp(n, 6, 24), text: need => `Remplis ton panier : ${need} cueillettes` })
+    recolte: n => ({ need: ramp(n, 30, 90), text: GOAL_TEXTS.recolte }),
+    filon: n => ({ need: ramp(n, 2, 7), text: GOAL_TEXTS.filon }),
+    cueillette: n => ({ need: ramp(n, 6, 24), text: GOAL_TEXTS.cueillette })
 };
 function goalOf(game, n) {
     const { need, text } = GOALS[game](n);

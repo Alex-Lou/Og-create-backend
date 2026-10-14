@@ -4,6 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const { limiter } = require('./middleware/rateLimit');
+const { TOO_MANY_REQUESTS, TOO_MANY_WAIT, REQUEST_REFUSED, ROUTE_NOT_FOUND, SERVER_ERROR } = require('./texts/errors');
 
 const app = express();
 // Render place le serveur derrière un proxy (et le site relaie /api : un saut de plus) : l'adresse du joueur,
@@ -40,7 +41,7 @@ app.use(cors({
 const tooMany = (req, res) => {
     const reset = req.rateLimit && req.rateLimit.resetTime ? new Date(req.rateLimit.resetTime).getTime() : Date.now();
     const minutes = Math.max(1, Math.ceil((reset - Date.now()) / 60000));
-    res.status(429).json({ error: 'Trop de requêtes', message: `Trop de requêtes, réessaie dans ${minutes} min.`, retryAfter: minutes });
+    res.status(429).json({ error: TOO_MANY_REQUESTS, message: TOO_MANY_WAIT(minutes), retryAfter: minutes });
 };
 const globalLimiter = limiter({ minutes: Number(process.env.RATE_LIMIT_WINDOW_MINUTES) || 15, max: Number(process.env.RATE_LIMIT_MAX_REQUESTS) || 1000, handler: tooMany });
 const gameLimiter = limiter({ minutes: 1, max: Number(process.env.GAME_RATE_LIMIT_MAX_REQUESTS) || 200, handler: tooMany });
@@ -49,7 +50,7 @@ app.use(globalLimiter);
 // Anti-CSRF : toute requête d'écriture porte l'en-tête de l'application (en plus des cookies SameSite=Strict)
 app.use('/api', (req, res, next) => {
     if (['GET', 'HEAD', 'OPTIONS'].includes(req.method) || req.get('X-Requested-With') === 'origins') return next();
-    res.status(403).json({ message: 'Requête refusée' });
+    res.status(403).json({ message: REQUEST_REFUSED });
 });
 
 const bodyLimit = process.env.REQUEST_BODY_SIZE_LIMIT || '10kb';
@@ -77,7 +78,7 @@ app.get('/api/health', (req, res) => {
 
 app.use((req, res) => {
     if (req.path !== '/favicon.ico') console.log(`Route non trouvée: ${req.method} ${req.path}`);
-    res.status(404).json({ message: 'Route non trouvée', path: req.path });
+    res.status(404).json({ message: ROUTE_NOT_FOUND, path: req.path });
 });
 
 // eslint-disable-next-line no-unused-vars
@@ -85,7 +86,7 @@ app.use((err, req, res, next) => {
     console.error('Erreur serveur:', err.message);
     if (process.env.LOG_LEVEL === 'debug') console.error('Détails:', err.stack);
     res.status(err.status || 500).json({
-        message: 'Une erreur serveur est survenue',
+        message: SERVER_ERROR,
         error: process.env.NODE_ENV === 'development' ? err.message : {}
     });
 });

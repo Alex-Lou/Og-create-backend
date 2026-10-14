@@ -4,6 +4,7 @@
 const crypto = require('crypto');
 const { BASE_ELEMENTS } = require('./recipeBook');
 const hangman = require('./hangman');
+const { VERSES } = require('../texts/book');
 
 // Les 15 familles regroupées en 7 chapitres ; « need » = découvertes requises (hors 4 éléments de base),
 // « verse » = la phrase de la page de garde du chapitre. Le chapitre II s'ouvre à 3 découvertes (bible, D4)
@@ -12,13 +13,13 @@ const hangman = require('./hangman');
 // « Le Foyer », où l'acte IV trouve le Bateau d'Hermine ; la Civilisation, le défi de l'acte VI, ouvre « Les Âges » ; le
 // Phénix, la flamme rendue à Brume, ouvre « Les Légendes »)
 const CHAPTERS = [
-    { id: 'I', name: 'Les Premiers Souffles', families: ['Elements Fondamentaux', 'Phénomènes Naturels'], need: 0, verse: 'Au commencement, quatre souffles et une étincelle de curiosité.' },
-    { id: 'II', name: 'La Matière', families: ['Matériaux', 'Chimie', 'Physique'], need: 3, verse: 'Ce qui se pétrit, se fond, se forge : le monde a des mains.' },
-    { id: 'III', name: 'Ciel et Terre', families: ['Cosmos', 'Formations Naturelles'], need: 5, verse: 'Lève les yeux vers les astres, puis baisse-les vers les montagnes.' },
-    { id: 'IV', name: 'Le Vivant', families: ['Flore', 'Biologie', 'Vie et Créatures'], need: 12, seal: 'Vie', verse: 'Une graine, un souffle, un battement : tout ce qui pousse et respire.' },
-    { id: 'V', name: 'Le Foyer', families: ['Corps et Esprit', 'Créations Humaines'], need: 25, seal: 'Village', verse: 'Autour du feu, l’humain invente, rêve et bâtit sa maison.' },
-    { id: 'VI', name: 'Les Âges', families: ['Histoire', 'Technologie'], need: 45, seal: 'Civilisation', verse: 'Des silex aux étoiles : les siècles tournent leurs pages.' },
-    { id: 'VII', name: 'Les Légendes', families: ['Légendes'], need: 70, seal: 'Phénix', verse: 'Ici s’écrit ce que nul n’a vu, et que tout le monde connaît.' }
+    { id: 'I', name: 'Les Premiers Souffles', families: ['Elements Fondamentaux', 'Phénomènes Naturels'], need: 0, verse: VERSES.I },
+    { id: 'II', name: 'La Matière', families: ['Matériaux', 'Chimie', 'Physique'], need: 3, verse: VERSES.II },
+    { id: 'III', name: 'Ciel et Terre', families: ['Cosmos', 'Formations Naturelles'], need: 5, verse: VERSES.III },
+    { id: 'IV', name: 'Le Vivant', families: ['Flore', 'Biologie', 'Vie et Créatures'], need: 12, seal: 'Vie', verse: VERSES.IV },
+    { id: 'V', name: 'Le Foyer', families: ['Corps et Esprit', 'Créations Humaines'], need: 25, seal: 'Village', verse: VERSES.V },
+    { id: 'VI', name: 'Les Âges', families: ['Histoire', 'Technologie'], need: 45, seal: 'Civilisation', verse: VERSES.VI },
+    { id: 'VII', name: 'Les Légendes', families: ['Légendes'], need: 70, seal: 'Phénix', verse: VERSES.VII }
 ];
 
 // Difficulté de chaque chapitre : leurres du plateau, pages ouvertes à la fois, première lettre,

@@ -16,6 +16,7 @@ const { migrate } = require('./migrate');
 const { BIG, footprintAt, inSiteAt, placesOf } = require('./places');
 const { campOfUser, cellsOfCamp } = require('./camp');
 const { roadsOf } = require('./paths');
+const { MOVE, BUILDING_UNKNOWN } = require('../../texts/world');
 
 // Cases réservées pour toujours : trouvailles de la plage, panneaux des quartiers
 const FIXED = new Set([...pickups.SPOTS, ...Object.values(map.ANCHORS).filter(Boolean)].map(keyOf));
@@ -24,15 +25,15 @@ const FIXED = new Set([...pickups.SPOTS, ...Object.values(map.ANCHORS).filter(Bo
 // zones (à soi), ground(x, y) (le sol du joueur, ses chemins compris), taken (clés prises : camp, annexes, créations) ,
 // placed ([{ x, y, craft }] créations posées) }
 function moveBlock(siteId, x, y, ctx) {
-    if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x + BIG > SIZE || y + BIG > SIZE) return 'Hors de l’île.';
+    if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x + BIG > SIZE || y + BIG > SIZE) return MOVE.outside;
     for (let dy = 0; dy < BIG; dy++) {
         for (let dx = 0; dx < BIG; dx++) {
             const cx = x + dx, cy = y + dy;
-            if (!ctx.zones.has(map.zoneAt(cx, cy))) return 'Pose-le dans tes quartiers.';
-            if (!['g', 's', 'm'].includes(ctx.ground(cx, cy))) return 'Il se pose sur l’herbe, le sable ou la prairie (pas sur un chemin).';
+            if (!ctx.zones.has(map.zoneAt(cx, cy))) return MOVE.zones;
+            if (!['g', 's', 'm'].includes(ctx.ground(cx, cy))) return MOVE.ground;
             const key = keyOf({ x: cx, y: cy });
             if (inSiteAt(ctx.places, cx, cy, siteId) || ctx.taken.has(key) || FIXED.has(key) || landmarks.isLandmark(cx, cy) || finds.isDeposit(cx, cy)) {
-                return 'La place est prise.';
+                return MOVE.taken;
             }
         }
     }
@@ -43,7 +44,7 @@ function moveBlock(siteId, x, y, ctx) {
         const near = crafts.CRAFT_BY_ID[p.craft]?.place.nearSite;
         return near && near.id === siteId && crafts.gapTo(p.x, p.y, at) > near.reach;
     });
-    if (far) return `« ${crafts.CRAFT_BY_ID[far.craft].name} » doit rester près de lui : déplace-la d’abord.`;
+    if (far) return MOVE.keepNear(crafts.CRAFT_BY_ID[far.craft].name);
     return null;
 }
 
@@ -65,7 +66,7 @@ async function moveCtx(userId, conn) {
 // Les coins où ce bâtiment peut aller maintenant : [{ x, y }] (sa place actuelle comprise), des plus proches aux plus
 // lointains. { spots } ou { status, message }
 async function siteSpots(userId, siteId) {
-    if (!Object.hasOwn(SITES, siteId)) return { status: 404, message: 'Bâtiment inconnu.' };
+    if (!Object.hasOwn(SITES, siteId)) return { status: 404, message: BUILDING_UNKNOWN };
     await migrate(userId);
     const ctx = await moveCtx(userId, db);
     const from = ctx.places[siteId];
@@ -81,7 +82,7 @@ async function siteSpots(userId, siteId) {
 
 // Pose la grande emprise de siteId avec son coin en (x, y). {} ou { status, message }
 async function moveSite(userId, siteId, x, y) {
-    if (!Object.hasOwn(SITES, siteId)) return { status: 404, message: 'Bâtiment inconnu.' };
+    if (!Object.hasOwn(SITES, siteId)) return { status: 404, message: BUILDING_UNKNOWN };
     await migrate(userId);
     return db.transaction(async conn => {
         // (la ligne de stock verrouillée : deux poses sur l'île ne se croisent pas)
