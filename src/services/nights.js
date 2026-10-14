@@ -5,6 +5,8 @@
 //   du Feu sert vraiment) ;
 // - une lumière (le feu du Foyer, une lanterne, un brasero : 3 cases ; une torche : 2) change en luciole celui qui passe
 //   à sa portée ;
+// - le coq (choix de l'auteur, 14 oct.) voit à COQ_SIGHT cases de son poulailler : le premier qui passerait (ni barré, ni
+//   luciole), il chante, le camp s'éveille et le chasse, une fois par nuit ;
 // - un camarade content repousse celui qui vise son bâtiment, une fois par nuit ;
 // - un toucher du joueur en repousse un.
 // Au plus une panne par nuit (le premier égaré arrivé embrume son bâtiment). Tout se tire d'une graine (le joueur, la
@@ -20,6 +22,8 @@ const LIGHTS = new Set(['lanterne', 'brasero', 'torche']);
 // La portée d'une lumière, en cases (LIGHT_REACH, sinon)
 const REACH = { torche: 2 };
 const FENCES = new Set(['cloture', 'muret']);
+// Le coq voit à tant de cases (de sa place : le poulailler, sinon la cage)
+const COQ_SIGHT = 4;
 // Un égaré marche une case toutes les 2 minutes (3 avant la grande carte : les chemins y sont 1,5 fois plus longs)
 const MS_PER_CELL = 2 * 60 * 1000;
 // Une nuit à la fois : 3 égarés avant l'acte I fini, un de plus par acte, 8 au plus (choix de l'auteur, 13 oct.)
@@ -154,14 +158,27 @@ function fateOf(creature, defense) {
     }
     return { end: 'arrive', step: creature.path.length - 1 };
 }
+// Celui que le coq chasse : parmi ceux qui arriveraient (fates), le premier à entrer dans sa vue (watch : sa place,
+// ou null) ; { id, step } (la case où il le voit), ou null
+function crowOf(plan, fates, watch) {
+    if (!watch) return null;
+    let best = null;
+    for (const creature of plan) {
+        if (fates[creature.id].end !== 'arrive') continue;
+        const step = creature.path.findIndex(cell => distance(cell, watch) <= COQ_SIGHT);
+        const at = creature.at + step * MS_PER_CELL;
+        if (step >= 0 && (!best || at < best.at || (at === best.at && creature.id < best.id))) best = { id: creature.id, step, at };
+    }
+    return best;
+}
 // L'issue d'une nuit : le sort de chacun, et la panne (le premier arrivé embrume son bâtiment), ou null.
 // helpers : Set des bâtiments dont le camarade est content (il repousse un égaré, une fois) ; repelled : Set des égarés
-// repoussés d'un toucher. { fates: { id: { end, step } }, panne: { site, at } | null }
-function outcomeOf(plan, defense, helpers = new Set(), repelled = new Set()) {
+// repoussés d'un toucher ; watch : la place du coq ({ x, y }), ou null. { fates: { id: { end, step } }, panne: { site, at } | null }
+function outcomeOf(plan, defense, helpers = new Set(), repelled = new Set(), watch = null) {
     const helping = new Set(helpers);
     const fates = {};
-    let panne = null;
-    for (const creature of [...plan].sort((a, b) => a.arrives - b.arrives || (a.id < b.id ? -1 : 1))) {
+    const sorted = [...plan].sort((a, b) => a.arrives - b.arrives || (a.id < b.id ? -1 : 1));
+    for (const creature of sorted) {
         if (repelled.has(creature.id)) {
             fates[creature.id] = { end: 'touche', step: null };
             continue;
@@ -173,9 +190,12 @@ function outcomeOf(plan, defense, helpers = new Set(), repelled = new Set()) {
             continue;
         }
         fates[creature.id] = fate;
-        if (fate.end === 'arrive' && !panne) panne = { site: creature.site, at: creature.arrives };
     }
-    return { fates, panne };
+    // (le coq chasse un de ceux qui arriveraient vraiment : ni barrière, ni lumière, ni camarade)
+    const crow = crowOf(plan, fates, watch);
+    if (crow) fates[crow.id] = { end: 'coq', step: crow.step };
+    const first = sorted.find(creature => fates[creature.id].end === 'arrive');
+    return { fates, panne: first ? { site: first.site, at: first.arrives } : null };
 }
 
 // Anya, le jour de son passage (services/anya.js, slotOn), guérit le bâtiment embrumé : l'heure de Paris où elle est
@@ -187,6 +207,6 @@ const STONE_SITES = new Set(['carriere', 'puits', 'atelier', 'foyer']);
 const repairOf = (site, level) => ({ resource: STONE_SITES.has(site) ? 'stone' : 'wood', amount: 3 + 2 * (Math.max(1, level) - 1) });
 
 module.exports = {
-    START_HOUR, END_HOUR, LIGHT_REACH, REACH, MS_PER_CELL, LIGHTS, FENCES, ANYA_HOURS, countOf,
+    START_HOUR, END_HOUR, LIGHT_REACH, REACH, COQ_SIGHT, MS_PER_CELL, LIGHTS, FENCES, ANYA_HOURS, countOf,
     parisAt, dayOf, nextDay, boundsOf, nightAt, nightNear, endedBetween, borderOf, lineOf, planOf, defenseOf, fateOf, outcomeOf, repairOf
 };

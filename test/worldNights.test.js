@@ -22,7 +22,7 @@ const settle = (userId, now) => db.transaction(async conn => worldNights.settleN
 const view = (userId, now) => worldNights.nightsView(userId, db, now);
 const blightsOf = async userId => (await sql('SELECT blights FROM world_nights WHERE user_id = $1', [userId]))[0].blights;
 // Le bilan d'une nuit (ce que Brume dit au matin) : combien de chaque sort
-const countsOf = ({ fates }) => Object.values(fates).reduce((out, f) => ({ ...out, [f.end]: out[f.end] + 1 }), { luciole: 0, barre: 0, camarade: 0, touche: 0, arrive: 0 });
+const countsOf = ({ fates }) => Object.values(fates).reduce((out, f) => ({ ...out, [f.end]: out[f.end] + 1 }), { luciole: 0, barre: 0, coq: 0, camarade: 0, touche: 0, arrive: 0 });
 
 // Une île : Brumelune et la Source, le Puits bâti ; sans défense posée ; ses habitants tristes, sans repas depuis un mois
 // (aucun camarade content : un habitant sans ligne de besoins arrive comblé, donc content). Le Puits est posé loin du

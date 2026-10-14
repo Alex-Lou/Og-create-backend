@@ -117,6 +117,29 @@ test('une nuit embrume au plus un bâtiment : le premier arrivé ; un camarade c
   assert.equal(nights.outcomeOf(plan, open, new Set(['puits', 'bosquet']), new Set(['n:2'])).panne, null);
 });
 
+test('le coq chante une fois par nuit : le premier qui arriverait à sa vue (4 cases) boude et repart', () => {
+  // Trois égarés vers le Puits, en ligne (y = 0), qui passent près du poulailler en (4, 3)
+  const walk = (id, site, at) => ({ id, site, path: nights.lineOf({ x: 0, y: 0 }, { x: 8, y: 0 }), at, arrives: at + 8 * nights.MS_PER_CELL });
+  const plan = [walk('n:0', 'puits', 2000), walk('n:1', 'puits', 1000), walk('n:2', 'puits', 3000)];
+  const open = nights.defenseOf([], {});
+  const coop = { x: 4, y: 3 };
+  // Il voit le premier (n:1) dès la case (0, 0), à 4 cases : il chante, l'égaré boude là ; la panne vient du suivant
+  const crowed = nights.outcomeOf(plan, open, new Set(), new Set(), coop);
+  assert.deepEqual(crowed.fates['n:1'], { end: 'coq', step: 0 });
+  assert.deepEqual([crowed.fates['n:0'].end, crowed.fates['n:2'].end], ['arrive', 'arrive']);
+  assert.deepEqual(crowed.panne, { site: 'puits', at: plan[0].arrives });
+  // Trop loin (5 cases) : il ne voit rien ; sans coq non plus
+  assert.equal(Object.values(nights.outcomeOf(plan, open, new Set(), new Set(), { x: 4, y: 5 }).fates).filter(f => f.end === 'coq').length, 0);
+  assert.equal(Object.values(nights.outcomeOf(plan, open).fates).filter(f => f.end === 'coq').length, 0);
+  // Un camarade content renvoie d'abord le sien (n:1) : le coq chasse le suivant à arriver (n:0) ; le dernier embrume
+  const helped = nights.outcomeOf(plan, open, new Set(['puits']), new Set(), coop);
+  assert.deepEqual([helped.fates['n:1'].end, helped.fates['n:0'].end, helped.fates['n:2'].end], ['camarade', 'coq', 'arrive']);
+  assert.deepEqual(helped.panne, { site: 'puits', at: plan[2].arrives });
+  // Une lumière qui les change tous en lucioles : le coq n'a rien à faire
+  const lit = nights.defenseOf([{ craft: 'lanterne', x: 1, y: 1 }], {});
+  assert.deepEqual(Object.values(nights.outcomeOf(plan, lit, new Set(), new Set(), coop).fates).map(f => f.end), ['luciole', 'luciole', 'luciole']);
+});
+
 test('réparer : de la pierre ou du bois, 3 au palier I puis 2 de plus par palier', () => {
   assert.deepEqual(nights.repairOf('puits', 1), { resource: 'stone', amount: 3 });
   assert.deepEqual(nights.repairOf('puits', 2), { resource: 'stone', amount: 5 });

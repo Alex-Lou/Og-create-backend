@@ -12,11 +12,13 @@ const anya = require('../anya');
 const map = require('../worldMap');
 const quests = require('../quests');
 const { SITES } = require('./rules');
-const { stockOf, levelsOf, zonesOf, craftsOf, placedOf, claimedOf, needRowsOf, settlersOf } = require('./reads');
+const { stockOf, levelsOf, zonesOf, craftsOf, placedOf, claimedOf, needRowsOf, settlersOf, annexesOf } = require('./reads');
 const { migrate } = require('./migrate');
 const { payWith } = require('./produce');
 const { presenceOf, residentsOf, moodsOf } = require('./people');
 const { placesOf } = require('./places');
+const { coqSinceOf } = require('./beasts');
+const { campOfUser } = require('./camp');
 
 // Un jour de grâce entre la présentation et la première nuit
 const GRACE_MS = 24 * 3600 * 1000;
@@ -24,8 +26,16 @@ const DAY_MS = 24 * 3600 * 1000;
 const msOf = t => new Date(t).getTime();
 const iso = ms => new Date(ms).toISOString();
 
-// L'île telle que la voient les nuits : island (pour nights.planOf), defense, levels, et les bâtiments gardés par un
-// camarade content (ou heureux) à un instant (helpersAt)
+// Où veille le coq : le poulailler, sinon la cage ouverte du camp ({ x, y }), ou null
+async function coopOf(userId, conn) {
+    const coop = (await annexesOf(userId, conn)).find(a => a.annex === 'poulailler');
+    if (coop) return { x: coop.x, y: coop.y };
+    const cage = (await campOfUser(userId, conn)).find(c => c.id === 'cage');
+    return cage ? { x: cage.x, y: cage.y } : null;
+}
+
+// L'île telle que la voient les nuits : island (pour nights.planOf), defense, levels, les bâtiments gardés par un
+// camarade content (ou heureux) à un instant (helpersAt), et la place du coq s'il est là au début d'une nuit (watchAt)
 async function islandOf(userId, conn) {
     const { levels } = await levelsOf(userId, conn);
     const zones = await zonesOf(userId, conn);
@@ -39,7 +49,10 @@ async function islandOf(userId, conn) {
     const { places } = await placesOf(userId, conn);
     const helpersAt = at => new Set(Object.values(moodsOf(residents, levels, zones, decor, filled, presence, at, places))
         .filter(m => m.built && m.mood !== 'triste').map(m => m.site));
-    return { island: { owned: zones, sites, acts, places }, defense: nights.defenseOf(decor, levels, places), levels, helpersAt };
+    const coqSince = await coqSinceOf(userId, conn);
+    const home = coqSince === null ? null : await coopOf(userId, conn);
+    const watchAt = at => (home && coqSince <= at ? home : null);
+    return { island: { owned: zones, sites, acts, places }, defense: nights.defenseOf(decor, levels, places), levels, helpersAt, watchAt };
 }
 
 // Anya révélée : le cœur de l'île libéré, et la Révélation vue (sa ligne world_friends)
@@ -75,10 +88,11 @@ async function settleNights(userId, conn, stock, now = Date.now()) {
     if (!due.length && !blights.some(b => !b.until || spent(b))) return;
     const events = [];
     if (due.length) {
-        const { island, defense, helpersAt } = await islandOf(userId, conn);
+        const { island, defense, helpersAt, watchAt } = await islandOf(userId, conn);
         for (const night of due) {
             const repelled = new Set(row.repelled.night === night ? row.repelled.ids : []);
-            const { panne } = nights.outcomeOf(nights.planOf(userId, night, island), defense, helpersAt(nights.boundsOf(night).end), repelled);
+            const { start, end } = nights.boundsOf(night);
+            const { panne } = nights.outcomeOf(nights.planOf(userId, night, island), defense, helpersAt(end), repelled, watchAt(start));
             if (panne) events.push(panne);
         }
     }
@@ -154,16 +168,16 @@ async function repairSite(userId, site, now = Date.now()) {
 // night: { id, start, end } (la nuit en cours ou la prochaine), creatures: [{ id, site, path, at, arrives, end, step }]
 // (leur sort avec l'île d'à présent), panne (le bâtiment que la nuit embrumerait, ou null), blight: { site, since,
 // repair: { resource, amount } } | null, last : le bilan de la dernière nuit finie (lastOf) }
-// Le bilan de la dernière nuit finie (Brume le dit au matin) : { id, counts: { luciole, barre, camarade, touche,
+// Le bilan de la dernière nuit finie (Brume le dit au matin) : { id, counts: { luciole, barre, coq, camarade, touche,
 // arrive }, panne (le bâtiment qu'elle a embrumé, ou null) }, ou null avant la première nuit
-function lastOf(userId, row, first, { island, defense, helpersAt }, now) {
+function lastOf(userId, row, first, { island, defense, helpersAt, watchAt }, now) {
     const night = nights.endedBetween(now - 2 * DAY_MS, now).pop();
     if (!night) return null;
     const { start, end } = nights.boundsOf(night);
     if (start < first) return null;
     const repelled = new Set(row.repelled.night === night ? row.repelled.ids : []);
-    const { fates } = nights.outcomeOf(nights.planOf(userId, night, island), defense, helpersAt(end), repelled);
-    const counts = { luciole: 0, barre: 0, camarade: 0, touche: 0, arrive: 0 };
+    const { fates } = nights.outcomeOf(nights.planOf(userId, night, island), defense, helpersAt(end), repelled, watchAt(start));
+    const counts = { luciole: 0, barre: 0, coq: 0, camarade: 0, touche: 0, arrive: 0 };
     for (const fate of Object.values(fates)) counts[fate.end] += 1;
     const blight = row.blights.find(b => msOf(b.since) >= start && msOf(b.since) <= end);
     return { id: night, counts, panne: blight ? blight.site : null };
@@ -176,14 +190,14 @@ async function nightsView(userId, conn = db, now = Date.now()) {
     const night = nights.nightNear(now);
     const { start, end } = nights.boundsOf(night);
     const seen = await islandOf(userId, conn);
-    const { island, defense, levels, helpersAt } = seen;
+    const { island, defense, levels, helpersAt, watchAt } = seen;
     const active = row.blights.find(b => !b.until);
     const blight = active ? { site: active.site, since: msOf(active.since), repair: nights.repairOf(active.site, levels[active.site] || 1) } : null;
     const last = lastOf(userId, row, first, seen, now);
     if (start < first) return { started: true, first, now, night: { id: night, start, end }, creatures: [], panne: null, blight, last };
     const plan = nights.planOf(userId, night, island);
     const repelled = new Set(row.repelled.night === night ? row.repelled.ids : []);
-    const { fates, panne } = nights.outcomeOf(plan, defense, helpersAt(end), repelled);
+    const { fates, panne } = nights.outcomeOf(plan, defense, helpersAt(end), repelled, watchAt(start));
     return {
         started: true, first, now, night: { id: night, start, end },
         creatures: plan.map(c => ({ ...c, ...fates[c.id] })), panne: blight ? null : panne, blight, last

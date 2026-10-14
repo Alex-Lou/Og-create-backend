@@ -18,9 +18,28 @@ test('les poules de Cannelle, la cage ouverte ; les bêtes du Potager selon son 
   assert.deepEqual(ids(3, true), ['poule-rousse', 'poule-blanche', 'poule-noire', 'vache']);
   assert.deepEqual(ids(6, false), ['vache', 'mouton', 'brebis', 'cochon', 'chevre']);
   assert.deepEqual(beasts.HENS.map(id => beasts.BEAST_BY_ID[id].name), ['Paprika', 'Brioche', 'Madame']);
-  // Le petit plus : par jour, poule 4 (Madame ne pond pas), vache 8, mouton 4, cochon 6, chèvre 6 ; un repas coûte 2 vivres
-  assert.deepEqual(beasts.BEASTS.map(b => b.daily), [4, 4, 0, 8, 4, 4, 6, 6]);
+  // Le petit plus : par jour, poule 4 (Madame ne pond pas, le coq non plus ; les poulettes 2), vache 8, mouton 4,
+  // cochon 6, chèvre 6 ; un repas coûte 2 vivres
+  assert.deepEqual(beasts.BEASTS.map(b => b.daily), [4, 4, 0, 0, 2, 2, 2, 8, 4, 4, 6, 6]);
   assert.deepEqual(beasts.FEED_COST, { food: 2 });
+});
+
+test('le coq et la couvée : Amiral là, une poulette éclot tous les deux jours (trois au plus), poussin trois jours', () => {
+  const D = beasts.DAY_MS;
+  const camp = (since, now) => beasts.beastsOf(0, true, since, now).map(b => b.id);
+  // Sans coq : les trois poules ; la cage fermée : personne, coq ou pas
+  assert.deepEqual(camp(null, T), ['poule-rousse', 'poule-blanche', 'poule-noire']);
+  assert.deepEqual(beasts.beastsOf(0, false, T, T + 9 * D), []);
+  // Le coq là : Muscade éclot au 2e jour, Praline au 4e, Noisette au 6e, pas d'autre ensuite
+  assert.deepEqual(camp(T, T + 2 * D - 1), ['poule-rousse', 'poule-blanche', 'poule-noire', 'coq']);
+  assert.deepEqual(camp(T, T + 2 * D).slice(4), ['poulette-muscade']);
+  assert.deepEqual(camp(T, T + 6 * D).slice(4), ['poulette-muscade', 'poulette-praline', 'poulette-noisette']);
+  assert.equal(camp(T, T + 60 * D).length, 7);
+  // Poussin trois jours après son éclosion, puis poule
+  const muscade = beasts.BEAST_BY_ID['poulette-muscade'];
+  assert.deepEqual([beasts.isChick(muscade, T, T + 2 * D), beasts.isChick(muscade, T, T + 5 * D - 1), beasts.isChick(muscade, T, T + 5 * D)], [true, true, false]);
+  assert.equal(beasts.isChick(hen, T, T + 3 * D), false);
+  assert.deepEqual(beasts.HENS, ['poule-rousse', 'poule-blanche', 'poule-noire']);
 });
 
 test('Madame ne pond pas : nourrie, elle est contente, sa bulle reste vide', () => {

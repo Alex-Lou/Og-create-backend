@@ -4,6 +4,10 @@
 // Cannelle (bible, § 6.16 et étape 8 : sauvées dans leur cage, elles vivent au camp, près du feu) : là dès la cage
 // ouverte, sans attendre le Potager ; Madame ne pond pas (« Elle juge. »). Les autres bêtes sont celles que le Potager
 // montre selon son palier (world/village.js du front) ; les variantes du Bestiaire restent des décors.
+// Le coq et la couvée (choix de l'auteur, 14 oct.) : Amiral échoue au camp quand le Foyer passe à l'Abri (la cage
+// ouverte) ; avec lui, une poulette éclot tous les HATCH_DAYS jours, trois au plus. Poussin GROW_DAYS jours (elle suit
+// les poules, on ne la nourrit pas), puis poule : elle pond, moins que ses aînées. Le coq ne pond pas : il veille (la
+// nuit, son chant chasse un égaré : services/nights.js).
 const HOUR_MS = 3600 * 1000;
 const CONTENT_HOURS = 24;
 const DAY_MS = CONTENT_HOURS * HOUR_MS;
@@ -14,6 +18,10 @@ const BEASTS = [
     { id: 'poule-rousse', species: 'hen', name: 'Paprika', camp: true, daily: 4 },
     { id: 'poule-blanche', species: 'hen', name: 'Brioche', camp: true, daily: 4 },
     { id: 'poule-noire', species: 'hen', name: 'Madame', camp: true, daily: 0 },
+    { id: 'coq', species: 'rooster', name: 'Amiral', camp: true, daily: 0, rooster: true },
+    { id: 'poulette-muscade', species: 'hen', name: 'Muscade', camp: true, daily: 2, brood: 1 },
+    { id: 'poulette-praline', species: 'hen', name: 'Praline', camp: true, daily: 2, brood: 2 },
+    { id: 'poulette-noisette', species: 'hen', name: 'Noisette', camp: true, daily: 2, brood: 3 },
     { id: 'vache', species: 'cow', name: 'La vache', level: 3, daily: 8 },
     { id: 'mouton', species: 'sheep', name: 'Le mouton', level: 4, daily: 4 },
     { id: 'brebis', species: 'sheep', name: 'La brebis', level: 4, daily: 4 },
@@ -21,11 +29,29 @@ const BEASTS = [
     { id: 'chevre', species: 'goat', name: 'La chèvre', level: 6, daily: 6 }
 ];
 const BEAST_BY_ID = Object.fromEntries(BEASTS.map(b => [b.id, b]));
-// Les poules de Cannelle
-const HENS = BEASTS.filter(b => b.camp).map(b => b.id);
-// Les bêtes de l'île : les poules si la cage est ouverte (freed), puis celles du Potager à son palier
-const beastsOf = (level, freed = false) => BEASTS.filter(b => (b.camp ? freed : level >= b.level));
+// Les poules de Cannelle, sorties de la cage
+const HENS = BEASTS.filter(b => b.camp && !b.rooster && !b.brood).map(b => b.id);
+// Le coq arrive quand le Foyer atteint ce palier (l'Abri) ; une poulette éclot tous les HATCH_DAYS jours, et reste
+// poussin GROW_DAYS jours
+const COOP_LEVEL = 2;
+const HATCH_DAYS = 2;
+const GROW_DAYS = 3;
 const ms = t => new Date(t).getTime();
+// L'instant où une poulette éclot (coqSince : l'arrivée du coq), ou null (pas de coq)
+const hatchedAt = (beast, coqSince) => (coqSince === null || coqSince === undefined ? null : ms(coqSince) + beast.brood * HATCH_DAYS * DAY_MS);
+// Encore poussin à l'instant now ?
+const isChick = (beast, coqSince, now) => Boolean(beast.brood) && now < hatchedAt(beast, coqSince) + GROW_DAYS * DAY_MS;
+// Les bêtes de l'île : les poules si la cage est ouverte (freed), le coq et les poulettes écloses s'il est là (coqSince :
+// son arrivée, ou null), puis celles du Potager à son palier
+function beastsOf(level, freed = false, coqSince = null, now = Date.now()) {
+    return BEASTS.filter(b => {
+        if (!b.camp) return level >= b.level;
+        if (!freed) return false;
+        if (b.rooster) return coqSince !== null && coqSince !== undefined;
+        if (b.brood) return hatchedAt(b, coqSince) !== null && now >= hatchedAt(b, coqSince);
+        return true;
+    });
+}
 
 // Ce que contient la bulle d'une bête (row : { fed_at, collected_at }) : { amount, collectedAt }. Elle se remplit tant
 // que la bête est contente, une unité à la fois ; collectedAt : jusqu'où c'est compté (la part d'une unité en cours
@@ -55,4 +81,7 @@ function feedOf(beast, row, now) {
     return { amount, row: { fed_at: now, collected_at: content ? collectedAt : now } };
 }
 
-module.exports = { CONTENT_HOURS, DAY_MS, FEED_COST, BEASTS, BEAST_BY_ID, HENS, beastsOf, readyOf, stateOf, feedOf };
+module.exports = {
+    CONTENT_HOURS, DAY_MS, FEED_COST, BEASTS, BEAST_BY_ID, HENS, COOP_LEVEL, HATCH_DAYS, GROW_DAYS,
+    beastsOf, hatchedAt, isChick, readyOf, stateOf, feedOf
+};

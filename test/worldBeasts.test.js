@@ -87,6 +87,37 @@ test('nourrir une poule, voir sa bulle se remplir, ramasser les œufs ; Madame j
   assert.ok(Math.abs(Number(row.behind) - 1) < 0.01, `${row.behind} h`);
 });
 
+test('le coq échoue au Foyer II, la cage ouverte ; sa couvée : un poussin qu’on ne nourrit pas, puis une poulette qui pond', async () => {
+  const player = await newPlayer({ settled: true });
+  const id = player.userId;
+  const feed = beast => api('POST', '/play/world/beast/feed', { beast }, player);
+  await withCannelle(id);
+  await api('POST', '/play/world/beasts/cage', {}, player);
+  // Au Foyer I : pas de coq
+  assert.ok(!(await herdOf(player)).list.some(b => b.id === 'coq'));
+  assert.equal((await feed('coq')).status, 404);
+  // Le Foyer à l'Abri : Amiral est là (sa ligne retient son arrivée), il ne pond pas ; pas encore de poussin
+  await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'foyer', 2) ON CONFLICT (user_id, site) DO UPDATE SET level = 2`, [id]);
+  const herd = (await herdOf(player)).list;
+  assert.deepEqual(herd.filter(b => b.id === 'coq').map(b => [b.species, b.name, b.daily]), [['rooster', 'Amiral', 0]]);
+  assert.equal((await sql(`SELECT COUNT(*)::int AS n FROM world_items WHERE user_id = $1 AND item = 'coq'`, [id]))[0].n, 1);
+  assert.equal(herd.length, 4);
+  // Deux jours plus tard : Muscade a éclos, poussin ; on ne la nourrit pas
+  await sql(`UPDATE world_items SET bought_at = bought_at - INTERVAL '2 days 1 hour' WHERE user_id = $1 AND item = 'coq'`, [id]);
+  const chick = (await herdOf(player)).list.find(b => b.id === 'poulette-muscade');
+  assert.deepEqual([chick.species, chick.chick, chick.refill, chick.ready, chick.daily], ['chick', true, false, 0, 0]);
+  assert.deepEqual([(await feed('poulette-muscade')).status, (await feed('poulette-muscade')).data.message], [409, 'Muscade n’a pas encore faim.']);
+  // Trois jours encore : c'est une poule, affamée ; nourrie, elle pond (2 par jour)
+  await sql(`UPDATE world_items SET bought_at = bought_at - INTERVAL '3 days' WHERE user_id = $1 AND item = 'coq'`, [id]);
+  await sql('UPDATE world_stock SET food = 10 WHERE user_id = $1', [id]);
+  const grown = await feed('poulette-muscade');
+  assert.equal(grown.status, 200);
+  const muscade = grown.data.world.beasts.list.find(b => b.id === 'poulette-muscade');
+  assert.deepEqual([muscade.species, muscade.daily, muscade.fed, Boolean(muscade.chick)], ['hen', 2, true, false]);
+  // (Praline a éclos au 4e jour : encore poussin au 5e)
+  assert.equal(grown.data.world.beasts.list.find(b => b.id === 'poulette-praline').species, 'chick');
+});
+
 test('nourrie deux fois à la fois : un seul repas payé', async () => {
   const player = await newPlayer();
   await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'jardins')`, [player.userId]);
