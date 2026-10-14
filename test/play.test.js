@@ -1232,9 +1232,9 @@ function playRun(run, count) {
   for (let i = 0; i < count; i++) {
     const path = firstChain(game.board);
     moves.push(path);
-    h.play(game, path);
+    h.play(game, path, run.rules);
   }
-  return { moves, expected: h.replay(run.seed, run.kinds, moves, run.maxMoves, run.boosts).gains };
+  return { moves, expected: h.replay(run.seed, run.kinds, moves, run.maxMoves, run.boosts, run.rules).gains };
 }
 
 test('le Monde : les écus d’une Récolte sont plafonnés comme les mini-jeux (60 × le palier le plus haut) ; pas ses ressources', async () => {
@@ -1275,6 +1275,8 @@ test('le Monde : la Récolte se joue contre une partie de la réserve, rejouée 
   for (let i = 0; i < 3; i++) runs.push((await api('POST', '/play/world/harvest/start', {}, player)).data);
   assert.equal((await api('POST', '/play/world/harvest/start', {}, player)).status, 409);
   assert.ok(Number.isInteger(runs[0].seed));
+  // (les règles de la partie : les combos, la lune et la série ; services/harvest.js)
+  assert.deepEqual(runs.map(r => r.rules), [2, 2, 2]);
   // Pas d'eau douce avant la clé du Puits (la Pluie au Grimoire) ; les deux premières sont courtes (8 coups), puis normales
   assert.deepEqual([runs[0].kinds, runs[0].maxMoves], [['stone', 'wood', 'food'], 8]);
   assert.deepEqual([runs[1].kinds, runs[1].maxMoves, runs[2].maxMoves], [['stone', 'wood', 'food'], 8, 15]);
@@ -1307,6 +1309,11 @@ test('le Monde : la Récolte se joue contre une partie de la réserve, rejouée 
   // La partie d'un autre joueur ne se rend pas
   const other = await newPlayer();
   assert.equal((await api('POST', '/play/world/harvest/finish', { run: runs[2].id, moves: [] }, other)).status, 404);
+  // Une partie d'avant les combos (sans règles) se rejoue avec les règles 1
+  await sql(`UPDATE world_runs SET config = config - 'rules' WHERE id = $1`, [runs[2].id]);
+  const old = playRun({ ...runs[2], rules: undefined }, 4);
+  const replayed = await api('POST', '/play/world/harvest/finish', { run: runs[2].id, moves: old.moves }, player);
+  assert.deepEqual([replayed.status, replayed.data.gains], [200, old.expected]);
 
   // Réserve : une partie revient toutes les 30 minutes
   await sql(`UPDATE world_stock SET charges = 0, charges_at = NOW() - INTERVAL '65 minutes' WHERE user_id = $1`, [player.userId]);

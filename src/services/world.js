@@ -726,8 +726,9 @@ function startRun(userId, asked = null) {
         // départ est toujours plus ancien (undoItem)
         const { rows } = await conn.query(
             'INSERT INTO world_runs (user_id, seed, config, created_at) VALUES ($1, $2, $3, clock_timestamp()) RETURNING id',
-            [userId, seed, JSON.stringify({ kinds, maxMoves, boosts, lvl: chosen.level })]);
-        return { run: { id: Number(rows[0].id), seed, kinds, maxMoves, boosts, level: chosen.level, goal: gridLevels.goalOf('recolte', chosen.level) } };
+            [userId, seed, JSON.stringify({ kinds, maxMoves, boosts, lvl: chosen.level, rules: harvest.RULES })]);
+        // (rules : les règles de la partie, que le jeu et le serveur rejouent ; services/harvest.js)
+        return { run: { id: Number(rows[0].id), seed, kinds, maxMoves, boosts, level: chosen.level, goal: gridLevels.goalOf('recolte', chosen.level), rules: harvest.RULES } };
     });
 }
 
@@ -743,7 +744,7 @@ function finishRun(userId, runId, moves) {
         const { seed, config, created_at: createdAt } = rows[0];
         const played = Date.now() - new Date(createdAt).getTime() > RUN_TTL_MS
             ? { ok: false, error: 'Partie expirée' }
-            : harvest.replay(seed, config.kinds, moves, config.maxMoves, config.boosts);
+            : harvest.replay(seed, config.kinds, moves, config.maxMoves, config.boosts, config.rules || 1);
         if (!played.ok) return { status: 400, message: `Partie refusée : ${played.error.toLowerCase()}.` };
         await stockOf(userId, conn, true);
         const g = played.gains;
