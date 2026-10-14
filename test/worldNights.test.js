@@ -22,7 +22,7 @@ const settle = (userId, now) => db.transaction(async conn => worldNights.settleN
 const view = (userId, now) => worldNights.nightsView(userId, db, now);
 const blightsOf = async userId => (await sql('SELECT blights FROM world_nights WHERE user_id = $1', [userId]))[0].blights;
 // Le bilan d'une nuit (ce que Brume dit au matin) : combien de chaque sort
-const countsOf = ({ fates }) => Object.values(fates).reduce((out, f) => ({ ...out, [f.end]: out[f.end] + 1 }), { luciole: 0, barre: 0, coq: 0, camarade: 0, touche: 0, arrive: 0 });
+const countsOf = ({ fates }) => Object.values(fates).reduce((out, f) => ({ ...out, [f.end]: out[f.end] + 1 }), { luciole: 0, barre: 0, dort: 0, coq: 0, camarade: 0, touche: 0, arrive: 0, revenu: 0 });
 
 // Une île : Brumelune et la Source, le Puits bâti ; sans défense posée ; ses habitants tristes, sans repas depuis un mois
 // (aucun camarade content : un habitant sans ligne de besoins arrive comblé, donc content). Le Puits est posé loin du
@@ -42,16 +42,19 @@ async function islandPlayer() {
   await sql(`INSERT INTO world_needs (user_id, villager, need, filled_at) VALUES ($1, 'puits', 'manger', NOW() - INTERVAL '30 days'), ($1, 'foyer', 'manger', NOW() - INTERVAL '30 days')`, [player.userId]);
   return player;
 }
+// Le plan d'une nuit tel que le serveur le tire, les nuits présentées juste avant (startBefore : la n-ième, index ; la
+// première, celle des trois Sans-Nom, par défaut ; le Puits bâti, le Noyé peut sortir)
+const planAt = (userId, night, index) => nights.planOf(userId, night, { ...ISLAND, first: nights.boundsOf(night).start - MINUTE - index * DAY, unlocks: { noye: 0 } });
 // La première nuit, dès from, où pick(plan) est vrai (le plan tiré de la graine du joueur)
-function nightWhere(userId, from, pick) {
+function nightWhere(userId, from, pick, index = 0) {
   for (let night = nights.nightNear(from), i = 0; i < 90; night = nights.nextDay(night), i++) {
-    const plan = nights.planOf(userId, night, ISLAND);
+    const plan = planAt(userId, night, index);
     if (pick(plan)) return { night, plan, ...nights.boundsOf(night) };
   }
   throw new Error('aucune nuit qui convienne');
 }
 // Les nuits présentées juste avant celle-ci (sa veille est encore la grâce)
-const startBefore = (userId, start) => sql('UPDATE world_nights SET started_at = $2, seen_until = $2 WHERE user_id = $1', [userId, iso(start - DAY - MINUTE)]);
+const startBefore = (userId, start, index = 0) => sql('UPDATE world_nights SET started_at = $2, seen_until = $2 WHERE user_id = $1', [userId, iso(start - DAY - MINUTE - index * DAY)]);
 
 test('pas de nuit avant que Brume les présente, puis un jour de grâce ; ensuite une panne au plus, le premier arrivé', async () => {
   const player = await islandPlayer();
@@ -86,7 +89,7 @@ test('pas de nuit avant que Brume les présente, puis un jour de grâce ; ensuit
   const morning = await view(id, end + HOUR);
   assert.deepEqual(morning.blight, { site: panne.site, since: panne.at, repair: nights.repairOf(panne.site, 1) });
   // Brume en fait le bilan au matin : le sort de chacun, le bâtiment embrumé
-  assert.deepEqual(morning.last, { id: night, counts: countsOf(nights.outcomeOf(plan, FIRE)), panne: panne.site });
+  assert.deepEqual(morning.last, { id: night, counts: countsOf(nights.outcomeOf(plan, FIRE)), kinds: { fantome: 3 }, panne: panne.site });
   // Les nuits suivantes n'en embrument pas un second tant qu'il n'est pas réparé
   await settle(id, end + 6 * DAY);
   assert.equal((await blightsOf(id)).length, 1);
@@ -156,6 +159,33 @@ test('d’un toucher, la nuit, on repousse un égaré sur son chemin ; pas le jo
   // La route : un égaré mal écrit est refusé ; un bien écrit, à l'heure réelle, ne trouve personne (jour ou grâce)
   assert.equal((await api('POST', '/play/world/nights/repel', { id: 'x' }, player)).status, 400);
   assert.equal((await api('POST', '/play/world/nights/repel', { id: `${night}:0` }, player)).status, 409);
+});
+
+test('la troisième nuit, un Esprit : repoussé d’un toucher, il revient par un autre chemin ; sinon, on ne peut toucher son retour', async () => {
+  const player = await islandPlayer();
+  const id = player.userId;
+  await worldNights.startNights(id);
+  // (la troisième nuit écrite : un Sans-Nom, un Dormeur, un Esprit qui marche au moins une case)
+  const walking = p => p.some(c => c.kind === 'esprit' && !c.back && nights.fateOf(c, FIRE).step > 0);
+  const { night, plan, start, end } = nightWhere(id, Date.now() + 2 * DAY, walking, 2);
+  await startBefore(id, start, 2);
+  assert.deepEqual(plan.filter(c => !c.back).map(c => c.kind), ['fantome', 'zombie', 'esprit']);
+  const spirit = plan.find(c => c.kind === 'esprit' && !c.back);
+  const back = plan.find(c => c.back === spirit.id);
+  // Pas encore repoussé (luciole ou arrivée) : son retour n'est pas dehors, ni à toucher
+  const evening = await view(id, start - HOUR);
+  assert.ok(evening.creatures.every(c => c.kind && c.pace));
+  assert.ok(!evening.creatures.some(c => c.id === back.id) || ['barre', 'coq', 'camarade'].includes(evening.creatures.find(c => c.id === spirit.id).end));
+  if (!evening.creatures.some(c => c.id === back.id)) assert.equal((await worldNights.repelCreature(id, back.id, back.at + MINUTE)).status, 409);
+  // Un toucher : il boude, puis revient
+  assert.deepEqual(await worldNights.repelCreature(id, spirit.id, spirit.at + MINUTE), { id: spirit.id, night });
+  const later = await view(id, back.at + MINUTE);
+  assert.equal(later.creatures.find(c => c.id === back.id).back, spirit.id);
+  // Au matin : trois égarés sortis (le retour ne compte pas pour un de plus), un Esprit revenu
+  await settle(id, end + HOUR);
+  const morning = await view(id, end + HOUR);
+  assert.deepEqual(morning.last.kinds, { fantome: 1, zombie: 1, esprit: 1 });
+  assert.equal(morning.last.counts.revenu, 1);
 });
 
 test('un bâtiment embrumé ne produit plus ; la réparation (selon son palier) le relance', async () => {

@@ -50,7 +50,8 @@ test('ils sortent du bord de la brume et marchent droit vers le bâtiment le plu
   assert.deepEqual([line[0], line.at(-1)], [{ x: 2, y: 3 }, { x: 9, y: 5 }]);
   line.slice(1).forEach((c, i) => assert.equal(step(c, line[i]), 1));
 
-  const island = { owned, sites: [{ id: 'foyer', level: 1 }, { id: 'puits', level: 1 }], acts: 0 };
+  // (la première nuit, écrite : trois Sans-Nom, qui marchent du bord de la brume)
+  const island = { owned, sites: [{ id: 'foyer', level: 1 }, { id: 'puits', level: 1 }], acts: 0, first: nights.boundsOf('2026-10-06').start };
   const plan = nights.planOf(42, '2026-10-06', island);
   // La même graine, le même plan (tous les appareils voient la même nuit) ; une autre nuit, un autre
   assert.deepEqual(nights.planOf(42, '2026-10-06', island), plan);
@@ -158,6 +159,78 @@ test('le coq chante une fois par nuit : le premier qui arriverait à sa vue (4 c
   // Une lumière qui les change tous en lucioles : le coq n'a rien à faire
   const lit = nights.defenseOf([{ craft: 'lanterne', x: 1, y: 1 }], {});
   assert.deepEqual(Object.values(nights.outcomeOf(plan, lit, new Set(), new Set(), coop).fates).map(f => f.end), ['luciole', 'luciole', 'luciole']);
+});
+
+test('qui sort : les trois premières nuits écrites, puis un mélange de ce qui existe ; le premier Noyé, la première Racine', () => {
+  const island = { owned: new Set(['coeur', 'source']), sites: [{ id: 'foyer', level: 1 }], acts: 0, first: nights.boundsOf('2026-10-06').start };
+  const kinds = (night, more = {}) => nights.kindsOf(42, night, { ...island, ...more }, 3);
+  // La n-ième nuit depuis la première possible (présentées l'après-midi : celle du soir même ; le soir : la suivante)
+  assert.deepEqual(['2026-10-06', '2026-10-09'].map(n => nights.indexOf(n, island.first)), [0, 3]);
+  assert.equal(nights.indexOf('2026-10-07', nights.boundsOf('2026-10-06').start + 1), 0);
+  assert.deepEqual(['2026-10-06', '2026-10-07', '2026-10-08'].map(n => kinds(n)), nights.SCRIPT);
+  // Au-delà : jamais de Noyé ni de Racine tant qu'ils ne peuvent pas sortir
+  const later = Array.from({ length: 40 }, (_, k) => kinds(nights.nextDay(`2026-10-${String(9 + (k % 20)).padStart(2, '0')}`))).flat();
+  assert.ok(later.every(k => nights.KINDS.includes(k) && !['noye', 'racine'].includes(k)));
+  assert.ok(new Set(later).size >= 3);
+  // Pierrot arrivé le 20 au matin : la nuit du 20, le premier Noyé sort à coup sûr ; le Bosquet bâti le 21, la Racine
+  const unlocks = { noye: at('2026-10-20T08:00:00Z'), racine: at('2026-10-21T08:00:00Z') };
+  assert.notEqual(kinds('2026-10-19', { unlocks })[0], 'noye');
+  assert.equal(kinds('2026-10-20', { unlocks })[0], 'noye');
+  assert.equal(kinds('2026-10-21', { unlocks })[0], 'racine');
+  // (0 : depuis toujours, sans nuit « première »)
+  const always = Array.from({ length: 30 }, (_, k) => kinds(`2026-11-${String(k + 1).padStart(2, '0')}`, { unlocks: { noye: 0, racine: 0 } })).flat();
+  assert.ok(always.includes('noye') && always.includes('racine'));
+});
+
+test('d’où ils sortent et à quel pas : le Noyé de la mer, la Racine de la lisière ; le Dormeur lent, la bête vive', () => {
+  const owned = new Set(['coeur', 'source', 'lisiere']);
+  const island = { owned, sites: [{ id: 'foyer', level: 1 }, { id: 'puits', level: 1 }], acts: 5, unlocks: { noye: 0, racine: 0 } };
+  const all = Array.from({ length: 30 }, (_, k) => nights.planOf(7, `2026-11-${String(k + 1).padStart(2, '0')}`, island)).flat();
+  const near = (c, what) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => what(c.x + dx, c.y + dy));
+  const of = kind => all.filter(c => c.kind === kind && !c.back);
+  assert.ok(of('noye').length && of('noye').every(c => near(c.path[0], (x, y) => map.groundAt(x, y) === '~')));
+  const woods = (x, y) => ['f', 't'].includes(map.groundAt(x, y));
+  assert.ok(of('racine').length && of('racine').every(c => woods(c.path[0].x, c.path[0].y) && near(c.path[0], (x, y) => map.isLand(x, y) && !woods(x, y))));
+  for (const c of all) assert.equal(c.arrives - c.at, (c.path.length - 1) * c.pace);
+  assert.deepEqual(['fantome', 'zombie', 'bete'].map(nights.paceOf), [nights.MS_PER_CELL, 1.5 * nights.MS_PER_CELL, 0.75 * nights.MS_PER_CELL]);
+  // L'Esprit a son retour prévu, d'ailleurs, après l'instant où il serait arrivé
+  for (const c of of('esprit')) {
+    const back = all.find(r => r.back === c.id);
+    assert.equal(back.id, `${c.id}:retour`);
+    assert.equal(back.at, c.arrives + nights.RETURN_MS);
+  }
+});
+
+test('chacun sa manière : le Sans-Nom dévie vers la lumière, le Dormeur s’endort contre la clôture, la Racine passe dessous, l’Esprit revient', () => {
+  const path = nights.lineOf({ x: 10, y: 10 }, { x: 20, y: 10 });
+  const walker = kind => ({ id: 'n:0', kind, site: 'puits', path, at: 0, pace: nights.paceOf(kind), arrives: 10 * nights.paceOf(kind) });
+  // Une lanterne à 5 cases au-dessus du chemin (hors de portée : 3) : le Sans-Nom la voit, y va, devient luciole
+  const lamp = nights.defenseOf([{ craft: 'lanterne', x: 15, y: 15 }], {});
+  assert.equal(nights.fateOf(walker('bete'), lamp).end, 'arrive');
+  const ghost = nights.fateOf(walker('fantome'), lamp);
+  assert.equal(ghost.end, 'luciole');
+  assert.deepEqual([ghost.path[0], ghost.path.at(-1)], [{ x: 10, y: 10 }, { x: 15, y: 15 }]);
+  assert.equal(nights.fateOf(walker('fantome'), nights.defenseOf([], {})).path, undefined);
+  // Le Dormeur : la lumière ne lui fait rien ; une clôture l'endort
+  const near = nights.defenseOf([{ craft: 'lanterne', x: 15, y: 12 }], {});
+  assert.equal(nights.fateOf(walker('zombie'), near).end, 'arrive');
+  const fence = nights.defenseOf([{ craft: 'cloture', x: 14, y: 10 }], {});
+  assert.deepEqual(nights.fateOf(walker('zombie'), fence), { end: 'dort', step: 4 });
+  // La Racine passe sous la clôture ; la lumière la change
+  assert.equal(nights.fateOf(walker('racine'), fence).end, 'arrive');
+  assert.equal(nights.fateOf(walker('racine'), near).end, 'luciole');
+  // L'Esprit : repoussé (clôture, toucher), il revient ; changé en luciole, jamais
+  const spirit = walker('esprit');
+  const back = { ...walker('esprit'), id: 'n:0:retour', back: 'n:0', at: spirit.arrives + nights.RETURN_MS, arrives: spirit.arrives + nights.RETURN_MS + 10 * nights.MS_PER_CELL };
+  const plan = [spirit, back];
+  assert.deepEqual(nights.outcomeOf(plan, fence).fates['n:0:retour'], { end: 'barre', step: 4 });
+  assert.deepEqual(nights.outcomeOf(plan, near).fates['n:0:retour'], { end: 'absent', step: null });
+  const touched = nights.outcomeOf(plan, nights.defenseOf([], {}), new Set(), new Set(['n:0']));
+  assert.deepEqual(touched.fates['n:0:retour'], { end: 'arrive', step: 10 });
+  assert.deepEqual(touched.panne, { site: 'puits', at: back.arrives });
+  // Chassé par le coq, il revient aussi (et le coq ne chante qu'une fois)
+  const crowed = nights.outcomeOf(plan, nights.defenseOf([], {}), new Set(), new Set(), { x: 10, y: 12 });
+  assert.deepEqual([crowed.fates['n:0'].end, crowed.fates['n:0:retour'].end], ['coq', 'arrive']);
 });
 
 test('réparer : de la pierre ou du bois, 3 au palier I puis 2 de plus par palier', () => {

@@ -147,6 +147,11 @@ async function claimedOf(userId, conn = db) {
     const { rows } = await conn.query('SELECT quest FROM world_quests WHERE user_id = $1', [userId]);
     return new Set(rows.map(r => r.quest));
 }
+// Quand ces quêtes ont été réclamées : { quête: instant (ms) } (les seules réclamées)
+async function claimedAtOf(userId, ids, conn = db) {
+    const { rows } = await conn.query('SELECT quest, claimed_at FROM world_quests WHERE user_id = $1 AND quest = ANY($2)', [userId, ids]);
+    return Object.fromEntries(rows.map(r => [r.quest, r.claimed_at.getTime()]));
+}
 // Les mots d'Héliane (loot.helianeOf) : déduits des quêtes réclamées et des bouteilles ouvertes, avec leurs heures
 async function helianeOfUser(userId, conn = db) {
     const claimed = await conn.query('SELECT quest, claimed_at FROM world_quests WHERE user_id = $1', [userId]);
@@ -199,6 +204,6 @@ async function balanceOf(userId, conn) {
 
 module.exports = {
     itemsOf, skinsOf, signsOf, namesOf, avatarOf, friendsOf, needRowsOf, settlersOf, gamesOf, annexesOf, levelsOf, stockOf,
-    tilesOf, zonesOf, findsOf, spendFinds, depositsOf, blightsOf, foundOf, claimedOf, helianeOfUser, runsOf, countOf,
+    tilesOf, zonesOf, findsOf, spendFinds, depositsOf, blightsOf, foundOf, claimedOf, claimedAtOf, helianeOfUser, runsOf, countOf,
     discoveredOf, exploredOf, craftsOf, placedOf, madeOf, addStock, balanceOf, writtenOf, PLAYED
 };
