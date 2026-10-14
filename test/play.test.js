@@ -1384,7 +1384,7 @@ test('le Monde : un chantier demande son quartier, son plan du Livre et ses ress
 });
 
 test('le Monde : les paliers III à VII demandent chapitre et écus, le palier IV agrandit l’emprise et range les créations', async () => {
-  // (une île neuve est à la plage : la Carrière de Galet au bord de La Colline, world/places.js)
+  // (une île neuve est à la plage : la Carrière de Saturnin au bord de La Colline, world/places.js)
   const CARRIERE = places.BEACH.carriere;
   const player = await newPlayer({ coins: 0 });
   const siteOf = (world, id) => world.sites.find(s => s.id === id);
@@ -1476,10 +1476,10 @@ test('habitants : on leur parle et on les gâte une fois par jour ; chaque cœur
   const talk = villager => api('POST', '/play/world/villager/talk', { villager }, player);
   const gift = (villager, resource) => api('POST', '/play/world/villager/gift', { villager, resource }, player);
   const view = (await api('GET', '/play/world', null, player)).data;
-  // Le tutoriel joué, la troupe vit sur l'île (bible, § 6.6) : Ondin, Aster et Rivet au camp tant que leur bâtiment n'est
-  // pas là ; Cannelle au Foyer
+  // Le tutoriel joué, la troupe vit sur l'île (bible, § 6.6) : Pierrot, Hermine et Jovin au camp tant que leur bâtiment n'est
+  // pas là ; Marcelle au Foyer
   assert.deepEqual(view.villagers.map(w => [w.id, w.name, w.hearts, w.talked, w.gifted, w.built]),
-    [['puits', 'Ondin', 0, false, false, false], ['ponton', 'Aster', 0, false, false, false], ['atelier', 'Rivet', 0, false, false, false], ['foyer', 'Cannelle', 0, false, false, true]]);
+    [['puits', 'Pierrot', 0, false, false, false], ['ponton', 'Hermine', 0, false, false, false], ['atelier', 'Jovin', 0, false, false, false], ['foyer', 'Marcelle', 0, false, false, true]]);
   assert.deepEqual(view.friendship.hearts, [30, 80, 150, 250, 400]);
   assert.equal((await talk('potager')).status, 403);
   // Bavarder : +8, une fois par jour
@@ -1488,7 +1488,7 @@ test('habitants : on leur parle et on les gâte une fois par jour ; chaque cœur
   assert.deepEqual([hello.data.gained, hello.data.hearts, hello.data.rewards], [8, 0, []]);
   assert.equal(hello.data.world.villagers.find(v => v.id === 'foyer').talked, true);
   assert.equal((await talk('foyer')).status, 409);
-  // Cadeau : 15 ressources ; Cannelle adore la nourriture (+30) : premier cœur, 40 écus
+  // Cadeau : 15 ressources ; Marcelle adore la nourriture (+30) : premier cœur, 40 écus
   assert.equal((await gift('foyer', 'food')).status, 400);
   await sql('UPDATE world_stock SET food = 100, water = 100 WHERE user_id = $1', [player.userId]);
   const loved = await gift('foyer', 'food');
@@ -1530,7 +1530,7 @@ test('Savoirs des maîtres : un indice par jour en bavardant, la famille puis l�
   const player = await newPlayer({ coins: 500, settled: true });
   const talk = (villager, body = {}) => api('POST', '/play/world/villager/talk', { villager, ...body }, player);
   const reach = (await api('GET', '/play/book', null, player)).data.chapters[0].pages.filter(p => p.status === 'reach');
-  // Aster (moins de deux cœurs) : la famille d'un ingrédient, sur une page à énigme de son Art (chapitre I)
+  // Hermine (moins de deux cœurs) : la famille d'un ingrédient, sur une page à énigme de son Art (chapitre I)
   const first = await talk('ponton');
   assert.equal(first.status, 200);
   const hint = first.data.savoir;
@@ -1540,7 +1540,7 @@ test('Savoirs des maîtres : un indice par jour en bavardant, la famille puis l�
   assert.equal(hint.ingredient, undefined);
   // Une fois par jour : le bavardage refusé ne souffle rien
   assert.equal((await talk('ponton')).status, 409);
-  // Cannelle : son chapitre (V) est scellé, rien à souffler
+  // Marcelle : son chapitre (V) est scellé, rien à souffler
   assert.equal((await talk('foyer')).data.savoir, null);
   // Deux cœurs : un ingrédient, celui que révèle l'Encre ; l'appareil qui l'a déjà en reçoit un autre
   await sql(`UPDATE world_friends SET talked_on = NULL, points = 80 WHERE user_id = $1 AND villager = 'ponton'`, [player.userId]);
@@ -1575,7 +1575,7 @@ test('Anya : la Révélation une seule fois, le Souffle une fois par passage, la
   const talk = (body = {}) => api('POST', '/play/world/villager/talk', { villager: 'anya', ...body }, player);
   const reveal = () => api('POST', '/play/world/anya/reveal', {}, player);
   const view = async () => (await api('GET', '/play/world', null, player)).data;
-  // Elle dort : ni Révélation, ni Souffle ; Cannelle, affamée et sans décor autour du Foyer, est triste
+  // Elle dort : ni Révélation, ni Souffle ; Marcelle, affamée et sans décor autour du Foyer, est triste
   await sql(`INSERT INTO world_needs (user_id, villager, need, filled_at) VALUES ($1, 'foyer', 'manger', NOW() - INTERVAL '30 days')
              ON CONFLICT (user_id, villager, need) DO UPDATE SET filled_at = EXCLUDED.filled_at`, [player.userId]);
   const asleep = await view();
@@ -1643,7 +1643,7 @@ test('Anya : la Révélation une seule fois, le Souffle une fois par passage, la
   const deposit = (await view()).deposits[0];
   await sql(`INSERT INTO world_deposits (user_id, deposit, gathered_at) VALUES ($1, $2, NOW() - INTERVAL '4 hours 1 minute')`, [player.userId, deposit.id]);
   assert.equal((await view()).deposits.find(d => d.id === deposit.id).readyIn, 0);
-  // Cannelle a toujours faim, mais ne descend plus sous « content »
+  // Marcelle a toujours faim, mais ne descend plus sous « content »
   assert.equal((await view()).villagers.find(v => v.id === 'foyer').mood, 'content');
 });
 
@@ -1688,7 +1688,7 @@ test('besoins des habitants : manger, travailler, se distraire ; l’humeur chan
     [player.userId, villager, need, hours]);
   const who = (world, id) => world.villagers.find(v => v.id === id);
   const deco = v => v.needs.find(n => n.id === 'deco');
-  // Cannelle arrive comblée : manger tient 24 h ; sans décoration autour du Foyer, elle n'est que contente
+  // Marcelle arrive comblée : manger tient 24 h ; sans décoration autour du Foyer, elle n'est que contente
   const first = await view();
   const paulette = who(first, 'foyer');
   assert.deepEqual(paulette.needs.map(n => [n.id, n.met]), [['manger', true], ['deco', false]]);
@@ -1697,7 +1697,7 @@ test('besoins des habitants : manger, travailler, se distraire ; l’humeur chan
   assert.deepEqual([paulette.mood, paulette.moodEffect, paulette.happyEffect], ['content', null, 'Une partie de Récolte revient 3 min plus vite']);
   assert.deepEqual(first.needs.kinds.manger, { label: 'Manger', hours: 24, cost: { food: 10 } });
   assert.deepEqual(first.needs.kinds.deco, { label: 'Se distraire', decos: 3, reach: 6 });
-  // La troupe (Ondin, Aster, Rivet, Cannelle) arrive comblée
+  // La troupe (Pierrot, Hermine, Jovin, Marcelle) arrive comblée
   assert.equal((await sql('SELECT COUNT(*)::int AS n FROM world_needs WHERE user_id = $1', [player.userId]))[0].n, 4);
   // Pas encore faim ; à mi-chemin, on peut la nourrir : 10 vivres
   assert.equal((await fill('foyer', 'manger')).status, 409);
@@ -1725,7 +1725,7 @@ test('besoins des habitants : manger, travailler, se distraire ; l’humeur chan
   assert.equal(deco(who(await view(), 'foyer')).met, true);
   const happy = who((await fill('foyer', 'manger')).data.world, 'foyer');
   assert.deepEqual([happy.mood, happy.moodEffect], ['heureux', 'Une partie de Récolte revient 3 min plus vite']);
-  // Mélisse (Potager, 10 h de production, plafonnées à 8) : contente, puis triste : −10 % de vivres et d'écus, mais
+  // Flore (Potager, 10 h de production, plafonnées à 8) : contente, puis triste : −10 % de vivres et d'écus, mais
   // seulement depuis qu'elle a faim (repas échu il y a 6 h) : des 8 heures gardées, 4 contente et 4 triste, soit
   // 3 × (4 + 4 × 0,9) = 22,8 vivres et 2 × 7,6 = 15,2 écus
   await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'jardins')`, [player.userId]);
@@ -1741,19 +1741,19 @@ test('besoins des habitants : manger, travailler, se distraire ; l’humeur chan
   assert.deepEqual([potager(gloomy).moodBonus, potager(gloomy).pending, potager(gloomy).perHour], [-10, { coins: 15, food: 22 }, { amount: 2.7, coins: 1.8 }]);
   const collected = await api('POST', '/play/world/collect', {}, player);
   assert.deepEqual([collected.data.gained, collected.data.stock.food], [15, 22]);
-  // Tout combler : Mélisse et Cannelle mangent (20 vivres), puis plus rien à faire
+  // Tout combler : Flore et Marcelle mangent (20 vivres), puis plus rien à faire
   await ago('foyer', 'manger', 20);
   const all = await fillAll();
   assert.equal(all.status, 200);
   assert.deepEqual(all.data.filled, [{ villager: 'potager', need: 'manger' }, { villager: 'foyer', need: 'manger' }]);
   assert.equal(all.data.world.stock.food, 82);
   assert.equal((await fillAll()).status, 409);
-  // Travailler : seulement avec l'Atelier (Rivet) ; triste, il ôte 2 coups à chaque Récolte
+  // Travailler : seulement avec l'Atelier (Jovin) ; triste, il ôte 2 coups à chaque Récolte
   assert.equal((await fill('foyer', 'outils')).status, 403);
   await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'est')`, [player.userId]);
   await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'atelier', 1)`, [player.userId]);
-  // L'Atelier est dans la zone de Rivet, au nord du Feu (île à la plage : world/places.js) : trois clôtures autour de
-  // lui, Rivet a de quoi se distraire, il est heureux
+  // L'Atelier est dans la zone de Jovin, au nord du Feu (île à la plage : world/places.js) : trois clôtures autour de
+  // lui, Jovin a de quoi se distraire, il est heureux
   const shop = places.BEACH.atelier;
   await sql(`INSERT INTO world_crafts (user_id, craft, x, y) SELECT $1, 'cloture', c[1], c[2] FROM jsonb_to_recordset($2::jsonb) AS t(c int[])`,
     [player.userId, JSON.stringify([[shop.x + 3, shop.y + 1], [shop.x + 3, shop.y + 2], [shop.x - 1, shop.y + 2]].map(c => ({ c })))]);
@@ -1793,7 +1793,7 @@ test('production juste : combler un besoin, poser, déplacer ou ranger une créa
   await sql(`INSERT INTO world_buildings (user_id, site, level, built_at) VALUES ($1, 'potager', 1, NOW() - INTERVAL '20 hours')`, [player.userId]);
   await view();
   await sql('UPDATE world_stock SET food = 0 WHERE user_id = $1', [player.userId]);
-  // Mélisse a faim depuis 6 h, récolte il y a 10 h : 4 h contente, 4 h triste (22 vivres, 15 écus). La nourrir encaisse
+  // Flore a faim depuis 6 h, récolte il y a 10 h : 4 h contente, 4 h triste (22 vivres, 15 écus). La nourrir encaisse
   // d'abord ces heures-là (sinon toutes compteraient « contente » au ramassage suivant : 24 vivres, 16 écus) ; ses
   // vivres paient le repas
   await since(10);
@@ -1822,7 +1822,7 @@ test('production juste : combler un besoin, poser, déplacer ou ranger une créa
   const place = c => api('POST', '/play/world/craft/place', { craft: 'cloture', x: c.x, y: c.y }, player);
   // Deux Clôtures : pas encore de quoi se distraire, rien n'est encaissé
   for (const c of spots.slice(0, 2)) assert.deepEqual(await place(c).then(r => [r.status, r.data.coins]), [200, undefined]);
-  // La troisième rend Mélisse heureuse : ses 5 h contente sont encaissées d'abord (15 vivres, 10 écus)
+  // La troisième rend Flore heureuse : ses 5 h contente sont encaissées d'abord (15 vivres, 10 écus)
   const glad = await place(spots[2]);
   assert.deepEqual([glad.data.coins, glad.data.world.stock.food, potager(glad.data.world).pending], [coins + 35, 17 + 15, { coins: 0, food: 0 }]);
   // 3 h heureuse : 3 × 3,3 = 9,9 vivres et 3 × 2,2 = 6,6 écus en attente
@@ -1831,7 +1831,7 @@ test('production juste : combler un besoin, poser, déplacer ou ranger une créa
   // Une Clôture déplacée tout près : toujours trois autour, rien n'est encaissé
   const moved = await api('POST', '/play/world/craft/move', { x: spots[0].x, y: spots[0].y, toX: spots[3].x, toY: spots[3].y }, player);
   assert.deepEqual([moved.status, moved.data.coins, potager(moved.data.world).pending], [200, undefined, { coins: 6, food: 9 }]);
-  // Une Clôture rangée : Mélisse n'est plus que contente ; ses heures heureuses sont encaissées d'abord, avec les
+  // Une Clôture rangée : Flore n'est plus que contente ; ses heures heureuses sont encaissées d'abord, avec les
   // fractions gardées : 9,9 + 0,8 = 10 vivres, 6,6 + 0,2 = 6 écus
   const stored = await api('POST', '/play/world/craft/store', { x: spots[1].x, y: spots[1].y }, player);
   assert.deepEqual([stored.status, stored.data.coins, stored.data.world.stock.food, potager(stored.data.world).pending], [200, coins + 41, 32 + 10, { coins: 0, food: 0 }]);
@@ -1899,13 +1899,13 @@ test('ce qui attend dans les bâtiments paie tout : expédition, établi, bête,
   const made = await api('POST', '/play/world/craft/finish', { run: run.id, layout: solveCraft(run) }, player);
   assert.equal(made.status, 200);
   near(made.data.world.stock.wood, pending.wood - 8, 'bûches de la Clôture');
-  // Une poule (2 vivres) : la cage de Cannelle ouverte (ses poules affamées)
+  // Une poule (2 vivres) : la cage de Marcelle ouverte (ses poules affamées)
   await sql(`INSERT INTO world_beasts (user_id, beast, fed_at, collected_at) VALUES ($1, 'poule-rousse', NOW() - INTERVAL '2 days', NOW())`, [player.userId]);
   pending = await empty();
   const hen = await api('POST', '/play/world/beast/feed', { beast: 'poule-rousse' }, player);
   assert.equal(hen.status, 200);
   near(hen.data.world.stock.food, pending.food - 2, 'vivres de la poule');
-  // Un cadeau à Sylve (15 bûches)
+  // Un cadeau à Freya (15 bûches)
   pending = await empty();
   const gift = await api('POST', '/play/world/villager/gift', { villager: 'bosquet', resource: 'wood' }, player);
   assert.equal(gift.status, 200);
@@ -1928,7 +1928,7 @@ test('ce qui attend dans les bâtiments paie tout : expédition, établi, bête,
   near(bought.data.coins, before + pending.coins - 350, 'écus après le Cercle de menhirs');
 });
 
-test('une Récolte quittée sans jouer ne compte pas ; Cannelle nourrie, la soupe reste faite même si elle a de nouveau faim', async () => {
+test('une Récolte quittée sans jouer ne compte pas ; Marcelle nourrie, la soupe reste faite même si elle a de nouveau faim', async () => {
   const player = await newPlayer();
   const claim = id => api('POST', '/play/world/quest', { id }, player);
   const start = async () => (await api('POST', '/play/world/harvest/start', {}, player)).data;
@@ -1945,7 +1945,7 @@ test('une Récolte quittée sans jouer ne compte pas ; Cannelle nourrie, la soup
   assert.equal(played.data.world.brume.quest.done, true);
   assert.equal((await claim('recolte')).status, 200);
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'premier-ponton'), ($1, 'chemin-aster'), ($1, 'clotures')`, [player.userId]);
-  // La journée d'Aster terminée (sa Récolte, son Ponton), puis la deuxième nuit, font arriver Cannelle, affamée : sa faim d'arrivée ne fait pas
+  // La journée d'Hermine terminée (sa Récolte, son Ponton), puis la deuxième nuit, font arriver Marcelle, affamée : sa faim d'arrivée ne fait pas
   // la quête ; nourrie, si.
   assert.equal((await api('POST', '/play/world/sleep', {}, player)).status, 200);
   const hungry = (await api('GET', '/play/world', null, player)).data;
@@ -1953,7 +1953,7 @@ test('une Récolte quittée sans jouer ne compte pas ; Cannelle nourrie, la soup
   await sql('UPDATE world_stock SET food = 10 WHERE user_id = $1', [player.userId]);
   const fed = await api('POST', '/play/world/villager/need', { villager: 'foyer', need: 'manger' }, player);
   assert.equal(fed.data.world.brume.quest.done, true);
-  // Un jour et demi passe sans réclamer : Cannelle a de nouveau faim, la quête reste faite
+  // Un jour et demi passe sans réclamer : Marcelle a de nouveau faim, la quête reste faite
   await sql(`UPDATE world_needs SET filled_at = filled_at - INTERVAL '36 hours' WHERE user_id = $1`, [player.userId]);
   await sql(`UPDATE world_quests SET claimed_at = claimed_at - INTERVAL '36 hours' WHERE user_id = $1`, [player.userId]);
   const later = (await api('GET', '/play/world', null, player)).data;
@@ -2383,7 +2383,7 @@ test('butins : chapitres ouverts, quêtes réclamées et bouteille donnent leur 
   assert.equal((await api('POST', '/play/world/chest', { source: 'jour' }, await guest())).status, 402);
 });
 
-test('l’enclos de Cannelle se trace même sans clôture jamais assemblée (un compte d’avant les clôtures d’Aster n’est pas lâché)', async () => {
+test('l’enclos de Marcelle se trace même sans clôture jamais assemblée (un compte d’avant les clôtures d’Hermine n’est pas lâché)', async () => {
   const player = await newPlayer();
   const view = async () => (await api('GET', '/play/world', null, player)).data;
   await view();
@@ -2394,7 +2394,7 @@ test('l’enclos de Cannelle se trace même sans clôture jamais assemblée (un 
   const before = (await view()).crafts.catalog.find(c => c.id === 'cloture');
   assert.deepEqual([before.made, before.traceable, before.spots.length], [0, false, 0]);
   assert.equal((await api('POST', '/play/world/craft/line', { craft: 'cloture', cells: [[93, 93]] }, player)).status, 409);
-  // À l'enclos de Cannelle : le trait est permis, ses piquets fabriqués et payés en passant
+  // À l'enclos de Marcelle : le trait est permis, ses piquets fabriqués et payés en passant
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'abri-cannelle')`, [player.userId]);
   const yard = await view();
   const fence = yard.crafts.catalog.find(c => c.id === 'cloture');
@@ -2409,7 +2409,7 @@ test('les mots d’Héliane : la première bouteille ouverte pendant un acte por
   const heliane = async () => (await api('GET', '/play/world', null, player)).data.heliane;
   // Le prologue n'a pas de mot
   assert.deepEqual(await heliane(), { found: [], next: null });
-  // Le prologue fini (le Puits d'Ondin réclamé il y a une heure, puis son chemin : la mer rend sa première bouteille) :
+  // Le prologue fini (le Puits de Pierrot réclamé il y a une heure, puis son chemin : la mer rend sa première bouteille) :
   // le mot de l'acte I attend
   await sql(`INSERT INTO world_quests (user_id, quest, claimed_at) VALUES ($1, 'puits-ondin', NOW() - INTERVAL '1 hour'), ($1, 'chemin', NOW() - INTERVAL '50 minutes')`, [player.userId]);
   assert.deepEqual(await heliane(), { found: [], next: 'I' });
@@ -2503,7 +2503,7 @@ test('quêtes de Brume : la quête active se réclame une fois, son objectif att
 
 
 // Lot H1 (la colonne vertébrale de la bible) : un nouveau compte suit le prologue, chaque objectif se lit dans l'état
-test('le prologue d’un nouveau compte : Brume mène au feu, puis Aster ouvre sa Récolte', async () => {
+test('le prologue d’un nouveau compte : Brume mène au feu, puis Hermine ouvre sa Récolte', async () => {
   const player = await newPlayer();
   const view = async () => (await api('GET', '/play/world', null, player)).data;
   const claim = id => api('POST', '/play/world/quest', { id }, player);
@@ -2512,7 +2512,7 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Aster ouvre s
   const who = (world, id) => world.villagers.find(v => v.id === id);
   // Le chapitre II est scellé jusqu'à la 3e découverte
   assert.deepEqual((await api('GET', '/play/book', null, player)).data.chapters.slice(0, 2).map(c => [c.need, c.open]), [[0, true], [3, false]]);
-  // Au compte : Brume seule ; Aster et Cannelle ne sont pas encore rencontrées.
+  // Au compte : Brume seule ; Hermine et Marcelle ne sont pas encore rencontrées.
   const first = await view();
   assert.deepEqual(first.villagers.map(v => [v.id, v.built, v.asleep]), []);
   assert.equal((await talk('foyer')).status, 403);
@@ -2532,16 +2532,16 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Aster ouvre s
   const third = await pick('greve-galet-1');
   assert.deepEqual([third.data.world.stock.wood, third.data.world.stock.stone, third.data.world.stock.food, third.data.world.brume.quest.done], [4, 2, 0, true]);
   assert.equal((await claim('ramasser')).status, 200);
-  // Le Brasier n'est appris qu'au moment de bâtir. Le feu ferme la leçon de Brume et fait arriver Aster, pas Cannelle.
+  // Le Brasier n'est appris qu'au moment de bâtir. Le feu ferme la leçon de Brume et fait arriver Hermine, pas Marcelle.
   await write(['Brasier']);
   const fire = await api('POST', '/play/world/build', { site: 'foyer' }, player);
   assert.deepEqual([fire.status, fire.data.world.stock.wood, fire.data.world.stock.stone], [200, 0, 0]);
   assert.equal(fire.data.world.brume.quest.done, true);
   assert.equal((await claim('feu')).status, 200);
-  // La première nuit : personne ; dormir fait venir Aster au matin, pas Cannelle
+  // La première nuit : personne ; dormir fait venir Hermine au matin, pas Marcelle
   const night = await view();
   assert.deepEqual([night.brume.quest.id, night.villagers.map(v => v.id)], ['nuit', []]);
-  // (la caisse d'Aster n'a pas encore échoué)
+  // (la caisse d'Hermine n'a pas encore échoué)
   const crate = () => api('POST', '/play/world/chest', { source: 'caisse:aster' }, player);
   assert.equal((await crate()).status, 403);
   assert.equal((await api('POST', '/play/world/sleep', {}, player)).status, 200);
@@ -2549,7 +2549,7 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Aster ouvre s
   assert.ok(who(morning, 'ponton'));
   assert.equal(who(morning, 'foyer'), undefined);
   assert.equal(morning.brume.quest.id, 'caisse');
-  // Le jour d'Aster : sa caisse (toujours la même : 5 bois, sa longue-vue, son filet, son carnet de quart, et quatre
+  // Le jour d'Hermine : sa caisse (toujours la même : 5 bois, sa longue-vue, son filet, son carnet de quart, et quatre
   // clôtures en réserve), une fois
   const opened = await crate();
   assert.deepEqual([opened.status, opened.data.chest.prize.stock, opened.data.chest.prize.keepsakes.length, opened.data.world.stock.wood], [200, { wood: 5 }, 4, 5]);
@@ -2581,7 +2581,7 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Aster ouvre s
   assert.equal((await view()).brume.quest.done, true);
   assert.equal((await claim('chemin-aster')).status, 200);
   // L'enclos du camp : la quête compte les clôtures posées ; deux à la main, puis le reste d'un trait autour du Feu (le
-  // sentier d'Aster laissé libre), la réserve d'abord
+  // sentier d'Hermine laissé libre), la réserve d'abord
   const fences = await view();
   assert.deepEqual([fences.brume.quest.id, fences.brume.quest.have, fences.brume.quest.need], ['clotures', 0, 13]);
   const fence = fences.crafts.catalog.find(c => c.id === 'cloture');
@@ -2599,7 +2599,7 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Aster ouvre s
   assert.deepEqual([paid.status, paid.data.placed, Boolean(paid.data.stopped), paid.data.world.stock.wood], [200, 1, true, 4], JSON.stringify(paid.data));
   assert.equal((await api('POST', '/play/world/craft/line', { craft: 'cloture', cells: [[93, 94]] }, player)).status, 400);
   assert.equal((await claim('clotures')).status, 200);
-  // Sa journée finit par une deuxième nuit (un personnage par jour), et Cannelle arrive au matin, dans sa propre séquence
+  // Sa journée finit par une deuxième nuit (un personnage par jour), et Marcelle arrive au matin, dans sa propre séquence
   const evening = await view();
   assert.deepEqual([evening.brume.quest.id, who(evening, 'foyer')], ['veille', undefined]);
   assert.equal((await api('POST', '/play/world/sleep', {}, player)).status, 200);
@@ -2612,8 +2612,8 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Aster ouvre s
   const fed = await api('POST', '/play/world/villager/need', { villager: 'foyer', need: 'manger' }, player);
   assert.equal(fed.data.world.brume.quest.done, true);
   assert.equal((await claim('soupe')).status, 200);
-  // Le jour de Cannelle : la cage échouée s'ouvre (sa quête), les trois poules se nourrissent, leur poulailler se pose
-  // (une annexe du Feu, offerte), puis la troisième nuit ; Rivet arrive après elle
+  // Le jour de Marcelle : la cage échouée s'ouvre (sa quête), les trois poules se nourrissent, leur poulailler se pose
+  // (une annexe du Feu, offerte), puis la troisième nuit ; Jovin arrive après elle
   const caged = await api('POST', '/play/world/beasts/cage', {}, player);
   assert.deepEqual([caged.status, caged.data.world.brume.quest.id, caged.data.world.brume.quest.done], [200, 'cage', true]);
   assert.equal(who(caged.data.world, 'atelier'), undefined);
@@ -2640,7 +2640,7 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Aster ouvre s
   const coop = await api('POST', '/play/world/annex', { annex: 'poulailler', x: coopSpots[0].x, y: coopSpots[0].y }, player);
   assert.deepEqual([coop.status, coop.data.world.brume.quest.id, coop.data.world.brume.quest.done], [200, 'poulailler', true], JSON.stringify(coop.data));
   assert.equal((await claim('poulailler')).status, 200);
-  // L'abri de Cannelle : refusé sans de quoi le payer ; payé, son coin devient un abri (une seule fois)
+  // L'abri de Marcelle : refusé sans de quoi le payer ; payé, son coin devient un abri (une seule fois)
   const [kept] = await sql('SELECT wood, stone FROM world_stock WHERE user_id = $1', [player.userId]);
   await sql('UPDATE world_stock SET wood = 0, stone = 0 WHERE user_id = $1', [player.userId]);
   assert.equal((await api('POST', '/play/world/shelter', { who: 'cannelle' }, player)).status, 409);
@@ -2666,7 +2666,7 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Aster ouvre s
   assert.equal((await claim('enclos-cannelle')).status, 200);
   assert.equal(who(await view(), 'atelier'), undefined);
   assert.equal((await api('POST', '/play/world/sleep', {}, player)).status, 200);
-  // Rivet est là ; sa lanterne (au tutoriel, sans palier ni éléments) posée
+  // Jovin est là ; sa lanterne (au tutoriel, sans palier ni éléments) posée
   const rivet = await view();
   assert.deepEqual(who(rivet, 'atelier').built, false);
   const lantern = rivet.crafts.catalog.find(c => c.id === 'lanterne');
@@ -2679,8 +2679,8 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Aster ouvre s
   assert.deepEqual([torch.open, torch.cost, torch.block], [true, { wood: 2 }, null]);
   for (const x of [X(20), X(21), X(22)]) await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'torche', $2, $3)`, [player.userId, x, Y(20)]);
   assert.equal((await claim('torches-rivet')).status, 200);
-  // Le jour de Rivet finit : Ondin n'est pas encore là ; la quatrième nuit (choix de l'auteur, 13 oct. : chaque
-  // personnage son jour), puis Ondin dort au Puits (plus de quartier à acheter) : on le réveille en lui parlant
+  // Le jour de Jovin finit : Pierrot n'est pas encore là ; la quatrième nuit (choix de l'auteur, 13 oct. : chaque
+  // personnage son jour), puis Pierrot dort au Puits (plus de quartier à acheter) : on le réveille en lui parlant
   const rivetNight = await view();
   assert.deepEqual([rivetNight.brume.quest.id, who(rivetNight, 'puits')], ['nuit-rivet', undefined]);
   assert.equal((await api('POST', '/play/world/sleep', {}, player)).status, 200);
@@ -2703,9 +2703,9 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Aster ouvre s
   assert.deepEqual(who(built.data.world, 'foyer').needs.map(n => n.id), ['manger', 'deco']);
   // (puis le premier chemin, du Puits au Feu : l'île neuve n'a que son sentier)
   assert.deepEqual([who(built.data.world, 'puits').built, built.data.world.brume.quest.id], [true, 'chemin']);
-  // (210 à la lanterne, les torches de Rivet 15, puis Ondin : son réveil, sa Pluie, son Puits)
+  // (210 à la lanterne, les torches de Jovin 15, puis Pierrot : son réveil, sa Pluie, son Puits)
   assert.equal(await coinsOf(player), 210 + 15 + 10 + 20 + 40);
-  // Aster est là depuis le matin qui suit le premier feu ; le chemin ne conditionne plus son arrivée (son Ponton bâti
+  // Hermine est là depuis le matin qui suit le premier feu ; le chemin ne conditionne plus son arrivée (son Ponton bâti
   // hors de La Crique ne l'y installe pas encore : people.livesHere)
   assert.equal(who(built.data.world, 'ponton').built, false);
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'chemin')`, [player.userId]);
@@ -2792,20 +2792,20 @@ test('le fil d’Ariane marque la bonne étape suivante : Pluie, Vie, Arbre, Bat
   // L'indice de la page marquée : le texte de la quête « fais naître un élément » (sa recette)
   const say = id => require('../src/services/quests').QUESTS.find(q => q.id === id).say;
   const marked = book => book.chapters.flatMap(c => c.pages.map(p => ({ ...p, chapter: c.id, open: c.open }))).filter(p => p.marked);
-  // La Pluie (le don d'Ondin, la clé du Puits) : une page du chapitre I, ouvert ; la page ne dit pas son nom ; elle
+  // La Pluie (le don de Pierrot, la clé du Puits) : une page du chapitre I, ouvert ; la page ne dit pas son nom ; elle
   // garde ses leurres (l'Encre s'y apprend, offerte)
   const pluie = await at('eveil-ondin', T);
   assert.deepEqual(pluie.ariane, { target: 'Pluie', remaining: 1, page: pageId('Pluie'), chapter: 'I', hint: say('souvenir-ondin') });
   const [page] = marked(pluie);
   assert.deepEqual([page.id, page.status, page.chapter, page.open, page.name, page.emoji, page.guidedInk], [pageId('Pluie'), 'reach', 'I', true, undefined, undefined, true]);
   assert.ok(page.tray.length > 2, 'des leurres sur la page de la Pluie');
-  // L'Athanor grandit avec l'histoire : deux emplacements au tutoriel, trois le Puits réclamé, quatre Sylve arrivée
+  // L'Athanor grandit avec l'histoire : deux emplacements au tutoriel, trois le Puits réclamé, quatre Freya arrivée
   assert.equal(pluie.athanor, 2);
   assert.equal((await at('puits-ondin', afterT)).athanor, 3);
   assert.equal((await at('eveil-sylve', afterT)).athanor, 4);
   // (l'île le dit aussi : le jeu agrandit l'Athanor sans attendre le Grimoire)
   assert.equal((await api('GET', '/play/world', null, player)).data.brume.athanor, 4);
-  // L'Arbre (souvenir de Sylve) passe par la Vie ; le Bateau (Aster), une page ; le Feu follet, par le Marais
+  // L'Arbre (souvenir de Freya) passe par la Vie ; le Bateau (Hermine), une page ; le Feu follet, par le Marais
   assert.deepEqual((await at('eveil-sylve', afterT)).ariane, { target: 'Vie', remaining: 1, page: pageId('Vie'), chapter: 'IV', hint: say('vie') });
   assert.deepEqual((await at('vie', afterT)).ariane, { target: 'Arbre', remaining: 3, page: pageId('Vie'), chapter: 'IV', hint: say('souvenir-sylve') });
   assert.deepEqual((await at('crique', actI)).ariane, { target: 'Bateau', remaining: 1, page: pageId('Bateau'), chapter: 'V', hint: say('souvenir-aster') });

@@ -13,7 +13,7 @@ test('les places : la carte, la plage, puis le joueur', () => {
   assert.deepEqual(places.STATIC.foyer, map.SITE_BIG.foyer);
   const beach = places.placesFrom({ beach: true });
   assert.deepEqual(beach.foyer, places.BEACH.foyer);
-  // Une île à la plage : chaque personnage a sa zone, son bâtiment au milieu (le Puits d'Ondin à l'ouest, près du
+  // Une île à la plage : chaque personnage a sa zone, son bâtiment au milieu (le Puits de Pierrot à l'ouest, près du
   // ruisseau) ; une île d'avant garde les places de la carte
   assert.deepEqual(beach.puits, { x: 88, y: 86 });
   assert.deepEqual(places.STATIC.puits, map.SITE_BIG.puits);
@@ -40,10 +40,10 @@ test('le camp : rien avant son personnage ; sur une île à la plage, chacun dan
   const ids = camp => camp.map(c => c.id).sort();
   // Brume seule : l'épave, rien d'autre
   assert.deepEqual(ids(campOf({ met: new Set() })), ['hirondelle']);
-  // Aster arrive avec son camp
+  // Hermine arrive avec son camp
   assert.deepEqual(ids(campOf({ met: new Set(['ponton']) })), ['aster', 'caisses', 'filet', 'hirondelle', 'rondins', 'sos']);
-  // Sur une île à la plage : la cuisine de Cannelle sur la plage (sa zone), le camp d'Aster au sud-ouest, le coin de
-  // Rivet au nord du Feu
+  // Sur une île à la plage : la cuisine de Marcelle sur la plage (sa zone), le camp d'Hermine au sud-ouest, le coin de
+  // Jovin au nord du Feu
   const beach = places.placesFrom({ beach: true });
   const camp = campOf({ met: new Set(['ponton', 'foyer', 'atelier']), places: beach, beach: true });
   const at = id => { const c = camp.find(e => e.id === id); return [c.x, c.y]; };
@@ -91,7 +91,7 @@ test.describe('île', () => {
     // Le suivi des quêtes montre tout le tutoriel : vingt-deux étapes, de la première page au premier chemin
     assert.deepEqual([start.brume.steps.length, start.brume.steps[0].id, start.brume.steps.at(-1).id], [24, 'pages', 'chemin']);
     assert.ok(start.brume.steps.every(st => st.label && st.done === false));
-    // Le feu fait : personne encore (la première nuit se passe seul) ; la nuit passée : Aster arrive, son Ponton et
+    // Le feu fait : personne encore (la première nuit se passe seul) ; la nuit passée : Hermine arrive, son Ponton et
     // son camp avec elle
     await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'pages'), ($1, 'ramasser'), ($1, 'feu')`, [player.userId]);
     assert.deepEqual((await view()).villagers.map(v => v.id), []);

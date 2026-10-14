@@ -19,7 +19,7 @@ const ACTS = [...new Set(QUESTS.map(q => q.act))];
 const ATHANOR = [['eveil-sylve', 4], ['puits-ondin', 3]];
 // Le palier I du Ponton se bâtit sans plan pendant le tutoriel (world.tutorialPonton)
 const WAIVED = (site, need) => site === 'ponton' && need === 1;
-// La lanterne de Rivet, au tutoriel, se fabrique sans savoir-faire (crafts.TUTORIAL_CRAFTS)
+// La lanterne de Jovin, au tutoriel, se fabrique sans savoir-faire (crafts.TUTORIAL_CRAFTS)
 const TUTORIAL_CRAFT = (quest, craft) => quest.act === 'T' && craft === 'lanterne';
 
 test.after(() => db.pool.end());

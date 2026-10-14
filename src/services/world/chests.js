@@ -22,7 +22,7 @@ async function openedOf(userId, now, conn = db) {
 }
 
 // La mer ne rend rien pendant le tutoriel (choix de l'auteur, 12 oct.) : la première bouteille s'échoue une fois le
-// chemin du Puits tracé et réclamé, la dernière étape du tutoriel ; Aster la présente sur l'île. Ensuite, une par tranche
+// chemin du Puits tracé et réclamé, la dernière étape du tutoriel ; Hermine la présente sur l'île. Ensuite, une par tranche
 const ASHORE_AFTER = 'chemin';
 const ashoreOf = claimed => quests.doneOf(claimed).has(ASHORE_AFTER);
 
@@ -71,7 +71,7 @@ async function grant(userId, source, rarity, conn, { wanted = null, streak = nul
 
 // La caisse d'un personnage, échouée près du camp (choix de l'auteur, 11 oct.) : elle s'ouvre une fois, le jour de son
 // arrivée (after : la quête faite avant), et donne toujours la même chose : des ressources, et ce qu'elle garde (keepsakes,
-// ce que le coffre montre). Celle d'Aster : sa longue-vue, son filet, son carnet de quart (le plan de son Ponton)
+// ce que le coffre montre). Celle d'Hermine : sa longue-vue, son filet, son carnet de quart (le plan de son Ponton)
 // crafts : des créations prêtes, mises en réserve (les piquets de l'enclos du camp : la quête des clôtures)
 const CRATES = {
     aster: {

@@ -34,7 +34,7 @@ const ofPlace = name => name.replace(/^Les /, 'des ').replace(/^Le /, 'du ').rep
 const craft = (id, name, tier, cost, elements, after, place, shape, spent = {}) => ({ id, name, tier, cost, elements, after, place, shape, finds: spent });
 const CRAFTS = [
     craft('cloture', 'Clôture', 'start', { wood: 8 }, [], [], {}, ['x.x', 'xxx', 'x.x']),
-    // (la torche de bois flotté, choix de l'auteur, 13 oct. : les trois de Rivet, au jour 4 ; une lumière de la nuit,
+    // (la torche de bois flotté, choix de l'auteur, 13 oct. : les trois de Jovin, au jour 4 ; une lumière de la nuit,
     // nights.js)
     craft('torche', 'Torche', 'start', { wood: 2 }, ['Feu'], [], {}, ['x', 'x', 'x', 'x']),
     // (des fleurs sans pluie, non : la Pluie, clé du Puits, apporte l'eau qu'il coûte, choix de l'auteur, 12 oct.)
@@ -189,7 +189,7 @@ function tierLock(tier, open, stars = 0) {
     return `Ouvre le chapitre ${tier} du Grimoire : encore ${missing} découverte${missing > 1 ? 's' : ''}.`;
 }
 
-// Les créations que le tutoriel fait fabriquer avant leur palier et leurs éléments (la lanterne de Rivet, sa première
+// Les créations que le tutoriel fait fabriquer avant leur palier et leurs éléments (la lanterne de Jovin, sa première
 // leçon à l'établi, choix de l'auteur, 11 oct.) : world/creations.js les passe à blockOf (tutorial) tant qu'elle n'est
 // pas faite
 const TUTORIAL_CRAFTS = new Set(['lanterne']);

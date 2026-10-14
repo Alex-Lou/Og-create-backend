@@ -12,7 +12,7 @@ test.after(() => server?.kill());
 const view = async player => (await api('GET', '/play/world', null, player)).data;
 const at = (w, x, y) => w.map.ground[y][x];
 const draw = (player, lay, erase = []) => api('POST', '/play/world/paths', { lay, erase }, player);
-// Du Puits d'Ondin (île à la plage : palier I, 2 × 2 en 89, 87, contre le village) au sentier du Feu : quatre cases
+// Du Puits de Pierrot (île à la plage : palier I, 2 × 2 en 89, 87, contre le village) au sentier du Feu : quatre cases
 // vers l'est, sous le Puits, jusqu'au haut du sentier (95, 89)
 const LINK = [[91, 89], [92, 89], [93, 89], [94, 89]];
 
@@ -20,7 +20,7 @@ test('une île neuve n’a que son sentier ; une île d’avant garde ses routes
     const fresh = await newPlayer();
     const w = await view(fresh);
     // La grande route de la plage (rangées 90-91) est redevenue de l'herbe ; le sentier descend de la cuisine de
-    // Cannelle au rivage, puis d'une case jusqu'à la porte du Feu, qui brûle près de l'épave (île à la plage)
+    // Marcelle au rivage, puis d'une case jusqu'à la porte du Feu, qui brûle près de l'épave (île à la plage)
     assert.equal(at(w, 90, 90), 'g');
     for (let y = 89; y <= 95; y++) assert.equal(at(w, 95, y), 'p', `sentier ${y}`);
     assert.equal(at(w, 96, 95), 'p');

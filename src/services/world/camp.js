@@ -1,15 +1,15 @@
 // Le camp des naufragés sur la plage de Brumelune (dessins : design/bibliotheque/svg/decor/camp/camp.json) : l'épave de
-// l'Hirondelle, la cuisine de Cannelle, les coins d'Aster et de Rivet (débris, abri, cabanon), quelques objets ; les
-// voyageurs de l'acte IV y plantent leur tente et leur hamac, et le panneau SOS s'en va. La cage aux poules de Cannelle
+// l'Hirondelle, la cuisine de Marcelle, les coins d'Hermine et de Jovin (débris, abri, cabanon), quelques objets ; les
+// voyageurs de l'acte IV y plantent leur tente et leur hamac, et le panneau SOS s'en va. La cage aux poules de Marcelle
 // (decor/camp/poules) y paraît avec elle, coincée sous les rochers ; ouverte, elle reste près du feu.
 // Chaque élément a sa place prévue (PLACES) ; si un objet du joueur l'occupe déjà, l'élément se pose sur la case libre
 // la plus proche : rien du joueur ne bouge, et le camp est toujours complet. Ses cases sont ensuite réservées (on n'y
 // pose ni annexe ni création). Fonctions pures, et campOfUser qui lit dans la base ce qui le décide.
 // Sur une île qui suit l'histoire (choix de l'auteur, 9 oct.), rien n'est là avant son personnage : l'épave seule tant
-// que Brume est seule avec le joueur ; le camp d'Aster (son coin, le SOS, les caisses, le filet, les rondins) avec
-// Aster ; la cuisine avec Cannelle ; le coin de Rivet avec Rivet. Sur une île à la plage (world/places.js : une zone par
-// personnage), le camp d'Aster et ce que la mer a laissé autour sont dans sa zone, au sud-ouest, le coin de Rivet dans
-// la sienne, au nord du Feu ; la cuisine de Cannelle reste sur la plage, sa zone, près de son Feu.
+// que Brume est seule avec le joueur ; le camp d'Hermine (son coin, le SOS, les caisses, le filet, les rondins) avec
+// Hermine ; la cuisine avec Marcelle ; le coin de Jovin avec Jovin. Sur une île à la plage (world/places.js : une zone par
+// personnage), le camp d'Hermine et ce que la mer a laissé autour sont dans sa zone, au sud-ouest, le coin de Jovin dans
+// la sienne, au nord du Feu ; la cuisine de Marcelle reste sur la plage, sa zone, près de son Feu.
 const map = require('../worldMap');
 const landmarks = require('../landmarks');
 const finds = require('../finds');
@@ -23,25 +23,25 @@ const { presenceOf, metOf } = require('./people');
 const { sheltersOf } = require('./shelters');
 
 const ZONE = 'coeur';
-// Le Foyer à l'Abri (palier II) : la cuisine de Cannelle devient son cabanon, les cabanons peuvent venir
+// Le Foyer à l'Abri (palier II) : la cuisine de Marcelle devient son cabanon, les cabanons peuvent venir
 const ABRI = 2;
 // Les places du camp sur une île à la plage (world/places.js) : dans la zone de chacun
 const BEACH_PLACES = {
-    // (le camp d'Aster serré autour de son Ponton, contre l'épave : sa zone est petite)
+    // (le camp d'Hermine serré autour de son Ponton, contre l'épave : sa zone est petite)
     aster: { x: 90, y: 96 }, sos: { x: 90, y: 94 }, caisses: { x: 91, y: 95 }, filet: { x: 90, y: 98 }, rondins: { x: 92, y: 94 },
     rivet: { x: 93, y: 86 },
-    // (la cage des poules, échouée par la mer au bout de la plage, dans le coin de Cannelle : choix de l'auteur, 11 oct.)
+    // (la cage des poules, échouée par la mer au bout de la plage, dans le coin de Marcelle : choix de l'auteur, 11 oct.)
     cage: { x: 101, y: 98 }
 };
 
 // Place prévue (coin haut-gauche), taille (2 : 2 × 2 cases, sinon 1), dessin selon l'avancée (null : pas encore, ou
 // plus). at : { acts (actes finis), levels (paliers des bâtiments), cage ('coincee', 'ouverte' ou null), here (le
-// personnage est là ? id de son bâtiment : ponton Aster, foyer Cannelle, atelier Rivet) }. Un camp sobre, qui libère la plage : l'épave et
-// trois objets restent ; le coin d'Aster s'en va quand son Ponton est bâti, celui de Rivet avec son Atelier, la cuisine
-// de Cannelle devient son cabanon à l'Abri (elle le garde) ; le SOS, quand les voyageurs arrivent (acte IV) avec leur tente et leur hamac
+// personnage est là ? id de son bâtiment : ponton Hermine, foyer Marcelle, atelier Jovin) }. Un camp sobre, qui libère la plage : l'épave et
+// trois objets restent ; le coin d'Hermine s'en va quand son Ponton est bâti, celui de Jovin avec son Atelier, la cuisine
+// de Marcelle devient son cabanon à l'Abri (elle le garde) ; le SOS, quand les voyageurs arrivent (acte IV) avec leur tente et leur hamac
 const has = (at, act) => at.acts.includes(act);
 const foyer = at => at.levels.foyer || 0;
-// Le camp d'Aster (et ce que la mer a laissé autour) arrive avec elle
+// Le camp d'Hermine (et ce que la mer a laissé autour) arrive avec elle
 const aster = at => at.here('ponton');
 // Un coin de maître, une fois arrivé et tant que son bâtiment n'est pas bâti : débris, abri (acte I), cabanon (acte II,
 // et le Foyer à l'Abri)

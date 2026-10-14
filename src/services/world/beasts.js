@@ -1,6 +1,6 @@
 // Les bêtes de ferme, avec la base (v6, § 6.16 ; règles pures : services/beasts.js). Une ligne world_beasts par bête
 // libérée ou nourrie au moins une fois : l'heure du dernier repas et jusqu'où sa bulle a été ramassée. Ce qu'elles
-// donnent va à la nourriture du stock. Les poules de Cannelle sortent de leur cage (au camp, dès que Cannelle est là) :
+// donnent va à la nourriture du stock. Les poules de Marcelle sortent de leur cage (au camp, dès que Marcelle est là) :
 // l'ouvrir leur donne leur ligne, affamées ; une poule qui a sa ligne dit que la cage est ouverte (sans autre mémoire).
 // Le coq (choix de l'auteur, 14 oct.) : une ligne de world_items « coq » dit qu'il est là et depuis quand (la couvée
 // se compte de son arrivée : services/beasts.js) ; elle s'écrit au premier passage où le Foyer est à l'Abri, la cage
@@ -25,7 +25,7 @@ async function coqSinceOf(userId, conn = db) {
     const { rows: [row] } = await conn.query('SELECT bought_at FROM world_items WHERE user_id = $1 AND item = $2', [userId, COQ_ITEM]);
     return row ? new Date(row.bought_at).getTime() : null;
 }
-// Les bêtes de l'île : les poules de Cannelle, la cage ouverte (freed), le coq et sa couvée ; celles du Potager bâti,
+// Les bêtes de l'île : les poules de Marcelle, la cage ouverte (freed), le coq et sa couvée ; celles du Potager bâti,
 // dans un quartier à soi. rows : leurs lignes ({ bête: ligne }) ; coqSince : l'arrivée du coq, ou null
 async function herdOf(userId, conn, now = Date.now()) {
     const { levels } = await levelsOf(userId, conn);
@@ -40,8 +40,8 @@ async function herdOf(userId, conn, now = Date.now()) {
     }
     return { level, freed, rows, coqSince, herd: beasts.beastsOf(level, freed, coqSince, now) };
 }
-// La cage des poules, au camp : 'ouverte', 'coincee' (dès que Cannelle est là ; sur une île neuve, échouée par la mer
-// au bout de la plage une fois sa soupe faite : le jour de Cannelle, choix de l'auteur, 11 oct.), ou null (pas encore)
+// La cage des poules, au camp : 'ouverte', 'coincee' (dès que Marcelle est là ; sur une île neuve, échouée par la mer
+// au bout de la plage une fois sa soupe faite : le jour de Marcelle, choix de l'auteur, 11 oct.), ou null (pas encore)
 async function cageOf(userId, conn = db) {
     if (freedOf(await rowsOf(userId, conn))) return 'ouverte';
     const { levels } = await levelsOf(userId, conn);
@@ -50,7 +50,7 @@ async function cageOf(userId, conn = db) {
     return metOf('foyer', levels, await zonesOf(userId, conn), presence) ? 'coincee' : null;
 }
 
-// Ouvrir la cage (un toucher, une fois) : Paprika, Brioche et Madame sortent, affamées (on les nourrit depuis leur
+// Ouvrir la cage (un toucher, une fois) : Caramel, Flocon et Réglisse sortent, affamées (on les nourrit depuis leur
 // fiche). { hens: [leurs noms] } ou { status, message }
 async function openCage(userId, now = Date.now()) {
     await migrate(userId);
@@ -58,7 +58,7 @@ async function openCage(userId, now = Date.now()) {
         await stockOf(userId, conn, true);
         const cage = await cageOf(userId, conn);
         if (cage === 'ouverte') return db.rollback({ status: 409, message: 'La cage est déjà ouverte.' });
-        if (!cage) return db.rollback({ status: 403, message: 'Pas encore de cage : Cannelle n’est pas arrivée.' });
+        if (!cage) return db.rollback({ status: 403, message: 'Pas encore de cage : Marcelle n’est pas arrivée.' });
         await conn.query(
             `INSERT INTO world_beasts (user_id, beast, fed_at, collected_at) SELECT $1, hen, $2, $3 FROM unnest($4::text[]) AS hen
              ON CONFLICT (user_id, beast) DO NOTHING`,

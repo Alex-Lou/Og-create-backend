@@ -104,7 +104,7 @@ router.post('/world/craft/line', withAccount(async (req, res, owner, b) => {
     const done = await world.placeLine(owner.id, craft, cells.map(([x, y]) => [Number(x), Number(y)]), owned, bookPages.openChapters(b, owned), bookPages.starsOf(b, owned));
     await craftDone(res, owner, b, done, { placed: done.placed, ...(done.stopped ? { stopped: done.stopped } : {}) });
 }));
-// L'abri d'un coin du camp (celui de Cannelle) : bâti et payé
+// L'abri d'un coin du camp (celui de Marcelle) : bâti et payé
 router.post('/world/shelter', withAccount(async (req, res, owner, b) => {
     const who = String(req.body.who || '');
     if (!/^[a-z]{1,20}$/.test(who)) return res.status(400).json({ message: 'Abri invalide' });
@@ -548,7 +548,7 @@ router.post('/world/quest', withAccount(async (req, res, owner, b) => {
     res.json({ gained: done.gained, coins: done.coins, world: await worldView(owner, b) });
 }));
 
-// Dormir, la première nuit (tutoriel, étape « nuit ») : sans écus ni coffre ; au matin, Aster arrive et sa Récolte
+// Dormir, la première nuit (tutoriel, étape « nuit ») : sans écus ni coffre ; au matin, Hermine arrive et sa Récolte
 // s'ouvre. { slept, world }
 router.post('/world/sleep', withAccount(async (req, res, owner, b) => {
     const done = await world.sleep(owner.id);

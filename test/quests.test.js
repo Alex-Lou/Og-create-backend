@@ -114,7 +114,7 @@ test('la quête active est la première pas encore faite ; à la fin, Brume se r
   assert.match(QUESTS.find(q => q.id === 'feu').say, /sur la plage de Brumelune/);
   assert.deepEqual([first.id, first.act, first.step, first.total, first.kind, first.done], ['pages', 'T', 1, 72, 'element', false]);
   assert.equal(active(new Set(), facts({ elements: new Set([...facts().elements, 'Vent']) })).done, true);
-  // La lanterne de Rivet faite, on dort : Ondin au matin, jamais le même jour (choix de l'auteur, 13 oct.)
+  // La lanterne de Jovin faite, on dort : Pierrot au matin, jamais le même jour (choix de l'auteur, 13 oct.)
   // (ses trois torches d'abord : choix de l'auteur, 13 oct.)
   const torches = active(new Set(['deco']), facts({ placedCount: { torche: 2 } }));
   assert.deepEqual([torches.id, torches.kind, torches.have, torches.need, torches.done], ['torches-rivet', 'craft', 2, 3, false]);
@@ -122,7 +122,7 @@ test('la quête active est la première pas encore faite ; à la fin, Brume se r
   assert.deepEqual([night.id, night.kind, night.coins], ['nuit-rivet', 'sleep', 0]);
   const ondin = active(new Set(['nuit-rivet']), facts());
   assert.deepEqual([ondin.id, ondin.target], ['eveil-ondin', { villager: 'puits' }]);
-  // (un compte d'avant la bible, son ancienne quête de La Source réclamée : il trouve Ondin comme avant, sans dormir de plus)
+  // (un compte d'avant la bible, son ancienne quête de La Source réclamée : il trouve Pierrot comme avant, sans dormir de plus)
   assert.equal(active(new Set(['source']), facts()).id, 'eveil-ondin');
   const souvenir = active(new Set(['eveil-ondin']), facts());
   assert.deepEqual([souvenir.id, souvenir.kind, souvenir.element], ['souvenir-ondin', 'element', 'Pluie']);
@@ -176,7 +176,7 @@ test('un joueur d’avant la bible ne recule jamais : ses anciennes quêtes se r
   assert.deepEqual(['cabane', 'serre'].map(id => chests.get(id)), ['rare', 'epique']);
 });
 
-test('la première nuit est faite une fois la Récolte d’Aster réclamée (passer le tutoriel n’est permis qu’ensuite)', () => {
+test('la première nuit est faite une fois la Récolte d’Hermine réclamée (passer le tutoriel n’est permis qu’ensuite)', () => {
   assert.equal(firstNightDoneOf(new Set()), false);
   assert.equal(firstNightDoneOf(new Set(['feu'])), false);
   assert.equal(firstNightDoneOf(new Set(['recolte'])), true);

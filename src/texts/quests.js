@@ -20,16 +20,16 @@ const QUEST_TEXTS = {
         say: 'Le feu tient. La nuit tombe sur Brumelune, qui ne s’éveille que pour toi. Explore à ta guise… puis dors : demain, nous ne serons plus seuls.'
     },
     caisse: {
-        label: 'Ouvre la caisse d’Aster',
+        label: 'Ouvre la caisse d’Hermine',
         say: 'Sa caisse a échoué près du camp. Ouvre-la avec elle : la mer rend ce qu’elle a pris.'
     },
     recolte: {
-        label: 'Termine une Récolte avec Aster',
-        say: 'Aster a rejoint le camp au matin. Suis-la au rivage : relie ce qui se ressemble, vite, avant la marée.'
+        label: 'Termine une Récolte avec Hermine',
+        say: 'Hermine a rejoint le camp au matin. Suis-la au rivage : relie ce qui se ressemble, vite, avant la marée.'
     },
     'premier-ponton': {
-        label: 'Bâtis le Ponton d’Aster',
-        say: 'Vingt-cinq bois, et la mer nous ouvre ses portes. Bâtis le Ponton avec Aster.'
+        label: 'Bâtis le Ponton d’Hermine',
+        say: 'Vingt-cinq bois, et la mer nous ouvre ses portes. Bâtis le Ponton avec Hermine.'
     },
     'chemin-aster': {
         label: 'Relie le Ponton au Feu',
@@ -44,27 +44,27 @@ const QUEST_TEXTS = {
         say: 'Deux, ce soir, autour du feu. Dors : je veille.'
     },
     soupe: {
-        label: 'Une soupe pour Cannelle',
-        say: 'Cannelle grelotte… Touche la bulle au-dessus d’elle : un repas chaud, et elle reprend des couleurs.'
+        label: 'Une soupe pour Marcelle',
+        say: 'Marcelle grelotte… Touche la bulle au-dessus d’elle : un repas chaud, et elle reprend des couleurs.'
     },
     cage: {
         label: 'Ouvre la cage des poules',
-        say: 'Des caquets sur l’eau… La cage du navire s’est échouée au bout de la plage. Ouvre-la avec Cannelle.'
+        say: 'Des caquets sur l’eau… La cage du navire s’est échouée au bout de la plage. Ouvre-la avec Marcelle.'
     },
     poules: {
         label: 'Nourris les trois poules',
-        say: 'Paprika, Brioche et Madame ont faim : deux vivres chacune, depuis la bulle au-dessus d’elles.'
+        say: 'Caramel, Flocon et Réglisse ont faim : deux vivres chacune, depuis la bulle au-dessus d’elles.'
     },
     poulailler: {
-        label: 'Pose le poulailler de Cannelle',
-        say: 'Il leur faut un toit : touche le Feu de camp, puis « Annexes », et pose le poulailler dans l’herbe, près de la cuisine de Cannelle.'
+        label: 'Pose le poulailler de Marcelle',
+        say: 'Il leur faut un toit : touche le Feu de camp, puis « Annexes », et pose le poulailler dans l’herbe, près de la cuisine de Marcelle.'
     },
     'abri-cannelle': {
-        label: 'Un abri pour Cannelle',
-        say: 'Cannelle dort sur la cuisine de l’épave. Touche son coin : vingt bois, dix pierres, et elle a un toit.'
+        label: 'Un abri pour Marcelle',
+        say: 'Marcelle dort sur la cuisine de l’épave. Touche son coin : vingt bois, dix pierres, et elle a un toit.'
     },
     'enclos-cannelle': {
-        label: 'Entoure le coin de Cannelle',
+        label: 'Entoure le coin de Marcelle',
         say: 'Ses piquets, cette fois, c’est toi qui les fais : glisse autour de son abri, huit bois le piquet.'
     },
     'nuit-cannelle': {
@@ -73,18 +73,18 @@ const QUEST_TEXTS = {
     },
     deco: {
         label: 'Fabrique ta première lanterne',
-        say: 'Rivet a monté un établi près du feu. Assemble une Lanterne, puis pose-la au bord d’un chemin, là où l’île brille d’or.'
+        say: 'Jovin a monté un établi près du feu. Assemble une Lanterne, puis pose-la au bord d’un chemin, là où l’île brille d’or.'
     },
     'torches-rivet': {
-        label: 'Plante les trois torches de Rivet',
-        say: 'Rivet a une idée pour la nuit : trois torches, une par côté d’où venaient les égarés. Assemble-les à l’établi, puis plante-les.'
+        label: 'Plante les trois torches de Jovin',
+        say: 'Jovin a une idée pour la nuit : trois torches, une par côté d’où venaient les égarés. Assemble-les à l’établi, puis plante-les.'
     },
     'nuit-rivet': {
         label: 'Passe ta quatrième nuit',
         say: 'Quatre, ce soir, autour du feu. Dors : je veille.'
     },
     'eveil-ondin': {
-        label: 'Réveille Ondin',
+        label: 'Réveille Pierrot',
         say: 'Un petit dort contre un rocher, sa baguette à la main. Parle-lui doucement : la brume endort, sans faire de mal.'
     },
     'souvenir-ondin': {
@@ -93,18 +93,18 @@ const QUEST_TEXTS = {
     },
     'puits-ondin': {
         label: 'Construis le Puits',
-        say: 'Ondin sent l’eau sous ses pieds. Creuse le Puits avec la pierre de la Récolte : l’eau ne manquera plus.'
+        say: 'Pierrot sent l’eau sous ses pieds. Creuse le Puits avec la pierre de la Récolte : l’eau ne manquera plus.'
     },
     chemin: {
         label: 'Relie le Puits au Feu',
-        say: 'Ondin porte l’eau à travers l’herbe mouillée… Trace un chemin du Puits jusqu’au Feu : les premières pierres sont offertes.'
+        say: 'Pierrot porte l’eau à travers l’herbe mouillée… Trace un chemin du Puits jusqu’au Feu : les premières pierres sont offertes.'
     },
     lisiere: {
         label: 'Achète La Lisière',
         say: 'Le bois flotté s’épuise. À l’ouest, des arbres dorment sous la brume… et quelqu’un avec eux. Achète La Lisière.'
     },
     'eveil-sylve': {
-        label: 'Réveille Sylve',
+        label: 'Réveille Freya',
         say: 'Une sauvageonne dort roulée en boule, près d’un radeau brisé. Approche sans bruit, et parle-lui.'
     },
     vie: {
@@ -112,12 +112,12 @@ const QUEST_TEXTS = {
         say: 'Air, Eau, Feu, Terre… Les quatre Souffles ensemble, dans l’Athanor. Je crois que c’est ça, la Vie.'
     },
     'souvenir-sylve': {
-        label: 'Rends son souvenir à Sylve : fais naître l’Arbre',
-        say: 'De la Vie naît la Plante, et de la Plante, l’Arbre. Fais-le naître : Sylve se souviendra de sa forêt.'
+        label: 'Rends son souvenir à Freya : fais naître l’Arbre',
+        say: 'De la Vie naît la Plante, et de la Plante, l’Arbre. Fais-le naître : Freya se souviendra de sa forêt.'
     },
     bosquet: {
         label: 'Plante le Bosquet',
-        say: 'Sylve se souvient ! Plante le Bosquet : elle ramassera le bois mort, sans abattre un seul arbre.'
+        say: 'Freya se souvient ! Plante le Bosquet : elle ramassera le bois mort, sans abattre un seul arbre.'
     },
     lumiere: {
         label: 'Fais naître la Lumière',
@@ -132,12 +132,12 @@ const QUEST_TEXTS = {
         say: 'L’orage approche, et l’Abri demande de la pierre. Au nord-est, une fissure… Achète La Colline.'
     },
     'eveil-galet': {
-        label: 'Réveille Galet',
+        label: 'Réveille Saturnin',
         say: 'Un vieil homme dort dans la fissure, son maillet à la main. Il ronfle comme une pierre qui roule.'
     },
     'souvenir-galet': {
-        label: 'Rends son souvenir à Galet : fais naître la Pierre',
-        say: 'Galet a oublié la pierre. Le Feu et la Terre font la Lave ; l’Air la refroidit… Fais naître la Pierre.'
+        label: 'Rends son souvenir à Saturnin : fais naître la Pierre',
+        say: 'Saturnin a oublié la pierre. Le Feu et la Terre font la Lave ; l’Air la refroidit… Fais naître la Pierre.'
     },
     carriere: {
         label: 'Ouvre la Fissure',
@@ -145,7 +145,7 @@ const QUEST_TEXTS = {
     },
     bois: {
         label: 'Fais naître le Bois',
-        say: 'Pour l’Abri, il faut du bois… sans faire pleurer Sylve. L’Arbre et le Métal, peut-être ?'
+        say: 'Pour l’Abri, il faut du bois… sans faire pleurer Freya. L’Arbre et le Métal, peut-être ?'
     },
     cabane: {
         label: 'Dresse l’Abri avant l’orage',
@@ -160,7 +160,7 @@ const QUEST_TEXTS = {
         say: 'Sept bouches, et la Récolte ne suffit plus. Au nord, une terre noire… et une barque de graines. Achète Les Jardins.'
     },
     'eveil-melisse': {
-        label: 'Réveille Mélisse',
+        label: 'Réveille Flore',
         say: 'Une jardinière dort sur sa boîte en fer. Réveille-la : ses graines ont de la mémoire, dit-elle.'
     },
     potager: {
@@ -169,15 +169,15 @@ const QUEST_TEXTS = {
     },
     faubourg: {
         label: 'Achète Le Faubourg',
-        say: 'Rivet rêve d’une vraie forge. « Attends… Non. Si ! » À l’est, Le Faubourg l’attend.'
+        say: 'Jovin rêve d’une vraie forge. « Attends… Non. Si ! » À l’est, Le Faubourg l’attend.'
     },
     atelier: {
         label: 'Bâtis l’Atelier',
-        say: 'Le Métal et la Terre font le Fer. Bâtis l’Atelier : Rivet forgera les outils de tous.'
+        say: 'Le Métal et la Terre font le Fer. Bâtis l’Atelier : Jovin forgera les outils de tous.'
     },
     etoile: {
         label: 'Fais naître l’Étoile',
-        say: 'Aster veut explorer, mais la nuit, il faut un guide. Fais naître l’Étoile : elle tracera la route.'
+        say: 'Hermine veut explorer, mais la nuit, il faut un guide. Fais naître l’Étoile : elle tracera la route.'
     },
     hauteurs: {
         label: 'Achète Les Hauteurs',
@@ -197,11 +197,11 @@ const QUEST_TEXTS = {
     },
     crique: {
         label: 'Achète La Crique',
-        say: 'Aster veut reprendre la mer. Au nord-est, une crique abritée : on dit que des dauphins y viennent.'
+        say: 'Hermine veut reprendre la mer. Au nord-est, une crique abritée : on dit que des dauphins y viennent.'
     },
     'souvenir-aster': {
-        label: 'Rends son courage à Aster : fais naître le Bateau',
-        say: '« Je ne sais plus tenir une barre », dit Aster. Le Bois et l’Eau… Fais naître le Bateau : rends-lui la mer.'
+        label: 'Rends son courage à Hermine : fais naître le Bateau',
+        say: '« Je ne sais plus tenir une barre », dit Hermine. Le Bois et l’Eau… Fais naître le Bateau : rends-lui la mer.'
     },
     'ponton-aster': {
         label: 'Fais du Ponton un port de pêche',
@@ -209,7 +209,7 @@ const QUEST_TEXTS = {
     },
     bete: {
         label: 'Fais naître une bête',
-        say: 'Ce qu’on fabrique renaît. Une bête, dans le Grimoire : Poisson, Oiseau, Grenouille… Sylve dit qu’elles attendent.'
+        say: 'Ce qu’on fabrique renaît. Une bête, dans le Grimoire : Poisson, Oiseau, Grenouille… Freya dit qu’elles attendent.'
     },
     voyageur: {
         label: 'Comble un voyageur',
@@ -225,7 +225,7 @@ const QUEST_TEXTS = {
     },
     serre: {
         label: 'Bâtis la Serre',
-        say: 'Sous le verre, tout pousse plus vite. Fais de ton Potager une Serre : Mélisse y sèmera ses graines étranges.'
+        say: 'Sous le verre, tout pousse plus vite. Fais de ton Potager une Serre : Flore y sèmera ses graines étranges.'
     },
     maison: {
         label: 'Bâtis la Cabane',
@@ -244,8 +244,8 @@ const QUEST_TEXTS = {
         say: 'Des toits dorment sous la brume, à l’est. Achète Le Hameau : une baleine passe parfois au large.'
     },
     potion: {
-        label: 'Rends le goût à Cannelle : fais naître le Remède',
-        say: 'Cannelle repose sa cuillère. « Plus rien n’a de goût… Ce n’est pas la brume, c’est moi. » Le Grimoire se souvient du Remède : écris-le.'
+        label: 'Rends le goût à Marcelle : fais naître le Remède',
+        say: 'Marcelle repose sa cuillère. « Plus rien n’a de goût… Ce n’est pas la brume, c’est moi. » Le Grimoire se souvient du Remède : écris-le.'
     },
     alchimiste: {
         label: 'Bâtis la Maison de l’alchimiste',
@@ -261,11 +261,11 @@ const QUEST_TEXTS = {
     },
     ecriture: {
         label: 'Fais naître l’Écriture',
-        say: 'Galet lit les runes des Anciens. Le Langage et la Pierre : réapprenons à écrire, nous aussi.'
+        say: 'Saturnin lit les runes des Anciens. Le Langage et la Pierre : réapprenons à écrire, nous aussi.'
     },
     cle: {
         label: 'Trouve la clé du phare',
-        say: '« J’ai laissé la clé du phare sous une pierre », écrivait H. Le Cercle de menhirs… Ondin, ta baguette ?'
+        say: '« J’ai laissé la clé du phare sous une pierre », écrivait H. Le Cercle de menhirs… Pierrot, ta baguette ?'
     },
     tour: {
         label: 'Bâtis la Tour d’étude',
@@ -289,7 +289,7 @@ const QUEST_TEXTS = {
     },
     'phare-brume': {
         label: 'Allume le Phare de Brume',
-        say: 'Rivet a monté la lentille. Il ne manque que la flamme… Allume le Phare : je serai sa lumière.'
+        say: 'Jovin a monté la lentille. Il ne manque que la flamme… Allume le Phare : je serai sa lumière.'
     }
 };
 

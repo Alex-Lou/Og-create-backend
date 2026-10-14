@@ -62,7 +62,7 @@ const stars = require('./world/stars');
 const { startNights, repelCreature, repairSite, nightsView } = require('./world/nights');
 const { feedBeast, collectBeasts, beastsView, openCage } = require('./world/beasts');
 
-// Un habitant arrive comblé (Cannelle, pendant le prologue, affamée : hungryOf) : la première vue de l'île après son
+// Un habitant arrive comblé (Marcelle, pendant le prologue, affamée : hungryOf) : la première vue de l'île après son
 // arrivée inscrit l'heure de ses besoins (ou de celui qui apparaît, travailler avec l'Atelier), une seule fois
 async function welcome(userId, moods, filled, presence, now = Date.now()) {
     const fresh = Object.entries(moods).flatMap(([id, m]) => m.needs.filter(n => n.cost && !filled[id]?.[n.id]).map(n => [id, n.id]));
@@ -90,7 +90,7 @@ async function factsOf(userId, owned, stars, conn = db, moods = null) {
         // (les gisements de climat ; ce que la mer rend sur la plage de Brumelune compte à part)
         count('SELECT COUNT(*)::int AS n FROM world_deposits WHERE user_id = $1 AND deposit NOT LIKE $2', [userId, `${pickups.PREFIX}%`]),
         count('SELECT COUNT(*)::int AS n FROM world_deposits WHERE user_id = $1 AND deposit LIKE $2', [userId, `${pickups.PREFIX}%`]),
-        // Les poules de Cannelle nourries, encore rassasiées (ouvrir la cage les laisse affamées : seul un repas compte)
+        // Les poules de Marcelle nourries, encore rassasiées (ouvrir la cage les laisse affamées : seul un repas compte)
         count(`SELECT COUNT(*)::int AS n FROM world_beasts WHERE user_id = $1 AND beast = ANY($2)
             AND fed_at > NOW() - make_interval(secs => $3)`, [userId, beastRules.HENS, beastRules.DAY_MS / 1000]),
         count('SELECT COUNT(*)::int AS n FROM world_visitors WHERE user_id = $1 AND satisfied_at IS NOT NULL', [userId]),
@@ -98,7 +98,7 @@ async function factsOf(userId, owned, stars, conn = db, moods = null) {
         namesOf(userId, conn),
         // Les caisses des personnages ouvertes (world/chests.js : CRATES)
         conn.query(`SELECT source FROM world_chests WHERE user_id = $1 AND source LIKE 'caisse:%'`, [userId]),
-        // La cage des poules ouverte (chacune a sa ligne : world/beasts.js) ; le poulailler de Cannelle posé
+        // La cage des poules ouverte (chacune a sa ligne : world/beasts.js) ; le poulailler de Marcelle posé
         count('SELECT COUNT(*)::int AS n FROM world_beasts WHERE user_id = $1 AND beast = ANY($2)', [userId, beastRules.HENS]),
         count('SELECT COUNT(*)::int AS n FROM world_annexes WHERE user_id = $1 AND annex = $2', [userId, 'poulailler'])
     ]);
@@ -111,7 +111,7 @@ async function factsOf(userId, owned, stars, conn = db, moods = null) {
         moods = moodsOf(residents, levels, zones, placed, filled, presence, Date.now(), places);
     }
     // Un besoin comblé depuis l'ouverture de la quête en cours (la dernière réclamée) reste fait pour elle, même s'il
-    // revient avant qu'on la réclame. La faim de Cannelle à son arrivée (welcome, datée d'avant) ne compte pas
+    // revient avant qu'on la réclame. La faim de Marcelle à son arrivée (welcome, datée d'avant) ne compte pas
     const [last] = lastRows.rows;
     const fedSince = Object.entries(filled).flatMap(([id, needs]) => Object.entries(needs)
         .filter(([, at]) => !last.at || new Date(at) >= last.at).map(([need]) => `${id}:${need}`));
@@ -159,13 +159,13 @@ async function guidedInkOf(userId) {
     return Boolean(quest && quests.GUIDED_INK.has(quest.id));
 }
 // La page que marque le ruban pendant le tutoriel n'a pas de leurre (choix de l'auteur, 9 oct.) : le Brasier du feu de
-// camp (Feu + Feu, sans Encre). La Pluie d'Ondin garde ses leurres : l'Encre s'y apprend (choix de l'auteur, 12 oct.)
+// camp (Feu + Feu, sans Encre). La Pluie de Pierrot garde ses leurres : l'Encre s'y apprend (choix de l'auteur, 12 oct.)
 async function guidedPageOf(userId) {
     const quest = quests.currentOf(await claimedOf(userId));
     return Boolean(quest && (quest.id === 'feu' || await brasierFirst(userId, quest)));
 }
 // L'Athanor grandit avec l'histoire (choix de l'auteur, 12 oct.), en plus des familles : un emplacement de plus quand
-// le Puits d'Ondin est réclamé, la fin du tutoriel ; quatre quand Sylve arrive, juste avant la Vie
+// le Puits de Pierrot est réclamé, la fin du tutoriel ; quatre quand Freya arrive, juste avant la Vie
 const ATHANOR = [['eveil-sylve', 4], ['puits-ondin', 3]];
 const athanorFrom = claimed => {
     const done = quests.doneOf(claimed);
@@ -225,14 +225,14 @@ async function board(userId, owned, stars, openChapters) {
 
 // « Passer le tutoriel » : retenu sur le compte, pour tous ses appareils (une ligne de world_items, sans donnée nouvelle)
 const PROLOGUE_SKIP = 'prologue:passe';
-// Le tutoriel du compte (chaque île le suit) : « Passer » ne vaut qu'une fois la Récolte d'Aster validée
+// Le tutoriel du compte (chaque île le suit) : « Passer » ne vaut qu'une fois la Récolte d'Hermine validée
 async function tutorialOf(userId, conn = db) {
     const items = await itemsOf(userId, conn);
     return { tutorial: true, skipped: quests.firstNightDoneOf(await claimedOf(userId, conn)) && items.has(PROLOGUE_SKIP) };
 }
 async function skipPrologue(userId) {
     if (!quests.firstNightDoneOf(await claimedOf(userId))) {
-        return { status: 409, message: 'Bâtis d’abord le camp et termine la première Récolte avec Aster.' };
+        return { status: 409, message: 'Bâtis d’abord le camp et termine la première Récolte avec Hermine.' };
     }
     await db.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'tutoriel') ON CONFLICT DO NOTHING`, [userId, PROLOGUE_SKIP]);
     return { skipped: true };
@@ -609,7 +609,7 @@ async function claimQuest(userId, questId, owned, stars) {
 }
 
 // Dormir, la première nuit (choix de l'auteur, 9 oct.) : seule l'étape « nuit » du tutoriel se passe ainsi, sans écus
-// ni coffre. La nuit est marquée comme faite ; au matin, Aster rejoint le camp (world/people.js) et sa Récolte s'ouvre.
+// ni coffre. La nuit est marquée comme faite ; au matin, Hermine rejoint le camp (world/people.js) et sa Récolte s'ouvre.
 async function sleep(userId) {
     await migrate(userId);
     return db.transaction(async conn => {
@@ -641,7 +641,7 @@ async function buyZone(userId, zoneId, openChapters) {
     });
 }
 
-// Le Ponton I (choix de l'auteur, 11 oct.) : Aster le bâtit à son premier jour, avec le bois de la Récolte seul ; son
+// Le Ponton I (choix de l'auteur, 11 oct.) : Hermine le bâtit à son premier jour, avec le bois de la Récolte seul ; son
 // carnet de quart (dans sa caisse) tient lieu de plan, et son quartier (La Crique, acte IV) n'est pas encore à soi. Les
 // paliers suivants suivent la règle
 const tutorialPonton = (siteId, level) => siteId === 'ponton' && !level;

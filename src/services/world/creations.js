@@ -59,15 +59,15 @@ async function stowCrafts(userId, rows, levels, zones, annexRows, places = STATI
     return craftsOf(userId);
 }
 // Ce que le tutoriel fait fabriquer sans palier ni éléments (crafts.TUTORIAL_CRAFTS), pendant sa leçon seulement (la
-// lanterne de Rivet : la quête « deco » en cours). presence : people.presenceOf
+// lanterne de Jovin : la quête « deco » en cours). presence : people.presenceOf
 const LESSON = 'deco';
 const questNow = presence => quests.QUESTS.find(q => !presence.done.has(q.id))?.id;
 const tutorialOf = presence => (questNow(presence) === LESSON ? crafts.TUTORIAL_CRAFTS : new Set());
-// L'enclos de Cannelle (choix de l'auteur, 13 oct.) : sa clôture se trace même sans en avoir jamais assemblé une (un
-// compte d'avant les clôtures d'Aster y arrive sans piquet : il n'est jamais lâché)
+// L'enclos de Marcelle (choix de l'auteur, 13 oct.) : sa clôture se trace même sans en avoir jamais assemblé une (un
+// compte d'avant les clôtures d'Hermine y arrive sans piquet : il n'est jamais lâché)
 const FENCE_LESSON = 'enclos-cannelle';
 const freeTraceOf = presence => (questNow(presence) === FENCE_LESSON ? new Set(['cloture']) : new Set());
-// Une création en ligne se trace-t-elle ? (la première assemblée à la main, ou la leçon de l'enclos de Cannelle)
+// Une création en ligne se trace-t-elle ? (la première assemblée à la main, ou la leçon de l'enclos de Marcelle)
 const traceable = (id, made, free) => Boolean(made[id] || free.has(id));
 
 // Questions de l'Épreuve réussies (progress.timer_progress : niveau → catégorie → identifiants)
@@ -262,7 +262,7 @@ async function placeLine(userId, craftId, cells, owned, chapters, stars = 0) {
     });
 }
 
-// L'anneau d'un coin du camp (l'enclos de Cannelle, choix de l'auteur, 13 oct.) : les cases à une case de son coin, sauf
+// L'anneau d'un coin du camp (l'enclos de Marcelle, choix de l'auteur, 13 oct.) : les cases à une case de son coin, sauf
 // celles qui bordent le Feu (son enclos à lui, autour de sa grande emprise) ; have : celles qui ont déjà leur clôture,
 // need : have et celles où une clôture peut encore se poser (rien d'impossible n'est demandé). { have, need }
 async function fenceRingOf(userId, conn, who) {

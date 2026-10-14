@@ -6,7 +6,7 @@
 // - une grande annexe au palier VI.
 // Le Foyer a aussi ses maisons (lot 7d) : jusqu'à 4, ouvertes aux paliers II à V, chacune loge un visiteur qui reste.
 // Annexes de climat (lot 9d) : une par trouvaille de climat, au palier III, payée aussi en trouvailles (finds).
-// Le poulailler de Cannelle (choix de l'auteur, 11 oct. : sa leçon, poser une annexe) : un seul, dès le Feu bâti,
+// Le poulailler de Marcelle (choix de l'auteur, 11 oct. : sa leçon, poser une annexe) : un seul, dès le Feu bâti,
 // gratuit ; ses poules y vivent.
 // Effets : rate = ressources par heure en plus et earn = écus par heure en plus (production du bâtiment, comptée
 // depuis la pose, avec les bonus de production de la boutique) ; cap = heures de production gardées en plus ;
@@ -69,7 +69,7 @@ const maxOf = a => (a.kind === 'house' ? HOUSE_LEVELS.length : a.kind === 'small
 // Palier du bâtiment qui ouvre l'exemplaire n° copy (0, 1, 2…)
 const levelFor = (a, copy) => (a.kind === 'house' ? HOUSE_LEVELS[copy] : a.kind === 'small' ? SMALL_LEVELS[copy] : KIND_LEVEL[a.kind]);
 // Le palier d'un bâtiment où s'ouvre sa première annexe : le palier II, sauf le Feu, dès le palier I (le poulailler de
-// Cannelle, le jour de Cannelle)
+// Marcelle, le jour de Marcelle)
 const OPEN_LEVEL = {};
 for (const a of ANNEXES) OPEN_LEVEL[a.site] = Math.min(OPEN_LEVEL[a.site] ?? Infinity, levelFor(a, 0));
 const openLevelOf = site => OPEN_LEVEL[site] || 2;
@@ -111,7 +111,7 @@ function effectText(a, words, capHours) {
     if (e.regenCut) return `Une partie revient ${Math.round(e.regenCut / 60000)} min plus vite`;
     if (e.moves) return `+${e.moves} coup${e.moves > 1 ? 's' : ''} par Récolte`;
     if (e.house) return 'Loge un visiteur qui veut rester sur l’île';
-    if (e.hens) return 'Un toit pour les poules de Cannelle';
+    if (e.hens) return 'Un toit pour les poules de Marcelle';
     return '';
 }
 

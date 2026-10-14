@@ -6,14 +6,14 @@
 // Ce que donne chaque sorte, versé dans les réserves
 const KINDS = {
     bois: { name: 'Bois flotté', gives: { wood: 2 } },
-    // (deux coquillages : la soupe de Cannelle, dix vivres, le jour de Cannelle ; choix de l'auteur, 11 oct.)
+    // (deux coquillages : la soupe de Marcelle, dix vivres, le jour de Marcelle ; choix de l'auteur, 11 oct.)
     coquillage: { name: 'Coquillages', gives: { food: 5 } },
     galet: { name: 'Galets', gives: { stone: 2 } }
 };
 // Les cases de la plage : le sable au bord de l'eau, au pied du camp (le cœur de l'île, à soi dès le départ), toutes
 // sur le sable découvert dès l'arrivée. Le premier soir (choix de l'auteur, 11 oct.) : deux bois flottés et un galet,
-// exactement le prix du feu de camp ; les coquillages, au jour de Cannelle (after : la quête faite avant qu'ils
-// paraissent). Le coin de Cannelle, au bout de la plage (x 99 et plus), se voit dès la première nuit (le carré de la
+// exactement le prix du feu de camp ; les coquillages, au jour de Marcelle (after : la quête faite avant qu'ils
+// paraissent). Le coin de Marcelle, au bout de la plage (x 99 et plus), se voit dès la première nuit (le carré de la
 // plage, choix de l'auteur, 12 oct.) : rien du premier soir n'y est, ses coquillages paraissent avec elle
 const SPOTS = [
     ['greve-bois-1', 'bois', 95, 98], ['greve-galet-1', 'galet', 98, 98], ['greve-bois-2', 'bois', 97, 98],

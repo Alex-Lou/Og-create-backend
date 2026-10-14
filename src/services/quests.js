@@ -11,7 +11,7 @@
 // - wake : un habitant réveillé (amitié > 0) ; heart : un cœur ;
 // - expedition : expéditions revenues ; landmark : lieux découverts (ou un lieu précis) ; gather : gisements ramassés ;
 // - pickup : trouvailles de la plage de Brumelune ramassées (bois flotté, galets, coquillages : services/pickups.js) ;
-// - hens : poules de Cannelle nourries et encore rassasiées ; crate : la caisse d'un personnage ouverte (world/chests.js) ;
+// - hens : poules de Marcelle nourries et encore rassasiées ; crate : la caisse d'un personnage ouverte (world/chests.js) ;
 // - visitor : voyageurs comblés ; settle : voyageurs installés ; name : le peuple a un nom.
 // chest : la dernière quête des actes donne aussi un coffre de cette rareté (loot.js), à ouvrir une fois réclamée.
 //
@@ -27,19 +27,19 @@ const BEASTS = ['Poisson', 'Méduse', 'Grenouille', 'Oiseau', 'Tortue', 'Papillo
 
 // (son titre et ce qu'en dit Brume : texts/quests.js)
 const q = (id, act, goal, coins, chest) => ({ id, act, goal, coins, ...QUEST_TEXTS[id], ...(chest ? { chest } : {}) });
-// Les piquets de l'enclos d'Aster, autour du Feu (quête des clôtures)
+// Les piquets de l'enclos d'Hermine, autour du Feu (quête des clôtures)
 const ENCLOS = 13;
 const QUESTS = [
-    // Prologue : Brume accompagne une action à la fois jusqu'à la première nuit. Aster ouvre ensuite sa propre leçon
+    // Prologue : Brume accompagne une action à la fois jusqu'à la première nuit. Hermine ouvre ensuite sa propre leçon
     // par la Récolte.
     q('pages', 'T', { kind: 'element', element: 'Vent' }, 20),
     q('ramasser', 'T', { kind: 'pickup', need: 3 }, 10),
     // Le premier feu est réellement bâti avec les trouvailles ; c'est le Foyer au palier I.
     q('feu', 'T', { kind: 'level', site: 'foyer', need: 1 }, 15),
-    // La première nuit (choix de l'auteur, 9 oct.) : seul avec Brume, sans personne d'autre, avant l'arrivée d'Aster au
+    // La première nuit (choix de l'auteur, 9 oct.) : seul avec Brume, sans personne d'autre, avant l'arrivée d'Hermine au
     // matin. Une étape de respiration, sans écus : on explore, puis on dort (world.sleep).
     q('nuit', 'T', { kind: 'sleep', site: 'foyer' }, 0),
-    // Le jour d'Aster (choix de l'auteur, 11 oct. : un vrai parcours, pas expédié) : sa scène au réveil, sa caisse
+    // Le jour d'Hermine (choix de l'auteur, 11 oct. : un vrai parcours, pas expédié) : sa scène au réveil, sa caisse
     // échouée (world/chests.js : CRATES), sa Récolte, son Ponton (le palier I, sans plan ni quartier sur une île du
     // tutoriel : son carnet de quart en tient lieu, world.js : tutorialPonton), puis sa longue-vue au couchant
     q('caisse', 'T', { kind: 'crate', crate: 'aster' }, 10),
@@ -49,19 +49,19 @@ const QUESTS = [
     // world/paths.js : FREE)
     q('chemin-aster', 'T', { kind: 'link', from: 'ponton', to: 'foyer' }, 15),
     // (l'enclos du camp, choix de l'auteur, 13 oct. : ses piquets, dans sa caisse (world/chests.js, CRATES), un par case
-    // autour de la grande emprise du Feu, le sentier d'Aster laissé libre ; une clôture barre la route d'un égaré, nights.js)
+    // autour de la grande emprise du Feu, le sentier d'Hermine laissé libre ; une clôture barre la route d'un égaré, nights.js)
     q('clotures', 'T', { kind: 'craft', craft: 'cloture', need: ENCLOS }, 15),
-    // La deuxième nuit (choix de l'auteur, 10 oct. : un personnage par jour) : la journée d'Aster finit autour du feu ;
-    // Cannelle arrivera au matin
+    // La deuxième nuit (choix de l'auteur, 10 oct. : un personnage par jour) : la journée d'Hermine finit autour du feu ;
+    // Marcelle arrivera au matin
     q('veille', 'T', { kind: 'sleep', site: 'foyer' }, 0),
     q('soupe', 'T', { kind: 'need', villager: 'foyer', what: 'manger' }, 15),
-    // Le jour de Cannelle (choix de l'auteur, 11 oct.) : la cage de ses poules arrive par la mer, au bout de la plage ; on
+    // Le jour de Marcelle (choix de l'auteur, 11 oct.) : la cage de ses poules arrive par la mer, au bout de la plage ; on
     // l'ouvre, on attrape les poules (le jeu), on les nourrit toutes les trois ; puis leur poulailler, sa leçon à elle
-    // (poser une annexe) ; et la troisième nuit, avant Rivet. (Les œufs viendront plus tard, avec le coq.)
+    // (poser une annexe) ; et la troisième nuit, avant Jovin. (Les œufs viendront plus tard, avec le coq.)
     q('cage', 'T', { kind: 'cage' }, 10),
     q('poules', 'T', { kind: 'hens', need: 3 }, 10),
     q('poulailler', 'T', { kind: 'coop' }, 15),
-    // L'abri de Cannelle, puis son enclos (choix de l'auteur, 13 oct.) : son coin passe des débris à l'abri (payé :
+    // L'abri de Marcelle, puis son enclos (choix de l'auteur, 13 oct.) : son coin passe des débris à l'abri (payé :
     // world/shelters.js), puis le joueur fabrique et paie les piquets qui l'entourent (son anneau, du moment :
     // world/creations.js, fenceRingOf)
     q('abri-cannelle', 'T', { kind: 'shelter', who: 'cannelle', villager: 'foyer' }, 15),
@@ -73,12 +73,12 @@ const QUESTS = [
     // (ses trois torches, une par côté d'où venaient les égarés de la veillée : choix de l'auteur, 13 oct.)
     q('torches-rivet', 'T', { kind: 'craft', craft: 'torche', need: 3 }, 15),
     // La quatrième nuit (choix de l'auteur, 13 oct. : chaque personnage son jour, le suivant quand le joueur choisit de
-    // dormir) : le jour de Rivet finit autour du feu ; Ondin sera trouvé au matin
+    // dormir) : le jour de Jovin finit autour du feu ; Pierrot sera trouvé au matin
     q('nuit-rivet', 'T', { kind: 'sleep', site: 'foyer' }, 0),
     q('eveil-ondin', 'T', { kind: 'wake', villager: 'puits' }, 10),
     q('souvenir-ondin', 'T', { kind: 'element', element: 'Pluie' }, 20),
     q('puits-ondin', 'T', { kind: 'level', site: 'puits', need: 1 }, 40, 'rare'),
-    // Acte I : la Vie et la lumière (Sylve). D'abord le premier chemin (choix de l'auteur, 8 oct. : l'île neuve n'a que
+    // Acte I : la Vie et la lumière (Freya). D'abord le premier chemin (choix de l'auteur, 8 oct. : l'île neuve n'a que
     // son sentier ; ses cases offertes le paient)
     q('chemin', 'I', { kind: 'link', from: 'puits', to: 'foyer' }, 15),
     q('lisiere', 'I', { kind: 'zone', zone: 'lisiere' }, 50),
@@ -88,14 +88,14 @@ const QUESTS = [
     q('bosquet', 'I', { kind: 'level', site: 'bosquet', need: 1 }, 40),
     q('lumiere', 'I', { kind: 'element', element: 'Lumière' }, 40),
     q('lanterne', 'I', { kind: 'craft', craft: 'lanterne' }, 60, 'rare'),
-    // Acte II : la matière, s'abriter (Galet)
+    // Acte II : la matière, s'abriter (Saturnin)
     q('colline', 'II', { kind: 'zone', zone: 'colline' }, 80),
     q('eveil-galet', 'II', { kind: 'wake', villager: 'carriere' }, 10),
     q('souvenir-galet', 'II', { kind: 'element', element: 'Pierre' }, 20),
     q('carriere', 'II', { kind: 'level', site: 'carriere', need: 1 }, 40),
     q('bois', 'II', { kind: 'element', element: 'Bois' }, 40),
     q('cabane', 'II', { kind: 'level', site: 'foyer', need: 2 }, 70, 'rare'),
-    // Acte III : se nourrir, explorer (Mélisse, la forge de Rivet)
+    // Acte III : se nourrir, explorer (Flore, la forge de Jovin)
     // L'annexe vient après l'Abri : il faut un bâtiment au palier II (bible, mises à jour du lot H1)
     q('annexe', 'III', { kind: 'annex', need: 1 }, 50),
     q('jardins', 'III', { kind: 'zone', zone: 'jardins' }, 110),
@@ -108,17 +108,17 @@ const QUESTS = [
     q('expedition', 'III', { kind: 'expedition', need: 1 }, 60),
     q('ruine', 'III', { kind: 'landmark', need: 1 }, 60),
     q('village', 'III', { kind: 'element', element: 'Village' }, 80, 'epique'),
-    // Acte IV : le vivant, s'ouvrir aux autres (Aster reprend la mer, les bêtes, les voyageurs)
+    // Acte IV : le vivant, s'ouvrir aux autres (Hermine reprend la mer, les bêtes, les voyageurs)
     q('crique', 'IV', { kind: 'zone', zone: 'crique' }, 160),
     q('souvenir-aster', 'IV', { kind: 'element', element: 'Bateau' }, 30),
-    // (le Ponton I se bâtit au jour d'Aster : l'acte IV en fait un port de pêche, choix de l'auteur, 11 oct.)
+    // (le Ponton I se bâtit au jour d'Hermine : l'acte IV en fait un port de pêche, choix de l'auteur, 11 oct.)
     q('ponton-aster', 'IV', { kind: 'level', site: 'ponton', need: 2 }, 80),
     q('bete', 'IV', { kind: 'element', any: BEASTS }, 50),
     q('voyageur', 'IV', { kind: 'visitor', need: 1 }, 80),
     q('coeur', 'IV', { kind: 'heart', need: 1 }, 60),
     q('trouvaille', 'IV', { kind: 'gather', need: 1 }, 60),
     q('serre', 'IV', { kind: 'level', site: 'potager', need: 2 }, 120, 'epique'),
-    // Acte V : le foyer, se nommer (les voyageurs restent, le goût de Cannelle)
+    // Acte V : le foyer, se nommer (les voyageurs restent, le goût de Marcelle)
     q('maison', 'V', { kind: 'level', site: 'foyer', need: 3 }, 150),
     q('une-maison', 'V', { kind: 'house', need: 1 }, 100),
     q('installe', 'V', { kind: 'settle', need: 1 }, 120),
@@ -144,7 +144,7 @@ const INDEX = new Map(QUESTS.map((quest, i) => [quest.id, i]));
 // Anciennes quêtes (avant la chaîne de la bible) : où elles se rangent dans la nouvelle chaîne (les mêmes identifiants
 // s'y rangent tout seuls), et leurs coffres. Une ancienne quête réclamée vaut celle-ci comme « plus avancée ».
 const LEGACY = {
-    // (à la quatrième nuit, ajoutée après elle le 13 oct. : ces comptes trouvent Ondin comme avant, sans dormir de plus)
+    // (à la quatrième nuit, ajoutée après elle le 13 oct. : ces comptes trouvent Pierrot comme avant, sans dormir de plus)
     source: { at: 'nuit-rivet', label: LEGACY_LABELS.source, chest: 'rare' },
     puits: { at: 'puits-ondin', label: LEGACY_LABELS.puits },
     livre5: { at: 'cabane', label: LEGACY_LABELS.livre5 },
@@ -177,8 +177,8 @@ function doneOf(claimed) {
     return new Set(QUESTS.filter((quest, i) => i <= reach || claimed.has(quest.id)).map(quest => quest.id));
 }
 
-// La première nuit est validée côté serveur quand la Récolte d'Aster a été réclamée : le feu a donc été bâti,
-// la nuit jouée et Aster rencontrée. Les anciennes quêtes plus avancées comptent aussi, via doneOf.
+// La première nuit est validée côté serveur quand la Récolte d'Hermine a été réclamée : le feu a donc été bâti,
+// la nuit jouée et Hermine rencontrée. Les anciennes quêtes plus avancées comptent aussi, via doneOf.
 const FIRST_NIGHT_DONE = 'recolte';
 const firstNightDoneOf = claimed => doneOf(claimed).has(FIRST_NIGHT_DONE);
 
@@ -193,7 +193,7 @@ function currentOf(claimed) {
 // depuis la dernière quête réclamée), awake: Set, hearts (cœurs du meilleur ami), expeditions, landmarks: Set,
 // gathered, visitors, settled, named, links: Set ('puits-foyer' : bâtiments reliés par un chemin) }
 // Quêtes du tutoriel qui passent par le Grimoire : la page que marque le ruban a son Encre offerte (le joueur, qui a
-// peu d'écus, n'est jamais bloqué devant une énigme) : le Puits d'Ondin, dont la Boue (Eau + Terre), la première
+// peu d'écus, n'est jamais bloqué devant une énigme) : le Puits de Pierrot, dont la Boue (Eau + Terre), la première
 // recette à deux ingrédients différents. Pas le Brasier (Feu + Feu : l'énigme suffit, choix de l'auteur, 12 oct.)
 const GUIDED_INK = new Set(['souvenir-ondin']);
 
@@ -216,7 +216,7 @@ const HAVE = {
     gather: (goal, facts) => facts.gathered,
     pickup: (goal, facts) => facts.pickups,
     hens: (goal, facts) => facts.hensFed,
-    // La cage ouverte (ses poules libérées) ; le poulailler de Cannelle posé
+    // La cage ouverte (ses poules libérées) ; le poulailler de Marcelle posé
     cage: (goal, facts) => (facts.hensFreed ? 1 : 0),
     coop: (goal, facts) => (facts.coops ? 1 : 0),
     // L'abri d'un coin bâti ; les piquets posés autour de lui (son anneau : facts.fences[qui] = { have, need })

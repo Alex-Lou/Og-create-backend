@@ -9,7 +9,7 @@ const hangman = require('./hangman');
 // « verse » = la phrase de la page de garde du chapitre. Le chapitre II s'ouvre à 3 découvertes (bible, D4)
 // seal : la page-sceau d'un chapitre (choix de l'auteur, 12 oct.) : l'écrire l'ouvre d'un coup, quel que soit le compte
 // de découvertes (la Vie, la grande scène de l'acte I, ouvre « Le Vivant » ; le Village, à la fin de l'acte III, ouvre
-// « Le Foyer », où l'acte IV trouve le Bateau d'Aster ; la Civilisation, le défi de l'acte VI, ouvre « Les Âges » ; le
+// « Le Foyer », où l'acte IV trouve le Bateau d'Hermine ; la Civilisation, le défi de l'acte VI, ouvre « Les Âges » ; le
 // Phénix, la flamme rendue à Brume, ouvre « Les Légendes »)
 const CHAPTERS = [
     { id: 'I', name: 'Les Premiers Souffles', families: ['Elements Fondamentaux', 'Phénomènes Naturels'], need: 0, verse: 'Au commencement, quatre souffles et une étincelle de curiosité.' },

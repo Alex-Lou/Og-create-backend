@@ -1,4 +1,4 @@
-// Les bêtes de ferme, avec la base et l'API (bible du dépôt front, § 6.16, v6) : la cage des poules de Cannelle, la
+// Les bêtes de ferme, avec la base et l'API (bible du dépôt front, § 6.16, v6) : la cage des poules de Marcelle, la
 // fiche, nourrir, la bulle, ramasser
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -10,22 +10,22 @@ test.after(() => server?.kill());
 
 const herdOf = async player => (await api('GET', '/play/world', null, player)).data.beasts;
 
-// Cannelle est là après la première Récolte d'Aster ; les quêtes d'avant comptent comme faites.
+// Marcelle est là après la première Récolte d'Hermine ; les quêtes d'avant comptent comme faites.
 const withCannelle = id => sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'recolte'), ($1, 'veille') ON CONFLICT DO NOTHING`, [id]);
 const cageOf = async player => ((await api('GET', '/play/world', null, player)).data.camp || []).find(c => c.id === 'cage') || null;
 
-test('la cage de Cannelle : échouée au bout de la plage une fois sa soupe faite, ouverte une fois ; Paprika, Brioche et Madame en sortent', async () => {
-  // Un compte d'après la bible (un ancien compte a déjà Cannelle, et la cage à ouvrir)
+test('la cage de Marcelle : échouée au bout de la plage une fois sa soupe faite, ouverte une fois ; Caramel, Flocon et Réglisse en sortent', async () => {
+  // Un compte d'après la bible (un ancien compte a déjà Marcelle, et la cage à ouvrir)
   const player = await newPlayer();
   const id = player.userId;
   const open = () => api('POST', '/play/world/beasts/cage', {}, player);
-  // Avant Cannelle : ni cage ni poules
+  // Avant Marcelle : ni cage ni poules
   assert.equal(await cageOf(player), null);
   assert.deepEqual((await herdOf(player)).list, []);
   assert.equal((await open()).status, 403);
   assert.deepEqual([(await api('POST', '/play/world/beast/feed', { beast: 'poule-rousse' }, player)).data.message], ['Ouvre d’abord la cage des poules, au camp.']);
-  // Cannelle est là, affamée : pas encore de cage (son jour commence par la soupe) ; la soupe faite, la cage s'échoue
-  // au bout de la plage, dans le coin de Cannelle
+  // Marcelle est là, affamée : pas encore de cage (son jour commence par la soupe) ; la soupe faite, la cage s'échoue
+  // au bout de la plage, dans le coin de Marcelle
   await withCannelle(id);
   assert.equal(await cageOf(player), null);
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'soupe')`, [id]);
@@ -33,11 +33,11 @@ test('la cage de Cannelle : échouée au bout de la plage une fois sa soupe fait
   assert.deepEqual([cage.art, cage.x, cage.y], ['cage_coincee', 101, 98]);
   const opened = await open();
   assert.equal(opened.status, 200);
-  assert.deepEqual(opened.data.hens, ['Paprika', 'Brioche', 'Madame']);
+  assert.deepEqual(opened.data.hens, ['Caramel', 'Flocon', 'Réglisse']);
   assert.equal(opened.data.world.camp.find(c => c.id === 'cage').art, 'cage_ouverte');
   // Elles sortent affamées, sans le Potager ; ouverte une seule fois
   assert.deepEqual(opened.data.world.beasts.list.map(b => [b.id, b.name, b.daily, b.fed, b.refill, b.ready]),
-    [['poule-rousse', 'Paprika', 4, false, true, 0], ['poule-blanche', 'Brioche', 4, false, true, 0], ['poule-noire', 'Madame', 0, false, true, 0]]);
+    [['poule-rousse', 'Caramel', 4, false, true, 0], ['poule-blanche', 'Flocon', 4, false, true, 0], ['poule-noire', 'Réglisse', 0, false, true, 0]]);
   assert.equal((await open()).status, 409);
   // Le Potager III ajoute la vache, pas d'autres poules
   await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'jardins')`, [id]);
@@ -45,7 +45,7 @@ test('la cage de Cannelle : échouée au bout de la plage une fois sa soupe fait
   assert.deepEqual((await herdOf(player)).list.map(b => b.id), ['poule-rousse', 'poule-blanche', 'poule-noire', 'vache']);
 });
 
-test('nourrir une poule, voir sa bulle se remplir, ramasser les œufs ; Madame juge', async () => {
+test('nourrir une poule, voir sa bulle se remplir, ramasser les œufs ; Réglisse juge', async () => {
   const player = await newPlayer({ settled: true });
   const id = player.userId;
   const feed = beast => api('POST', '/play/world/beast/feed', { beast }, player);
@@ -69,7 +69,7 @@ test('nourrir une poule, voir sa bulle se remplir, ramasser les œufs ; Madame j
   assert.equal((await feed('poule-rousse')).status, 409);
   assert.equal((await feed('poule-noire')).status, 200);
 
-  // 13 heures plus tard : deux œufs dans la bulle de Paprika, et elle peut de nouveau manger ; Madame, contente, rien
+  // 13 heures plus tard : deux œufs dans la bulle de Caramel, et elle peut de nouveau manger ; Réglisse, contente, rien
   await sql(`UPDATE world_beasts SET fed_at = fed_at - INTERVAL '13 hours', collected_at = collected_at - INTERVAL '13 hours' WHERE user_id = $1`, [id]);
   const later = (await herdOf(player)).list;
   assert.deepEqual([later[0].ready, later[0].refill], [2, true]);
@@ -96,17 +96,17 @@ test('le coq échoue au Foyer II, la cage ouverte ; sa couvée : un poussin qu�
   // Au Foyer I : pas de coq
   assert.ok(!(await herdOf(player)).list.some(b => b.id === 'coq'));
   assert.equal((await feed('coq')).status, 404);
-  // Le Foyer à l'Abri : Amiral est là (sa ligne retient son arrivée), il ne pond pas ; pas encore de poussin
+  // Le Foyer à l'Abri : Coquelicot est là (sa ligne retient son arrivée), il ne pond pas ; pas encore de poussin
   await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'foyer', 2) ON CONFLICT (user_id, site) DO UPDATE SET level = 2`, [id]);
   const herd = (await herdOf(player)).list;
-  assert.deepEqual(herd.filter(b => b.id === 'coq').map(b => [b.species, b.name, b.daily]), [['rooster', 'Amiral', 0]]);
+  assert.deepEqual(herd.filter(b => b.id === 'coq').map(b => [b.species, b.name, b.daily]), [['rooster', 'Coquelicot', 0]]);
   assert.equal((await sql(`SELECT COUNT(*)::int AS n FROM world_items WHERE user_id = $1 AND item = 'coq'`, [id]))[0].n, 1);
   assert.equal(herd.length, 4);
-  // Deux jours plus tard : Muscade a éclos, poussin ; on ne la nourrit pas
+  // Deux jours plus tard : Pépite a éclos, poussin ; on ne la nourrit pas
   await sql(`UPDATE world_items SET bought_at = bought_at - INTERVAL '2 days 1 hour' WHERE user_id = $1 AND item = 'coq'`, [id]);
   const chick = (await herdOf(player)).list.find(b => b.id === 'poulette-muscade');
   assert.deepEqual([chick.species, chick.chick, chick.refill, chick.ready, chick.daily], ['chick', true, false, 0, 0]);
-  assert.deepEqual([(await feed('poulette-muscade')).status, (await feed('poulette-muscade')).data.message], [409, 'Muscade n’a pas encore faim.']);
+  assert.deepEqual([(await feed('poulette-muscade')).status, (await feed('poulette-muscade')).data.message], [409, 'Pépite n’a pas encore faim.']);
   // Trois jours encore : c'est une poule, affamée ; nourrie, elle pond (2 par jour)
   await sql(`UPDATE world_items SET bought_at = bought_at - INTERVAL '3 days' WHERE user_id = $1 AND item = 'coq'`, [id]);
   await sql('UPDATE world_stock SET food = 10 WHERE user_id = $1', [id]);
@@ -114,7 +114,7 @@ test('le coq échoue au Foyer II, la cage ouverte ; sa couvée : un poussin qu�
   assert.equal(grown.status, 200);
   const muscade = grown.data.world.beasts.list.find(b => b.id === 'poulette-muscade');
   assert.deepEqual([muscade.species, muscade.daily, muscade.fed, Boolean(muscade.chick)], ['hen', 2, true, false]);
-  // (Praline a éclos au 4e jour : encore poussin au 5e)
+  // (Mimosa a éclos au 4e jour : encore poussin au 5e)
   assert.equal(grown.data.world.beasts.list.find(b => b.id === 'poulette-praline').species, 'chick');
 });
 

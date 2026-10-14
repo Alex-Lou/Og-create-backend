@@ -1,10 +1,10 @@
 // Les bêtes de ferme (HISTOIRE.md du dépôt front, § 6.16, v6 ; réglage « petit plus » choisi par l'auteur le 6 octobre
 // 2026) : règles pures, sans base. On nourrit une bête depuis sa fiche (2 vivres) ; nourrie, elle est contente un jour
 // et remplit sa bulle de nourriture, que l'on ramasse. La bulle garde un jour au plus. Les poules sont celles de
-// Cannelle (bible, § 6.16 et étape 8 : sauvées dans leur cage, elles vivent au camp, près du feu) : là dès la cage
-// ouverte, sans attendre le Potager ; Madame ne pond pas (« Elle juge. »). Les autres bêtes sont celles que le Potager
+// Marcelle (bible, § 6.16 et étape 8 : sauvées dans leur cage, elles vivent au camp, près du feu) : là dès la cage
+// ouverte, sans attendre le Potager ; Réglisse ne pond pas (« Elle juge. »). Les autres bêtes sont celles que le Potager
 // montre selon son palier (world/village.js du front) ; les variantes du Bestiaire restent des décors.
-// Le coq et la couvée (choix de l'auteur, 14 oct.) : Amiral échoue au camp quand le Foyer passe à l'Abri (la cage
+// Le coq et la couvée (choix de l'auteur, 14 oct.) : Coquelicot échoue au camp quand le Foyer passe à l'Abri (la cage
 // ouverte) ; avec lui, une poulette éclot tous les HATCH_DAYS jours, trois au plus. Poussin GROW_DAYS jours (elle suit
 // les poules, on ne la nourrit pas), puis poule : elle pond, moins que ses aînées. Le coq ne pond pas : il veille (la
 // nuit, son chant chasse un égaré : services/nights.js).
@@ -12,16 +12,16 @@ const HOUR_MS = 3600 * 1000;
 const CONTENT_HOURS = 24;
 const DAY_MS = CONTENT_HOURS * HOUR_MS;
 const FEED_COST = { food: 2 };
-// L'espèce est celle du front ; level : le palier du Potager où elle arrive (les poules de Cannelle, camp : à la cage
+// L'espèce est celle du front ; level : le palier du Potager où elle arrive (les poules de Marcelle, camp : à la cage
 // ouverte) ; daily : vivres donnés par jour, contente (identifiants des poules gardés : rien ne se perd)
 const BEASTS = [
-    { id: 'poule-rousse', species: 'hen', name: 'Paprika', camp: true, daily: 4 },
-    { id: 'poule-blanche', species: 'hen', name: 'Brioche', camp: true, daily: 4 },
-    { id: 'poule-noire', species: 'hen', name: 'Madame', camp: true, daily: 0 },
-    { id: 'coq', species: 'rooster', name: 'Amiral', camp: true, daily: 0, rooster: true },
-    { id: 'poulette-muscade', species: 'hen', name: 'Muscade', camp: true, daily: 2, brood: 1 },
-    { id: 'poulette-praline', species: 'hen', name: 'Praline', camp: true, daily: 2, brood: 2 },
-    { id: 'poulette-noisette', species: 'hen', name: 'Noisette', camp: true, daily: 2, brood: 3 },
+    { id: 'poule-rousse', species: 'hen', name: 'Caramel', camp: true, daily: 4 },
+    { id: 'poule-blanche', species: 'hen', name: 'Flocon', camp: true, daily: 4 },
+    { id: 'poule-noire', species: 'hen', name: 'Réglisse', camp: true, daily: 0 },
+    { id: 'coq', species: 'rooster', name: 'Coquelicot', camp: true, daily: 0, rooster: true },
+    { id: 'poulette-muscade', species: 'hen', name: 'Pépite', camp: true, daily: 2, brood: 1 },
+    { id: 'poulette-praline', species: 'hen', name: 'Mimosa', camp: true, daily: 2, brood: 2 },
+    { id: 'poulette-noisette', species: 'hen', name: 'Coquille', camp: true, daily: 2, brood: 3 },
     { id: 'vache', species: 'cow', name: 'La vache', level: 3, daily: 8 },
     { id: 'mouton', species: 'sheep', name: 'Le mouton', level: 4, daily: 4 },
     { id: 'brebis', species: 'sheep', name: 'La brebis', level: 4, daily: 4 },
@@ -29,7 +29,7 @@ const BEASTS = [
     { id: 'chevre', species: 'goat', name: 'La chèvre', level: 6, daily: 6 }
 ];
 const BEAST_BY_ID = Object.fromEntries(BEASTS.map(b => [b.id, b]));
-// Les poules de Cannelle, sorties de la cage
+// Les poules de Marcelle, sorties de la cage
 const HENS = BEASTS.filter(b => b.camp && !b.rooster && !b.brood).map(b => b.id);
 // Le coq arrive quand le Foyer atteint ce palier (l'Abri) ; une poulette éclot tous les HATCH_DAYS jours, et reste
 // poussin GROW_DAYS jours

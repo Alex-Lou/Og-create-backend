@@ -16,13 +16,13 @@ test('un habitant par bâtiment (et la cuisinière du Foyer), chacun ses goûts'
 test('la troupe de la bible (HISTOIRE.md § 8.1) : prénom, rôle, cadeau adoré et apprécié', () => {
   const troupe = Object.fromEntries(Object.entries(v.VILLAGERS).map(([id, w]) => [id, [w.name, w.role, w.loves, w.likes]]));
   assert.deepEqual(troupe, {
-    potager: ['Mélisse', 'Jardinière des lunes', 'water', 'food'],
-    carriere: ['Galet', 'Tailleur de runes', 'food', 'stone'],
-    bosquet: ['Sylve', 'Gardienne des bois', 'water', 'food'],
-    puits: ['Ondin', 'Petit sourcier', 'water', 'food'],
-    ponton: ['Aster', 'Navigatrice', 'wood', 'food'],
-    atelier: ['Rivet', 'Horloger-artificier', 'stone', 'wood'],
-    foyer: ['Cannelle', 'Cuisinière-guérisseuse', 'food', 'water']
+    potager: ['Flore', 'Jardinière des lunes', 'water', 'food'],
+    carriere: ['Saturnin', 'Tailleur de runes', 'food', 'stone'],
+    bosquet: ['Freya', 'Gardienne des bois', 'water', 'food'],
+    puits: ['Pierrot', 'Petit sourcier', 'water', 'food'],
+    ponton: ['Hermine', 'Navigatrice', 'wood', 'food'],
+    atelier: ['Jovin', 'Horloger-artificier', 'stone', 'wood'],
+    foyer: ['Marcelle', 'Cuisinière-guérisseuse', 'food', 'water']
   });
 });
 

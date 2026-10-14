@@ -1,4 +1,4 @@
-// Les bêtes de ferme (bible du dépôt front, § 6.16, v6 ; réglage « petit plus ») : les poules de Cannelle, la cage
+// Les bêtes de ferme (bible du dépôt front, § 6.16, v6 ; réglage « petit plus ») : les poules de Marcelle, la cage
 // ouverte, puis celles du Potager selon son palier ; contentes un jour une fois nourries, leur bulle d'un jour au plus
 // (fonctions pures)
 const test = require('node:test');
@@ -10,27 +10,27 @@ const T = Date.parse('2026-10-06T08:00:00Z');
 const hen = beasts.BEAST_BY_ID['poule-rousse'];
 const cow = beasts.BEAST_BY_ID.vache;
 
-test('les poules de Cannelle, la cage ouverte ; les bêtes du Potager selon son palier, comme le front les montre', () => {
+test('les poules de Marcelle, la cage ouverte ; les bêtes du Potager selon son palier, comme le front les montre', () => {
   const ids = (level, freed) => beasts.beastsOf(level, freed).map(b => b.id);
   assert.deepEqual(ids(0, false), []);
   assert.deepEqual(ids(1, false), []);
   assert.deepEqual(ids(0, true), ['poule-rousse', 'poule-blanche', 'poule-noire']);
   assert.deepEqual(ids(3, true), ['poule-rousse', 'poule-blanche', 'poule-noire', 'vache']);
   assert.deepEqual(ids(6, false), ['vache', 'mouton', 'brebis', 'cochon', 'chevre']);
-  assert.deepEqual(beasts.HENS.map(id => beasts.BEAST_BY_ID[id].name), ['Paprika', 'Brioche', 'Madame']);
-  // Le petit plus : par jour, poule 4 (Madame ne pond pas, le coq non plus ; les poulettes 2), vache 8, mouton 4,
+  assert.deepEqual(beasts.HENS.map(id => beasts.BEAST_BY_ID[id].name), ['Caramel', 'Flocon', 'Réglisse']);
+  // Le petit plus : par jour, poule 4 (Réglisse ne pond pas, le coq non plus ; les poulettes 2), vache 8, mouton 4,
   // cochon 6, chèvre 6 ; un repas coûte 2 vivres
   assert.deepEqual(beasts.BEASTS.map(b => b.daily), [4, 4, 0, 0, 2, 2, 2, 8, 4, 4, 6, 6]);
   assert.deepEqual(beasts.FEED_COST, { food: 2 });
 });
 
-test('le coq et la couvée : Amiral là, une poulette éclot tous les deux jours (trois au plus), poussin trois jours', () => {
+test('le coq et la couvée : Coquelicot là, une poulette éclot tous les deux jours (trois au plus), poussin trois jours', () => {
   const D = beasts.DAY_MS;
   const camp = (since, now) => beasts.beastsOf(0, true, since, now).map(b => b.id);
   // Sans coq : les trois poules ; la cage fermée : personne, coq ou pas
   assert.deepEqual(camp(null, T), ['poule-rousse', 'poule-blanche', 'poule-noire']);
   assert.deepEqual(beasts.beastsOf(0, false, T, T + 9 * D), []);
-  // Le coq là : Muscade éclot au 2e jour, Praline au 4e, Noisette au 6e, pas d'autre ensuite
+  // Le coq là : Pépite éclot au 2e jour, Mimosa au 4e, Coquille au 6e, pas d'autre ensuite
   assert.deepEqual(camp(T, T + 2 * D - 1), ['poule-rousse', 'poule-blanche', 'poule-noire', 'coq']);
   assert.deepEqual(camp(T, T + 2 * D).slice(4), ['poulette-muscade']);
   assert.deepEqual(camp(T, T + 6 * D).slice(4), ['poulette-muscade', 'poulette-praline', 'poulette-noisette']);
@@ -42,7 +42,7 @@ test('le coq et la couvée : Amiral là, une poulette éclot tous les deux jours
   assert.deepEqual(beasts.HENS, ['poule-rousse', 'poule-blanche', 'poule-noire']);
 });
 
-test('Madame ne pond pas : nourrie, elle est contente, sa bulle reste vide', () => {
+test('Réglisse ne pond pas : nourrie, elle est contente, sa bulle reste vide', () => {
   const madame = beasts.BEAST_BY_ID['poule-noire'];
   const row = { fed_at: T, collected_at: T };
   assert.deepEqual(beasts.stateOf(madame, row, T + 20 * H), { fed: true, left: 4 * H, refill: true, ready: 0 });
