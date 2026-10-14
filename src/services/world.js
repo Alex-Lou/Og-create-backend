@@ -55,7 +55,7 @@ const { sheltersOf, sheltersView, buildShelter } = require('./world/shelters');
 const { annexSpotOk, annexSpots, annexesView, placeAnnex, moveAnnex, poseAnnex } = require('./world/annexPlots');
 const { campOfUser, cellsOfCamp } = require('./world/camp');
 const paths = require('./world/paths');
-const { PLAGE, placesOf, footprintAt } = require('./world/places');
+const { PLAGE, BEACH_BEFORE, placesOf, footprintAt } = require('./world/places');
 const { siteSpots, moveSite } = require('./world/moves');
 const gridLevels = require('./levels');
 const stars = require('./world/stars');
@@ -684,6 +684,12 @@ async function build(userId, owned, siteId, openChapters = new Set()) {
             if (coins === null) return db.rollback({ status: 400, message: `Il te faut ${next.coins} écus.` });
         }
         await conn.query('UPDATE world_stock SET stone = stone - $2, wood = wood - $3, water = water - $4, food = food - $5 WHERE user_id = $1', [userId, ...costs]);
+        // Bâti pour la première fois là où la carte le met aujourd'hui (le Bosquet, rapproché du Puits) : sa place est
+        // retenue, comme un déplacement (world/places.js : ceux bâtis avant gardent leur place d'avant)
+        if (!level && BEACH_BEFORE[siteId]) {
+            const at = (await placesOf(userId, conn)).places[siteId];
+            await conn.query('INSERT INTO world_site_places (user_id, site, x, y) VALUES ($1, $2, $3, $4) ON CONFLICT (user_id, site) DO NOTHING', [userId, siteId, at.x, at.y]);
+        }
         await conn.query(
             `INSERT INTO world_buildings (user_id, site, level) VALUES ($1, $2, $3)
              ON CONFLICT (user_id, site) DO UPDATE SET level = EXCLUDED.level, built_at = NOW()`, [userId, siteId, level + 1]);

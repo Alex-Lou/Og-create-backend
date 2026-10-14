@@ -32,14 +32,19 @@ const BEACH = {
     puits: { x: 88, y: 86 },
     carriere: { x: 86, y: 69 },
     potager: { x: 73, y: 70 },
-    bosquet: { x: 72, y: 86 }
+    // (choix de l'auteur, 14 oct. : trop loin à la Lisière ; près du Puits, entre le ruisseau et la mare, à cinq cases de
+    // lui ; son quartier reste la Lisière, qu'il faut toujours acheter)
+    bosquet: { x: 81, y: 84 }
 };
+// Leurs places d'avant, pour qui les a déjà bâtis là (leurs annexes y sont) : ils ne bougent pas
+const BEACH_BEFORE = { bosquet: { x: 72, y: 86 } };
 
 // Les places d'un joueur : { bâtiment : { x, y } } (coin haut-gauche de la grande emprise). beach : île à la plage ;
-// rows : ses déplacements [{ site, x, y }]
-function placesFrom({ beach = false, rows = [] } = {}) {
+// rows : ses déplacements [{ site, x, y }] ; built : ses bâtiments déjà bâtis (ceux d'avant un déplacement de la carte
+// restent à leur place d'avant : BEACH_BEFORE)
+function placesFrom({ beach = false, rows = [], built = [] } = {}) {
     const out = {};
-    for (const [id, p] of Object.entries(map.SITE_BIG)) out[id] = { ...((beach && BEACH[id]) || p) };
+    for (const [id, p] of Object.entries(map.SITE_BIG)) out[id] = { ...((beach && ((built.includes(id) && BEACH_BEFORE[id]) || BEACH[id])) || p) };
     for (const row of rows) if (out[row.site]) out[row.site] = { x: row.x, y: row.y };
     return out;
 }
@@ -75,12 +80,13 @@ function freeSpotsAt(places, zoneId, levels = {}) {
 // Les places d'un joueur, d'après la base : { places, beach }
 // (une île à la plage est une île neuve : ses deux marques, comme world/paths.js)
 async function placesOf(userId, conn = db) {
-    const [flags, rows] = await Promise.all([
+    const [flags, rows, built] = await Promise.all([
         conn.query('SELECT COUNT(*)::int AS n FROM world_items WHERE user_id = $1 AND item = ANY($2)', [userId, [PLAGE, NEW_ISLAND]]),
-        conn.query('SELECT site, x, y FROM world_site_places WHERE user_id = $1', [userId])
+        conn.query('SELECT site, x, y FROM world_site_places WHERE user_id = $1', [userId]),
+        conn.query('SELECT site FROM world_buildings WHERE user_id = $1 AND site = ANY($2) AND level > 0', [userId, Object.keys(BEACH_BEFORE)])
     ]);
     const beach = flags.rows[0].n === 2;
-    return { places: placesFrom({ beach, rows: rows.rows }), beach };
+    return { places: placesFrom({ beach, rows: rows.rows, built: built.rows.map(r => r.site) }), beach };
 }
 
-module.exports = { PLAGE, BEACH, BIG, placesFrom, STATIC, footprintAt, inFootprintAt, inSiteAt, freeSpotsAt, placesOf };
+module.exports = { PLAGE, BEACH, BEACH_BEFORE, BIG, placesFrom, STATIC, footprintAt, inFootprintAt, inSiteAt, freeSpotsAt, placesOf };

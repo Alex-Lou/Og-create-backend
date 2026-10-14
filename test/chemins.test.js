@@ -116,3 +116,19 @@ test('la quête du premier chemin : relier le Puits au Feu', async () => {
       ON CONFLICT (user_id, site) DO UPDATE SET level = EXCLUDED.level`, [old.userId]);
     assert.equal((await view(old)).brume.quest.done, true);
 });
+
+test('le parvis (choix de l’auteur, 14 oct.) : de la terre battue devant la porte de chaque bâtiment bâti, qui compte comme un chemin', () => {
+  const paths = require('../src/services/world/paths');
+  const places = require('../src/services/world/places').placesFrom({ beach: true });
+  const rows = paths.groundRows(true, [], true);
+  const base = (x, y) => rows[y]?.[x];
+  // Le Puits : la rangée devant sa porte (le bas de son emprise), deux cases, puis trois quand il grandit ; rien d'un
+  // bâtiment pas encore bâti, ni du Feu (son sentier arrive déjà à sa porte), ni du Ponton (la mer devant lui)
+  assert.deepEqual(paths.parvisOf(places, { puits: 1, foyer: 2, ponton: 1, bosquet: 0 }, base), [{ x: 89, y: 89 }, { x: 90, y: 89 }]);
+  assert.deepEqual(paths.parvisOf(places, { puits: 4 }, base).map(c => c.x), [88, 89, 90]);
+  // Un chemin tracé jusqu'au parvis relie le bâtiment
+  const ground = paths.groundRows(true, [{ x: 91, y: 89 }], true, paths.parvisOf(places, { puits: 1 }, base));
+  const at = (x, y) => ground[y]?.[x];
+  assert.equal(at(89, 89), 'p');
+  assert.equal(paths.linked(at, { x: 89, y: 87, w: 2, h: 2 }, { x: 92, y: 88, w: 1, h: 1 }), true);
+});

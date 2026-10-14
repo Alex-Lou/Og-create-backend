@@ -77,15 +77,17 @@ const SITES = {
             tier('Cité minière', 'Menhir', { wood: 300, stone: 250, water: 130, food: 120 }, 1800)
         ]
     },
+    // Le bois mort, jamais un arbre abattu (choix de l'auteur, 14 oct. : Freya, gardienne des bois) ; les plans changés
+    // restent de leur chapitre (Menuisier, comme Bûcheron, au V ; Moulin à eau, comme Grue, au VI)
     bosquet: {
         produce: 'wood',
         levels: [
             tier('Bosquet', 'Arbre', { stone: 5 }),
-            tier('Grand bosquet', 'Forêt', { wood: 25, water: 15 }),
-            tier('Clairière du bûcheron', 'Taïga', { stone: 35, water: 35, food: 20 }, 150),
+            tier('Taillis', 'Forêt', { wood: 25, water: 15 }),
+            tier('Clairière aux fagots', 'Taïga', { stone: 35, water: 35, food: 20 }, 150),
             tier('Chênaie', 'Chêne', { stone: 60, water: 50, wood: 30, food: 20 }, 300),
-            tier('Scierie', 'Bûcheron', { stone: 100, wood: 70, water: 70, food: 40 }, 600),
-            tier('Exploitation forestière', 'Grue', { stone: 170, wood: 120, water: 110, food: 80 }, 1000),
+            tier('Menuiserie', 'Menuisier', { stone: 100, wood: 70, water: 70, food: 40 }, 600),
+            tier('Moulin à scie', 'Moulin à eau', { stone: 170, wood: 120, water: 110, food: 80 }, 1000),
             tier('Forêt enchantée', 'Fée', { stone: 280, wood: 200, water: 180, food: 140 }, 1800)
         ]
     },

@@ -68,10 +68,10 @@ const ITEMS = [
     { id: 'roche-granit', site: 'carriere', kind: 'skin', name: 'Granit', price: 80, minLevel: 2 },
     { id: 'roche-cristal', site: 'carriere', kind: 'skin', name: 'Veines de cristal', price: 80, minLevel: 3 },
     // Bosquet
-    { id: 'hache', site: 'bosquet', kind: 'outil', name: 'Hache', price: 80, minLevel: 1, effect: { prod: 0.2 } },
+    { id: 'hache', site: 'bosquet', kind: 'outil', name: 'Serpe', price: 80, minLevel: 1, effect: { prod: 0.2 } },
     { id: 'scie', site: 'bosquet', kind: 'outil', name: 'Scie', price: 160, minLevel: 2, effect: { prod: 0.2 } },
     { id: 'nichoir', site: 'bosquet', kind: 'objet', name: 'Nichoir et oiseaux', price: 120, minLevel: 3, effect: { prod: 0.1 } },
-    { id: 'charrette', site: 'bosquet', kind: 'objet', name: 'Charrette de bûcheron', price: 380, minLevel: 4, effect: { prod: 0.3 } },
+    { id: 'charrette', site: 'bosquet', kind: 'objet', name: 'Charrette à fagots', price: 380, minLevel: 4, effect: { prod: 0.3 } },
     { id: 'passe-partout', site: 'bosquet', kind: 'outil', name: 'Scie passe-partout', price: 700, minLevel: 5, effect: { prod: 0.2 } },
     { id: 'ecureuil', site: 'bosquet', kind: 'objet', name: 'Écureuil', price: 1300, minLevel: 6, effect: { coins: 3 } },
     { id: 'cerf', site: 'bosquet', kind: 'objet', name: 'Cerf blanc', price: 2400, minLevel: 7, effect: { coins: 5 } },

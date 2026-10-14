@@ -47,7 +47,7 @@ test('la Récolte : un plateau a toujours une chaîne possible', () => {
   }
 });
 
-// Règles 2 (les combos : la lune et la série) : graine 2, six longues chaînes jouées, la Scierie double le bois
+// Règles 2 (les combos : la lune et la série) : graine 2, six longues chaînes jouées, le Bosquet double le bois
 const SEED2 = 2;
 const MOVES2 = [
   [[3, 1], [3, 2], [3, 3], [4, 3], [5, 3], [5, 4], [4, 5], [5, 5]],

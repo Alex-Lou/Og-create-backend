@@ -10,7 +10,7 @@ const map = require('../worldMap');
 const landmarks = require('../landmarks');
 const finds = require('../finds');
 const { SIZE } = require('./rules');
-const { STATIC, inFootprintAt, PLAGE } = require('./places');
+const { STATIC, inFootprintAt, footprintAt, placesOf, PLAGE } = require('./places');
 
 const MARK = 'ile:sentiers';
 const PREFIX = 'chemin:';
@@ -71,25 +71,54 @@ async function newRoadsOf(userId, conn) {
     const items = new Set(rows.map(r => r.item));
     return { fresh: items.has(MARK), beach: items.has(MARK) && items.has(PLAGE) };
 }
-// Le sol vu par un joueur (lignes, comme map.GROUND) : la carte (sans ses routes pour une île neuve), plus ses chemins
-function groundRows(fresh, laid, beach = false) {
+// Le parvis de chaque bâtiment bâti (choix de l'auteur, 14 oct.) : la rangée de terre battue devant sa porte (le bas de
+// son emprise, là où le sentier du Feu arrive), sur l'herbe, le sable ou la prairie, hors des emprises, des lieux et des
+// gisements. Il compte comme un chemin : un chemin tracé jusqu'à lui relie le bâtiment (linked). Sauf le Feu : son sentier
+// arrive déjà à sa porte, et l'enclos du tutoriel y plante deux de ses piquets. places, levels : où sont les bâtiments
+// et leurs paliers ; base(x, y) : le sol sans parvis. [{ x, y }]
+const NO_PARVIS = new Set(['foyer']);
+function parvisOf(places, levels, base) {
+    const out = [];
+    for (const [id, level] of Object.entries(levels)) {
+        if (!level || !places[id] || NO_PARVIS.has(id)) continue;
+        const f = footprintAt(places, id, level);
+        for (let x = f.x; x < f.x + f.w; x++) {
+            const y = f.y + f.h;
+            if (!['g', 's', 'm'].includes(base(x, y)) || inFootprintAt(places, x, y, levels) || landmarks.isLandmark(x, y) || finds.isDeposit(x, y)) continue;
+            out.push({ x, y });
+        }
+    }
+    return out;
+}
+// Le sol vu par un joueur (lignes, comme map.GROUND) : la carte (sans ses routes pour une île neuve), plus ses chemins et
+// les parvis de ses bâtiments
+function groundRows(fresh, laid, beach = false, parvis = []) {
     const rows = (fresh ? (beach ? FRESH_BEACH : FRESH) : map.GROUND).map(row => [...row]);
     for (const c of laid) rows[c.y][c.x] = 'p';
+    for (const c of parvis) rows[c.y][c.x] = 'p';
     return rows.map(row => row.join(''));
 }
 // Les chemins d'un joueur, lus une fois : { fresh, laid, rows, added, ground(x, y), key } (key : ce qui décide du sol)
 async function roadsOf(userId, conn) {
     const { fresh, beach } = await newRoadsOf(userId, conn);
-    const laid = await laidOf(userId, conn);
-    const rows = groundRows(fresh, laid, beach);
-    const sum = laid.length ? crypto.createHash('sha1').update(laid.map(c => `${c.x},${c.y}`).join(';')).digest('hex').slice(0, 10) : '';
-    // Les cases de chemin en plus de la carte (le sentier d'une île neuve, les cases tracées) : ni annexe ni camp dessus
+    const [laid, { places }, built] = await Promise.all([
+        laidOf(userId, conn), placesOf(userId, conn),
+        conn.query('SELECT site, level FROM world_buildings WHERE user_id = $1 AND level > 0', [userId])
+    ]);
+    const levels = Object.fromEntries(built.rows.map(r => [r.site, r.level]));
+    const bare = groundRows(fresh, laid, beach);
+    const parvis = parvisOf(places, levels, (x, y) => bare[y]?.[x]);
+    const rows = groundRows(fresh, laid, beach, parvis);
+    const drawn = [...laid, ...parvis];
+    const sum = drawn.length ? crypto.createHash('sha1').update(drawn.map(c => `${c.x},${c.y}`).join(';')).digest('hex').slice(0, 10) : '';
+    // Les cases de chemin en plus de la carte (le sentier d'une île neuve, les cases tracées, les parvis) : ni annexe ni
+    // camp dessus
     const added = new Set();
-    for (const c of fresh ? [...(beach ? SENTIER_BEACH : SENTIER), ...laid] : laid) if (!isPath(map.groundAt(c.x, c.y))) added.add(c.y * SIZE + c.x);
+    for (const c of fresh ? [...(beach ? SENTIER_BEACH : SENTIER), ...drawn] : drawn) if (!isPath(map.groundAt(c.x, c.y))) added.add(c.y * SIZE + c.x);
     return {
         fresh, laid, rows, added,
         ground: (x, y) => (Number.isInteger(x) && Number.isInteger(y) ? rows[y]?.[x] : undefined),
-        key: `${fresh ? (beach ? 'b' : 'n') : 'v'}${laid.length}${sum}`
+        key: `${fresh ? (beach ? 'b' : 'n') : 'v'}${drawn.length}${sum}`
     };
 }
 
@@ -175,4 +204,4 @@ function planOf(lay, erase, laid, stock, ctx) {
     return { add, remove, stone: pay - back };
 }
 
-module.exports = { MARK, PREFIX, FREE, MAX_CELLS, SENTIER, MARCHES, FRESH, isPath, laidOf, newRoadsOf, groundRows, roadsOf, linked, layBlock, planOf };
+module.exports = { MARK, PREFIX, FREE, MAX_CELLS, SENTIER, MARCHES, FRESH, isPath, laidOf, newRoadsOf, parvisOf, groundRows, roadsOf, linked, layBlock, planOf };

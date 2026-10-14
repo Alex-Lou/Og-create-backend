@@ -80,6 +80,32 @@ test.describe('île', () => {
   test.before(async () => { server = await startServer(); });
   test.after(() => server?.kill());
 
+  test('le Bosquet bâti pour la première fois sur une île à la plage : sa place est retenue, il ne saute pas', async () => {
+    const player = await newPlayer({ settled: true });
+    const bosquet = world => world.sites.find(s => s.id === 'bosquet');
+    await sql(`INSERT INTO world_items (user_id, item) VALUES ($1, 'ile:plage'), ($1, 'ile:sentiers') ON CONFLICT DO NOTHING`, [player.userId]);
+    await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'lisiere') ON CONFLICT DO NOTHING`, [player.userId]);
+    await sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Arbre"]'::jsonb WHERE user_id = $1`, [player.userId]);
+    const before = bosquet((await api('GET', '/play/world', null, player)).data);
+    assert.deepEqual([before.x, before.y], [82, 85]);
+    await sql('UPDATE world_stock SET stone = 5 WHERE user_id = $1', [player.userId]);
+    const built = await api('POST', '/play/world/build', { site: 'bosquet' }, player);
+    assert.equal(built.status, 200, JSON.stringify(built.data));
+    assert.equal(built.data.built, 'Bosquet');
+    const after = bosquet(built.data.world);
+    assert.deepEqual([after.x, after.y, after.level], [82, 85, 1]);
+    // (le bois mort, jamais un arbre abattu : ses paliers et leurs plans, chacun de son chapitre)
+    assert.deepEqual(after.levels.map(l => l.name), ['Bosquet', 'Taillis', 'Clairière aux fagots', 'Chênaie', 'Menuiserie', 'Moulin à scie', 'Forêt enchantée']);
+    assert.deepEqual(after.levels.map(l => l.plan), ['Arbre', 'Forêt', 'Taïga', 'Chêne', 'Menuisier', 'Moulin à eau', 'Fée']);
+    assert.deepEqual(built.data.world.harvest.boosts, { wood: 2 });
+    // (un joueur qui l'avait bâti à la Lisière avant : il l'y garde)
+    const old = await newPlayer({ settled: true });
+    await sql(`INSERT INTO world_items (user_id, item) VALUES ($1, 'ile:plage'), ($1, 'ile:sentiers') ON CONFLICT DO NOTHING`, [old.userId]);
+    await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'bosquet', 1)`, [old.userId]);
+    const kept = bosquet((await api('GET', '/play/world', null, old)).data);
+    assert.deepEqual([kept.x, kept.y], [73, 87]);
+  });
+
   test('une île neuve : le Feu sur la plage ; les chantiers et le camp paraissent avec leurs personnages', async () => {
     const player = await newPlayer();
     const view = async () => (await api('GET', '/play/world', null, player)).data;
@@ -123,4 +149,13 @@ test.describe('île', () => {
     await api('POST', '/play/world/restart', { confirm: 'RECOMMENCER' }, player);
     assert.deepEqual(await sql('SELECT 1 FROM world_site_places WHERE user_id = $1', [player.userId]), []);
   });
+});
+
+test('le Bosquet, rapproché du Puits (choix de l’auteur, 14 oct.) : bâti là, il y reste ; bâti avant, il garde sa place', () => {
+  assert.deepEqual(places.placesFrom({ beach: true }).bosquet, { x: 81, y: 84 });
+  assert.deepEqual(places.placesFrom({ beach: true, built: ['bosquet'] }).bosquet, { x: 72, y: 86 });
+  // (sa place retenue à sa construction prime : world.js, build)
+  assert.deepEqual(places.placesFrom({ beach: true, built: ['bosquet'], rows: [{ site: 'bosquet', x: 81, y: 84 }] }).bosquet, { x: 81, y: 84 });
+  // (une île d'avant la plage : la carte, rien ne change)
+  assert.deepEqual(places.placesFrom({ built: ['bosquet'] }).bosquet, map.SITE_BIG.bosquet);
 });

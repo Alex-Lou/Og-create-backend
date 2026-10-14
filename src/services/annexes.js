@@ -36,7 +36,7 @@ const ANNEXES = [
     annex('filon', 'carriere', 'small', 'Filon', { wood: 25, food: 15 }, SMALL),
     annex('depot', 'carriere', 'reserve', 'Dépôt de pierres', { wood: 80, stone: 70 }, RESERVE),
     annex('taille', 'carriere', 'grand', 'Taille de pierre', { stone: 150, wood: 100, water: 50 }, GRAND),
-    annex('coupe', 'bosquet', 'small', 'Coupe', { stone: 20, food: 20 }, SMALL),
+    annex('coupe', 'bosquet', 'small', 'Fagotière', { stone: 20, food: 20 }, SMALL),
     annex('remise', 'bosquet', 'reserve', 'Remise à bois', { wood: 90, stone: 60 }, RESERVE),
     annex('pepiniere', 'bosquet', 'grand', 'Pépinière', { water: 140, wood: 100, stone: 60 }, GRAND),
     annex('citerne', 'puits', 'small', 'Citerne', { stone: 25, wood: 15 }, SMALL),
