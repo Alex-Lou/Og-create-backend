@@ -26,16 +26,16 @@ test('au début : l’épave, la cuisine de Cannelle, les débris d’Aster et d
 
 test('il change avec l’histoire, et libère la plage de Brumelune', () => {
   assert.deepEqual(ids(camp.campOf({ acts: ['I'], levels: { foyer: 1 } })).slice(2, 4), ['aster_abri', 'rivet_abri']);
-  // Pas de cabanon avant l'Abri ; à l'Abri, Cannelle quitte la cuisine de l'épave
+  // Pas de cabanon avant l'Abri ; à l'Abri, la cuisine de Cannelle devient son cabanon
   assert.equal(camp.campOf({ acts: ['I', 'II'], levels: { foyer: 1 } }).find(c => c.id === 'aster').art, 'aster_abri');
   const abri = camp.campOf({ acts: ['I', 'II'], levels: { foyer: 2 } });
-  assert.deepEqual([abri.find(c => c.id === 'aster').art, abri.some(c => c.id === 'cannelle')], ['aster_cabanon', false]);
+  assert.deepEqual([abri.find(c => c.id === 'aster').art, abri.find(c => c.id === 'cannelle').art], ['aster_cabanon', 'cannelle_cabanon']);
   // Aster a son Ponton, Rivet son Atelier : leurs coins s'en vont
   const built = camp.campOf({ acts: ['I', 'II'], levels: { foyer: 2, ponton: 1, atelier: 1 } });
   assert.ok(!built.some(c => c.id === 'aster' || c.id === 'rivet'));
   // Acte IV : les voyageurs arrivent (tente, hamac), le SOS s'en va
   const later = camp.campOf({ acts: ['I', 'II', 'III', 'IV'], levels: { foyer: 3, ponton: 2, atelier: 2 } });
-  assert.deepEqual(ids(later), ['hirondelle', 'tente', 'hamac', 'caisses', 'filet', 'rondins']);
+  assert.deepEqual(ids(later), ['hirondelle', 'cannelle_cabanon', 'tente', 'hamac', 'caisses', 'filet', 'rondins']);
 });
 
 test('une place prise par le joueur : l’élément se pose au plus près, rien ne se chevauche', () => {

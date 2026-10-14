@@ -23,7 +23,7 @@ const { presenceOf, metOf } = require('./people');
 const { sheltersOf } = require('./shelters');
 
 const ZONE = 'coeur';
-// Le Foyer à l'Abri (palier II) : Cannelle quitte la cuisine de l'épave, les cabanons peuvent venir
+// Le Foyer à l'Abri (palier II) : la cuisine de Cannelle devient son cabanon, les cabanons peuvent venir
 const ABRI = 2;
 // Les places du camp sur une île à la plage (world/places.js) : dans la zone de chacun
 const BEACH_PLACES = {
@@ -38,7 +38,7 @@ const BEACH_PLACES = {
 // plus). at : { acts (actes finis), levels (paliers des bâtiments), cage ('coincee', 'ouverte' ou null), here (le
 // personnage est là ? id de son bâtiment : ponton Aster, foyer Cannelle, atelier Rivet) }. Un camp sobre, qui libère la plage : l'épave et
 // trois objets restent ; le coin d'Aster s'en va quand son Ponton est bâti, celui de Rivet avec son Atelier, la cuisine
-// de Cannelle avec l'Abri ; le SOS, quand les voyageurs arrivent (acte IV) avec leur tente et leur hamac
+// de Cannelle devient son cabanon à l'Abri (elle le garde) ; le SOS, quand les voyageurs arrivent (acte IV) avec leur tente et leur hamac
 const has = (at, act) => at.acts.includes(act);
 const foyer = at => at.levels.foyer || 0;
 // Le camp d'Aster (et ce que la mer a laissé autour) arrive avec elle
@@ -51,8 +51,9 @@ const corner = (who, site) => at => {
 };
 const PLACES = [
     { id: 'hirondelle', x: 96, y: 96, size: 2, art: () => 'hirondelle' },
-    // (sa cuisine de l'épave, puis son abri, bâti par le joueur : world/shelters.js)
-    { id: 'cannelle', x: 99, y: 96, size: 2, art: at => (foyer(at) < ABRI && at.here('foyer') ? (at.shelters.has('cannelle') ? 'cannelle_abri' : 'cannelle_debris') : null) },
+    // (sa cuisine de l'épave, puis son abri, bâti par le joueur : world/shelters.js ; le Foyer à l'Abri, son cabanon :
+    // choix de l'auteur, 14 oct.)
+    { id: 'cannelle', x: 99, y: 96, size: 2, art: at => (!at.here('foyer') ? null : foyer(at) >= ABRI ? 'cannelle_cabanon' : at.shelters.has('cannelle') ? 'cannelle_abri' : 'cannelle_debris') },
     // (son coin, à côté de son Ponton : elle y plante son camp en débarquant, choix de l'auteur, 11 oct.)
     { id: 'aster', x: 87, y: 96, size: 2, art: corner('aster', 'ponton') },
     { id: 'rivet', x: 91, y: 94, size: 2, art: corner('rivet', 'atelier') },
