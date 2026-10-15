@@ -114,6 +114,8 @@ function craftsView(rows, ctx, { owned, stock, open, epreuves, stars = 0, have, 
                 // (tutorial : la leçon du tutoriel la fait fabriquer avant son palier ; le front ouvre l'établi sur elle)
                 after: c.after, open: open.has(c.tier) || tutorial.has(c.id), tutorial: tutorial.has(c.id), made: made[c.id] || 0, reserve, climate: c.place.climate || null,
                 ...(crafts.LINE_CRAFTS.has(c.id) ? { line: true, traceable: traceable(c.id, made, free) } : {}),
+                // (la porte : son verrou, ce qu'il coûte, et les portes de la réserve qui l'ont déjà)
+                ...(c.id === crafts.DOOR ? { lock: { cost: crafts.LOCK_COST, ready: rows.filter(r => r.craft === c.id && r.x === null && r.locked).length } } : {}),
                 block: crafts.blockOf(c, { made, owned, stock, open, have, tutorial: tutorial.has(c.id), stars }), place: crafts.placeText(c, siteName),
                 spots: made[c.id] || free.has(c.id) ? craftSpots(c, ctx) : []
             };

@@ -40,6 +40,8 @@ test('poser une porte : dans un trou entre deux piquets ou à la place d’un pi
   // Deux piquets en colonne, un trou entre eux ; un troisième plus bas
   await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'cloture', 93, 93), ($1, 'cloture', 93, 95), ($1, 'cloture', 93, 96), ($1, 'cloture', 93, 97)`, [id]);
   const door = body => api('POST', '/play/world/craft/door', body, player);
+  // (l'établi dit ce que coûte le verrou, et les portes de la réserve qui l'ont déjà)
+  assert.deepEqual((await view()).crafts.catalog.find(c => c.id === 'porte').lock, { cost: { stone: 6 }, ready: 0 });
   // Hors du mur : refusée ; requête mal formée : refusée
   assert.equal((await door({ x: 90, y: 90, lock: false })).status, 400);
   assert.equal((await door({ x: 93, y: 94 })).status, 400);
