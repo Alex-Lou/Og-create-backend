@@ -38,7 +38,8 @@ test('chaque quête désigne un vrai quartier, palier, création, lieu ou habita
       const tier = SITES[goal.site]?.levels[goal.need - 1];
       assert.ok(tier, q.id);
       // (« Fais du Ponton un port de pêche » : le palier, en minuscules dans la phrase)
-      assert.ok(q.label.toLowerCase().includes(tier.name.toLowerCase()), q.id);
+      // (sauf le premier feu, « Rallume le feu de ceux d’avant » : choix de l'auteur, 15 oct., ecriture/lots/07_quetes.md)
+      assert.ok(q.id === 'feu' || q.label.toLowerCase().includes(tier.name.toLowerCase()), q.id);
     }
     if (goal.kind === 'craft') assert.ok(CRAFT_BY_ID[goal.craft], q.id);
     if (goal.kind === 'landmark' && goal.landmark) assert.ok(LANDMARKS.some(l => l.id === goal.landmark), q.id);
@@ -111,7 +112,7 @@ test('avancée de chaque objectif, plafonnée', () => {
 test('la quête active est la première pas encore faite ; à la fin, Brume se repose', () => {
   const first = active(new Set(), facts());
   assert.deepEqual(QUESTS.slice(0, 10).map(q => q.id), ['pages', 'ramasser', 'feu', 'nuit', 'caisse', 'recolte', 'premier-ponton', 'chemin-aster', 'clotures', 'veille']);
-  assert.match(QUESTS.find(q => q.id === 'feu').say, /sur la plage de Brumelune/);
+  assert.match(QUESTS.find(q => q.id === 'feu').say, /Rallume-les/);
   assert.deepEqual([first.id, first.act, first.step, first.total, first.kind, first.done], ['pages', 'T', 1, 72, 'element', false]);
   assert.equal(active(new Set(), facts({ elements: new Set([...facts().elements, 'Vent']) })).done, true);
   // La lanterne de Jovin faite, on dort : Pierrot au matin, jamais le même jour (choix de l'auteur, 13 oct.)

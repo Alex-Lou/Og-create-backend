@@ -168,8 +168,10 @@ test('la troisième nuit, un Esprit : repoussé d’un toucher, il revient par u
   const player = await islandPlayer();
   const id = player.userId;
   await worldNights.startNights(id);
-  // (la troisième nuit écrite : un Sans-Nom, un Dormeur, un Esprit qui marche au moins une case)
-  const walking = p => p.some(c => c.kind === 'esprit' && !c.back && nights.fateOf(c, FIRE).step > 0);
+  // (la troisième nuit écrite : un Sans-Nom, un Dormeur, un Esprit qui marche au moins une case, et qui revient avant
+  // l'aube : sinon, son retour ne sort pas)
+  const returnsAtNight = (p, c) => p.find(b => b.back === c.id).at + MINUTE < nights.boundsOf(c.id.split(':')[0]).end;
+  const walking = p => p.some(c => c.kind === 'esprit' && !c.back && nights.fateOf(c, FIRE).step > 0 && returnsAtNight(p, c));
   const { night, plan, start, end } = nightWhere(id, Date.now() + 2 * DAY, walking, 2);
   await startBefore(id, start, 2);
   assert.deepEqual(plan.filter(c => !c.back).map(c => c.kind), ['fantome', 'zombie', 'esprit']);

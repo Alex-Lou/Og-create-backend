@@ -1936,7 +1936,7 @@ test('une Récolte quittée sans jouer ne compte pas ; Marcelle nourrie, la soup
   await sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Vent", "Pluie", "Brasier"]'::jsonb WHERE user_id = $1`, [player.userId]);
   assert.equal((await claim('pages')).status, 200);
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'ramasser'), ($1, 'feu'), ($1, 'nuit'), ($1, 'caisse')`, [player.userId]);
-  // Quittée sans un coup : la partie est perdue et ne compte pas pour « Termine une Récolte »
+  // Quittée sans un coup : la partie est perdue et ne compte pas pour « Fais une Récolte avec Hermine »
   const quit = await finish(await start(), []);
   assert.equal(quit.status, 200);
   assert.deepEqual([quit.data.world.brume.quest.id, quit.data.world.brume.quest.done], ['recolte', false]);

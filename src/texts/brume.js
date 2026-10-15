@@ -12,6 +12,6 @@ const BREATH_REFUSED = {
     breathed: 'Anya t’a déjà soufflé un Savoir : elle repassera.'
 };
 
-const RESTED = 'La brume s’est levée sur toute l’île. Merci, alchimiste : elle est de nouveau vivante.';
+const RESTED = 'La brume s’est levée sur toute l’île. Elle est de nouveau vivante. Merci, Alchimiste.';
 
 module.exports = { SAVOIR_LOCKED, SAVOIR_GIVEN, ANYA_ASLEEP_HEART, BREATH_REFUSED, RESTED };

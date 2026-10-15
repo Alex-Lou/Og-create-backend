@@ -4,40 +4,40 @@
 
 const QUEST_TEXTS = {
     pages: {
-        label: 'Découvre ta première recette : le Vent',
-        say: 'Le Grimoire s’est ouvert pour toi. Mêle l’Air à l’Air dans l’Athanor : que le Vent chasse la brume du rivage.'
+        label: 'Écris ta première page : le Vent',
+        say: 'Il s’est ouvert pour toi. Ceux d’avant savaient en faire sortir le vent… Essaie.'
     },
     ramasser: {
-        label: 'Ramasse les trois trouvailles du rivage',
-        say: 'Deux bois flottés, un galet : ramasse les trois trouvailles, de quoi bâtir notre premier feu.'
+        label: 'Ramasse ce que la mer a rendu',
+        say: 'Ce que la mer rend, on le garde. Ce soir, on en fera un feu.'
     },
     feu: {
-        label: 'Allume le Feu de camp',
-        say: 'Ceux d’avant faisaient un cercle de pierres, et le bois au milieu. Bâtis le feu ici, sur la plage de Brumelune : tes trouvailles suffiront.'
+        label: 'Rallume le feu de ceux d’avant',
+        say: 'C’est ici qu’ils dansaient, autour des flammes. Rallume-les.'
     },
     nuit: {
         label: 'Passe ta première nuit',
-        say: 'Le feu tient. La nuit tombe sur Brumelune, qui ne s’éveille que pour toi. Explore à ta guise… puis dors : demain, nous ne serons plus seuls.'
+        say: 'Le feu tient. Va voir la plage, si tu veux. Quand tu auras sommeil, je veillerai.'
     },
     caisse: {
         label: 'Ouvre la caisse d’Hermine',
-        say: 'Sa caisse a échoué près du camp. Ouvre-la avec elle : la mer rend ce qu’elle a pris.'
+        say: 'Une caisse est venue avec l’épave. Hermine dit qu’elle est à elle.'
     },
     recolte: {
-        label: 'Termine une Récolte avec Hermine',
-        say: 'Hermine a rejoint le camp au matin. Suis-la au rivage : relie ce qui se ressemble, vite, avant la marée.'
+        label: 'Fais une Récolte avec Hermine',
+        say: 'Hermine connaît la marée. Suis-la au rivage.'
     },
     'premier-ponton': {
         label: 'Bâtis le Ponton d’Hermine',
-        say: 'Vingt-cinq bois, et la mer nous ouvre ses portes. Bâtis le Ponton avec Hermine.'
+        say: 'Un ponton, dit-elle, et la mer devient un chemin. Elle a l’air d’y croire.'
     },
     'chemin-aster': {
-        label: 'Relie le Ponton au Feu',
-        say: 'Deux camps, un seul chemin : trace-le du Ponton jusqu’au Feu. Les premières pierres sont offertes.'
+        label: 'Relie le Ponton au feu',
+        say: 'Deux camps, un seul feu. Il leur faut un chemin.'
     },
     clotures: {
         label: 'Entoure le feu d’un enclos',
-        say: 'Brume l’a dit : les égarés rôdent la nuit. Plante les piquets tout autour du feu, jusqu’à boucler l’enclos.'
+        say: 'La nuit, des égarés sortent de ma brume. Une clôture autour du feu… et ils s’arrêtent, je crois.'
     },
     veille: {
         label: 'Passe ta deuxième nuit',
@@ -45,39 +45,39 @@ const QUEST_TEXTS = {
     },
     soupe: {
         label: 'Une soupe pour Marcelle',
-        say: 'Marcelle grelotte… Touche la bulle au-dessus d’elle : un repas chaud, et elle reprend des couleurs.'
+        say: 'Marcelle a faim, et froid. Deux nuits sur les rochers, ça creuse.'
     },
     cage: {
         label: 'Ouvre la cage des poules',
-        say: 'Des caquets sur l’eau… La cage du navire s’est échouée au bout de la plage. Ouvre-la avec Marcelle.'
+        say: 'Des caquets, sur l’eau… La cage du navire est venue jusqu’au bout de la plage.'
     },
     poules: {
         label: 'Nourris les trois poules',
-        say: 'Caramel, Flocon et Réglisse ont faim : deux vivres chacune, depuis la bulle au-dessus d’elles.'
+        say: 'Elles ont faim. Marcelle les regarde comme si c’étaient ses filles. Ce sont ses filles.'
     },
     poulailler: {
         label: 'Pose le poulailler de Marcelle',
-        say: 'Il leur faut un toit : touche le Feu de camp, puis « Annexes », et pose le poulailler dans l’herbe, près de la cuisine de Marcelle.'
+        say: 'Il leur faut un toit, dans l’herbe, près de la cuisine. Marcelle a déjà choisi l’endroit.'
     },
     'abri-cannelle': {
         label: 'Un abri pour Marcelle',
-        say: 'Marcelle dort sur la cuisine de l’épave. Touche son coin : vingt bois, dix pierres, et elle a un toit.'
+        say: 'Elle dort sur une marmite renversée. Elle ne se plaint pas. Enfin, un peu.'
     },
     'enclos-cannelle': {
         label: 'Entoure le coin de Marcelle',
-        say: 'Ses piquets, cette fois, c’est toi qui les fais : glisse autour de son abri, huit bois le piquet.'
+        say: 'Une cuisine brille toute la nuit. Les égarés le savent aussi.'
     },
     'nuit-cannelle': {
         label: 'Passe ta troisième nuit',
         say: 'Trois, ce soir, autour du feu. Dors : je veille.'
     },
     deco: {
-        label: 'Fabrique ta première lanterne',
-        say: 'Jovin a monté un établi près du feu. Assemble une Lanterne, puis pose-la au bord d’un chemin, là où l’île brille d’or.'
+        label: 'Assemble ta première lanterne',
+        say: 'Jovin a monté un établi : une porte de cabine, deux caisses. Il dit que c’est un début.'
     },
     'torches-rivet': {
         label: 'Plante les trois torches de Jovin',
-        say: 'Jovin a une idée pour la nuit : trois torches, une par côté d’où venaient les égarés. Assemble-les à l’établi, puis plante-les.'
+        say: 'Ils sont venus de trois côtés, hier soir. Jovin a compté. Il compte tout.'
     },
     'nuit-rivet': {
         label: 'Passe ta quatrième nuit',
@@ -85,183 +85,183 @@ const QUEST_TEXTS = {
     },
     'eveil-ondin': {
         label: 'Réveille Pierrot',
-        say: 'Un petit dort contre un rocher, sa baguette à la main. Parle-lui doucement : la brume endort, sans faire de mal.'
+        say: 'Un enfant dort sur une planche. La vague l’a posé là. Doucement.'
     },
     'souvenir-ondin': {
-        label: 'Fais naître la Pluie',
-        say: 'La source s’est tue sous ses pieds. Sans pluie, la terre oublie l’eau. Écris-la : sa baguette aura de nouveau quelque chose à chercher.'
+        label: 'Écris la Pluie',
+        say: 'Sans pluie, la terre oublie l’eau. Et Pierrot aussi.'
     },
     'puits-ondin': {
-        label: 'Construis le Puits',
-        say: 'Pierrot sent l’eau sous ses pieds. Creuse le Puits avec la pierre de la Récolte : l’eau ne manquera plus.'
+        label: 'Bâtis le Puits',
+        say: 'Pierrot sent l’eau sous ses pieds. Il chuchote qu’elle chante.'
     },
     chemin: {
-        label: 'Relie le Puits au Feu',
-        say: 'Pierrot porte l’eau à travers l’herbe mouillée… Trace un chemin du Puits jusqu’au Feu : les premières pierres sont offertes.'
+        label: 'Relie le Puits au feu',
+        say: 'Pierrot porte l’eau dans l’herbe mouillée. Les seaux arrivent à moitié vides.'
     },
     lisiere: {
         label: 'Achète La Lisière',
-        say: 'Le bois flotté s’épuise. À l’ouest, des arbres dorment sous la brume… et quelqu’un avec eux. Achète La Lisière.'
+        say: 'Le bois flotté ne suffira pas. À l’ouest, des arbres dorment sous la brume. Et une lueur, entre eux.'
     },
     'eveil-sylve': {
-        label: 'Réveille Freya',
-        say: 'Une sauvageonne dort roulée en boule, près d’un radeau brisé. Approche sans bruit, et parle-lui.'
+        label: 'Apprivoise Freya',
+        say: 'Quelqu’un vit dans ces arbres, et se cache. Une queue rousse t’a montré le chemin. Approche sans bruit.'
     },
     vie: {
-        label: 'Fais naître la Vie',
-        say: 'Air, Eau, Feu, Terre… Les quatre Souffles ensemble, dans l’Athanor. Je crois que c’est ça, la Vie.'
+        label: 'Écris la Vie',
+        say: 'Air, Eau, Feu, Terre… Les quatre Souffles ensemble. Je crois que c’est ça, la Vie.'
     },
     'souvenir-sylve': {
-        label: 'Rends son souvenir à Freya : fais naître l’Arbre',
-        say: 'De la Vie naît la Plante, et de la Plante, l’Arbre. Fais-le naître : Freya se souviendra de sa forêt.'
+        label: 'Rends son souvenir à Freya : écris l’Arbre',
+        say: 'De la Vie naît la Plante, et de la Plante, l’Arbre. Freya se souviendra de sa forêt.'
     },
     bosquet: {
         label: 'Plante le Bosquet',
-        say: 'Freya se souvient ! Plante le Bosquet : elle ramassera le bois mort, sans abattre un seul arbre.'
+        say: 'Freya ramassera le bois mort. Pas un arbre ne tombera : elle y veille.'
     },
     lumiere: {
-        label: 'Fais naître la Lumière',
-        say: 'Une lumière repousse la brume. Le Feu, et l’Éclair d’un orage… Le Grimoire te mettra sur la voie.'
+        label: 'Écris la Lumière',
+        say: 'Le Feu, et l’Éclair d’un orage… Une lumière qui ne s’éteint pas.'
     },
     lanterne: {
         label: 'Allume la première lanterne',
-        say: 'Assemble une Lanterne à l’établi et pose-la au bord d’un chemin. Une lumière… Je les compterai toutes.'
+        say: 'Une lumière de plus. Je les compterai toutes.'
     },
     colline: {
         label: 'Achète La Colline',
-        say: 'L’orage approche, et l’Abri demande de la pierre. Au nord-est, une fissure… Achète La Colline.'
+        say: 'L’orage approche, et l’Abri demandera de la pierre. Du côté de la Colline, quelqu’un taille la pierre.'
     },
     'eveil-galet': {
-        label: 'Réveille Saturnin',
-        say: 'Un vieil homme dort dans la fissure, son maillet à la main. Il ronfle comme une pierre qui roule.'
+        label: 'Va trouver Saturnin',
+        say: 'Il vit dans la fissure depuis des années. Il ne parle pas beaucoup. Il ne parle pas du tout, en fait.'
     },
     'souvenir-galet': {
-        label: 'Rends son souvenir à Saturnin : fais naître la Pierre',
-        say: 'Saturnin a oublié la pierre. Le Feu et la Terre font la Lave ; l’Air la refroidit… Fais naître la Pierre.'
+        label: 'Rends son souvenir à Saturnin : écris la Pierre',
+        say: 'Le Feu et la Terre font la Lave ; l’Air la refroidit… Saturnin, lui, a oublié.'
     },
     carriere: {
         label: 'Ouvre la Fissure',
-        say: '« Hm. » Il dit qu’il est prêt à tailler. Ouvre la Fissure : la pierre de l’Abri viendra de là.'
+        say: '« Hm. » Il dit qu’il est prêt à tailler. Je crois.'
     },
     bois: {
-        label: 'Fais naître le Bois',
+        label: 'Écris le Bois',
         say: 'Pour l’Abri, il faut du bois… sans faire pleurer Freya. L’Arbre et le Métal, peut-être ?'
     },
     cabane: {
         label: 'Dresse l’Abri avant l’orage',
-        say: 'Le ciel gronde déjà. Dresse l’Abri près du feu de camp : il faut tenir, tous ensemble.'
+        say: 'Le ciel gronde déjà. Un toit, avant la pluie.'
     },
     annexe: {
         label: 'Pose une annexe',
-        say: 'L’Abri tient ! Un bâtiment grandit aussi par ce qu’on pose autour de lui : dans sa fiche, l’onglet Annexes.'
+        say: 'L’Abri tient. Autour de lui, il y a de la place pour autre chose.'
     },
     jardins: {
         label: 'Achète Les Jardins',
-        say: 'Sept bouches, et la Récolte ne suffit plus. Au nord, une terre noire… et une barque de graines. Achète Les Jardins.'
+        say: 'Sept bouches, et la marée ne suffit plus. Au nord, une terre noire, et une barque de graines échouée.'
     },
     'eveil-melisse': {
         label: 'Réveille Flore',
-        say: 'Une jardinière dort sur sa boîte en fer. Réveille-la : ses graines ont de la mémoire, dit-elle.'
+        say: 'Une jardinière dort sur sa boîte en fer. Elle la serre comme on serre un secret.'
     },
     potager: {
         label: 'Bâtis le Potager',
-        say: 'Tes pages l’ont réveillée avant toi : elle se souvient déjà de la Plante. Bâtis le Potager.'
+        say: 'Tes pages l’ont réveillée avant toi : elle se souvient déjà de la Plante.'
     },
     faubourg: {
         label: 'Achète Le Faubourg',
-        say: 'Jovin rêve d’une vraie forge. « Attends… Non. Si ! » À l’est, Le Faubourg l’attend.'
+        say: 'Jovin rêve d’une vraie forge. Il n’ose pas le dire. Il le dit quand même.'
     },
     atelier: {
         label: 'Bâtis l’Atelier',
-        say: 'Le Métal et la Terre font le Fer. Bâtis l’Atelier : Jovin forgera les outils de tous.'
+        say: 'Le Métal et la Terre font le Fer. Jovin forgera les outils de tous.'
     },
     etoile: {
-        label: 'Fais naître l’Étoile',
-        say: 'Hermine veut explorer, mais la nuit, il faut un guide. Fais naître l’Étoile : elle tracera la route.'
+        label: 'Écris l’Étoile',
+        say: 'Hermine veut un guide, pour la nuit. Une étoile. … Oui. Une étoile.'
     },
     hauteurs: {
         label: 'Achète Les Hauteurs',
-        say: 'Des Hauteurs, on voit tout le cœur de l’île… et ce qui dort au-delà, dans la brume. C’est de là-haut qu’on partira.'
+        say: 'De là-haut, on voit tout le cœur de l’île… et ce qui dort au-delà, dans la brume.'
     },
     expedition: {
         label: 'Envoie une expédition',
-        say: 'Au-delà de nos quartiers, des terres dorment dans la brume. La boussole, en haut : envoie une expédition.'
+        say: 'Au-delà de nos quartiers, des terres dorment dans la brume. Quelqu’un doit aller voir.'
     },
     ruine: {
         label: 'Découvre un lieu des Anciens',
-        say: 'D’autres ont vécu ici, avant nous. Achète une terre explorée, et touche ce qui y luit.'
+        say: 'D’autres ont vécu ici, avant nous. Il reste des pierres qui luisent.'
     },
     village: {
-        label: 'Fais naître le Village',
-        say: 'Des maisons, des voisins… Notre camp devient un village. Fais-le naître dans le Grimoire.'
+        label: 'Écris le Village',
+        say: 'Des maisons, des voisins… Notre camp devient un village.'
     },
     crique: {
         label: 'Achète La Crique',
-        say: 'Hermine veut reprendre la mer. Au nord-est, une crique abritée : on dit que des dauphins y viennent.'
+        say: 'Hermine veut reprendre la mer. Elle ne le dit pas. Elle regarde la crique.'
     },
     'souvenir-aster': {
-        label: 'Rends son courage à Hermine : fais naître le Bateau',
-        say: '« Je ne sais plus tenir une barre », dit Hermine. Le Bois et l’Eau… Fais naître le Bateau : rends-lui la mer.'
+        label: 'Rends son courage à Hermine : écris le Bateau',
+        say: '« Je ne tiens plus une barre », dit Hermine. Le Bois et l’Eau…'
     },
     'ponton-aster': {
         label: 'Fais du Ponton un port de pêche',
-        say: 'Cap sur la crique ! Agrandis le Ponton : la mer devient un chemin.'
+        say: 'Cap sur la crique, dit-elle. Ses mains ne tremblent plus.'
     },
     bete: {
-        label: 'Fais naître une bête',
-        say: 'Ce qu’on fabrique renaît. Une bête, dans le Grimoire : Poisson, Oiseau, Grenouille… Freya dit qu’elles attendent.'
+        label: 'Écris une bête',
+        say: 'Freya dit que les bêtes attendent qu’on se souvienne d’elles.'
     },
     voyageur: {
         label: 'Comble un voyageur',
-        say: 'Une barque approche… et ne se brise pas ! Ils ont vu nos lanternes. Comble la demande du voyageur.'
+        say: 'Une barque approche… et elle ne se brise pas. Ils ont vu nos lanternes.'
     },
     coeur: {
         label: 'Gagne un cœur d’amitié',
-        say: 'Bavarde avec la troupe, offre-leur ce qu’ils aiment. Un cœur, et ils te diront un peu de leur passé.'
+        say: 'Ils ont tous un passé. Ils le racontent à qui revient les voir.'
     },
     trouvaille: {
         label: 'Ramasse une trouvaille de climat',
-        say: 'Les terres nouvelles ont leurs trésors : glace, laine, sel… Achète-en une, et ramasse un gisement.'
+        say: 'Les terres nouvelles ont leurs trésors : glace, laine, sel…'
     },
     serre: {
         label: 'Bâtis la Serre',
-        say: 'Sous le verre, tout pousse plus vite. Fais de ton Potager une Serre : Flore y sèmera ses graines étranges.'
+        say: 'Sous le verre, tout pousse plus vite. Flore y sèmera ses graines étranges.'
     },
     maison: {
         label: 'Bâtis la Cabane',
-        say: 'Notre camp devient un foyer. Bâtis la Cabane : on y verra de la lumière la nuit.'
+        say: 'Une cabane, avec une fenêtre. On y verra de la lumière, la nuit. Une de plus.'
     },
     'une-maison': {
         label: 'Pose une maison',
-        say: 'Des voyageurs voudraient rester. Une maison autour du Foyer, et quelqu’un pourra s’installer.'
+        say: 'Des voyageurs voudraient rester. Il leur faut un toit.'
     },
     installe: {
         label: 'Garde un voyageur sur l’île',
-        say: 'Comble un voyageur, puis propose-lui de rester : une maison l’attend.'
+        say: 'Quelqu’un hésite à repartir. Une maison l’attend.'
     },
     hameau: {
         label: 'Achète Le Hameau',
-        say: 'Des toits dorment sous la brume, à l’est. Achète Le Hameau : une baleine passe parfois au large.'
+        say: 'Des toits dorment sous la brume, à l’est. Une baleine passe parfois au large.'
     },
     potion: {
-        label: 'Rends le goût à Marcelle : fais naître le Remède',
-        say: 'Marcelle repose sa cuillère. « Plus rien n’a de goût… Ce n’est pas la brume, c’est moi. » Le Grimoire se souvient du Remède : écris-le.'
+        label: 'Rends le goût à Marcelle : écris le Remède',
+        say: 'Marcelle repose sa cuillère. « Plus rien n’a de goût… Ce n’est pas la brume, c’est moi. » Le livre se souvient du Remède.'
     },
     alchimiste: {
         label: 'Bâtis la Maison de l’alchimiste',
-        say: 'Le Remède est le plan d’une maison très ancienne. Bâtis-la : quelqu’un y a laissé son bureau.'
+        say: 'Le Remède est le plan d’une maison très ancienne. Quelqu’un y a laissé son bureau.'
     },
     peuple: {
         label: 'Donne un nom au peuple',
-        say: 'Une table, une soupe, un nom : c’est comme ça que tout commence. Comment s’appelle notre peuple ?'
+        say: 'Une table pour tous, et pas encore de nom. Comment s’appelle notre peuple ?'
     },
     phare: {
         label: 'Achète L’Îlot aux Mouettes',
-        say: 'Sur l’Îlot aux Mouettes dort le phare éteint des Anciens. Achète-le : je dois savoir ce qui s’est passé.'
+        say: 'Sur l’Îlot aux Mouettes dort le phare éteint des Anciens. Je dois savoir ce qui s’est passé.'
     },
     ecriture: {
-        label: 'Fais naître l’Écriture',
-        say: 'Saturnin lit les runes des Anciens. Le Langage et la Pierre : réapprenons à écrire, nous aussi.'
+        label: 'Réapprends l’Écriture',
+        say: 'Saturnin lit les runes des Anciens. Le Langage et la Pierre… Réapprenons, nous aussi.'
     },
     cle: {
         label: 'Trouve la clé du phare',
@@ -269,23 +269,23 @@ const QUEST_TEXTS = {
     },
     tour: {
         label: 'Bâtis la Tour d’étude',
-        say: 'Pour lire tout ce qui revient, il faut une tour. Bâtis la Tour d’étude : son plan, c’est le Livre.'
+        say: 'Pour lire tout ce qui revient, il faut une tour.'
     },
     civilisation: {
-        label: 'Fais naître la Civilisation',
-        say: 'Une ville, et l’écriture : nous ne sommes plus des naufragés. Fais naître la Civilisation.'
+        label: 'Écris la Civilisation',
+        say: 'Une ville, et l’écriture. Nous ne sommes plus des naufragés.'
     },
     phenix: {
-        label: 'Fais naître le Phénix',
-        say: 'J’ai froid, tout à coup… Le Feu et la Vie. Fais naître le Phénix, s’il te plaît.'
+        label: 'Écris le Phénix',
+        say: 'J’ai froid, tout à coup… Le Feu et la Vie. S’il te plaît.'
     },
     'ile-legendes': {
         label: 'Achète L’Île des Légendes',
         say: 'Le Passeur attend avec sa barque qui vole. Sur L’Île des Légendes, Héliane a laissé son dernier mot.'
     },
     'feu-follet': {
-        label: 'Fais naître le Feu follet',
-        say: 'Le Feu et le Marais… C’est ma recette, n’est-ce pas ? Fais-moi naître. Ce qui est né ne s’oublie plus.'
+        label: 'Écris le Feu follet',
+        say: 'Le Feu et le Marais… C’est moi, n’est-ce pas ? Écris-moi. Ce qui est écrit ne s’oublie plus.'
     },
     'phare-brume': {
         label: 'Allume le Phare de Brume',
