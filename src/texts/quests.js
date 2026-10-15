@@ -56,8 +56,9 @@ const QUEST_TEXTS = {
         label: 'Ouvre la cage des poules',
         say: 'Des caquets, sur l’eau… La cage du navire est venue jusqu’au bout de la plage.'
     },
+    // (choix de l'auteur, 15 oct. : on les attrape d'abord ; texte validé)
     poules: {
-        label: 'Nourris les trois poules',
+        label: 'Attrape et nourris les trois poules',
         say: 'Elles ont faim. Agathe les regarde comme si c’étaient ses filles. Ce sont ses filles.'
     },
     poulailler: {
