@@ -30,7 +30,7 @@ const BEACH_PLACES = {
     // (le camp de Lorena serré autour de son Ponton, contre l'épave : sa zone est petite)
     aster: { x: 90, y: 95 }, sos: { x: 90, y: 94 }, caisses: { x: 91, y: 94 }, filet: { x: 90, y: 100 }, rondins: { x: 92, y: 94 },
     // (la grande Hirondelle, couchée en travers de l'anse à l'ouest du camp, entre le bout sud des rochers et le Ponton ;
-    // sa poupe arrachée reste à l'ancienne place, au bout du sillon, et ferme toujours le coin de l'enclos du Feu : choix
+    // sa poupe arrachée, rejetée par la mer à l'ancienne place, ferme toujours le coin de l'enclos du Feu : choix
     // de l'auteur, 15 oct. ; le camp de Lorena se serre derrière elle, son filet devant)
     hirondelle: { x: 86, y: 97, w: 6, h: 3 },
     rivet: { x: 93, y: 86 },
