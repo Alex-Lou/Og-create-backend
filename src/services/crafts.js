@@ -33,46 +33,49 @@ const { GROUND_TEXT } = T;
 const ofPlace = name => name.replace(/^Les /, 'des ').replace(/^Le /, 'du ').replace(/^La /, 'de la ');
 
 // Gabarit en lignes ('x' : case de la silhouette) ; spent : trouvailles de climat dépensées ({ trouvaille: nombre })
+// shape : le gabarit du puzzle d'assemblage, qui suit la silhouette du dessin de la création (choix de l'auteur, 15 oct. :
+// le dessin se lit en entier, sans morceau dans un creux ni pièce de bois nu ; le jeu cale le corps du dessin sur le
+// gabarit : crafts.artFit, côté front)
 const craft = (id, name, tier, cost, elements, after, place, shape, spent = {}) => ({ id, name, tier, cost, elements, after, place, shape, finds: spent });
 const CRAFTS = [
-    craft('cloture', 'Clôture', 'start', { wood: 8 }, [], [], {}, ['x.x', 'xxx', 'x.x']),
+    craft('cloture', 'Clôture', 'start', { wood: 8 }, [], [], {}, ['xx.', 'xxx', '.xx']),
     // (la porte d'un enclos, choix de l'auteur, 15 oct. : dans le mur, sentiers compris ; son verrou à part, LOCK_COST)
-    craft('porte', 'Porte', 'start', { wood: 10 }, [], ['cloture'], { ground: 'gsmpkt', wall: true }, ['xxx', 'x.x', 'xxx']),
+    craft('porte', 'Porte', 'start', { wood: 10 }, [], ['cloture'], { ground: 'gsmpkt', wall: true }, ['x..', 'xxx', 'xxx', '..x']),
     // (la torche de bois flotté, choix de l'auteur, 13 oct. : les trois de Nathan, au jour 4 ; une lumière de la nuit,
     // nights.js)
     craft('torche', 'Torche', 'start', { wood: 2 }, ['Feu'], [], {}, ['x', 'x', 'x', 'x']),
     // (des fleurs sans pluie, non : la Pluie, clé du Puits, apporte l'eau qu'il coûte, choix de l'auteur, 12 oct.)
-    craft('massif', 'Massif de fleurs', 'start', { water: 6, food: 4 }, ['Pluie'], [], { ground: 'gm' }, ['.x.', 'xxx', 'xxx']),
-    craft('muret', 'Muret de pierre', 'I', { stone: 12 }, ['Terre'], ['cloture'], {}, ['xxxx', 'xxxx']),
-    craft('lanterne', 'Lanterne', 'I', { wood: 6, stone: 6 }, ['Feu', 'Lumière'], [], { path: true }, ['xxx', 'xxx', '.x.', '.x.']),
-    craft('banc', 'Banc', 'I', { wood: 14 }, [], ['cloture'], { nearCraft: { id: 'lanterne', reach: 3 } }, ['xxxx', 'xxxx', 'x..x']),
-    craft('epouvantail', 'Épouvantail', 'I', { wood: 8, food: 8 }, ['Vent'], ['massif'], { nearSite: { id: 'potager', reach: 6 } }, ['.x.', 'xxx', '.x.', 'xxx']),
-    craft('nichoir', 'Nichoir', 'I', { wood: 10 }, ['Air'], ['cloture'], { nearSite: { id: 'bosquet', reach: 6 } }, ['.x.', 'xxx', 'xxx', '.x.']),
-    craft('girouette', 'Girouette', 'I', { wood: 10, stone: 6 }, ['Vent'], ['muret'], {}, ['xxx', '.x.', '.x.', 'xxx']),
-    craft('fontaine', 'Fontaine', 'II', { stone: 30, water: 20 }, ['Pierre', 'Eau'], ['muret'], { nearSite: { id: 'puits', reach: 6 } }, ['.xx.', 'xxxx', 'xxxx', '.xx.']),
-    craft('brasero', 'Brasero', 'II', { stone: 16, wood: 10 }, ['Fer', 'Charbon'], ['lanterne'], { path: true }, ['xxxx', 'xxxx', '.xx.', '.xx.']),
-    craft('pergola', 'Pergola', 'II', { wood: 30, water: 10 }, ['Corde'], ['banc', 'massif'], {}, ['xxxxx', 'x.x.x', 'x.x.x']),
-    craft('statue', 'Statue', 'II', { stone: 40 }, ['Marbre'], ['muret'], {}, ['.x.', 'xxx', '.x.', 'xxx', 'xxx']),
-    craft('arche', 'Arche fleurie', 'II', { wood: 24, water: 16 }, ['Corde'], ['massif', 'cloture'], { path: true }, ['xxxx', 'x..x', 'x..x', 'x..x']),
-    craft('etal', 'Étal du marché', 'II', { wood: 24, food: 16 }, ['Tissu'], ['banc'], { nearSite: { id: 'foyer', reach: 7 } }, ['xxxxx', 'xxxxx', 'x...x']),
-    craft('kiosque', 'Kiosque', 'III', { wood: 60, stone: 40 }, ['Bronze'], ['pergola', 'lanterne'], {}, ['..x..', '.xxx.', 'xxxxx', '.x.x.', '.x.x.']),
-    craft('cadran', 'Cadran solaire', 'III', { stone: 50 }, ['Soleil'], ['statue'], {}, ['..x..', '.xxx.', 'xxxxx', '.xxx.', '..x..']),
-    craft('bassin', 'Bassin', 'III', { stone: 40, water: 40 }, ['Source'], ['fontaine'], { nearCraft: { id: 'fontaine', reach: 5 } }, ['xxxxx', 'x...x', 'xxxxx']),
-    craft('longuevue', 'Longue-vue', 'III', { stone: 20, wood: 20 }, ['Étoile', 'Lentille'], ['girouette'], { ground: 's' }, ['...xx', '..xx.', '.xx..', 'xxx..', 'x.x..']),
+    craft('massif', 'Massif de fleurs', 'start', { water: 6, food: 4 }, ['Pluie'], [], { ground: 'gm' }, ['.xx.', 'xxxx', '.xxx']),
+    craft('muret', 'Muret de pierre', 'I', { stone: 12 }, ['Terre'], ['cloture'], {}, ['xx.', 'xxx', '.xx']),
+    craft('lanterne', 'Lanterne', 'I', { wood: 6, stone: 6 }, ['Feu', 'Lumière'], [], { path: true }, ['xx', 'xx', 'xx', 'xx']),
+    craft('banc', 'Banc', 'I', { wood: 14 }, [], ['cloture'], { nearCraft: { id: 'lanterne', reach: 3 } }, ['xx.', 'xxx', 'xxx', '..x']),
+    craft('epouvantail', 'Épouvantail', 'I', { wood: 8, food: 8 }, ['Vent'], ['massif'], { nearSite: { id: 'potager', reach: 6 } }, ['.x.', 'xxx', 'xxx', '.x.', '.x.']),
+    craft('nichoir', 'Nichoir', 'I', { wood: 10 }, ['Air'], ['cloture'], { nearSite: { id: 'bosquet', reach: 6 } }, ['xx', 'xx', 'xx', 'xx']),
+    craft('girouette', 'Girouette', 'I', { wood: 10, stone: 6 }, ['Vent'], ['muret'], {}, ['.x.', 'xxx', '.x.', '.x.', '.x.']),
+    craft('fontaine', 'Fontaine', 'II', { stone: 30, water: 20 }, ['Pierre', 'Eau'], ['muret'], { nearSite: { id: 'puits', reach: 6 } }, ['.xx.', 'xxx.', 'xxxx', 'xxxx']),
+    craft('brasero', 'Brasero', 'II', { stone: 16, wood: 10 }, ['Fer', 'Charbon'], ['lanterne'], { path: true }, ['.xx.', 'xxxx', 'xxx.', '.xx.', '.xx.']),
+    craft('pergola', 'Pergola', 'II', { wood: 30, water: 10 }, ['Corde'], ['banc', 'massif'], {}, ['.x.', 'xxx', 'xxx', 'xxx', '.x.']),
+    craft('statue', 'Statue', 'II', { stone: 40 }, ['Marbre'], ['muret'], {}, ['.xx', '.x.', '.xx', 'xxx', 'xxx']),
+    craft('arche', 'Arche fleurie', 'II', { wood: 24, water: 16 }, ['Corde'], ['massif', 'cloture'], { path: true }, ['xxx', 'x.x', 'x.x', 'x.x']),
+    craft('etal', 'Étal du marché', 'II', { wood: 24, food: 16 }, ['Tissu'], ['banc'], { nearSite: { id: 'foyer', reach: 7 } }, ['xx.', 'xxx', 'xxx', 'xxx', '.xx']),
+    craft('kiosque', 'Kiosque', 'III', { wood: 60, stone: 40 }, ['Bronze'], ['pergola', 'lanterne'], {}, ['.x.', 'xxx', 'xxx', 'xxx', 'xxx']),
+    craft('cadran', 'Cadran solaire', 'III', { stone: 50 }, ['Soleil'], ['statue'], {}, ['xxx', 'xxx', 'xxx', 'xxx', 'xx.']),
+    craft('bassin', 'Bassin', 'III', { stone: 40, water: 40 }, ['Source'], ['fontaine'], { nearCraft: { id: 'fontaine', reach: 5 } }, ['..x..', 'xxxx.', 'xxxxx', '.xxx.']),
+    craft('longuevue', 'Longue-vue', 'III', { stone: 20, wood: 20 }, ['Étoile', 'Lentille'], ['girouette'], { ground: 's' }, ['.xxx', '.xx.', 'xxx.', 'xxx.']),
     // Créations de climat (lot 9d) : deux par climat, la seconde après la première
-    craft('igloo', 'Igloo', 'climat', { wood: 10 }, ['Neige'], [], { climate: 'cimes', ground: 'n' }, ['.xxx.', 'xxxxx', 'xx.xx'], { glace: 8 }),
-    craft('sculpture', 'Sculpture de glace', 'climat', { stone: 10 }, ['Glace'], ['igloo'], { climate: 'cimes', ground: 'n' }, ['..x..', '.xxx.', '..x..', '.xxx.', 'xxxxx'], { glace: 12 }),
+    craft('igloo', 'Igloo', 'climat', { wood: 10 }, ['Neige'], [], { climate: 'cimes', ground: 'n' }, ['..x.', 'xxxx', 'xxxx', 'xxxx'], { glace: 8 }),
+    craft('sculpture', 'Sculpture de glace', 'climat', { stone: 10 }, ['Glace'], ['igloo'], { climate: 'cimes', ground: 'n' }, ['..x.', '.xx.', '.xx.', 'xxxx', 'xxxx'], { glace: 12 }),
     // (les landes : le Cairn d'abord, le Vent est connu ; l'Enclos ensuite, le Mouton est loin, choix de l'auteur, 12 oct.)
-    craft('cairn', 'Cairn aux rubans', 'climat', { stone: 20 }, ['Vent'], [], { climate: 'landes', ground: 'lg' }, ['..x..', '.xxx.', '.xxx.', 'xxxxx'], { laine: 8 }),
-    craft('parc', 'Enclos à moutons', 'climat', { wood: 24 }, ['Mouton'], ['cairn'], { climate: 'landes', ground: 'lg' }, ['xxxx', 'x..x', 'x..x', 'xxxx'], { laine: 12 }),
-    craft('passerelle', 'Passerelle de roseaux', 'climat', { wood: 16 }, ['Marais'], [], { climate: 'marais', ground: 'x' }, ['xxxxx', 'xxxxx', '.x.x.'], { roseau: 8 }),
-    craft('heron', 'Héron de bois', 'climat', { wood: 14 }, ['Oiseau'], ['passerelle'], { climate: 'marais', ground: 'x' }, ['xx...', '.x...', '.xxxx', '..xx.', '..xx.'], { roseau: 12 }),
-    craft('tente', 'Tente nomade', 'climat', { wood: 12, food: 10 }, ['Tissu'], [], { climate: 'dunes', ground: 's' }, ['..x..', '.xxx.', 'xxxxx', 'xx.xx'], { sel: 8 }),
-    craft('cadransel', 'Cadran de sel', 'climat', { stone: 20 }, ['Sel'], ['tente'], { climate: 'dunes', ground: 's' }, ['.xxx.', 'xxxxx', 'xx.xx', 'xxxxx', '.xxx.'], { sel: 12 }),
-    craft('hamac', 'Hamac', 'climat', { wood: 14 }, ['Corde'], [], { climate: 'jungle', ground: 'jg' }, ['x...x', 'xx.xx', 'xxxxx'], { fruits: 8 }),
-    craft('totem', 'Totem', 'climat', { wood: 30 }, ['Jungle'], ['hamac'], { climate: 'jungle', ground: 'jg' }, ['xxx', '.x.', 'xxx', '.x.', 'xxx'], { fruits: 12 }),
-    craft('obelisque', 'Obélisque d’obsidienne', 'climat', { stone: 24 }, ['Obsidienne'], [], { climate: 'volcan', ground: 'ar' }, ['..x..', '.xxx.', '.xxx.', '.xxx.', 'xxxxx'], { obsidienne: 10 }),
-    craft('bassinchaud', 'Bassin chaud', 'climat', { stone: 20, water: 20 }, ['Vapeur'], ['obelisque'], { climate: 'volcan', ground: 'ar' }, ['.xxx.', 'xxxxx', 'xxxxx', '.xxx.'], { obsidienne: 12 })
+    craft('cairn', 'Cairn aux rubans', 'climat', { stone: 20 }, ['Vent'], [], { climate: 'landes', ground: 'lg' }, ['.xxx', 'xxxx', 'xxx.', 'x.x.'], { laine: 8 }),
+    craft('parc', 'Enclos à moutons', 'climat', { wood: 24 }, ['Mouton'], ['cairn'], { climate: 'landes', ground: 'lg' }, ['xxxx', 'xxxx', 'xxxx'], { laine: 12 }),
+    craft('passerelle', 'Passerelle de roseaux', 'climat', { wood: 16 }, ['Marais'], [], { climate: 'marais', ground: 'x' }, ['.xx..', 'xxxxx', 'xxxxx'], { roseau: 8 }),
+    craft('heron', 'Héron de bois', 'climat', { wood: 14 }, ['Oiseau'], ['passerelle'], { climate: 'marais', ground: 'x' }, ['.xx', 'xx.', 'xxx', 'xxx'], { roseau: 12 }),
+    craft('tente', 'Tente nomade', 'climat', { wood: 12, food: 10 }, ['Tissu'], [], { climate: 'dunes', ground: 's' }, ['.xx.', 'xxxx', 'xxxx', 'xxx.'], { sel: 8 }),
+    craft('cadransel', 'Cadran de sel', 'climat', { stone: 20 }, ['Sel'], ['tente'], { climate: 'dunes', ground: 's' }, ['..x..', 'xxxxx', 'xxxxx', '.xxx.'], { sel: 12 }),
+    craft('hamac', 'Hamac', 'climat', { wood: 14 }, ['Corde'], [], { climate: 'jungle', ground: 'jg' }, ['xxxx', 'xxxx', 'xxxx'], { fruits: 8 }),
+    craft('totem', 'Totem', 'climat', { wood: 30 }, ['Jungle'], ['hamac'], { climate: 'jungle', ground: 'jg' }, ['xxxx', '.xx.', '.xx.', '.xx.'], { fruits: 12 }),
+    craft('obelisque', 'Obélisque d’obsidienne', 'climat', { stone: 24 }, ['Obsidienne'], [], { climate: 'volcan', ground: 'ar' }, ['.xx.', '.xx.', '.xx.', 'xxx.', 'xxxx'], { obsidienne: 10 }),
+    craft('bassinchaud', 'Bassin chaud', 'climat', { stone: 20, water: 20 }, ['Vapeur'], ['obelisque'], { climate: 'volcan', ground: 'ar' }, ['..xx.', 'xxxxx', 'xxxxx', '.xxxx'], { obsidienne: 12 })
 ];
 const CRAFT_BY_ID = Object.fromEntries(CRAFTS.map(c => [c.id, c]));
 

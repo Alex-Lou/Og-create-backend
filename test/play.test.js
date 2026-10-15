@@ -580,7 +580,7 @@ test('créations d’île : assembler (pièces vérifiées), payer à la réussi
   await sql('UPDATE world_stock SET wood = 60, stone = 60, water = 60, food = 60 WHERE user_id = $1', [player.userId]);
   // Un assemblage : le gabarit et ses pièces ; une disposition fausse est refusée (rien payé), l'assemblage est rendu
   const { run } = (await start('cloture')).data;
-  assert.deepEqual(run.shape, ['x.x', 'xxx', 'x.x']);
+  assert.deepEqual(run.shape, ['xx.', 'xxx', '.xx']);
   assert.ok(run.pieces.length >= 2 && run.pieces.every(p => p.length >= 2));
   assert.equal((await finish(run.id, [{ piece: 0, rot: 0, x: 9, y: 9 }])).status, 400);
   assert.equal((await finish(run.id, solveCraft(run))).status, 404);
