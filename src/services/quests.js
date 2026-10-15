@@ -60,7 +60,7 @@ const QUESTS = [
     q('soupe', 'T', { kind: 'need', villager: 'foyer', what: 'manger' }, 15),
     // Le jour d’Agathe (choix de l'auteur, 11 oct.) : la cage de ses poules arrive par la mer, au bout de la plage ; on
     // l'ouvre, on attrape les poules (le jeu), on les nourrit toutes les trois ; puis leur poulailler, sa leçon à elle
-    // (poser une annexe) ; et la troisième nuit, avant Jovin. (Les œufs viendront plus tard, avec le coq.)
+    // (poser une annexe) ; et la troisième nuit, avant Nathan. (Les œufs viendront plus tard, avec le coq.)
     q('cage', 'T', { kind: 'cage' }, 10),
     q('poules', 'T', { kind: 'hens', need: 3 }, 10),
     q('poulailler', 'T', { kind: 'coop' }, 15),
@@ -76,12 +76,12 @@ const QUESTS = [
     // (ses trois torches, une par côté d'où venaient les égarés de la veillée : choix de l'auteur, 13 oct.)
     q('torches-rivet', 'T', { kind: 'craft', craft: 'torche', need: 3 }, 15),
     // La quatrième nuit (choix de l'auteur, 13 oct. : chaque personnage son jour, le suivant quand le joueur choisit de
-    // dormir) : le jour de Jovin finit autour du feu ; Léo sera trouvé au matin
+    // dormir) : le jour de Nathan finit autour du feu ; Léo sera trouvé au matin
     q('nuit-rivet', 'T', { kind: 'sleep', site: 'foyer' }, 0),
     q('eveil-ondin', 'T', { kind: 'wake', villager: 'puits' }, 10),
     q('souvenir-ondin', 'T', { kind: 'element', element: 'Pluie' }, 20),
     q('puits-ondin', 'T', { kind: 'level', site: 'puits', need: 1 }, 40, 'rare'),
-    // Acte I : la Vie et la lumière (Freya). D'abord le premier chemin (choix de l'auteur, 8 oct. : l'île neuve n'a que
+    // Acte I : la Vie et la lumière (Maerys). D'abord le premier chemin (choix de l'auteur, 8 oct. : l'île neuve n'a que
     // son sentier ; ses cases offertes le paient)
     q('chemin', 'I', { kind: 'link', from: 'puits', to: 'foyer' }, 15),
     q('lisiere', 'I', { kind: 'zone', zone: 'lisiere' }, 50),
@@ -91,14 +91,14 @@ const QUESTS = [
     q('bosquet', 'I', { kind: 'level', site: 'bosquet', need: 1 }, 40),
     q('lumiere', 'I', { kind: 'element', element: 'Lumière' }, 40),
     q('lanterne', 'I', { kind: 'craft', craft: 'lanterne' }, 60, 'rare'),
-    // Acte II : la matière, s'abriter (Saturnin)
+    // Acte II : la matière, s'abriter (Robby)
     q('colline', 'II', { kind: 'zone', zone: 'colline' }, 80),
     q('eveil-galet', 'II', { kind: 'wake', villager: 'carriere' }, 10),
     q('souvenir-galet', 'II', { kind: 'element', element: 'Pierre' }, 20),
     q('carriere', 'II', { kind: 'level', site: 'carriere', need: 1 }, 40),
     q('bois', 'II', { kind: 'element', element: 'Bois' }, 40),
     q('cabane', 'II', { kind: 'level', site: 'foyer', need: 2 }, 70, 'rare'),
-    // Acte III : se nourrir, explorer (Flore, la forge de Jovin)
+    // Acte III : se nourrir, explorer (Maggy, la forge de Nathan)
     // L'annexe vient après l'Abri : il faut un bâtiment au palier II (bible, mises à jour du lot H1)
     q('annexe', 'III', { kind: 'annex', need: 1 }, 50),
     q('jardins', 'III', { kind: 'zone', zone: 'jardins' }, 110),

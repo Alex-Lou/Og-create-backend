@@ -115,7 +115,7 @@ test('la quête active est la première pas encore faite ; à la fin, Brume se r
   assert.match(QUESTS.find(q => q.id === 'feu').say, /Rallume-les/);
   assert.deepEqual([first.id, first.act, first.step, first.total, first.kind, first.done], ['pages', 'T', 1, 73, 'element', false]);
   assert.equal(active(new Set(), facts({ elements: new Set([...facts().elements, 'Vent']) })).done, true);
-  // La lanterne de Jovin faite, on dort : Léo au matin, jamais le même jour (choix de l'auteur, 13 oct.)
+  // La lanterne de Nathan faite, on dort : Léo au matin, jamais le même jour (choix de l'auteur, 13 oct.)
   // (ses trois torches d'abord : choix de l'auteur, 13 oct.)
   const torches = active(new Set(['deco']), facts({ placedCount: { torche: 2 } }));
   assert.deepEqual([torches.id, torches.kind, torches.have, torches.need, torches.done], ['torches-rivet', 'craft', 2, 3, false]);

@@ -119,7 +119,7 @@ test('prodSteps : la part du Potager à chaque échéance ; un visiteur install�
     levels: { foyer: 1, potager: 1 }, zones: new Set(['coeur', 'jardins']), settlers: [],
     presence: { done: new Set(['puits-ondin']), blessed: false }, decor: [], filled: { potager: { manger: new Date(at(30)) } }
   };
-  // Flore : contente (sans créations autour), puis triste quand son repas échoit, il y a 6 h
+  // Maggy : contente (sans créations autour), puis triste quand son repas échoit, il y a 6 h
   const steps = prodSteps(island, base, lm, new Date(at(10)), T);
   assert.deepEqual(steps.map(s => [s.at, s.prod.potager]), [[at(10), 0], [at(6), -0.1]]);
   const made = productionAll(island.levels, { potager: new Date(at(20)) }, new Date(at(10)), T, { ...NO_BONUS, prod: { potager: -0.1 } }, NO_ANNEX, steps);
@@ -127,7 +127,7 @@ test('prodSteps : la part du Potager à chaque échéance ; un visiteur install�
   // Jamais récolté : la fenêtre part de zéro
   assert.equal(prodSteps(island, base, lm, null, T)[0].at, 0);
   // Un visiteur installé au Potager : sans créations autour, il n'est que content (rien ne change, rien à encaisser
-  // d'abord) ; avec trois créations autour du Potager, Flore et lui sont heureux : +10 % chacun
+  // d'abord) ; avec trois créations autour du Potager, Maggy et lui sont heureux : +10 % chacun
   const window = isl => prodSteps(isl, base, lm, new Date(at(10)), T);
   const settler = [{ id: 7, seed: 1234, site: 'potager', settled_at: new Date(T) }];
   assert.equal(sameSteps(steps, window({ ...island, settlers: settler })), true);

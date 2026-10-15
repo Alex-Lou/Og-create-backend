@@ -1,5 +1,5 @@
 // Le tutoriel de l'île neuve (bible du dépôt front, § 9) : la plage de Brumelune, le feu bâti avec Brume, puis Lorena et sa Récolte ;
-// un compte d'avant la v6 garde ses règles (le feu allumé d'office, Agathe après la Récolte, Jovin
+// un compte d'avant la v6 garde ses règles (le feu allumé d'office, Agathe après la Récolte, Nathan
 // après la soupe) et ne recule jamais
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -54,7 +54,7 @@ test('les trouvailles de la plage paient chacune leur leçon : deux bois et un g
     assert.ok(gives('veille', 'food') >= villagers.NEEDS.manger.cost.food);
 });
 
-test('un nouveau compte bâtit son feu ; Lorena vient au matin, Agathe après sa Récolte, Jovin après la troisième nuit', async () => {
+test('un nouveau compte bâtit son feu ; Lorena vient au matin, Agathe après sa Récolte, Nathan après la troisième nuit', async () => {
   const player = await newPlayer();
   const id = player.userId;
   const first = await view(player);
@@ -71,7 +71,7 @@ test('un nouveau compte bâtit son feu ; Lorena vient au matin, Agathe après sa
   assert.deepEqual([met(await view(player)), (await view(player)).brume.quest.id], [[], 'feu']);
   assert.equal((await api('POST', '/play/world/beasts/cage', {}, player)).status, 403);
   // Le feu réclamé : personne encore ; la première nuit passée : Lorena, puis sa Récolte fait venir Agathe. La
-  // soupe seule n'amène plus Jovin.
+  // soupe seule n'amène plus Nathan.
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'feu')`, [id]);
   assert.deepEqual(met(await view(player)), []);
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'nuit')`, [id]);
@@ -79,12 +79,12 @@ test('un nouveau compte bâtit son feu ; Lorena vient au matin, Agathe après sa
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'recolte'), ($1, 'veille'), ($1, 'soupe')`, [id]);
   const after = await view(player);
   assert.deepEqual([met(after).includes('ponton'), met(after).includes('foyer'), met(after).includes('atelier')], [true, true, false]);
-  // Le jour d’Agathe (la cage, ses poules, leur poulailler) ne fait pas encore venir Jovin : sa troisième nuit, si
+  // Le jour d’Agathe (la cage, ses poules, leur poulailler) ne fait pas encore venir Nathan : sa troisième nuit, si
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'cage'), ($1, 'poules'), ($1, 'poulailler')`, [id]);
   assert.equal(met(await view(player)).includes('atelier'), false);
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'nuit-cannelle')`, [id]);
   assert.equal(met(await view(player)).includes('atelier'), true);
-  // Le jour de Jovin (sa lanterne) ne fait pas encore venir Léo : sa quatrième nuit, si (choix de l'auteur, 13 oct.)
+  // Le jour de Nathan (sa lanterne) ne fait pas encore venir Léo : sa quatrième nuit, si (choix de l'auteur, 13 oct.)
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'deco')`, [id]);
   assert.equal(met(await view(player)).includes('puits'), false);
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'nuit-rivet')`, [id]);

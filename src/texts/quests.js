@@ -79,11 +79,11 @@ const QUEST_TEXTS = {
     },
     deco: {
         label: 'Assemble ta première lanterne',
-        say: 'Jovin a monté un établi : une porte de cabine, deux caisses. Il dit que c’est un début.'
+        say: 'Nathan a monté un établi : une porte de cabine, deux caisses. Il dit que c’est un début.'
     },
     'torches-rivet': {
-        label: 'Plante les trois torches de Jovin',
-        say: 'Ils sont venus de trois côtés, hier soir. Jovin a compté. Il compte tout.'
+        label: 'Plante les trois torches de Nathan',
+        say: 'Ils sont venus de trois côtés, hier soir. Nathan a compté. Il compte tout.'
     },
     'nuit-rivet': {
         label: 'Passe ta quatrième nuit',
@@ -110,7 +110,7 @@ const QUEST_TEXTS = {
         say: 'Le bois flotté ne suffira pas. À l’ouest, des arbres dorment sous la brume. Et une lueur, entre eux.'
     },
     'eveil-sylve': {
-        label: 'Apprivoise Freya',
+        label: 'Apprivoise Maerys',
         say: 'Quelqu’un vit dans ces arbres, et se cache. Une queue rousse t’a montré le chemin. Approche sans bruit.'
     },
     vie: {
@@ -118,12 +118,12 @@ const QUEST_TEXTS = {
         say: 'Air, Eau, Feu, Terre… Les quatre Souffles ensemble. Je crois que c’est ça, la Vie.'
     },
     'souvenir-sylve': {
-        label: 'Rends son souvenir à Freya : écris l’Arbre',
-        say: 'De la Vie naît la Plante, et de la Plante, l’Arbre. Freya se souviendra de sa forêt.'
+        label: 'Rends son souvenir à Maerys : écris l’Arbre',
+        say: 'De la Vie naît la Plante, et de la Plante, l’Arbre. Maerys se souviendra de sa forêt.'
     },
     bosquet: {
         label: 'Plante le Bosquet',
-        say: 'Freya ramassera le bois mort. Pas un arbre ne tombera : elle y veille.'
+        say: 'Maerys ramassera le bois mort. Pas un arbre ne tombera : elle y veille.'
     },
     lumiere: {
         label: 'Écris la Lumière',
@@ -138,12 +138,12 @@ const QUEST_TEXTS = {
         say: 'L’orage approche, et l’Abri demandera de la pierre. Du côté de la Colline, quelqu’un taille la pierre.'
     },
     'eveil-galet': {
-        label: 'Va trouver Saturnin',
+        label: 'Va trouver Robby',
         say: 'Il vit dans la fissure depuis des années. Il ne parle pas beaucoup. Il ne parle pas du tout, en fait.'
     },
     'souvenir-galet': {
-        label: 'Rends son souvenir à Saturnin : écris la Pierre',
-        say: 'Le Feu et la Terre font la Lave ; l’Air la refroidit… Saturnin, lui, a oublié.'
+        label: 'Rends son souvenir à Robby : écris la Pierre',
+        say: 'Le Feu et la Terre font la Lave ; l’Air la refroidit… Robby, lui, a oublié.'
     },
     carriere: {
         label: 'Ouvre la Fissure',
@@ -151,7 +151,7 @@ const QUEST_TEXTS = {
     },
     bois: {
         label: 'Écris le Bois',
-        say: 'Pour l’Abri, il faut du bois… sans faire pleurer Freya. L’Arbre et le Métal, peut-être ?'
+        say: 'Pour l’Abri, il faut du bois… sans faire pleurer Maerys. L’Arbre et le Métal, peut-être ?'
     },
     cabane: {
         label: 'Dresse l’Abri avant l’orage',
@@ -166,7 +166,7 @@ const QUEST_TEXTS = {
         say: 'Sept bouches, et la marée ne suffit plus. Au nord, une terre noire, et une barque de graines échouée.'
     },
     'eveil-melisse': {
-        label: 'Réveille Flore',
+        label: 'Réveille Maggy',
         say: 'Une jardinière dort sur sa boîte en fer. Elle la serre comme on serre un secret.'
     },
     potager: {
@@ -175,11 +175,11 @@ const QUEST_TEXTS = {
     },
     faubourg: {
         label: 'Achète Le Faubourg',
-        say: 'Jovin rêve d’une vraie forge. Il n’ose pas le dire. Il le dit quand même.'
+        say: 'Nathan rêve d’une vraie forge. Il n’ose pas le dire. Il le dit quand même.'
     },
     atelier: {
         label: 'Bâtis l’Atelier',
-        say: 'Le Métal et la Terre font le Fer. Jovin forgera les outils de tous.'
+        say: 'Le Métal et la Terre font le Fer. Nathan forgera les outils de tous.'
     },
     etoile: {
         label: 'Écris l’Étoile',
@@ -215,7 +215,7 @@ const QUEST_TEXTS = {
     },
     bete: {
         label: 'Écris une bête',
-        say: 'Freya dit que les bêtes attendent qu’on se souvienne d’elles.'
+        say: 'Maerys dit que les bêtes attendent qu’on se souvienne d’elles.'
     },
     voyageur: {
         label: 'Comble un voyageur',
@@ -231,7 +231,7 @@ const QUEST_TEXTS = {
     },
     serre: {
         label: 'Bâtis la Serre',
-        say: 'Sous le verre, tout pousse plus vite. Flore y sèmera ses graines étranges.'
+        say: 'Sous le verre, tout pousse plus vite. Maggy y sèmera ses graines étranges.'
     },
     maison: {
         label: 'Bâtis la Cabane',
@@ -267,7 +267,7 @@ const QUEST_TEXTS = {
     },
     ecriture: {
         label: 'Réapprends l’Écriture',
-        say: 'Saturnin lit les runes des Anciens. Le Langage et la Pierre… Réapprenons, nous aussi.'
+        say: 'Robby lit les runes des Anciens. Le Langage et la Pierre… Réapprenons, nous aussi.'
     },
     cle: {
         label: 'Trouve la clé du phare',
@@ -295,7 +295,7 @@ const QUEST_TEXTS = {
     },
     'phare-brume': {
         label: 'Allume le Phare de Brume',
-        say: 'Jovin a monté la lentille. Il ne manque que la flamme… Allume le Phare : je serai sa lumière.'
+        say: 'Nathan a monté la lentille. Il ne manque que la flamme… Allume le Phare : je serai sa lumière.'
     }
 };
 
