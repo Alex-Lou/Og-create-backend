@@ -6,7 +6,7 @@ const quests = require('../quests');
 const loot = require('../loot');
 const landmarks = require('../landmarks');
 const { random, RESOURCES, WATER_KEY, withWater } = require('./rules');
-const { itemsOf, levelsOf, stockOf, foundOf, claimedOf, helianeOfUser, addStock, balanceOf, writtenOf } = require('./reads');
+const { itemsOf, levelsOf, stockOf, foundOf, claimedOf, helianeOfUser, addStock, balanceOf, writtenOf, LOCK_PREFIX } = require('./reads');
 const { migrate } = require('./migrate');
 const T = require('../../texts/chests');
 const { OPEN_CHAPTER_FIRST } = require('../../texts/world');
@@ -78,8 +78,10 @@ async function grant(userId, source, rarity, conn, { wanted = null, streak = nul
 const CRATES = {
     aster: {
         after: 'nuit',
-        prize: { kind: 'stock', stock: { wood: 5 }, keepsakes: T.HERMINE_KEEPSAKES(quests.ENCLOS) },
-        crafts: { cloture: quests.ENCLOS }
+        prize: { kind: 'stock', stock: { wood: 5 }, keepsakes: T.HERMINE_KEEPSAKES(quests.ENCLOS, quests.ENCLOS_DOORS) },
+        crafts: { cloture: quests.ENCLOS, porte: quests.ENCLOS_DOORS },
+        // (ses portes ont leur verrou : une ligne de world_items « verrou:<id> », comme une porte verrouillée à l'établi)
+        locked: new Set(['porte'])
     }
 };
 async function openCrate(userId, id) {
@@ -93,7 +95,12 @@ async function openCrate(userId, id) {
         if (!added.rows.length) return db.rollback({ status: 409, message: T.CRATE_OPEN });
         await addStock(userId, prize.stock, conn);
         for (const [craft, n] of Object.entries(CRATES[id].crafts || {})) {
-            for (let i = 0; i < n; i++) await conn.query('INSERT INTO world_crafts (user_id, craft) VALUES ($1, $2)', [userId, craft]);
+            for (let i = 0; i < n; i++) {
+                const { rows: [row] } = await conn.query('INSERT INTO world_crafts (user_id, craft) VALUES ($1, $2) RETURNING id', [userId, craft]);
+                if (CRATES[id].locked && CRATES[id].locked.has(craft)) {
+                    await conn.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'verrou')`, [userId, `${LOCK_PREFIX}${row.id}`]);
+                }
+            }
         }
         return { chest: { source: `caisse:${id}`, rarity: 'commun', prize }, coins: await balanceOf(userId, conn) };
     });

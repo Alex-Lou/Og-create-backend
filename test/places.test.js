@@ -115,7 +115,7 @@ test.describe('île', () => {
     assert.deepEqual(start.sites.filter(s => !s.hidden).map(s => s.id), ['foyer']);
     assert.deepEqual(start.camp.map(c => c.id), ['hirondelle']);
     // Le suivi des quêtes montre tout le tutoriel : vingt-deux étapes, de la première page au premier chemin
-    assert.deepEqual([start.brume.steps.length, start.brume.steps[0].id, start.brume.steps.at(-1).id], [24, 'pages', 'chemin']);
+    assert.deepEqual([start.brume.steps.length, start.brume.steps[0].id, start.brume.steps.at(-1).id], [25, 'pages', 'chemin']);
     assert.ok(start.brume.steps.every(st => st.label && st.done === false));
     // Le feu fait : personne encore (la première nuit se passe seul) ; la nuit passée : Hermine arrive, son Ponton et
     // son camp avec elle

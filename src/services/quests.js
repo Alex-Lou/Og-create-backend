@@ -27,8 +27,10 @@ const BEASTS = ['Poisson', 'Méduse', 'Grenouille', 'Oiseau', 'Tortue', 'Papillo
 
 // (son titre et ce qu'en dit Brume : texts/quests.js)
 const q = (id, act, goal, coins, chest) => ({ id, act, goal, coins, ...QUEST_TEXTS[id], ...(chest ? { chest } : {}) });
-// Les piquets de l'enclos d'Hermine, autour du Feu (quête des clôtures)
-const ENCLOS = 13;
+// Les piquets de l'enclos d'Hermine, à deux cases du Feu (quête des clôtures ; choix de l'auteur, 15 oct. : une rangée
+// libre dedans, pour y mettre ce qu'on défend), et ses portes, une sur chaque sentier qui le traverse (quête des portes)
+const ENCLOS = 20;
+const ENCLOS_DOORS = 2;
 const QUESTS = [
     // Prologue : Brume accompagne une action à la fois jusqu'à la première nuit. Hermine ouvre ensuite sa propre leçon
     // par la Récolte.
@@ -51,6 +53,7 @@ const QUESTS = [
     // (l'enclos du camp, choix de l'auteur, 13 oct. : ses piquets, dans sa caisse (world/chests.js, CRATES), un par case
     // autour de la grande emprise du Feu, le sentier d'Hermine laissé libre ; une clôture barre la route d'un égaré, nights.js)
     q('clotures', 'T', { kind: 'craft', craft: 'cloture', need: ENCLOS }, 15),
+    q('portes', 'T', { kind: 'craft', craft: 'porte', need: ENCLOS_DOORS }, 10),
     // La deuxième nuit (choix de l'auteur, 10 oct. : un personnage par jour) : la journée d'Hermine finit autour du feu ;
     // Marcelle arrivera au matin
     q('veille', 'T', { kind: 'sleep', site: 'foyer' }, 0),
@@ -301,6 +304,6 @@ function actStartsOf(rows) {
 const { RESTED } = require('../texts/brume');
 
 module.exports = {
-    QUESTS, ENCLOS, LEGACY, QUEST_CHESTS, BEASTS, GUIDED_INK, FIRST_NIGHT_DONE,
+    QUESTS, ENCLOS, ENCLOS_DOORS, LEGACY, QUEST_CHESTS, BEASTS, GUIDED_INK, FIRST_NIGHT_DONE,
     reachOf, doneOf, firstNightDoneOf, currentOf, progressOf, active, boardOf, actsDoneOf, actStartsOf, tutorialStepsOf, inTutorial
 };

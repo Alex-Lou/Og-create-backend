@@ -4,7 +4,7 @@
 // (services/world/creations.js).
 
 // Sols des règles de pose, en clair
-const GROUND_TEXT = { gm: 'sur l’herbe', s: 'sur le sable', n: 'sur la neige', lg: 'sur la lande', x: 'dans le marais', jg: 'dans la jungle', ar: 'sur la cendre ou la roche', gsmpk: 'sur l’herbe, le sable ou un chemin' };
+const GROUND_TEXT = { gm: 'sur l’herbe', s: 'sur le sable', n: 'sur la neige', lg: 'sur la lande', x: 'dans le marais', jg: 'dans la jungle', ar: 'sur la cendre ou la roche', gsmpkt: 'sur l’herbe, le sable ou un chemin' };
 
 // Règle de pose (fiche) : rule (« Se pose » + les morceaux, séparés par des virgules), ou anywhere
 const PLACE = {

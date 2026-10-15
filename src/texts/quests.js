@@ -39,6 +39,11 @@ const QUEST_TEXTS = {
         label: 'Entoure le feu d’un enclos',
         say: 'La nuit, des égarés sortent de ma brume. Une clôture autour du feu… et ils s’arrêtent, je crois.'
     },
+    // (choix de l'auteur, 15 oct. : les sentiers traversent l'enclos ; texte à valider)
+    portes: {
+        label: 'Pose les portes de l’enclos',
+        say: 'Les sentiers passent toujours. Hermine a deux portes, avec leurs verrous.'
+    },
     veille: {
         label: 'Passe ta deuxième nuit',
         say: 'Deux, ce soir, autour du feu. Dors : je veille.'

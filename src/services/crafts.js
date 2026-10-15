@@ -37,7 +37,7 @@ const craft = (id, name, tier, cost, elements, after, place, shape, spent = {}) 
 const CRAFTS = [
     craft('cloture', 'Clôture', 'start', { wood: 8 }, [], [], {}, ['x.x', 'xxx', 'x.x']),
     // (la porte d'un enclos, choix de l'auteur, 15 oct. : dans le mur, sentiers compris ; son verrou à part, LOCK_COST)
-    craft('porte', 'Porte', 'start', { wood: 10 }, [], ['cloture'], { ground: 'gsmpk', wall: true }, ['xxx', 'x.x', 'xxx']),
+    craft('porte', 'Porte', 'start', { wood: 10 }, [], ['cloture'], { ground: 'gsmpkt', wall: true }, ['xxx', 'x.x', 'xxx']),
     // (la torche de bois flotté, choix de l'auteur, 13 oct. : les trois de Jovin, au jour 4 ; une lumière de la nuit,
     // nights.js)
     craft('torche', 'Torche', 'start', { wood: 2 }, ['Feu'], [], {}, ['x', 'x', 'x', 'x']),
