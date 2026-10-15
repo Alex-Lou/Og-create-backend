@@ -30,6 +30,8 @@ const FORMES = {
     barbe: ['sans', 'malRase', 'courte', 'collier', 'bouc', 'pleine'],
     moustache: ['sans', 'fine', 'epaisse', 'guidon', 'gauloise'],
     bouche: ['douce', 'sourire', 'malice', 'serieuse'],
+    // l'expression générale du visage, au repos (choix de l'auteur, 15 oct. : neutre par défaut, au joueur de choisir)
+    expression: ['neutre', 'content', 'soulage', 'triste', 'surpris', 'gene', 'fache'],
     rousseur: ['non', 'legere', 'oui', 'dense', 'nez'],
     menton: ['doux', 'fin', 'court', 'fort', 'fendu'],
     age: ['jeune', 'adulte', 'mur', 'age'],
@@ -49,13 +51,13 @@ const FORMES = {
 // Chaque choix et ce dans quoi il se prend : une forme, ou un nuancier
 const CHOIX = {
     genre: 'formes', menton: 'formes', age: 'formes', cicatrice: 'formes', taille: 'formes', silhouette: 'formes', peau: 'peau', visage: 'formes', yeux: 'yeux', formeYeux: 'formes', cils: 'formes',
-    sourcils: 'formes', barbe: 'formes', moustache: 'formes', bouche: 'formes', levres: 'levres', rousseur: 'formes', joues: 'formes', grain: 'formes',
+    sourcils: 'formes', barbe: 'formes', moustache: 'formes', bouche: 'formes', expression: 'formes', levres: 'levres', rousseur: 'formes', joues: 'formes', grain: 'formes',
     coupe: 'formes', cheveux: 'cheveux', meches: 'formes', couleurMeches: 'cheveux', haut: 'formes', couleurHaut: 'tissus', motifHaut: 'formes', couleurHaut2: 'tissus',
     bas: 'formes', couleurBas: 'tissus', motifBas: 'formes', couleurBas2: 'tissus', chaussures: 'tissus', formeChaussures: 'formes'
 };
 const DEFAUT = {
     genre: 'femme', menton: 'doux', age: 'adulte', cicatrice: 'sans', taille: 'moyenne', silhouette: 'moyenne', peau: 'peche', visage: 'rond', yeux: 'brun', formeYeux: 'ronds', cils: 'sans', sourcils: 'fins',
-    barbe: 'sans', moustache: 'sans', bouche: 'douce', levres: 'naturelles', rousseur: 'non', joues: 'roses', grain: 'non', coupe: 'milongue', cheveux: 'brun', meches: 'sans',
+    barbe: 'sans', moustache: 'sans', bouche: 'douce', expression: 'neutre', levres: 'naturelles', rousseur: 'non', joues: 'roses', grain: 'non', coupe: 'milongue', cheveux: 'brun', meches: 'sans',
     couleurMeches: 'blond', haut: 'tshirt', couleurHaut: 'corail', motifHaut: 'uni', couleurHaut2: 'soleil', bas: 'pantalon', couleurBas: 'jean', motifBas: 'uni', couleurBas2: 'marine', chaussures: 'cuir', formeChaussures: 'souliers'
 };
 // Les accessoires : [emplacement, zones de couleur (t : tissu, m : métal), couleurs par défaut, gratuit]
