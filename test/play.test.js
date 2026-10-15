@@ -2394,6 +2394,8 @@ test('l’enclos de Marcelle se trace même sans clôture jamais assemblée (un 
   const before = (await view()).crafts.catalog.find(c => c.id === 'cloture');
   assert.deepEqual([before.made, before.traceable, before.spots.length], [0, false, 0]);
   assert.equal((await api('POST', '/play/world/craft/line', { craft: 'cloture', cells: [[93, 93]] }, player)).status, 409);
+  // (hors d'une leçon des clôtures, un piquet ne se défait pas)
+  assert.equal((await api('POST', '/play/world/craft/unpose', { x: 93, y: 93 }, player)).status, 409);
   // À l'enclos de Marcelle : le trait est permis, ses piquets fabriqués et payés en passant
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'abri-cannelle')`, [player.userId]);
   const yard = await view();
@@ -2401,6 +2403,10 @@ test('l’enclos de Marcelle se trace même sans clôture jamais assemblée (un 
   assert.deepEqual([yard.brume.quest.id, fence.made, fence.traceable, fence.spots.length > 0], ['enclos-cannelle', 0, true, true]);
   const line = await api('POST', '/play/world/craft/line', { craft: 'cloture', cells: [[fence.spots[0].x, fence.spots[0].y]] }, player);
   assert.deepEqual([line.status, line.data.placed, line.data.world.stock.wood], [200, 1, 192], JSON.stringify(line.data));
+  // Défait pendant la leçon : le piquet payé disparaît, ses 8 bois sont rendus (choix de l'auteur, 15 oct.)
+  const undone = await api('POST', '/play/world/craft/unpose', { x: fence.spots[0].x, y: fence.spots[0].y }, player);
+  const left = undone.data.world.crafts.catalog.find(c => c.id === 'cloture');
+  assert.deepEqual([undone.status, undone.data.refund, undone.data.world.stock.wood, left.made, left.reserve], [200, { wood: 8 }, 200, 0, 0], JSON.stringify(undone.data));
 });
 
 test('les mots d’Héliane : la première bouteille ouverte pendant un acte porte son mot (bible, § 6.13)', async () => {
@@ -2588,6 +2594,12 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Hermine ouvre
   assert.deepEqual([fence.reserve, fence.line], [13, true]);
   const ring = [[97, 91], [98, 91], [99, 91], [100, 91], [101, 91], [101, 92], [101, 93], [101, 94], [101, 95], [100, 95], [99, 95], [97, 94], [97, 93]];
   for (const [x, y] of ring.slice(0, 2)) assert.equal((await api('POST', '/play/world/craft/place', { craft: 'cloture', x, y }, player)).status, 200);
+  // (un piquet de sa caisse, défait pendant la leçon : il retourne dans la réserve, rien n'est rendu ; puis reposé)
+  const back = await api('POST', '/play/world/craft/unpose', { x: 98, y: 91 }, player);
+  assert.deepEqual([back.status, back.data.refund, back.data.world.crafts.catalog.find(c => c.id === 'cloture').reserve, back.data.world.stock.wood],
+    [200, undefined, 12, fences.stock.wood], JSON.stringify(back.data));
+  assert.equal((await api('POST', '/play/world/craft/unpose', { x: 98, y: 91 }, player)).status, 404);
+  assert.equal((await api('POST', '/play/world/craft/place', { craft: 'cloture', x: 98, y: 91 }, player)).status, 200);
   // (un tracé mal formé, une création qui ne se trace pas : refusés)
   assert.equal((await api('POST', '/play/world/craft/line', { craft: 'cloture', cells: [[97, 91.5]] }, player)).status, 400);
   assert.equal((await api('POST', '/play/world/craft/line', { craft: 'lanterne', cells: [[97, 92]] }, player)).status, 400);

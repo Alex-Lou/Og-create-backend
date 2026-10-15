@@ -59,9 +59,11 @@ const WORKBENCH_FIRST = name => `Fabrique d’abord « ${name} » à l’établi
 const CELL_TAKEN = 'Case déjà prise.';
 const NOTHING_TO_PLACE = 'Rien à poser.';
 const NO_CRAFT_HERE = 'Aucune création sur cette case.';
+// (défaire un piquet : seulement pendant une leçon des clôtures du tutoriel)
+const UNPOSE_LESSON_ONLY = 'Un piquet ne se défait que pendant la leçon de l’enclos.';
 
 module.exports = {
     GROUND_TEXT, PLACE, TIER_LOCK, MAKE_FIRST, KNOW_HOW, NEED_FINDS, SPOT, LEAVE_BLOCK, ASSEMBLY_ERRORS, CRAFT_UNKNOWN,
     ASSEMBLY_RETURNED, ASSEMBLY_LATE, ASSEMBLY_REFUSED, NONE_IN_RESERVE, NOT_A_LINE, WORKBENCH_FIRST, CELL_TAKEN,
-    NOTHING_TO_PLACE, NO_CRAFT_HERE
+    NOTHING_TO_PLACE, NO_CRAFT_HERE, UNPOSE_LESSON_ONLY
 };

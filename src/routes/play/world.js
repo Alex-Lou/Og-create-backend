@@ -129,6 +129,13 @@ router.post('/world/craft/store', withAccount(async (req, res, owner, b) => {
     if (!cellOk(x, y)) return res.status(400).json({ message: INVALID.cell });
     await craftDone(res, owner, b, await world.storeCraft(owner.id, x, y));
 }));
+// Un piquet défait pendant une leçon des clôtures : rendu à la réserve (celui d'une caisse), ou son coût rendu → { refund? }
+router.post('/world/craft/unpose', withAccount(async (req, res, owner, b) => {
+    const x = Number(req.body.x), y = Number(req.body.y);
+    if (!cellOk(x, y)) return res.status(400).json({ message: INVALID.cell });
+    const done = await world.unposeCraft(owner.id, x, y);
+    await craftDone(res, owner, b, done, done.refund ? { refund: done.refund } : {});
+}));
 
 // Chemins : tracer et effacer des cases ([[x, y]] : world/paths.js)
 router.post('/world/paths', withAccount(async (req, res, owner, b) => {

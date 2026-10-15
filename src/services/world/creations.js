@@ -8,7 +8,7 @@ const quests = require('../quests');
 const landmarks = require('../landmarks');
 const finds = require('../finds');
 const { SIZE, CRAFT_TTL_MS, keyOf } = require('./rules');
-const { annexesOf, levelsOf, stockOf, zonesOf, findsOf, spendFinds, craftsOf, placedOf, madeOf } = require('./reads');
+const { annexesOf, levelsOf, stockOf, zonesOf, findsOf, spendFinds, craftsOf, placedOf, madeOf, addStock } = require('./reads');
 const { migrate } = require('./migrate');
 const { livesHere, presenceOf } = require('./people');
 const { STATIC, footprintAt, inFootprintAt, placesOf } = require('./places');
@@ -68,6 +68,8 @@ const tutorialOf = presence => (questNow(presence) === LESSON ? crafts.TUTORIAL_
 // compte d'avant les clôtures d'Hermine y arrive sans piquet : il n'est jamais lâché)
 const FENCE_LESSON = 'enclos-cannelle';
 const freeTraceOf = presence => (questNow(presence) === FENCE_LESSON ? new Set(['cloture']) : new Set());
+// Les leçons des clôtures du tutoriel (l'enclos d'Hermine, celui de Marcelle) : un piquet posé s'y défait (unposeCraft)
+const FENCE_LESSONS = new Set(['clotures', FENCE_LESSON]);
 // Une création en ligne se trace-t-elle ? (la première assemblée à la main, ou la leçon de l'enclos de Marcelle)
 const traceable = (id, made, free) => Boolean(made[id] || free.has(id));
 
@@ -329,6 +331,32 @@ async function storeCraft(userId, x, y) {
     });
 }
 
+// Défait un piquet posé pendant une leçon des clôtures (choix de l'auteur, 15 oct. : ↶ jusqu'au premier, tant que
+// l'enclos n'est pas validé, le coût rendu). Un piquet donné par la caisse d'un personnage (fabriqué dans la transaction
+// qui l'a ouverte : même instant) retourne dans la réserve ; un piquet payé est défait, et son coût rendu.
+// { refund?: { ressource: nombre }, coins? } ou { status, message }
+async function unposeCraft(userId, x, y) {
+    await migrate(userId);
+    return db.transaction(async conn => {
+        if (!FENCE_LESSONS.has(questNow(await presenceOf(userId, conn)))) return db.rollback({ status: 409, message: T.UNPOSE_LESSON_ONLY });
+        const stock = await stockOf(userId, conn, true);
+        const placed = placedOf(await craftsOf(userId, conn));
+        const row = placed.find(r => r.x === x && r.y === y && r.craft === 'cloture');
+        if (!row) return db.rollback({ status: 404, message: T.NO_CRAFT_HERE });
+        const needed = crafts.leaveBlock(row, null, null, placed);
+        if (needed) return db.rollback({ status: 409, message: needed });
+        const done = await setSpot(userId, conn, stock, row, null, null);
+        const { rowCount: gift } = await conn.query(
+            `SELECT 1 FROM world_crafts c JOIN world_chests k ON k.user_id = c.user_id AND k.source LIKE 'caisse:%' AND k.opened_at = c.made_at
+             WHERE c.id = $1`, [row.id]);
+        if (gift) return done;
+        const refund = crafts.CRAFT_BY_ID[row.craft].cost;
+        await conn.query('DELETE FROM world_crafts WHERE id = $1', [row.id]);
+        await addStock(userId, refund, conn);
+        return { ...done, refund };
+    });
+}
+
 // Pivote une création posée (miroir) : rien d'autre ne change. {} ou { status, message }
 async function turnCraft(userId, x, y, flip) {
     await migrate(userId);
@@ -338,5 +366,5 @@ async function turnCraft(userId, x, y, flip) {
 
 module.exports = {
     craftCtx, craftSpots, stowCrafts, epreuvesOf, craftsView, startCraft, finishCraft, placeCraft, placeLine, fenceRingOf, moveCraft,
-    storeCraft, turnCraft
+    storeCraft, unposeCraft, turnCraft
 };
