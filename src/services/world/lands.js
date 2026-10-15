@@ -135,22 +135,29 @@ async function pickUp(userId, spotId, now = Date.now()) {
     return db.transaction(async conn => {
         await stockOf(userId, conn, true);
         // (pas encore rendue par la mer : les coquillages attendent le jour d’Agathe)
-        if (!pickups.shownFor(spot, (await presenceOf(userId, conn)).done)) return db.rollback({ status: 404, message: T.NOTHING_HERE });
-        if (!(await zonesOf(userId, conn)).has(map.zoneAt(spot.x, spot.y))) return db.rollback({ status: 403, message: BUY_ZONE_FIRST });
-        // (une annexe ou une création posée sur sa case la cache : rien à ramasser)
-        const { rows: covered } = await conn.query(
-            `SELECT 1 FROM world_annexes WHERE user_id = $1 AND x = $2 AND y = $3
-             UNION ALL SELECT 1 FROM world_crafts WHERE user_id = $1 AND x = $2 AND y = $3 LIMIT 1`, [userId, spot.x, spot.y]);
-        if (covered.length) return db.rollback({ status: 404, message: T.NOTHING_HERE });
-        const wait = finds.readyIn((await depositsOf(userId, conn)).get(spot.id), now, pickups.REGROW_MS);
+        const { done } = await presenceOf(userId, conn);
+        if (!pickups.shownFor(spot, done)) return db.rollback({ status: 404, message: T.NOTHING_HERE });
+        // Au tutoriel, à sa case : dans un quartier à soi, pas cachée par une annexe ou une création posée dessus
+        // (ensuite, la marée ne la laisse que sur une case libre d'un quartier à soi : pickups.shoreOf)
+        if (!done.has(pickups.TUTORIAL_LAST)) {
+            if (!(await zonesOf(userId, conn)).has(map.zoneAt(spot.x, spot.y))) return db.rollback({ status: 403, message: BUY_ZONE_FIRST });
+            const { rows: covered } = await conn.query(
+                `SELECT 1 FROM world_annexes WHERE user_id = $1 AND x = $2 AND y = $3
+                 UNION ALL SELECT 1 FROM world_crafts WHERE user_id = $1 AND x = $2 AND y = $3 LIMIT 1`, [userId, spot.x, spot.y]);
+            if (covered.length) return db.rollback({ status: 404, message: T.NOTHING_HERE });
+        }
+        const at = (await depositsOf(userId, conn)).get(spot.id);
+        const wait = finds.readyIn(at, now, pickups.REGROW_MS);
         if (wait > 0) return db.rollback({ status: 409, message: T.SEA_BRINGS_MORE(Math.ceil(wait / 60000)) });
-        const { gives } = pickups.KINDS[spot.kind];
+        // (sa sorte à cette marée : celle de sa source, après le tutoriel)
+        const kind = pickups.kindOf({ userId, done, spot, at });
+        const { gives } = pickups.KINDS[kind];
         await conn.query('UPDATE world_stock SET stone = stone + $2, wood = wood + $3, water = water + $4, food = food + $5 WHERE user_id = $1',
             [userId, gives.stone || 0, gives.wood || 0, gives.water || 0, gives.food || 0]);
         await conn.query(
             `INSERT INTO world_deposits (user_id, deposit, gathered_at) VALUES ($1, $2, $3)
              ON CONFLICT (user_id, deposit) DO UPDATE SET gathered_at = EXCLUDED.gathered_at`, [userId, spot.id, new Date(now)]);
-        return { kind: spot.kind, gives };
+        return { kind, gives };
     });
 }
 

@@ -55,7 +55,7 @@ const { sheltersOf, sheltersView, buildShelter } = require('./world/shelters');
 const { annexSpotOk, annexSpots, annexesView, placeAnnex, moveAnnex, poseAnnex } = require('./world/annexPlots');
 const { campOfUser, cellsOfCamp } = require('./world/camp');
 const paths = require('./world/paths');
-const { PLAGE, BEACH_BEFORE, placesOf, footprintAt } = require('./world/places');
+const { PLAGE, BEACH_BEFORE, placesOf, footprintAt, inSiteAt } = require('./world/places');
 const { siteSpots, moveSite } = require('./world/moves');
 const gridLevels = require('./levels');
 const stars = require('./world/stars');
@@ -516,10 +516,13 @@ async function view(userId, owned, book) {
         // grâce aux créations de climat de leur quartier
         deposits: finds.DEPOSITS.filter(d => isKnown(map.ZONE_BY_ID[d.zone], discovered))
             .map(d => ({ id: d.id, zone: d.zone, find: d.find, x: d.x, y: d.y, readyIn: finds.readyIn(gathered.get(d.id), Date.now(), presence.blessed ? anya.BLESSING.regrowMs : finds.REGROW_MS), bonus: craftBonusOf(decor, d.zone) })),
-        // Ce que la mer a rendu sur la plage de Brumelune (pickups.js) : case, sorte, quartier, temps avant qu'il en revienne (ms, 0 : prêt) ; une
-        // case où le joueur a déjà posé une annexe ou une création n'en montre pas
-        pickups: pickups.SPOTS.filter(p => !taken.has(keyOf(p)) && pickups.shownFor(p, presence.done))
-            .map(p => ({ id: p.id, kind: p.kind, zone: map.zoneAt(p.x, p.y), x: p.x, y: p.y, readyIn: finds.readyIn(gathered.get(p.id), Date.now(), pickups.REGROW_MS) })),
+        // Ce que la mer a rendu sur la plage de Brumelune (pickups.js) : case, sorte, quartier, temps avant qu'il en revienne (ms, 0 : prêt) ; au
+        // tutoriel à ses cases (une case où le joueur a posé une annexe ou une création n'en montre pas), ensuite où la
+        // marée l'a laissé, sur une case libre
+        pickups: pickups.shoreOf({
+            userId, done: presence.done, gathered, owned: zones, wreck: camp.find(c => c.id === 'hirondelle') || { x: 96, y: 96 },
+            free: (x, y) => !taken.has(keyOf({ x, y })) && !inSiteAt(places, x, y) && !landmarks.isLandmark(x, y) && !finds.isDeposit(x, y)
+        }).map(p => ({ id: p.id, kind: p.kind, zone: map.zoneAt(p.x, p.y), x: p.x, y: p.y, readyIn: finds.readyIn(p.at, Date.now(), pickups.REGROW_MS) })),
         // Expédition en route : vers quel quartier, retour dans combien de temps (ms)
         expedition: going ? { zone: going.zone, endsIn: Math.max(0, new Date(going.ends_at).getTime() - Date.now()) } : null,
         sites,

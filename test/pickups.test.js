@@ -169,3 +169,63 @@ test('le verrou parlant : le palier suivant dit les pages jusqu’à son plan et
   const written = (await api('GET', '/play/book?follow=Feu', null, player)).data;
   assert.notEqual(written.ariane && written.ariane.followed, true);
 });
+
+// Après le tutoriel (choix de l'auteur, 15 oct. : la plage ne doit pas être prévisible), chaque trouvaille revient
+// ailleurs et d'une autre source à chaque marée
+test('après le tutoriel, la mer rend ses trouvailles ailleurs à chaque marée, sur du sable libre au bord de l’eau ou autour de l’épave', () => {
+  const pickups = require('../src/services/pickups');
+  const map = require('../src/services/worldMap');
+  const done = new Set(['veille', 'chemin']);
+  const owned = new Set(['coeur']);
+  const wreck = { x: 96, y: 96 };
+  const shore = (userId, gathered = new Map(), free = () => true) => pickups.shoreOf({ userId, done, gathered, owned, free, wreck });
+  const first = shore(7);
+  // les cinq, chacune sur sa case : du sable du cœur, au bord de l'eau (ou autour de l'épave, la source de « greve-galet-1 »)
+  assert.deepEqual(first.map(p => p.id), pickups.SPOTS.map(s => s.id));
+  assert.equal(new Set(first.map(p => `${p.x},${p.y}`)).size, 5);
+  for (const p of first) {
+    assert.equal(map.groundAt(p.x, p.y), 's', p.id);
+    assert.equal(map.zoneAt(p.x, p.y), 'coeur', p.id);
+    if (p.id === 'greve-galet-1') assert.ok(Math.max(Math.abs(p.x - 96.5), Math.abs(p.y - 96.5)) <= 3.5, 'près de l’épave');
+    else assert.ok([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => map.heightAt(p.x + dx, p.y + dy) < 0 || map.groundAt(p.x + dx, p.y + dy) === 'w'), `${p.id} au bord de l’eau`);
+    assert.ok(Object.hasOwn(pickups.SOURCES.laisse.weights, p.kind) || Object.hasOwn(pickups.SOURCES.anse.weights, p.kind));
+  }
+  // le même tirage à chaque lecture ; un autre joueur, une autre plage
+  assert.deepEqual(shore(7), first);
+  assert.notDeepEqual(shore(8).map(p => [p.x, p.y]), first.map(p => [p.x, p.y]));
+  // ramassée, elle revient ailleurs, et pas toujours la même chose (sur vingt marées : au moins dix cases, deux sortes)
+  for (const id of ['greve-bois-1', 'greve-galet-1', 'greve-coquillage-1']) {
+    const tides = Array.from({ length: 20 }, (_, k) => shore(7, new Map([[id, new Date(Date.UTC(2026, 9, 15, k + 1))]])).find(p => p.id === id));
+    assert.ok(new Set(tides.map(p => `${p.x},${p.y}`)).size >= 10, `${id} change de place`);
+    assert.ok(new Set(tides.map(p => p.kind)).size >= 2, `${id} change de sorte`);
+  }
+  // ramasser l'une ne fait bouger aucune autre ; bâtir ailleurs non plus
+  const picked = shore(7, new Map([['greve-bois-1', new Date(Date.UTC(2026, 9, 15, 3))]]));
+  assert.deepEqual(picked.filter(p => p.id !== 'greve-bois-1'), first.filter(p => p.id !== 'greve-bois-1'));
+  const elsewhere = new Set(['80,95', '100,98', '104,98'].filter(k => !first.some(p => `${p.x},${p.y}` === k)));
+  assert.deepEqual(shore(7, new Map(), (x, y) => !elsewhere.has(`${x},${y}`)), first);
+  // une case prise (une création, un chemin…) n'en reçoit pas
+  const taken = new Set(first.map(p => `${p.x},${p.y}`));
+  assert.ok(shore(7, new Map(), (x, y) => !taken.has(`${x},${y}`)).every(p => !taken.has(`${p.x},${p.y}`)));
+  // la sorte au ramassage est celle de la vue, à chaque marée
+  for (const p of first) assert.equal(pickups.kindOf({ userId: 7, done, spot: pickups.SPOT_BY_ID[p.id], at: null }), p.kind);
+  // au tutoriel, rien ne bouge
+  const tuto = pickups.shoreOf({ userId: 7, done: new Set(['veille']), gathered: new Map(), owned, free: () => true, wreck });
+  assert.deepEqual(tuto.map(p => [p.id, p.kind, p.x, p.y]), pickups.SPOTS.map(s => [s.id, s.kind, s.x, s.y]));
+});
+
+test('après le tutoriel, la plage de l’API : ramasser rend la sorte que la vue montrait, la trouvaille revient ailleurs', async () => {
+  const player = await newPlayer();
+  const id = player.userId;
+  const order = require('../src/services/quests').QUESTS.map(q => q.id);
+  await sql(`INSERT INTO world_quests (user_id, quest) SELECT $1, unnest($2::text[]) ON CONFLICT DO NOTHING`, [id, order.slice(0, order.indexOf('chemin') + 1)]);
+  const before = (await view(player)).pickups;
+  assert.equal(before.length, 5);
+  const one = before.find(p => !p.readyIn);
+  const done = await pick(player, one.id);
+  assert.equal(done.status, 200);
+  assert.equal(done.data.kind, one.kind);
+  const again = done.data.world.pickups.find(p => p.id === one.id);
+  assert.ok(again.readyIn > 0);
+  assert.equal((await pick(player, one.id)).status, 409);
+});
