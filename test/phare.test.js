@@ -64,6 +64,23 @@ test('la traversée manquée n’est plus due une fois l’acte IV fini (un comp
   assert.deepEqual(scenes, { seen: [], due: ['conseil'] });
 });
 
+test('l’intérieur du phare à la clé trouvée (plus dû l’acte VI fini) ; le navire au Phare de Brume allumé', async () => {
+  const player = await newPlayer();
+  const view = async () => (await api('GET', '/play/world', null, player)).data.brume.scenes;
+  const seen = id => api('POST', '/play/world/scene', { id }, player);
+  assert.equal((await seen('phare')).status, 409);
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'cle')`, [player.userId]);
+  assert.deepEqual((await view()).due, ['conseil', 'phare']);
+  assert.equal((await seen('phare')).status, 200);
+  assert.equal((await seen('navire')).status, 409);
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'phare-brume')`, [player.userId]);
+  assert.deepEqual(await view(), { seen: ['phare'], due: ['conseil', 'navire'] });
+  // (un compte déjà au-delà de l'acte VI sans avoir vu l'intérieur du phare : il n'est plus dû)
+  const later = await newPlayer();
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'phare-brume')`, [later.userId]);
+  assert.deepEqual((await api('GET', '/play/world', null, later)).data.brume.scenes.due, ['conseil', 'navire']);
+});
+
 test('rallumer un feu : un lieu découvert, une fois, gratuit ; le Lac de lave n’en a pas', async () => {
   const player = await newPlayer();
   const fire = id => api('POST', '/play/world/landmark/fire', { id }, player);

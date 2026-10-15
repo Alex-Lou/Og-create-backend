@@ -236,11 +236,17 @@ async function tutorialOf(userId, conn = db) {
     const items = await itemsOf(userId, conn);
     return { tutorial: true, skipped: quests.firstNightDoneOf(await claimedOf(userId, conn)) && items.has(PROLOGUE_SKIP) };
 }
-// Les scènes de l'arc du Phare (choix de l'auteur, 15 oct. : une fois par compte, sur tous ses appareils ; rejouables
-// depuis « Revoir le prologue ») : chacune vient avec sa quête (after : le conseil à la fin du tutoriel, la traversée
-// manquée au Bateau écrit), et n'est plus due une fois son acte fini (until : la traversée, l'acte IV) ; vue, une ligne
-// de world_items (SCENE_PREFIX + id). Elles ne donnent ni ne retirent rien
-const STORY_SCENES = { conseil: { after: quests.TUTORIAL_LAST }, traversee: { after: 'souvenir-aster', until: 'IV' } };
+// Les scènes de l'arc du Phare (choix de l'auteur, 15 oct. : une fois par compte, sur tous ses appareils ; le conseil
+// se rejoue depuis « Revoir le prologue ») : chacune vient avec sa quête (after : le conseil à la fin du tutoriel, la
+// traversée manquée au Bateau écrit, l'intérieur du phare à la clé trouvée, le navire des parents de Pierrot au Phare
+// de Brume allumé), et n'est plus due une fois son acte fini (until : la traversée, l'acte IV ; le phare, l'acte VI) ;
+// vue, une ligne de world_items (SCENE_PREFIX + id). Elles ne donnent ni ne retirent rien
+const STORY_SCENES = {
+    conseil: { after: quests.TUTORIAL_LAST },
+    traversee: { after: 'souvenir-aster', until: 'IV' },
+    phare: { after: 'cle', until: 'VI' },
+    navire: { after: 'phare-brume' }
+};
 const SCENE_PREFIX = 'scene:';
 // { seen, due } : les scènes vues par le compte, celles à jouer maintenant (dans l'ordre de l'histoire)
 function scenesOf(items, claimed) {
