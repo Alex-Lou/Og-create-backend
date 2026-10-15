@@ -39,7 +39,7 @@ const QUEST_TEXTS = {
         label: 'Entoure le feu d’un enclos',
         say: 'La nuit, des égarés sortent de ma brume. Une clôture autour du feu… et ils s’arrêtent, je crois.'
     },
-    // (choix de l'auteur, 15 oct. : les sentiers traversent l'enclos ; texte à valider)
+    // (choix de l'auteur, 15 oct. : les sentiers traversent l'enclos ; texte validé)
     portes: {
         label: 'Pose les portes de l’enclos',
         say: 'Les sentiers passent toujours. Lorena a deux portes, avec leurs verrous.'
@@ -312,7 +312,7 @@ const LEGACY_LABELS = {
 };
 
 // L'objectif de fond (l'arc du Phare, choix de l'auteur, 15 oct. : ecriture/arc_phare.md § 3) : son titre, l'étape de
-// chaque acte (celle de l'acte en cours se lit dans le Carnet), et quand il est atteint. Textes à valider
+// chaque acte (celle de l'acte en cours se lit dans le Carnet), et quand il est atteint. Textes validés
 const PHARE_GOAL = {
     label: 'Rallumer le phare',
     steps: {

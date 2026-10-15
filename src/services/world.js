@@ -38,7 +38,7 @@ const {
     placedOf, madeOf, addStock, balanceOf, writtenOf
 } = require('./world/reads');
 const { migrate } = require('./world/migrate');
-const { openedOf, chestsView, grant, openChest, openAll } = require('./world/chests');
+const { openedOf, chestsView, grant, openChest, openAll, CRATE_COMPLETE, completeCrate } = require('./world/chests');
 const {
     SLEEPERS, metOf, presenceOf, residentsOf, hungryOf, HUNGRY_AGO, moodsOf, withMoods, withLandmarks, withBlights, prodSteps,
     runsSince, visitorNow, visitorView, befriend, fillNeeds, satisfyVisitor, settleVisitor
@@ -348,6 +348,8 @@ async function view(userId, owned, book) {
         levelsOf(userId), itemsOf(userId), skinsOf(userId), signsOf(userId), gamesOf(userId), friendsOf(userId), namesOf(userId),
         annexesOf(userId), stockOf(userId), zonesOf(userId), placesOf(userId)
     ]);
+    // (la caisse de Lorena d'avant l'enclos entier : complétée une fois, avant de lire les créations, chests.js)
+    if (!items.has(CRATE_COMPLETE)) await completeCrate(userId);
     const shopBonuses = shop.bonusesOf(items);
     const annexCells = new Set(annexRows.map(keyOf));
     const craftRows = await stowCrafts(userId, await craftsOf(userId), levels, zones, annexRows, places);
@@ -456,6 +458,8 @@ async function view(userId, owned, book) {
         claimedOf(userId), factsOf(userId, owned, book.stars ?? 0, db, moods), visitorNow(userId), epreuvesOf(userId),
         discoveredOf(userId), expeditionOf(userId), findsOf(userId), depositsOf(userId)
     ]);
+    // (les actes finis : un feu de la Route peut en attendre un, landmarks.hasFire)
+    const acts = quests.actsDoneOf(quests.doneOf(claimed));
     // (et ce que la vue montre plus bas, lu en même temps)
     const [stagesNow, avatarNow, savoirNow, openedNow, helianeNow, anyaNow, nightsNow, beastsNow] = await Promise.all([
         stars.starsOf(userId, db), avatarOf(userId), brumeSavoirOf(userId), openedOf(userId, Date.now()), helianeOfUser(userId),
@@ -499,7 +503,7 @@ async function view(userId, owned, book) {
             id: l.id, name: l.name, zone: l.zone, x: l.x, y: l.y, text: l.text, effect: landmarks.effectText(l), chest: l.chest,
             found: found.has(l.id), foundAt: found.get(l.id) || null,
             // (la Route des feux : le lieu a son feu ; rallumé)
-            fire: landmarks.hasFire(l.id), lit: items.has(`${landmarks.FIRE_PREFIX}${l.id}`)
+            fire: landmarks.hasFire(l.id, acts), lit: items.has(`${landmarks.FIRE_PREFIX}${l.id}`)
         } : { id: l.id, zone: l.zone, known: false })),
         // Trouvailles de climat (réserve à part) : nom, climat, nombre ; leur clé du Grimoire, connue ou non, et les pages
         // jusqu'à elle (le verrou parlant), pour un climat dont un quartier est connu

@@ -26,9 +26,28 @@ test('l’objectif de fond : rien pendant le tutoriel, puis l’étape de l’ac
   assert.ok(end.step);
 });
 
-test('la Route des feux : chaque lieu a son feu, sauf le Lac de lave', () => {
-  assert.equal(landmarks.LANDMARKS.filter(l => landmarks.hasFire(l.id)).length, 12);
+test('la Route des feux : chaque lieu a son feu, sauf le Lac de lave ; la lanterne du Saule attend l’acte VII', () => {
+  assert.equal(landmarks.LANDMARKS.filter(l => landmarks.hasFire(l.id)).length, 11);
+  assert.equal(landmarks.LANDMARKS.filter(l => landmarks.hasFire(l.id, ['VII'])).length, 12);
   assert.deepEqual([landmarks.hasFire('cratere'), landmarks.hasFire('grotte'), landmarks.hasFire('nulle')], [false, true, false]);
+  assert.deepEqual([landmarks.hasFire('saule', ['I', 'VI']), landmarks.hasFire('saule', ['VII']), landmarks.hasFire('cratere', ['VII'])], [false, true, false]);
+});
+
+test('la lanterne d’Héliane, au Saule, reste vide jusqu’à la fin : découverte, elle ne se rallume qu’une fois l’acte VII fini', async () => {
+  const player = await newPlayer();
+  const fire = id => api('POST', '/play/world/landmark/fire', { id }, player);
+  const saule = async () => (await api('GET', '/play/world', null, player)).data.landmarks.find(l => l.id === 'saule');
+  await sql(`INSERT INTO world_expeditions (user_id, zone, ends_at) VALUES ($1, 'roselieres', NOW() - INTERVAL '1 hour')`, [player.userId]);
+  await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'roselieres')`, [player.userId]);
+  await sql(`INSERT INTO world_landmarks (user_id, landmark) VALUES ($1, 'saule')`, [player.userId]);
+  assert.deepEqual([(await saule()).found, (await saule()).fire], [true, false]);
+  assert.match((await fire('saule')).data.message, /aucun feu/);
+  const lastOfVII = quests.QUESTS.filter(q => q.act === 'VII').pop().id;
+  const upTo = quests.QUESTS.slice(0, quests.QUESTS.findIndex(q => q.id === lastOfVII) + 1).map(q => q.id);
+  await sql(`INSERT INTO world_quests (user_id, quest) SELECT $1, unnest($2::text[])`, [player.userId, upTo]);
+  assert.equal((await saule()).fire, true);
+  const lit = await fire('saule');
+  assert.deepEqual([lit.status, lit.data.fresh], [200, true]);
 });
 
 test('les scènes de l’arc : pas avant leur quête, puis vues une fois par compte, sans rien donner', async () => {

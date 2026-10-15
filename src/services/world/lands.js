@@ -9,7 +9,8 @@ const finds = require('../finds');
 const pickups = require('../pickups');
 const anya = require('../anya');
 const { EXPEDITION_COST, chargesAt, effectsOf } = require('./rules');
-const { levelsOf, stockOf, zonesOf, depositsOf, foundOf, discoveredOf, craftsOf, placedOf, writtenOf } = require('./reads');
+const { levelsOf, stockOf, zonesOf, depositsOf, foundOf, discoveredOf, craftsOf, placedOf, writtenOf, claimedOf } = require('./reads');
+const quests = require('../quests');
 const { migrate } = require('./migrate');
 const { presenceOf } = require('./people');
 const { bonusesFor, gather, payWith } = require('./produce');
@@ -84,7 +85,7 @@ async function findLandmark(userId, landmarkId, now = Date.now()) {
 // une fois (redemander ne fait rien), retenu dans world_items. { landmark, fresh } ou { status, message }
 async function lightFire(userId, landmarkId) {
     if (!Object.hasOwn(landmarks.LANDMARK_BY_ID, landmarkId)) return { status: 404, message: T.LANDMARK_UNKNOWN };
-    if (!landmarks.hasFire(landmarkId)) return { status: 409, message: T.FIRE_NONE };
+    if (!landmarks.hasFire(landmarkId, quests.actsDoneOf(quests.doneOf(await claimedOf(userId))))) return { status: 409, message: T.FIRE_NONE };
     await migrate(userId);
     return db.transaction(async conn => {
         if (!(await foundOf(userId, conn)).has(landmarkId)) return db.rollback({ status: 409, message: T.FIRE_FIND_FIRST });

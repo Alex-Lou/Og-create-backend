@@ -94,15 +94,42 @@ async function openCrate(userId, id) {
             [userId, `caisse:${id}`, JSON.stringify(prize)]);
         if (!added.rows.length) return db.rollback({ status: 409, message: T.CRATE_OPEN });
         await addStock(userId, prize.stock, conn);
-        for (const [craft, n] of Object.entries(CRATES[id].crafts || {})) {
-            for (let i = 0; i < n; i++) {
-                const { rows: [row] } = await conn.query('INSERT INTO world_crafts (user_id, craft) VALUES ($1, $2) RETURNING id', [userId, craft]);
-                if (CRATES[id].locked && CRATES[id].locked.has(craft)) {
-                    await conn.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'verrou')`, [userId, `${LOCK_PREFIX}${row.id}`]);
-                }
+        await giveCrafts(userId, CRATES[id].crafts || {}, CRATES[id].locked, conn);
+        return { chest: { source: `caisse:${id}`, rarity: 'commun', prize }, coins: await balanceOf(userId, conn) };
+    });
+}
+// Des créations prêtes, mises en réserve ({ craft: nombre }) ; celles de locked avec leur verrou
+async function giveCrafts(userId, crafts, locked, conn) {
+    for (const [craft, n] of Object.entries(crafts)) {
+        for (let i = 0; i < n; i++) {
+            const { rows: [row] } = await conn.query('INSERT INTO world_crafts (user_id, craft) VALUES ($1, $2) RETURNING id', [userId, craft]);
+            if (locked && locked.has(craft)) {
+                await conn.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'verrou')`, [userId, `${LOCK_PREFIX}${row.id}`]);
             }
         }
-        return { chest: { source: `caisse:${id}`, rarity: 'commun', prize }, coins: await balanceOf(userId, conn) };
+    }
+}
+
+// La caisse de Lorena ouverte avant qu'elle donne l'enclos entier (13 piquets, sans portes ; choix de l'auteur, 15 oct. :
+// le serveur complète, plutôt que de faire payer 56 bois et deux portes à qui suivait le tutoriel) : une fois par
+// compte, tant que l'enclos n'est pas fini (la quête des portes), ce qui manque pour atteindre ce qu'elle donne
+// aujourd'hui. Un drapeau dans world_items, posé au premier passage de chaque compte (la vue le lit déjà : rien de plus
+// ensuite). Rend ce qui a été donné ({ craft: nombre }), ou null
+const CRATE_COMPLETE = 'caisse-complete:aster';
+async function completeCrate(userId) {
+    return db.transaction(async conn => {
+        const flagged = await conn.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'caisse') ON CONFLICT DO NOTHING RETURNING item`,
+            [userId, CRATE_COMPLETE]);
+        if (!flagged.rows.length) return null;
+        const opened = await conn.query(`SELECT 1 FROM world_chests WHERE user_id = $1 AND source = 'caisse:aster'`, [userId]);
+        if (!opened.rows.length || quests.doneOf(await claimedOf(userId, conn)).has('portes')) return null;
+        const { crafts, locked } = CRATES.aster;
+        const { rows } = await conn.query('SELECT craft, COUNT(*)::int AS n FROM world_crafts WHERE user_id = $1 AND craft = ANY($2) GROUP BY craft',
+            [userId, Object.keys(crafts)]);
+        const have = Object.fromEntries(rows.map(r => [r.craft, r.n]));
+        const missing = Object.fromEntries(Object.entries(crafts).map(([craft, n]) => [craft, Math.max(0, n - (have[craft] || 0))]));
+        await giveCrafts(userId, missing, locked, conn);
+        return missing;
     });
 }
 
@@ -176,4 +203,4 @@ async function openAll(userId, openChapters, now = Date.now()) {
     });
 }
 
-module.exports = { QUEST_CHESTS, CRATES, openedOf, streakOf, chestsView, grant, openChest, grantSource, bottleOf, openAll };
+module.exports = { QUEST_CHESTS, CRATES, CRATE_COMPLETE, completeCrate, openedOf, streakOf, chestsView, grant, openChest, grantSource, bottleOf, openAll };

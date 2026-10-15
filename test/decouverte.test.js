@@ -56,8 +56,9 @@ test('« Recommencer l’île » : confirmé en toutes lettres ; tout repart de 
     assert.equal((await sql('SELECT COUNT(*)::int AS n FROM users WHERE id = $1', [id]))[0].n, 1);
     assert.equal((await api('GET', '/account', null, player)).status, 200);
     const items = (await sql('SELECT item FROM world_items WHERE user_id = $1 ORDER BY item', [id])).map(r => r.item);
-    // (l'île recommencée part de ses sentiers, son Feu sur la plage : world/places.js)
-    assert.deepEqual(items, ['ile:plage', 'ile:recommencee', 'ile:sentiers']);
+    // (l'île recommencée part de ses sentiers, son Feu sur la plage : world/places.js ; la vue repose le drapeau de la
+    // caisse de Lorena, qui n'a rien à compléter : rouverte, elle donnera l'enclos entier, world/chests.js)
+    assert.deepEqual(items, ['caisse-complete:aster', 'ile:plage', 'ile:recommencee', 'ile:sentiers']);
     // Les habitants arrivent un à un, un par jour : personne pendant la première nuit, Lorena au matin, Agathe après
     // la deuxième nuit (pas dès la Récolte de Lorena)
     await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'pages'), ($1, 'ramasser'), ($1, 'feu')`, [id]);

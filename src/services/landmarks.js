@@ -99,8 +99,12 @@ function bonusesOf(found) {
 // La Route des feux (arc du Phare, choix de l'auteur, 15 oct. : ecriture/arc_phare.md § 4) : chaque lieu remarquable a
 // le feu des Anciens, que le Voile a soufflé, sauf le Lac de lave (« Ce qui est tombé dort encore ») ; une fois le lieu
 // découvert, un geste le rallume (world/lands.js : lightFire), retenu dans world_items (FIRE_PREFIX + id)
+// Un feu peut attendre un acte de l'histoire (acts : les actes finis) : la lanterne d'Héliane, au Saule des Roselières,
+// reste vide jusqu'à la fin (bible, § 6.18 ; choix de l'auteur, 15 oct.) ; l'acte VII fini, Brume sait qu'elle l'a
+// sauvée, et la rallume (lot 08 § 7 : sa réplique d'après)
 const NO_FIRE = new Set(['cratere']);
+const FIRE_AFTER = { saule: 'VII' };
 const FIRE_PREFIX = 'feu:';
-const hasFire = id => Object.hasOwn(LANDMARK_BY_ID, id) && !NO_FIRE.has(id);
+const hasFire = (id, acts = []) => Object.hasOwn(LANDMARK_BY_ID, id) && !NO_FIRE.has(id) && (!FIRE_AFTER[id] || acts.includes(FIRE_AFTER[id]));
 
 module.exports = { LANDMARKS, LANDMARK_BY_ID, PRODUCERS, FIRE_PREFIX, isLandmark, hasFire, effectText, bonusesOf };
