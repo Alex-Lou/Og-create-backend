@@ -43,7 +43,7 @@ test('le camp : rien avant son personnage ; sur une île à la plage, chacun dan
   // Lorena arrive avec son camp
   assert.deepEqual(ids(campOf({ met: new Set(['ponton']) })), ['aster', 'caisses', 'filet', 'hirondelle', 'rondins', 'sos']);
   // Sur une île à la plage : la cuisine d’Agathe sur la plage (sa zone), le camp de Lorena au sud-ouest, le coin de
-  // Jovin au nord du Feu
+  // Nathan au nord du Feu
   const beach = places.placesFrom({ beach: true });
   const camp = campOf({ met: new Set(['ponton', 'foyer', 'atelier']), places: beach, beach: true });
   const at = id => { const c = camp.find(e => e.id === id); return [c.x, c.y]; };

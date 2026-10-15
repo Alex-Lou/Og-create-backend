@@ -1391,7 +1391,7 @@ test('le Monde : un chantier demande son quartier, son plan du Livre et ses ress
 });
 
 test('le Monde : les paliers III à VII demandent chapitre et écus, le palier IV agrandit l’emprise et range les créations', async () => {
-  // (une île neuve est à la plage : la Carrière de Saturnin au bord de La Colline, world/places.js)
+  // (une île neuve est à la plage : la Carrière de Robby au bord de La Colline, world/places.js)
   const CARRIERE = places.BEACH.carriere;
   const player = await newPlayer({ coins: 0 });
   const siteOf = (world, id) => world.sites.find(s => s.id === id);
@@ -1483,10 +1483,10 @@ test('habitants : on leur parle et on les gâte une fois par jour ; chaque cœur
   const talk = villager => api('POST', '/play/world/villager/talk', { villager }, player);
   const gift = (villager, resource) => api('POST', '/play/world/villager/gift', { villager, resource }, player);
   const view = (await api('GET', '/play/world', null, player)).data;
-  // Le tutoriel joué, la troupe vit sur l'île (bible, § 6.6) : Léo, Lorena et Jovin au camp tant que leur bâtiment n'est
+  // Le tutoriel joué, la troupe vit sur l'île (bible, § 6.6) : Léo, Lorena et Nathan au camp tant que leur bâtiment n'est
   // pas là ; Agathe au Foyer
   assert.deepEqual(view.villagers.map(w => [w.id, w.name, w.hearts, w.talked, w.gifted, w.built]),
-    [['puits', 'Léo', 0, false, false, false], ['ponton', 'Lorena', 0, false, false, false], ['atelier', 'Jovin', 0, false, false, false], ['foyer', 'Agathe', 0, false, false, true]]);
+    [['puits', 'Léo', 0, false, false, false], ['ponton', 'Lorena', 0, false, false, false], ['atelier', 'Nathan', 0, false, false, false], ['foyer', 'Agathe', 0, false, false, true]]);
   assert.deepEqual(view.friendship.hearts, [30, 80, 150, 250, 400]);
   assert.equal((await talk('potager')).status, 403);
   // Bavarder : +8, une fois par jour
@@ -1704,7 +1704,7 @@ test('besoins des habitants : manger, travailler, se distraire ; l’humeur chan
   assert.deepEqual([paulette.mood, paulette.moodEffect, paulette.happyEffect], ['content', null, 'Une partie de Récolte revient 3 min plus vite']);
   assert.deepEqual(first.needs.kinds.manger, { label: 'Manger', hours: 24, cost: { food: 10 } });
   assert.deepEqual(first.needs.kinds.deco, { label: 'Se distraire', decos: 3, reach: 6 });
-  // La troupe (Léo, Lorena, Jovin, Agathe) arrive comblée
+  // La troupe (Léo, Lorena, Nathan, Agathe) arrive comblée
   assert.equal((await sql('SELECT COUNT(*)::int AS n FROM world_needs WHERE user_id = $1', [player.userId]))[0].n, 4);
   // Pas encore faim ; à mi-chemin, on peut la nourrir : 10 vivres
   assert.equal((await fill('foyer', 'manger')).status, 409);
@@ -1732,7 +1732,7 @@ test('besoins des habitants : manger, travailler, se distraire ; l’humeur chan
   assert.equal(deco(who(await view(), 'foyer')).met, true);
   const happy = who((await fill('foyer', 'manger')).data.world, 'foyer');
   assert.deepEqual([happy.mood, happy.moodEffect], ['heureux', 'Une partie de Récolte revient 3 min plus vite']);
-  // Flore (Potager, 10 h de production, plafonnées à 8) : contente, puis triste : −10 % de vivres et d'écus, mais
+  // Maggy (Potager, 10 h de production, plafonnées à 8) : contente, puis triste : −10 % de vivres et d'écus, mais
   // seulement depuis qu'elle a faim (repas échu il y a 6 h) : des 8 heures gardées, 4 contente et 4 triste, soit
   // 3 × (4 + 4 × 0,9) = 22,8 vivres et 2 × 7,6 = 15,2 écus
   await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'jardins')`, [player.userId]);
@@ -1748,19 +1748,19 @@ test('besoins des habitants : manger, travailler, se distraire ; l’humeur chan
   assert.deepEqual([potager(gloomy).moodBonus, potager(gloomy).pending, potager(gloomy).perHour], [-10, { coins: 15, food: 22 }, { amount: 2.7, coins: 1.8 }]);
   const collected = await api('POST', '/play/world/collect', {}, player);
   assert.deepEqual([collected.data.gained, collected.data.stock.food], [15, 22]);
-  // Tout combler : Flore et Agathe mangent (20 vivres), puis plus rien à faire
+  // Tout combler : Maggy et Agathe mangent (20 vivres), puis plus rien à faire
   await ago('foyer', 'manger', 20);
   const all = await fillAll();
   assert.equal(all.status, 200);
   assert.deepEqual(all.data.filled, [{ villager: 'potager', need: 'manger' }, { villager: 'foyer', need: 'manger' }]);
   assert.equal(all.data.world.stock.food, 82);
   assert.equal((await fillAll()).status, 409);
-  // Travailler : seulement avec l'Atelier (Jovin) ; triste, il ôte 2 coups à chaque Récolte
+  // Travailler : seulement avec l'Atelier (Nathan) ; triste, il ôte 2 coups à chaque Récolte
   assert.equal((await fill('foyer', 'outils')).status, 403);
   await sql(`INSERT INTO world_zones (user_id, zone) VALUES ($1, 'est')`, [player.userId]);
   await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'atelier', 1)`, [player.userId]);
-  // L'Atelier est dans la zone de Jovin, au nord du Feu (île à la plage : world/places.js) : trois clôtures autour de
-  // lui, Jovin a de quoi se distraire, il est heureux
+  // L'Atelier est dans la zone de Nathan, au nord du Feu (île à la plage : world/places.js) : trois clôtures autour de
+  // lui, Nathan a de quoi se distraire, il est heureux
   const shop = places.BEACH.atelier;
   await sql(`INSERT INTO world_crafts (user_id, craft, x, y) SELECT $1, 'cloture', c[1], c[2] FROM jsonb_to_recordset($2::jsonb) AS t(c int[])`,
     [player.userId, JSON.stringify([[shop.x + 3, shop.y + 1], [shop.x + 3, shop.y + 2], [shop.x - 1, shop.y + 2]].map(c => ({ c })))]);
@@ -1800,7 +1800,7 @@ test('production juste : combler un besoin, poser, déplacer ou ranger une créa
   await sql(`INSERT INTO world_buildings (user_id, site, level, built_at) VALUES ($1, 'potager', 1, NOW() - INTERVAL '20 hours')`, [player.userId]);
   await view();
   await sql('UPDATE world_stock SET food = 0 WHERE user_id = $1', [player.userId]);
-  // Flore a faim depuis 6 h, récolte il y a 10 h : 4 h contente, 4 h triste (22 vivres, 15 écus). La nourrir encaisse
+  // Maggy a faim depuis 6 h, récolte il y a 10 h : 4 h contente, 4 h triste (22 vivres, 15 écus). La nourrir encaisse
   // d'abord ces heures-là (sinon toutes compteraient « contente » au ramassage suivant : 24 vivres, 16 écus) ; ses
   // vivres paient le repas
   await since(10);
@@ -1829,7 +1829,7 @@ test('production juste : combler un besoin, poser, déplacer ou ranger une créa
   const place = c => api('POST', '/play/world/craft/place', { craft: 'cloture', x: c.x, y: c.y }, player);
   // Deux Clôtures : pas encore de quoi se distraire, rien n'est encaissé
   for (const c of spots.slice(0, 2)) assert.deepEqual(await place(c).then(r => [r.status, r.data.coins]), [200, undefined]);
-  // La troisième rend Flore heureuse : ses 5 h contente sont encaissées d'abord (15 vivres, 10 écus)
+  // La troisième rend Maggy heureuse : ses 5 h contente sont encaissées d'abord (15 vivres, 10 écus)
   const glad = await place(spots[2]);
   assert.deepEqual([glad.data.coins, glad.data.world.stock.food, potager(glad.data.world).pending], [coins + 35, 17 + 15, { coins: 0, food: 0 }]);
   // 3 h heureuse : 3 × 3,3 = 9,9 vivres et 3 × 2,2 = 6,6 écus en attente
@@ -1838,7 +1838,7 @@ test('production juste : combler un besoin, poser, déplacer ou ranger une créa
   // Une Clôture déplacée tout près : toujours trois autour, rien n'est encaissé
   const moved = await api('POST', '/play/world/craft/move', { x: spots[0].x, y: spots[0].y, toX: spots[3].x, toY: spots[3].y }, player);
   assert.deepEqual([moved.status, moved.data.coins, potager(moved.data.world).pending], [200, undefined, { coins: 6, food: 9 }]);
-  // Une Clôture rangée : Flore n'est plus que contente ; ses heures heureuses sont encaissées d'abord, avec les
+  // Une Clôture rangée : Maggy n'est plus que contente ; ses heures heureuses sont encaissées d'abord, avec les
   // fractions gardées : 9,9 + 0,8 = 10 vivres, 6,6 + 0,2 = 6 écus
   const stored = await api('POST', '/play/world/craft/store', { x: spots[1].x, y: spots[1].y }, player);
   assert.deepEqual([stored.status, stored.data.coins, stored.data.world.stock.food, potager(stored.data.world).pending], [200, coins + 41, 32 + 10, { coins: 0, food: 0 }]);
@@ -1912,7 +1912,7 @@ test('ce qui attend dans les bâtiments paie tout : expédition, établi, bête,
   const hen = await api('POST', '/play/world/beast/feed', { beast: 'poule-rousse' }, player);
   assert.equal(hen.status, 200);
   near(hen.data.world.stock.food, pending.food - 2, 'vivres de la poule');
-  // Un cadeau à Freya (15 bûches)
+  // Un cadeau à Maerys (15 bûches)
   pending = await empty();
   const gift = await api('POST', '/play/world/villager/gift', { villager: 'bosquet', resource: 'wood' }, player);
   assert.equal(gift.status, 200);
@@ -2646,7 +2646,7 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Lorena ouvre 
   assert.equal(fed.data.world.brume.quest.done, true);
   assert.equal((await claim('soupe')).status, 200);
   // Le jour d’Agathe : la cage échouée s'ouvre (sa quête), les trois poules se nourrissent, leur poulailler se pose
-  // (une annexe du Feu, offerte), puis la troisième nuit ; Jovin arrive après elle
+  // (une annexe du Feu, offerte), puis la troisième nuit ; Nathan arrive après elle
   const caged = await api('POST', '/play/world/beasts/cage', {}, player);
   assert.deepEqual([caged.status, caged.data.world.brume.quest.id, caged.data.world.brume.quest.done], [200, 'cage', true]);
   assert.equal(who(caged.data.world, 'atelier'), undefined);
@@ -2701,7 +2701,7 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Lorena ouvre 
   assert.equal((await claim('enclos-cannelle')).status, 200);
   assert.equal(who(await view(), 'atelier'), undefined);
   assert.equal((await api('POST', '/play/world/sleep', {}, player)).status, 200);
-  // Jovin est là ; sa lanterne (au tutoriel, sans palier ni éléments) posée
+  // Nathan est là ; sa lanterne (au tutoriel, sans palier ni éléments) posée
   const rivet = await view();
   assert.deepEqual(who(rivet, 'atelier').built, false);
   const lantern = rivet.crafts.catalog.find(c => c.id === 'lanterne');
@@ -2714,7 +2714,7 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Lorena ouvre 
   assert.deepEqual([torch.open, torch.cost, torch.block], [true, { wood: 2 }, null]);
   for (const x of [X(20), X(21), X(22)]) await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'torche', $2, $3)`, [player.userId, x, Y(20)]);
   assert.equal((await claim('torches-rivet')).status, 200);
-  // Le jour de Jovin finit : Léo n'est pas encore là ; la quatrième nuit (choix de l'auteur, 13 oct. : chaque
+  // Le jour de Nathan finit : Léo n'est pas encore là ; la quatrième nuit (choix de l'auteur, 13 oct. : chaque
   // personnage son jour), puis Léo dort au Puits (plus de quartier à acheter) : on le réveille en lui parlant
   const rivetNight = await view();
   assert.deepEqual([rivetNight.brume.quest.id, who(rivetNight, 'puits')], ['nuit-rivet', undefined]);
@@ -2738,7 +2738,7 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Lorena ouvre 
   assert.deepEqual(who(built.data.world, 'foyer').needs.map(n => n.id), ['manger', 'deco']);
   // (puis le premier chemin, du Puits au Feu : l'île neuve n'a que son sentier)
   assert.deepEqual([who(built.data.world, 'puits').built, built.data.world.brume.quest.id], [true, 'chemin']);
-  // (210 à la lanterne, les torches de Jovin 15, puis Léo : son réveil, sa Pluie, son Puits)
+  // (210 à la lanterne, les torches de Nathan 15, puis Léo : son réveil, sa Pluie, son Puits)
   assert.equal(await coinsOf(player), 220 + 15 + 10 + 20 + 40);
   // Lorena est là depuis le matin qui suit le premier feu ; le chemin ne conditionne plus son arrivée (son Ponton bâti
   // hors de La Crique ne l'y installe pas encore : people.livesHere)
@@ -2834,13 +2834,13 @@ test('le fil d’Ariane marque la bonne étape suivante : Pluie, Vie, Arbre, Bat
   const [page] = marked(pluie);
   assert.deepEqual([page.id, page.status, page.chapter, page.open, page.name, page.emoji, page.guidedInk], [pageId('Pluie'), 'reach', 'I', true, undefined, undefined, true]);
   assert.ok(page.tray.length > 2, 'des leurres sur la page de la Pluie');
-  // L'Athanor grandit avec l'histoire : deux emplacements au tutoriel, trois le Puits réclamé, quatre Freya arrivée
+  // L'Athanor grandit avec l'histoire : deux emplacements au tutoriel, trois le Puits réclamé, quatre Maerys arrivée
   assert.equal(pluie.athanor, 2);
   assert.equal((await at('puits-ondin', afterT)).athanor, 3);
   assert.equal((await at('eveil-sylve', afterT)).athanor, 4);
   // (l'île le dit aussi : le jeu agrandit l'Athanor sans attendre le Grimoire)
   assert.equal((await api('GET', '/play/world', null, player)).data.brume.athanor, 4);
-  // L'Arbre (souvenir de Freya) passe par la Vie ; le Bateau (Lorena), une page ; le Feu follet, par le Marais
+  // L'Arbre (souvenir de Maerys) passe par la Vie ; le Bateau (Lorena), une page ; le Feu follet, par le Marais
   assert.deepEqual((await at('eveil-sylve', afterT)).ariane, { target: 'Vie', remaining: 1, page: pageId('Vie'), chapter: 'IV', hint: say('vie') });
   assert.deepEqual((await at('vie', afterT)).ariane, { target: 'Arbre', remaining: 3, page: pageId('Vie'), chapter: 'IV', hint: say('souvenir-sylve') });
   assert.deepEqual((await at('crique', actI)).ariane, { target: 'Bateau', remaining: 1, page: pageId('Bateau'), chapter: 'V', hint: say('souvenir-aster') });

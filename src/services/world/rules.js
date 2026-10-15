@@ -78,7 +78,7 @@ const SITES = {
             tier('Cité minière', 'Menhir', { wood: 300, stone: 250, water: 130, food: 120 }, 1800)
         ]
     },
-    // Le bois mort, jamais un arbre abattu (choix de l'auteur, 14 oct. : Freya, gardienne des bois) ; les plans changés
+    // Le bois mort, jamais un arbre abattu (choix de l'auteur, 14 oct. : Maerys, gardienne des bois) ; les plans changés
     // restent de leur chapitre (Menuisier, comme Bûcheron, au V ; Moulin à eau, comme Grue, au VI)
     bosquet: {
         produce: 'wood',

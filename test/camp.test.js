@@ -13,7 +13,7 @@ test.after(() => server?.kill());
 const ids = list => list.map(c => c.art);
 const SIZE = map.SIZE;
 
-test('au début : l’épave, la cuisine d’Agathe, les débris de Lorena et de Jovin, le SOS et trois objets, à leur place', () => {
+test('au début : l’épave, la cuisine d’Agathe, les débris de Lorena et de Nathan, le SOS et trois objets, à leur place', () => {
   const start = camp.campOf({});
   assert.deepEqual(ids(start), ['hirondelle', 'cannelle_debris', 'aster_debris', 'rivet_debris', 'sos', 'caisses', 'filet', 'rondins']);
   for (const c of start) {
@@ -30,7 +30,7 @@ test('il change avec l’histoire, et libère la plage de Brumelune', () => {
   assert.equal(camp.campOf({ acts: ['I', 'II'], levels: { foyer: 1 } }).find(c => c.id === 'aster').art, 'aster_abri');
   const abri = camp.campOf({ acts: ['I', 'II'], levels: { foyer: 2 } });
   assert.deepEqual([abri.find(c => c.id === 'aster').art, abri.find(c => c.id === 'cannelle').art], ['aster_cabanon', 'cannelle_cabanon']);
-  // Lorena a son Ponton, Jovin son Atelier : leurs coins s'en vont
+  // Lorena a son Ponton, Nathan son Atelier : leurs coins s'en vont
   const built = camp.campOf({ acts: ['I', 'II'], levels: { foyer: 2, ponton: 1, atelier: 1 } });
   assert.ok(!built.some(c => c.id === 'aster' || c.id === 'rivet'));
   // Acte IV : les voyageurs arrivent (tente, hamac), le SOS s'en va

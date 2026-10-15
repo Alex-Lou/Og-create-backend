@@ -38,7 +38,7 @@ const CRAFTS = [
     craft('cloture', 'Clôture', 'start', { wood: 8 }, [], [], {}, ['x.x', 'xxx', 'x.x']),
     // (la porte d'un enclos, choix de l'auteur, 15 oct. : dans le mur, sentiers compris ; son verrou à part, LOCK_COST)
     craft('porte', 'Porte', 'start', { wood: 10 }, [], ['cloture'], { ground: 'gsmpkt', wall: true }, ['xxx', 'x.x', 'xxx']),
-    // (la torche de bois flotté, choix de l'auteur, 13 oct. : les trois de Jovin, au jour 4 ; une lumière de la nuit,
+    // (la torche de bois flotté, choix de l'auteur, 13 oct. : les trois de Nathan, au jour 4 ; une lumière de la nuit,
     // nights.js)
     craft('torche', 'Torche', 'start', { wood: 2 }, ['Feu'], [], {}, ['x', 'x', 'x', 'x']),
     // (des fleurs sans pluie, non : la Pluie, clé du Puits, apporte l'eau qu'il coûte, choix de l'auteur, 12 oct.)
@@ -193,7 +193,7 @@ function tierLock(tier, open, stars = 0) {
     return T.TIER_LOCK.chapter(tier, missing);
 }
 
-// Les créations que le tutoriel fait fabriquer avant leur palier et leurs éléments (la lanterne de Jovin, sa première
+// Les créations que le tutoriel fait fabriquer avant leur palier et leurs éléments (la lanterne de Nathan, sa première
 // leçon à l'établi, choix de l'auteur, 11 oct.) : world/creations.js les passe à blockOf (tutorial) tant qu'elle n'est
 // pas faite
 const TUTORIAL_CRAFTS = new Set(['lanterne']);

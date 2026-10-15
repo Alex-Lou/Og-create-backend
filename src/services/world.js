@@ -171,7 +171,7 @@ async function guidedPageOf(userId) {
     return Boolean(quest && (quest.id === 'feu' || await brasierFirst(userId, quest)));
 }
 // L'Athanor grandit avec l'histoire (choix de l'auteur, 12 oct.), en plus des familles : un emplacement de plus quand
-// le Puits de Léo est réclamé, la fin du tutoriel ; quatre quand Freya arrive, juste avant la Vie
+// le Puits de Léo est réclamé, la fin du tutoriel ; quatre quand Maerys arrive, juste avant la Vie
 const ATHANOR = [['eveil-sylve', 4], ['puits-ondin', 3]];
 const athanorFrom = claimed => {
     const done = quests.doneOf(claimed);

@@ -8,12 +8,12 @@
 const { MOOD_EFFECTS } = require('../texts/effects');
 
 const VILLAGERS = {
-    potager: { name: 'Flore', role: 'Jardinière des lunes', loves: 'water', likes: 'food' },
-    carriere: { name: 'Saturnin', role: 'Tailleur de runes', loves: 'food', likes: 'stone' },
-    bosquet: { name: 'Freya', role: 'Gardienne des bois', loves: 'water', likes: 'food' },
+    potager: { name: 'Maggy', role: 'Jardinière des lunes', loves: 'water', likes: 'food' },
+    carriere: { name: 'Robby', role: 'Tailleur de runes', loves: 'food', likes: 'stone' },
+    bosquet: { name: 'Maerys', role: 'Gardienne des bois', loves: 'water', likes: 'food' },
     puits: { name: 'Léo', role: 'Petit sourcier', loves: 'water', likes: 'food' },
     ponton: { name: 'Lorena', role: 'Navigatrice', loves: 'wood', likes: 'food' },
-    atelier: { name: 'Jovin', role: 'Horloger-artificier', loves: 'stone', likes: 'wood' },
+    atelier: { name: 'Nathan', role: 'Horloger-artificier', loves: 'stone', likes: 'wood' },
     foyer: { name: 'Agathe', role: 'Cuisinière-guérisseuse', loves: 'food', likes: 'water' }
 };
 const RESOURCES = ['stone', 'wood', 'water', 'food'];
@@ -32,8 +32,8 @@ const REWARDS = [
     { kind: 'chest', rarity: 'legendaire' }
 ];
 
-// Savoirs des maîtres (bible, § 4.2 et § 6.4) : les familles de l'Art de chacun (les pages de son chapitre ; Freya et
-// Flore se partagent le Vivant). À partir de SAVOIR_HEARTS cœurs, le maître souffle un ingrédient, sinon sa famille
+// Savoirs des maîtres (bible, § 4.2 et § 6.4) : les familles de l'Art de chacun (les pages de son chapitre ; Maerys et
+// Maggy se partagent le Vivant). À partir de SAVOIR_HEARTS cœurs, le maître souffle un ingrédient, sinon sa famille
 const SAVOIRS = {
     ponton: ['Elements Fondamentaux', 'Phénomènes Naturels'],
     carriere: ['Matériaux', 'Chimie', 'Physique'],
