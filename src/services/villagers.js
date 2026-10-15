@@ -12,7 +12,7 @@ const VILLAGERS = {
     carriere: { name: 'Saturnin', role: 'Tailleur de runes', loves: 'food', likes: 'stone' },
     bosquet: { name: 'Freya', role: 'Gardienne des bois', loves: 'water', likes: 'food' },
     puits: { name: 'Pierrot', role: 'Petit sourcier', loves: 'water', likes: 'food' },
-    ponton: { name: 'Hermine', role: 'Navigatrice', loves: 'wood', likes: 'food' },
+    ponton: { name: 'Lorena', role: 'Navigatrice', loves: 'wood', likes: 'food' },
     atelier: { name: 'Jovin', role: 'Horloger-artificier', loves: 'stone', likes: 'wood' },
     foyer: { name: 'Marcelle', role: 'Cuisinière-guérisseuse', loves: 'food', likes: 'water' }
 };

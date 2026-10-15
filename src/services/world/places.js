@@ -18,7 +18,7 @@ const SMALL = 2;
 // Une île à la plage (choix de l'auteur, 10 oct.) : une zone par personnage, qui ne se découvre qu'avec lui, et son
 // bâtiment au milieu, avec la place autour pour ses annexes, ses objets et deux bâtiments à venir (le jeu dessine les
 // zones : src/world/zones.js, mêmes cases). Le Feu, bâtiment de Marcelle, sur la plage (sa porte, le bas de son emprise,
-// y = 95, touche le bout du sentier : world/paths.js, SENTIER_BEACH, à tous ses paliers) ; le Ponton d'Hermine au
+// y = 95, touche le bout du sentier : world/paths.js, SENTIER_BEACH, à tous ses paliers) ; le Ponton de Lorena au
 // sud-ouest, contre la mer ; l'Atelier de Jovin au nord du Feu ; le Puits de Pierrot à l'ouest, près du ruisseau ; ceux
 // des actes suivants au bord de leur quartier (celui qu'il faut acheter pour les bâtir : map.siteZone)
 const BEACH = {

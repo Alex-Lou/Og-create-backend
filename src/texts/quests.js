@@ -20,15 +20,15 @@ const QUEST_TEXTS = {
         say: 'Le feu tient. Va voir la plage, si tu veux. Quand tu auras sommeil, je veillerai.'
     },
     caisse: {
-        label: 'Ouvre la caisse d’Hermine',
-        say: 'Une caisse est venue avec l’épave. Hermine dit qu’elle est à elle.'
+        label: 'Ouvre la caisse de Lorena',
+        say: 'Une caisse est venue avec l’épave. Lorena dit qu’elle est à elle.'
     },
     recolte: {
-        label: 'Fais une Récolte avec Hermine',
-        say: 'Hermine connaît la marée. Suis-la au rivage.'
+        label: 'Fais une Récolte avec Lorena',
+        say: 'Lorena connaît la marée. Suis-la au rivage.'
     },
     'premier-ponton': {
-        label: 'Bâtis le Ponton d’Hermine',
+        label: 'Bâtis le Ponton de Lorena',
         say: 'Un ponton, dit-elle, et la mer devient un chemin. Elle a l’air d’y croire.'
     },
     'chemin-aster': {
@@ -42,7 +42,7 @@ const QUEST_TEXTS = {
     // (choix de l'auteur, 15 oct. : les sentiers traversent l'enclos ; texte à valider)
     portes: {
         label: 'Pose les portes de l’enclos',
-        say: 'Les sentiers passent toujours. Hermine a deux portes, avec leurs verrous.'
+        say: 'Les sentiers passent toujours. Lorena a deux portes, avec leurs verrous.'
     },
     veille: {
         label: 'Passe ta deuxième nuit',
@@ -182,7 +182,7 @@ const QUEST_TEXTS = {
     },
     etoile: {
         label: 'Écris l’Étoile',
-        say: 'Hermine veut un guide, pour la nuit. Une étoile. … Oui. Une étoile.'
+        say: 'Lorena veut un guide, pour la nuit. Une étoile. … Oui. Une étoile.'
     },
     hauteurs: {
         label: 'Achète Les Hauteurs',
@@ -202,11 +202,11 @@ const QUEST_TEXTS = {
     },
     crique: {
         label: 'Achète La Crique',
-        say: 'Hermine veut reprendre la mer. Elle ne le dit pas. Elle regarde la crique.'
+        say: 'Lorena veut reprendre la mer. Elle ne le dit pas. Elle regarde la crique.'
     },
     'souvenir-aster': {
-        label: 'Rends son courage à Hermine : écris le Bateau',
-        say: '« Je ne tiens plus une barre », dit Hermine. Le Bois et l’Eau…'
+        label: 'Rends son courage à Lorena : écris le Bateau',
+        say: '« Je ne tiens plus une barre », dit Lorena. Le Bois et l’Eau…'
     },
     'ponton-aster': {
         label: 'Fais du Ponton un port de pêche',

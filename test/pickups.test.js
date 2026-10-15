@@ -1,4 +1,4 @@
-// Le tutoriel de l'île neuve (bible du dépôt front, § 9) : la plage de Brumelune, le feu bâti avec Brume, puis Hermine et sa Récolte ;
+// Le tutoriel de l'île neuve (bible du dépôt front, § 9) : la plage de Brumelune, le feu bâti avec Brume, puis Lorena et sa Récolte ;
 // un compte d'avant la v6 garde ses règles (le feu allumé d'office, Marcelle après la Récolte, Jovin
 // après la soupe) et ne recule jamais
 const test = require('node:test');
@@ -54,7 +54,7 @@ test('les trouvailles de la plage paient chacune leur leçon : deux bois et un g
     assert.ok(gives('veille', 'food') >= villagers.NEEDS.manger.cost.food);
 });
 
-test('un nouveau compte bâtit son feu ; Hermine vient au matin, Marcelle après sa Récolte, Jovin après la troisième nuit', async () => {
+test('un nouveau compte bâtit son feu ; Lorena vient au matin, Marcelle après sa Récolte, Jovin après la troisième nuit', async () => {
   const player = await newPlayer();
   const id = player.userId;
   const first = await view(player);
@@ -70,7 +70,7 @@ test('un nouveau compte bâtit son feu ; Hermine vient au matin, Marcelle après
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'pages'), ($1, 'ramasser')`, [id]);
   assert.deepEqual([met(await view(player)), (await view(player)).brume.quest.id], [[], 'feu']);
   assert.equal((await api('POST', '/play/world/beasts/cage', {}, player)).status, 403);
-  // Le feu réclamé : personne encore ; la première nuit passée : Hermine, puis sa Récolte fait venir Marcelle. La
+  // Le feu réclamé : personne encore ; la première nuit passée : Lorena, puis sa Récolte fait venir Marcelle. La
   // soupe seule n'amène plus Jovin.
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'feu')`, [id]);
   assert.deepEqual(met(await view(player)), []);

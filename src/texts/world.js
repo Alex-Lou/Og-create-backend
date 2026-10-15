@@ -15,7 +15,7 @@ const OPEN_CHAPTER_FIRST = chapter => `Ouvre d’abord le chapitre ${chapter} du
 const NAME_RULE = max => `Un nom de 2 à ${max} lettres ou chiffres (espace, tiret ou apostrophe entre deux).`;
 
 // Tutoriel, île recommencée
-const SKIP_TOO_EARLY = 'Bâtis d’abord le camp et termine la première Récolte avec Hermine.';
+const SKIP_TOO_EARLY = 'Bâtis d’abord le camp et termine la première Récolte avec Lorena.';
 const RESTART_CONFIRM = 'Écris RECOMMENCER pour confirmer.';
 const RESTARTED_ONCE = 'Ton île a déjà été recommencée une fois.';
 const RESTARTED = 'Ton île vient d’être recommencée.';

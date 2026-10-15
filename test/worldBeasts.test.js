@@ -10,7 +10,7 @@ test.after(() => server?.kill());
 
 const herdOf = async player => (await api('GET', '/play/world', null, player)).data.beasts;
 
-// Marcelle est là après la première Récolte d'Hermine ; les quêtes d'avant comptent comme faites.
+// Marcelle est là après la première Récolte de Lorena ; les quêtes d'avant comptent comme faites.
 const withCannelle = id => sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'recolte'), ($1, 'veille') ON CONFLICT DO NOTHING`, [id]);
 const cageOf = async player => ((await api('GET', '/play/world', null, player)).data.camp || []).find(c => c.id === 'cage') || null;
 

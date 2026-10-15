@@ -177,7 +177,7 @@ test('un joueur d’avant la bible ne recule jamais : ses anciennes quêtes se r
   assert.deepEqual(['cabane', 'serre'].map(id => chests.get(id)), ['rare', 'epique']);
 });
 
-test('la première nuit est faite une fois la Récolte d’Hermine réclamée (passer le tutoriel n’est permis qu’ensuite)', () => {
+test('la première nuit est faite une fois la Récolte de Lorena réclamée (passer le tutoriel n’est permis qu’ensuite)', () => {
   assert.equal(firstNightDoneOf(new Set()), false);
   assert.equal(firstNightDoneOf(new Set(['feu'])), false);
   assert.equal(firstNightDoneOf(new Set(['recolte'])), true);

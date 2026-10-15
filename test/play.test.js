@@ -1483,10 +1483,10 @@ test('habitants : on leur parle et on les gâte une fois par jour ; chaque cœur
   const talk = villager => api('POST', '/play/world/villager/talk', { villager }, player);
   const gift = (villager, resource) => api('POST', '/play/world/villager/gift', { villager, resource }, player);
   const view = (await api('GET', '/play/world', null, player)).data;
-  // Le tutoriel joué, la troupe vit sur l'île (bible, § 6.6) : Pierrot, Hermine et Jovin au camp tant que leur bâtiment n'est
+  // Le tutoriel joué, la troupe vit sur l'île (bible, § 6.6) : Pierrot, Lorena et Jovin au camp tant que leur bâtiment n'est
   // pas là ; Marcelle au Foyer
   assert.deepEqual(view.villagers.map(w => [w.id, w.name, w.hearts, w.talked, w.gifted, w.built]),
-    [['puits', 'Pierrot', 0, false, false, false], ['ponton', 'Hermine', 0, false, false, false], ['atelier', 'Jovin', 0, false, false, false], ['foyer', 'Marcelle', 0, false, false, true]]);
+    [['puits', 'Pierrot', 0, false, false, false], ['ponton', 'Lorena', 0, false, false, false], ['atelier', 'Jovin', 0, false, false, false], ['foyer', 'Marcelle', 0, false, false, true]]);
   assert.deepEqual(view.friendship.hearts, [30, 80, 150, 250, 400]);
   assert.equal((await talk('potager')).status, 403);
   // Bavarder : +8, une fois par jour
@@ -1537,7 +1537,7 @@ test('Savoirs des maîtres : un indice par jour en bavardant, la famille puis l�
   const player = await newPlayer({ coins: 500, settled: true });
   const talk = (villager, body = {}) => api('POST', '/play/world/villager/talk', { villager, ...body }, player);
   const reach = (await api('GET', '/play/book', null, player)).data.chapters[0].pages.filter(p => p.status === 'reach');
-  // Hermine (moins de deux cœurs) : la famille d'un ingrédient, sur une page à énigme de son Art (chapitre I)
+  // Lorena (moins de deux cœurs) : la famille d'un ingrédient, sur une page à énigme de son Art (chapitre I)
   const first = await talk('ponton');
   assert.equal(first.status, 200);
   const hint = first.data.savoir;
@@ -1704,7 +1704,7 @@ test('besoins des habitants : manger, travailler, se distraire ; l’humeur chan
   assert.deepEqual([paulette.mood, paulette.moodEffect, paulette.happyEffect], ['content', null, 'Une partie de Récolte revient 3 min plus vite']);
   assert.deepEqual(first.needs.kinds.manger, { label: 'Manger', hours: 24, cost: { food: 10 } });
   assert.deepEqual(first.needs.kinds.deco, { label: 'Se distraire', decos: 3, reach: 6 });
-  // La troupe (Pierrot, Hermine, Jovin, Marcelle) arrive comblée
+  // La troupe (Pierrot, Lorena, Jovin, Marcelle) arrive comblée
   assert.equal((await sql('SELECT COUNT(*)::int AS n FROM world_needs WHERE user_id = $1', [player.userId]))[0].n, 4);
   // Pas encore faim ; à mi-chemin, on peut la nourrir : 10 vivres
   assert.equal((await fill('foyer', 'manger')).status, 409);
@@ -1943,7 +1943,7 @@ test('une Récolte quittée sans jouer ne compte pas ; Marcelle nourrie, la soup
   await sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Vent", "Pluie", "Brasier"]'::jsonb WHERE user_id = $1`, [player.userId]);
   assert.equal((await claim('pages')).status, 200);
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'ramasser'), ($1, 'feu'), ($1, 'nuit'), ($1, 'caisse')`, [player.userId]);
-  // Quittée sans un coup : la partie est perdue et ne compte pas pour « Fais une Récolte avec Hermine »
+  // Quittée sans un coup : la partie est perdue et ne compte pas pour « Fais une Récolte avec Lorena »
   const quit = await finish(await start(), []);
   assert.equal(quit.status, 200);
   assert.deepEqual([quit.data.world.brume.quest.id, quit.data.world.brume.quest.done], ['recolte', false]);
@@ -1952,7 +1952,7 @@ test('une Récolte quittée sans jouer ne compte pas ; Marcelle nourrie, la soup
   assert.equal(played.data.world.brume.quest.done, true);
   assert.equal((await claim('recolte')).status, 200);
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'premier-ponton'), ($1, 'chemin-aster'), ($1, 'clotures'), ($1, 'portes')`, [player.userId]);
-  // La journée d'Hermine terminée (sa Récolte, son Ponton), puis la deuxième nuit, font arriver Marcelle, affamée : sa faim d'arrivée ne fait pas
+  // La journée de Lorena terminée (sa Récolte, son Ponton), puis la deuxième nuit, font arriver Marcelle, affamée : sa faim d'arrivée ne fait pas
   // la quête ; nourrie, si.
   assert.equal((await api('POST', '/play/world/sleep', {}, player)).status, 200);
   const hungry = (await api('GET', '/play/world', null, player)).data;
@@ -2390,7 +2390,7 @@ test('butins : chapitres ouverts, quêtes réclamées et bouteille donnent leur 
   assert.equal((await api('POST', '/play/world/chest', { source: 'jour' }, await guest())).status, 402);
 });
 
-test('l’enclos de Marcelle se trace même sans clôture jamais assemblée (un compte d’avant les clôtures d’Hermine n’est pas lâché)', async () => {
+test('l’enclos de Marcelle se trace même sans clôture jamais assemblée (un compte d’avant les clôtures de Lorena n’est pas lâché)', async () => {
   const player = await newPlayer();
   const view = async () => (await api('GET', '/play/world', null, player)).data;
   await view();
@@ -2516,7 +2516,7 @@ test('quêtes de Brume : la quête active se réclame une fois, son objectif att
 
 
 // Lot H1 (la colonne vertébrale de la bible) : un nouveau compte suit le prologue, chaque objectif se lit dans l'état
-test('le prologue d’un nouveau compte : Brume mène au feu, puis Hermine ouvre sa Récolte', async () => {
+test('le prologue d’un nouveau compte : Brume mène au feu, puis Lorena ouvre sa Récolte', async () => {
   const player = await newPlayer();
   const view = async () => (await api('GET', '/play/world', null, player)).data;
   const claim = id => api('POST', '/play/world/quest', { id }, player);
@@ -2525,7 +2525,7 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Hermine ouvre
   const who = (world, id) => world.villagers.find(v => v.id === id);
   // Le chapitre II est scellé jusqu'à la 3e découverte
   assert.deepEqual((await api('GET', '/play/book', null, player)).data.chapters.slice(0, 2).map(c => [c.need, c.open]), [[0, true], [3, false]]);
-  // Au compte : Brume seule ; Hermine et Marcelle ne sont pas encore rencontrées.
+  // Au compte : Brume seule ; Lorena et Marcelle ne sont pas encore rencontrées.
   const first = await view();
   assert.deepEqual(first.villagers.map(v => [v.id, v.built, v.asleep]), []);
   assert.equal((await talk('foyer')).status, 403);
@@ -2545,16 +2545,16 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Hermine ouvre
   const third = await pick('greve-galet-1');
   assert.deepEqual([third.data.world.stock.wood, third.data.world.stock.stone, third.data.world.stock.food, third.data.world.brume.quest.done], [4, 2, 0, true]);
   assert.equal((await claim('ramasser')).status, 200);
-  // Le Brasier n'est appris qu'au moment de bâtir. Le feu ferme la leçon de Brume et fait arriver Hermine, pas Marcelle.
+  // Le Brasier n'est appris qu'au moment de bâtir. Le feu ferme la leçon de Brume et fait arriver Lorena, pas Marcelle.
   await write(['Brasier']);
   const fire = await api('POST', '/play/world/build', { site: 'foyer' }, player);
   assert.deepEqual([fire.status, fire.data.world.stock.wood, fire.data.world.stock.stone], [200, 0, 0]);
   assert.equal(fire.data.world.brume.quest.done, true);
   assert.equal((await claim('feu')).status, 200);
-  // La première nuit : personne ; dormir fait venir Hermine au matin, pas Marcelle
+  // La première nuit : personne ; dormir fait venir Lorena au matin, pas Marcelle
   const night = await view();
   assert.deepEqual([night.brume.quest.id, night.villagers.map(v => v.id)], ['nuit', []]);
-  // (la caisse d'Hermine n'a pas encore échoué)
+  // (la caisse de Lorena n'a pas encore échoué)
   const crate = () => api('POST', '/play/world/chest', { source: 'caisse:aster' }, player);
   assert.equal((await crate()).status, 403);
   assert.equal((await api('POST', '/play/world/sleep', {}, player)).status, 200);
@@ -2562,7 +2562,7 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Hermine ouvre
   assert.ok(who(morning, 'ponton'));
   assert.equal(who(morning, 'foyer'), undefined);
   assert.equal(morning.brume.quest.id, 'caisse');
-  // Le jour d'Hermine : sa caisse (toujours la même : 5 bois, sa longue-vue, son filet, son carnet de quart, les piquets
+  // Le jour de Lorena : sa caisse (toujours la même : 5 bois, sa longue-vue, son filet, son carnet de quart, les piquets
   // de son enclos et ses deux portes à verrou, en réserve), une fois
   const opened = await crate();
   assert.deepEqual([opened.status, opened.data.chest.prize.stock, opened.data.chest.prize.keepsakes.length, opened.data.world.stock.wood], [200, { wood: 5 }, 5, 5]);
@@ -2686,7 +2686,7 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Hermine ouvre
   assert.equal((await api('POST', '/play/world/shelter', { who: 'cannelle' }, player)).status, 409);
   assert.equal((await claim('abri-cannelle')).status, 200);
   // Son enclos : les cases à une case de son coin, sauf celles qui bordent le Feu (son enclos à lui) ; celles qu'il
-  // partage avec l'enclos d'Hermine ont déjà leur piquet ; les autres, fabriqués et payés en passant, d'un trait
+  // partage avec l'enclos de Lorena ont déjà leur piquet ; les autres, fabriqués et payés en passant, d'un trait
   const yard = await view();
   const corner = yard.camp.find(c => c.id === 'cannelle');
   const gap = (v, a, w) => Math.max(a - v, 0, v - (a + w - 1));
@@ -2740,7 +2740,7 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Hermine ouvre
   assert.deepEqual([who(built.data.world, 'puits').built, built.data.world.brume.quest.id], [true, 'chemin']);
   // (210 à la lanterne, les torches de Jovin 15, puis Pierrot : son réveil, sa Pluie, son Puits)
   assert.equal(await coinsOf(player), 220 + 15 + 10 + 20 + 40);
-  // Hermine est là depuis le matin qui suit le premier feu ; le chemin ne conditionne plus son arrivée (son Ponton bâti
+  // Lorena est là depuis le matin qui suit le premier feu ; le chemin ne conditionne plus son arrivée (son Ponton bâti
   // hors de La Crique ne l'y installe pas encore : people.livesHere)
   assert.equal(who(built.data.world, 'ponton').built, false);
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'chemin')`, [player.userId]);
@@ -2840,7 +2840,7 @@ test('le fil d’Ariane marque la bonne étape suivante : Pluie, Vie, Arbre, Bat
   assert.equal((await at('eveil-sylve', afterT)).athanor, 4);
   // (l'île le dit aussi : le jeu agrandit l'Athanor sans attendre le Grimoire)
   assert.equal((await api('GET', '/play/world', null, player)).data.brume.athanor, 4);
-  // L'Arbre (souvenir de Freya) passe par la Vie ; le Bateau (Hermine), une page ; le Feu follet, par le Marais
+  // L'Arbre (souvenir de Freya) passe par la Vie ; le Bateau (Lorena), une page ; le Feu follet, par le Marais
   assert.deepEqual((await at('eveil-sylve', afterT)).ariane, { target: 'Vie', remaining: 1, page: pageId('Vie'), chapter: 'IV', hint: say('vie') });
   assert.deepEqual((await at('vie', afterT)).ariane, { target: 'Arbre', remaining: 3, page: pageId('Vie'), chapter: 'IV', hint: say('souvenir-sylve') });
   assert.deepEqual((await at('crique', actI)).ariane, { target: 'Bateau', remaining: 1, page: pageId('Bateau'), chapter: 'V', hint: say('souvenir-aster') });

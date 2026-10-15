@@ -27,21 +27,21 @@ const BEASTS = ['Poisson', 'Méduse', 'Grenouille', 'Oiseau', 'Tortue', 'Papillo
 
 // (son titre et ce qu'en dit Brume : texts/quests.js)
 const q = (id, act, goal, coins, chest) => ({ id, act, goal, coins, ...QUEST_TEXTS[id], ...(chest ? { chest } : {}) });
-// Les piquets de l'enclos d'Hermine, à deux cases du Feu (quête des clôtures ; choix de l'auteur, 15 oct. : une rangée
+// Les piquets de l'enclos de Lorena, à deux cases du Feu (quête des clôtures ; choix de l'auteur, 15 oct. : une rangée
 // libre dedans, pour y mettre ce qu'on défend), et ses portes, une sur chaque sentier qui le traverse (quête des portes)
 const ENCLOS = 20;
 const ENCLOS_DOORS = 2;
 const QUESTS = [
-    // Prologue : Brume accompagne une action à la fois jusqu'à la première nuit. Hermine ouvre ensuite sa propre leçon
+    // Prologue : Brume accompagne une action à la fois jusqu'à la première nuit. Lorena ouvre ensuite sa propre leçon
     // par la Récolte.
     q('pages', 'T', { kind: 'element', element: 'Vent' }, 20),
     q('ramasser', 'T', { kind: 'pickup', need: 3 }, 10),
     // Le premier feu est réellement bâti avec les trouvailles ; c'est le Foyer au palier I.
     q('feu', 'T', { kind: 'level', site: 'foyer', need: 1 }, 15),
-    // La première nuit (choix de l'auteur, 9 oct.) : seul avec Brume, sans personne d'autre, avant l'arrivée d'Hermine au
+    // La première nuit (choix de l'auteur, 9 oct.) : seul avec Brume, sans personne d'autre, avant l'arrivée de Lorena au
     // matin. Une étape de respiration, sans écus : on explore, puis on dort (world.sleep).
     q('nuit', 'T', { kind: 'sleep', site: 'foyer' }, 0),
-    // Le jour d'Hermine (choix de l'auteur, 11 oct. : un vrai parcours, pas expédié) : sa scène au réveil, sa caisse
+    // Le jour de Lorena (choix de l'auteur, 11 oct. : un vrai parcours, pas expédié) : sa scène au réveil, sa caisse
     // échouée (world/chests.js : CRATES), sa Récolte, son Ponton (le palier I, sans plan ni quartier sur une île du
     // tutoriel : son carnet de quart en tient lieu, world.js : tutorialPonton), puis sa longue-vue au couchant
     q('caisse', 'T', { kind: 'crate', crate: 'aster' }, 10),
@@ -51,10 +51,10 @@ const QUESTS = [
     // world/paths.js : FREE)
     q('chemin-aster', 'T', { kind: 'link', from: 'ponton', to: 'foyer' }, 15),
     // (l'enclos du camp, choix de l'auteur, 13 oct. : ses piquets, dans sa caisse (world/chests.js, CRATES), un par case
-    // autour de la grande emprise du Feu, le sentier d'Hermine laissé libre ; une clôture barre la route d'un égaré, nights.js)
+    // autour de la grande emprise du Feu, le sentier de Lorena laissé libre ; une clôture barre la route d'un égaré, nights.js)
     q('clotures', 'T', { kind: 'craft', craft: 'cloture', need: ENCLOS }, 15),
     q('portes', 'T', { kind: 'craft', craft: 'porte', need: ENCLOS_DOORS }, 10),
-    // La deuxième nuit (choix de l'auteur, 10 oct. : un personnage par jour) : la journée d'Hermine finit autour du feu ;
+    // La deuxième nuit (choix de l'auteur, 10 oct. : un personnage par jour) : la journée de Lorena finit autour du feu ;
     // Marcelle arrivera au matin
     q('veille', 'T', { kind: 'sleep', site: 'foyer' }, 0),
     q('soupe', 'T', { kind: 'need', villager: 'foyer', what: 'manger' }, 15),
@@ -111,10 +111,10 @@ const QUESTS = [
     q('expedition', 'III', { kind: 'expedition', need: 1 }, 60),
     q('ruine', 'III', { kind: 'landmark', need: 1 }, 60),
     q('village', 'III', { kind: 'element', element: 'Village' }, 80, 'epique'),
-    // Acte IV : le vivant, s'ouvrir aux autres (Hermine reprend la mer, les bêtes, les voyageurs)
+    // Acte IV : le vivant, s'ouvrir aux autres (Lorena reprend la mer, les bêtes, les voyageurs)
     q('crique', 'IV', { kind: 'zone', zone: 'crique' }, 160),
     q('souvenir-aster', 'IV', { kind: 'element', element: 'Bateau' }, 30),
-    // (le Ponton I se bâtit au jour d'Hermine : l'acte IV en fait un port de pêche, choix de l'auteur, 11 oct.)
+    // (le Ponton I se bâtit au jour de Lorena : l'acte IV en fait un port de pêche, choix de l'auteur, 11 oct.)
     q('ponton-aster', 'IV', { kind: 'level', site: 'ponton', need: 2 }, 80),
     q('bete', 'IV', { kind: 'element', any: BEASTS }, 50),
     q('voyageur', 'IV', { kind: 'visitor', need: 1 }, 80),
@@ -180,8 +180,8 @@ function doneOf(claimed) {
     return new Set(QUESTS.filter((quest, i) => i <= reach || claimed.has(quest.id)).map(quest => quest.id));
 }
 
-// La première nuit est validée côté serveur quand la Récolte d'Hermine a été réclamée : le feu a donc été bâti,
-// la nuit jouée et Hermine rencontrée. Les anciennes quêtes plus avancées comptent aussi, via doneOf.
+// La première nuit est validée côté serveur quand la Récolte de Lorena a été réclamée : le feu a donc été bâti,
+// la nuit jouée et Lorena rencontrée. Les anciennes quêtes plus avancées comptent aussi, via doneOf.
 const FIRST_NIGHT_DONE = 'recolte';
 const firstNightDoneOf = claimed => doneOf(claimed).has(FIRST_NIGHT_DONE);
 

@@ -231,7 +231,7 @@ async function board(userId, owned, stars, openChapters) {
 
 // « Passer le tutoriel » : retenu sur le compte, pour tous ses appareils (une ligne de world_items, sans donnée nouvelle)
 const PROLOGUE_SKIP = 'prologue:passe';
-// Le tutoriel du compte (chaque île le suit) : « Passer » ne vaut qu'une fois la Récolte d'Hermine validée
+// Le tutoriel du compte (chaque île le suit) : « Passer » ne vaut qu'une fois la Récolte de Lorena validée
 async function tutorialOf(userId, conn = db) {
     const items = await itemsOf(userId, conn);
     return { tutorial: true, skipped: quests.firstNightDoneOf(await claimedOf(userId, conn)) && items.has(PROLOGUE_SKIP) };
@@ -615,7 +615,7 @@ async function claimQuest(userId, questId, owned, stars) {
 }
 
 // Dormir, la première nuit (choix de l'auteur, 9 oct.) : seule l'étape « nuit » du tutoriel se passe ainsi, sans écus
-// ni coffre. La nuit est marquée comme faite ; au matin, Hermine rejoint le camp (world/people.js) et sa Récolte s'ouvre.
+// ni coffre. La nuit est marquée comme faite ; au matin, Lorena rejoint le camp (world/people.js) et sa Récolte s'ouvre.
 async function sleep(userId) {
     await migrate(userId);
     return db.transaction(async conn => {
@@ -647,7 +647,7 @@ async function buyZone(userId, zoneId, openChapters) {
     });
 }
 
-// Le Ponton I (choix de l'auteur, 11 oct.) : Hermine le bâtit à son premier jour, avec le bois de la Récolte seul ; son
+// Le Ponton I (choix de l'auteur, 11 oct.) : Lorena le bâtit à son premier jour, avec le bois de la Récolte seul ; son
 // carnet de quart (dans sa caisse) tient lieu de plan, et son quartier (La Crique, acte IV) n'est pas encore à soi. Les
 // paliers suivants suivent la règle
 const tutorialPonton = (siteId, level) => siteId === 'ponton' && !level;

@@ -58,8 +58,8 @@ test('« Recommencer l’île » : confirmé en toutes lettres ; tout repart de 
     const items = (await sql('SELECT item FROM world_items WHERE user_id = $1 ORDER BY item', [id])).map(r => r.item);
     // (l'île recommencée part de ses sentiers, son Feu sur la plage : world/places.js)
     assert.deepEqual(items, ['ile:plage', 'ile:recommencee', 'ile:sentiers']);
-    // Les habitants arrivent un à un, un par jour : personne pendant la première nuit, Hermine au matin, Marcelle après
-    // la deuxième nuit (pas dès la Récolte d'Hermine)
+    // Les habitants arrivent un à un, un par jour : personne pendant la première nuit, Lorena au matin, Marcelle après
+    // la deuxième nuit (pas dès la Récolte de Lorena)
     await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'pages'), ($1, 'ramasser'), ($1, 'feu')`, [id]);
     assert.deepEqual((await view(player)).villagers.map(v => v.id), []);
     await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'nuit')`, [id]);
@@ -74,7 +74,7 @@ test('« Recommencer l’île » : confirmé en toutes lettres ; tout repart de 
     assert.equal((await restart(player)).status, 409);
 });
 
-test('dormir : la première nuit se passe seul, sans écus ; Hermine n’arrive qu’au matin', async () => {
+test('dormir : la première nuit se passe seul, sans écus ; Lorena n’arrive qu’au matin', async () => {
     const player = await newPlayer();
     const id = player.userId;
     const view = async () => (await api('GET', '/play/world', null, player)).data;
@@ -83,7 +83,7 @@ test('dormir : la première nuit se passe seul, sans écus ; Hermine n’arrive 
     await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'pages'), ($1, 'ramasser'), ($1, 'feu')`, [id]);
     const before = await view();
     assert.deepEqual([before.brume.quest.id, before.villagers.map(v => v.id)], ['nuit', []]);
-    // La nuit passée : le jour d'Hermine s'ouvre (sa caisse d'abord), Hermine rejoint le camp ; rien ne se gagne en dormant
+    // La nuit passée : le jour de Lorena s'ouvre (sa caisse d'abord), Lorena rejoint le camp ; rien ne se gagne en dormant
     const slept = await api('POST', '/play/world/sleep', {}, player);
     assert.equal(slept.status, 200);
     assert.equal(slept.data.slept, true);

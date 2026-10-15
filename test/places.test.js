@@ -40,9 +40,9 @@ test('le camp : rien avant son personnage ; sur une île à la plage, chacun dan
   const ids = camp => camp.map(c => c.id).sort();
   // Brume seule : l'épave, rien d'autre
   assert.deepEqual(ids(campOf({ met: new Set() })), ['hirondelle']);
-  // Hermine arrive avec son camp
+  // Lorena arrive avec son camp
   assert.deepEqual(ids(campOf({ met: new Set(['ponton']) })), ['aster', 'caisses', 'filet', 'hirondelle', 'rondins', 'sos']);
-  // Sur une île à la plage : la cuisine de Marcelle sur la plage (sa zone), le camp d'Hermine au sud-ouest, le coin de
+  // Sur une île à la plage : la cuisine de Marcelle sur la plage (sa zone), le camp de Lorena au sud-ouest, le coin de
   // Jovin au nord du Feu
   const beach = places.placesFrom({ beach: true });
   const camp = campOf({ met: new Set(['ponton', 'foyer', 'atelier']), places: beach, beach: true });
@@ -117,7 +117,7 @@ test.describe('île', () => {
     // Le suivi des quêtes montre tout le tutoriel : vingt-deux étapes, de la première page au premier chemin
     assert.deepEqual([start.brume.steps.length, start.brume.steps[0].id, start.brume.steps.at(-1).id], [25, 'pages', 'chemin']);
     assert.ok(start.brume.steps.every(st => st.label && st.done === false));
-    // Le feu fait : personne encore (la première nuit se passe seul) ; la nuit passée : Hermine arrive, son Ponton et
+    // Le feu fait : personne encore (la première nuit se passe seul) ; la nuit passée : Lorena arrive, son Ponton et
     // son camp avec elle
     await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'pages'), ($1, 'ramasser'), ($1, 'feu')`, [player.userId]);
     assert.deepEqual((await view()).villagers.map(v => v.id), []);

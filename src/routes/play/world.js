@@ -578,7 +578,7 @@ router.post('/world/quest', withAccount(async (req, res, owner, b) => {
     res.json({ gained: done.gained, coins: done.coins, world: await worldView(owner, b) });
 }));
 
-// Dormir, la première nuit (tutoriel, étape « nuit ») : sans écus ni coffre ; au matin, Hermine arrive et sa Récolte
+// Dormir, la première nuit (tutoriel, étape « nuit ») : sans écus ni coffre ; au matin, Lorena arrive et sa Récolte
 // s'ouvre. { slept, world }
 router.post('/world/sleep', withAccount(async (req, res, owner, b) => {
     const done = await world.sleep(owner.id);
