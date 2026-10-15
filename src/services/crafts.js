@@ -36,6 +36,8 @@ const ofPlace = name => name.replace(/^Les /, 'des ').replace(/^Le /, 'du ').rep
 const craft = (id, name, tier, cost, elements, after, place, shape, spent = {}) => ({ id, name, tier, cost, elements, after, place, shape, finds: spent });
 const CRAFTS = [
     craft('cloture', 'Clôture', 'start', { wood: 8 }, [], [], {}, ['x.x', 'xxx', 'x.x']),
+    // (la porte d'un enclos, choix de l'auteur, 15 oct. : dans le mur, sentiers compris ; son verrou à part, LOCK_COST)
+    craft('porte', 'Porte', 'start', { wood: 10 }, [], ['cloture'], { ground: 'gsmpk', wall: true }, ['xxx', 'x.x', 'xxx']),
     // (la torche de bois flotté, choix de l'auteur, 13 oct. : les trois de Jovin, au jour 4 ; une lumière de la nuit,
     // nights.js)
     craft('torche', 'Torche', 'start', { wood: 2 }, ['Feu'], [], {}, ['x', 'x', 'x', 'x']),
@@ -198,7 +200,19 @@ const TUTORIAL_CRAFTS = new Set(['lanterne']);
 // Ce qui se pose en ligne, d'un glisser (choix de l'auteur, 13 oct.) : une pièce par case traversée, fabriquée et payée
 // en passant, une fois la première assemblée à la main ; au plus LINE_MAX cases d'un trait
 const LINE_CRAFTS = new Set(['cloture', 'muret']);
+// Les créations qui font un mur (un enclos se ferme par elles, ou par un bâtiment, le camp, l'eau), et la porte
+const WALL_CRAFTS = new Set(['cloture', 'muret', 'porte']);
+const DOOR = 'porte';
+// Le verrou d'une porte (choix de l'auteur, 15 oct.) : verrouillée, elle tient comme une clôture la nuit
+const LOCK_COST = { stone: 6 };
+// Dans le mur : un mur (wall(x, y) : vrai) de chaque côté, à gauche et à droite, ou en haut et en bas
+const inWall = (x, y, wall) => (wall(x - 1, y) && wall(x + 1, y)) || (wall(x, y - 1) && wall(x, y + 1));
 const LINE_MAX = 40;
+// Un assemblage fait jusqu'à tant de pièces d'un coup (choix de l'auteur, 15 oct.) : un seul casse-tête, le coût et les
+// trouvailles multipliés ; la création telle qu'elle se paie pour count pièces
+const BATCH_MAX = 20;
+const times = (bag, count) => Object.fromEntries(Object.entries(bag).map(([k, n]) => [k, n * count]));
+const batchOf = (c, count) => (count > 1 ? { ...c, cost: times(c.cost, count), finds: times(c.finds, count) } : c);
 
 // Ce qui empêche de fabriquer une création (texte), ou null. made : { création: nombre fabriqué } ; owned : Set des
 // éléments du Livre ; stock : ressources ; open : paliers ouverts ; have : trouvailles de climat ; tutorial : le
@@ -223,7 +237,8 @@ function placeText(c, siteName = id => id) {
     const p = c.place;
     const parts = [];
     if (p.climate) parts.push(T.PLACE.climate(map.CLIMATES[p.climate]));
-    if (p.ground) parts.push(GROUND_TEXT[p.ground]);
+    if (p.wall) parts.push(T.PLACE.wall);
+    else if (p.ground) parts.push(GROUND_TEXT[p.ground]);
     if (p.path) parts.push(T.PLACE.path);
     if (p.nearSite) parts.push(T.PLACE.near(p.nearSite.reach, siteName(p.nearSite.id)));
     if (p.nearCraft) parts.push(T.PLACE.near(p.nearCraft.reach, CRAFT_BY_ID[p.nearCraft.id].name));
@@ -242,6 +257,7 @@ function spotBlock(c, x, y, ctx) {
     if (p.climate && ctx.climate(x, y) !== p.climate) return T.SPOT.climate(map.CLIMATES[p.climate]);
     if (!(p.ground || 'gsm').includes(ctx.ground(x, y))) return T.PLACE.rule(GROUND_TEXT[p.ground || 'gm']);
     if (p.path && !DIRS.some(([dx, dy]) => 'pk'.includes(ctx.ground(x + dx, y + dy)))) return T.SPOT.path;
+    if (p.wall && !(ctx.wall && inWall(x, y, ctx.wall))) return T.SPOT.wall;
     if (p.nearSite) {
         const at = ctx.site(p.nearSite.id);
         if (!at || gapTo(x, y, at) > p.nearSite.reach) return T.SPOT.far;
@@ -273,6 +289,6 @@ function leaveBlock(row, x, y, placed) {
 }
 
 module.exports = {
-    EPREUVES, STARS, TIERS, TUTORIAL_CRAFTS, LINE_CRAFTS, LINE_MAX, PIECE_MAX, TURNED, CRAFTS, CRAFT_BY_ID, cellsOf, mulberry32, normal, turn, piecesOf, check, tiersOpen, tierLock, blockOf, placeText, gapTo, spotBlock,
+    EPREUVES, STARS, TIERS, TUTORIAL_CRAFTS, LINE_CRAFTS, WALL_CRAFTS, DOOR, LOCK_COST, inWall, LINE_MAX, BATCH_MAX, batchOf, PIECE_MAX, TURNED, CRAFTS, CRAFT_BY_ID, cellsOf, mulberry32, normal, turn, piecesOf, check, tiersOpen, tierLock, blockOf, placeText, gapTo, spotBlock,
     strandedBy, leaveBlock
 };

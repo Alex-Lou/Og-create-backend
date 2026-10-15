@@ -573,7 +573,7 @@ test('créations d’île : assembler (pièces vérifiées), payer à la réussi
   assert.deepEqual(Object.keys(first.crafts.locks), ['I', 'II', 'III']);
   assert.equal(first.crafts.locks.II, 'S’ouvre avec le palier I.');
   assert.deepEqual(first.crafts.epreuves, { have: 0, need: 10 });
-  assert.equal(first.crafts.catalog.length, 31);
+  assert.equal(first.crafts.catalog.length, 32);
   assert.match(cat(first, 'muret').block, /Palier I/);
   assert.match(cat(first, 'cloture').block, /ressources/);
   assert.equal((await start('cloture')).status, 403);
@@ -610,6 +610,13 @@ test('créations d’île : assembler (pièces vérifiées), payer à la réussi
   assert.deepEqual(stored.data.world.crafts.placed, []);
   assert.equal(cat(stored.data.world, 'cloture').reserve, 1);
   assert.equal((await api('POST', '/play/world/craft/store', { x: X(32), y: Y(35) }, player)).status, 404);
+  // Plusieurs pièces d'un coup (choix de l'auteur, 15 oct.) : un seul casse-tête, le coût multiplié ; pas plus que le
+  // stock ne paie, ni au-delà de BATCH_MAX
+  assert.equal((await api('POST', '/play/world/craft/start', { craft: 'cloture', count: 7 }, player)).status, 403);
+  assert.equal((await api('POST', '/play/world/craft/start', { craft: 'cloture', count: 21 }, player)).status, 400);
+  const batch = (await api('POST', '/play/world/craft/start', { craft: 'cloture', count: 3 }, player)).data.run;
+  const three = await api('POST', '/play/world/craft/finish', { run: batch.id, layout: solveCraft(batch), count: 3 }, player);
+  assert.deepEqual([three.status, three.data.count, three.data.world.stock.wood, cat(three.data.world, 'cloture').reserve], [200, 3, 28, 4]);
   // Palier I par l'Épreuve (10 questions) ; la Lanterne demande Feu et Lumière, et le bord d'un chemin
   await sql(`UPDATE progress SET timer_progress = jsonb_set(timer_progress, '{completedQuestions}', '{"Facile":{"A":[1,2,3,4,5,6,7,8,9,10]}}') WHERE user_id = $1`, [player.userId]);
   const opened = await view();

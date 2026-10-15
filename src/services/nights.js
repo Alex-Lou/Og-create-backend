@@ -24,6 +24,8 @@ const LIGHTS = new Set(['lanterne', 'brasero', 'torche']);
 // La portée d'une lumière, en cases (LIGHT_REACH, sinon)
 const REACH = { torche: 2 };
 const FENCES = new Set(['cloture', 'muret']);
+// Une porte verrouillée tient comme une clôture ; sans verrou, elle s'ouvre à qui la pousse (choix de l'auteur, 15 oct.)
+const barsOf = c => FENCES.has(c.craft) || (c.craft === 'porte' && c.locked);
 // Le coq voit à tant de cases (de sa place : le poulailler, sinon la cage)
 const COQ_SIGHT = 4;
 // Sous la pluie, le feu de camp à découvert ne porte qu'à tant de cases ; le Foyer l'abrite dès ce palier
@@ -244,7 +246,7 @@ function defenseOf(crafts, levels, places = STATIC, rainAt = () => false) {
     const lights = crafts.filter(c => LIGHTS.has(c.craft)).map(c => ({ x: c.x, y: c.y, reach: REACH[c.craft] || LIGHT_REACH }));
     const camp = (levels.foyer || 0) < SHELTER_LEVEL;
     if (levels.foyer) lights.push(...cellsOf('foyer', levels.foyer, places).map(c => ({ ...c, reach: LIGHT_REACH, camp })));
-    return { lights, fences: new Set(crafts.filter(c => FENCES.has(c.craft)).map(key)), rainAt };
+    return { lights, fences: new Set(crafts.filter(barsOf).map(key)), rainAt };
 }
 // La portée d'une lumière à l'instant at : le feu de camp à découvert, sous la pluie, ne porte qu'à RAIN_REACH
 const reachAt = (light, defense, at) => (light.camp && defense.rainAt && defense.rainAt(at) ? RAIN_REACH : light.reach);
@@ -258,6 +260,17 @@ function detourOf(path, defense) {
     }
     return null;
 }
+// Où une clôture arrête un chemin : la case de clôture où il bute, ou la case d'avant quand il passerait en diagonale
+// entre deux piquets qui se touchent par le coin (un enclos fermé en biais ne laisse personne se glisser) ; -1 sinon
+function barredAt(path, fences) {
+    for (let i = 0; i < path.length; i++) {
+        if (fences.has(key(path[i]))) return i;
+        const a = path[i - 1];
+        const b = path[i];
+        if (a && a.x !== b.x && a.y !== b.y && fences.has(key({ x: b.x, y: a.y })) && fences.has(key({ x: a.x, y: b.y }))) return i - 1;
+    }
+    return -1;
+}
 // Le sort d'un égaré sur son chemin : { end: 'luciole' | 'barre' | 'dort' | 'arrive', step, path? } (step : la case où il
 // s'arrête ; path : son chemin, s'il a dévié). La barrière d'abord : une clôture sur son chemin l'arrête (le Dormeur s'y
 // endort ; la Racine passe dessous), même s'il passe avant dans une lumière ; sinon, la première lumière à portée le
@@ -267,7 +280,7 @@ function fateOf(creature, defense) {
     const path = detour || creature.path;
     const pace = creature.pace || MS_PER_CELL;
     const out = fate => (detour ? { ...fate, path } : fate);
-    const barred = creature.kind === 'racine' ? -1 : path.findIndex(cell => defense.fences.has(key(cell)));
+    const barred = creature.kind === 'racine' ? -1 : barredAt(path, defense.fences);
     if (barred >= 0) return out({ end: creature.kind === 'zombie' ? 'dort' : 'barre', step: barred });
     if (creature.kind !== 'zombie') {
         for (const [step, cell] of path.entries()) {
@@ -344,7 +357,7 @@ const STONE_SITES = new Set(['carriere', 'puits', 'atelier', 'foyer']);
 const repairOf = (site, level) => ({ resource: STONE_SITES.has(site) ? 'stone' : 'wood', amount: 3 + 2 * (Math.max(1, level) - 1) });
 
 module.exports = {
-    LIGHT_REACH, REACH, COQ_SIGHT, RAIN_REACH, SHELTER_LEVEL, MS_PER_CELL, LIGHTS, FENCES, countOf, anyaTimesOn,
+    LIGHT_REACH, REACH, COQ_SIGHT, RAIN_REACH, SHELTER_LEVEL, MS_PER_CELL, LIGHTS, FENCES, countOf, anyaTimesOn, barredAt,
     KINDS, SIGHT, RETURN_MS, SCRIPT, paceOf, indexOf, kindsOf, underFence,
     parisAt, dayOf, nextDay, boundsOf, nightAt, nightNear, endedBetween, borderOf, lineOf, planOf, defenseOf, fateOf, outcomeOf, repairOf
 };

@@ -182,9 +182,13 @@ async function exploredOf(userId, conn = db, now = Date.now()) {
     return rows.map(r => r.zone);
 }
 
-// Créations d'île (lot 8) : [{ id, craft, x, y, flip }] (x, y vides : en réserve ; flip : posée en miroir)
+// Créations d'île (lot 8) : [{ id, craft, x, y, flip, locked }] (x, y vides : en réserve ; flip : posée en miroir ;
+// locked : une porte à verrou, une ligne de world_items « verrou:<id> », sans migration ; choix de l'auteur, 15 oct.)
+const LOCK_PREFIX = 'verrou:';
 async function craftsOf(userId, conn = db) {
-    const { rows } = await conn.query('SELECT id, craft, x, y, flip FROM world_crafts WHERE user_id = $1 ORDER BY id', [userId]);
+    const { rows } = await conn.query(
+        `SELECT c.id, c.craft, c.x, c.y, c.flip, (i.item IS NOT NULL) AS locked FROM world_crafts c
+         LEFT JOIN world_items i ON i.user_id = c.user_id AND i.item = $2 || c.id WHERE c.user_id = $1 ORDER BY c.id`, [userId, LOCK_PREFIX]);
     return rows;
 }
 const placedOf = rows => rows.filter(r => r.x !== null);
@@ -202,7 +206,7 @@ async function balanceOf(userId, conn) {
     return rows[0]?.coins ?? 0;
 }
 
-module.exports = {
+module.exports = { LOCK_PREFIX,
     itemsOf, skinsOf, signsOf, namesOf, avatarOf, friendsOf, needRowsOf, settlersOf, gamesOf, annexesOf, levelsOf, stockOf,
     tilesOf, zonesOf, findsOf, spendFinds, depositsOf, blightsOf, foundOf, claimedOf, claimedAtOf, helianeOfUser, runsOf, countOf,
     discoveredOf, exploredOf, craftsOf, placedOf, madeOf, addStock, balanceOf, writtenOf, PLAYED

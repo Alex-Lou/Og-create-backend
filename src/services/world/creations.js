@@ -8,7 +8,7 @@ const quests = require('../quests');
 const landmarks = require('../landmarks');
 const finds = require('../finds');
 const { SIZE, CRAFT_TTL_MS, keyOf } = require('./rules');
-const { annexesOf, levelsOf, stockOf, zonesOf, findsOf, spendFinds, craftsOf, placedOf, madeOf, addStock } = require('./reads');
+const { annexesOf, levelsOf, stockOf, zonesOf, findsOf, spendFinds, craftsOf, placedOf, madeOf, addStock, LOCK_PREFIX } = require('./reads');
 const { migrate } = require('./migrate');
 const { livesHere, presenceOf } = require('./people');
 const { STATIC, footprintAt, inFootprintAt, placesOf } = require('./places');
@@ -16,6 +16,7 @@ const { campOfUser, cellsOfCamp } = require('./camp');
 const { gatherBefore, payWith } = require('./produce');
 const { roadsOf } = require('./paths');
 const T = require('../../texts/crafts');
+const { MISSING_RESOURCES } = require('../../texts/errors');
 
 // Contexte des règles de pose (crafts.spotBlock) : sol, case libre (sur l'île, hors chantier, quartier à soi, ni annexe,
 // ni autre création, ni lieu remarquable, ni gisement), emprise d'un bâtiment bâti, créations posées (sauf skip : celle qu'on déplace)
@@ -25,6 +26,9 @@ const T = require('../../texts/crafts');
 function craftCtx({ levels, zones, annexRows, rows, skip = null, blocked = new Set(), ground = map.groundAt, places = STATIC }) {
     const others = placedOf(rows).filter(r => r.id !== skip);
     const busy = new Set([...annexRows.map(keyOf), ...others.map(keyOf), ...blocked]);
+    // Ce qui fait un mur, pour une porte (crafts.inWall) : une clôture, un muret ou une porte, le camp, un bâtiment, l'eau
+    const walls = new Set([...others.filter(r => crafts.WALL_CRAFTS.has(r.craft)).map(keyOf), ...blocked]);
+    const wall = (x, y) => walls.has(y * SIZE + x) || !map.isLand(x, y) || inFootprintAt(places, x, y, levels);
     const open = new Uint8Array(SIZE * SIZE);
     const cells = [];
     for (let y = 0; y < SIZE; y++) {
@@ -39,6 +43,7 @@ function craftCtx({ levels, zones, annexRows, rows, skip = null, blocked = new S
         climate: (x, y) => map.ZONE_BY_ID[map.zoneAt(x, y)]?.climate,
         free: (x, y) => Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < SIZE && y < SIZE && open[y * SIZE + x] === 1,
         site: id => (livesHere(id, levels, zones) ? footprintAt(places, id, levels[id]) : null),
+        wall,
         placed: others,
         cells
     };
@@ -113,14 +118,14 @@ function craftsView(rows, ctx, { owned, stock, open, epreuves, stars = 0, have, 
                 spots: made[c.id] || free.has(c.id) ? craftSpots(c, ctx) : []
             };
         }),
-        placed: placed.map(r => ({ x: r.x, y: r.y, craft: r.craft, flip: r.flip, ...keepsOf(r) }))
+        placed: placed.map(r => ({ x: r.x, y: r.y, craft: r.craft, flip: r.flip, ...(r.craft === crafts.DOOR ? { locked: r.locked } : {}), ...keepsOf(r) }))
     };
 }
 
 // Assemblage d'une création : palier ouvert, celles d'avant déjà fabriquées, savoir-faire du Livre, ressources. Une
 // graine, les pièces à poser (rien n'est payé avant la réussite). owned : éléments du Livre ; chapters : chapitres
 // ouverts. { run: { id, craft, shape, pieces, turned } } ou { status, message }
-async function startCraft(userId, craftId, owned, chapters, stars = 0) {
+async function startCraft(userId, craftId, owned, chapters, stars = 0, count = 1) {
     if (!Object.hasOwn(crafts.CRAFT_BY_ID, craftId)) return { status: 404, message: T.CRAFT_UNKNOWN };
     const c = crafts.CRAFT_BY_ID[craftId];
     await migrate(userId);
@@ -129,7 +134,7 @@ async function startCraft(userId, craftId, owned, chapters, stars = 0) {
         const { stock, balance } = await payWith(userId, conn, await stockOf(userId, conn, true));
         const open = crafts.tiersOpen(chapters, await epreuvesOf(userId, conn), stars);
         const tutorial = tutorialOf(await presenceOf(userId, conn)).has(c.id);
-        const block = crafts.blockOf(c, { made: madeOf(await craftsOf(userId, conn)), owned: new Set(owned), stock, open, have: await findsOf(userId, conn), tutorial, stars });
+        const block = crafts.blockOf(crafts.batchOf(c, count), { made: madeOf(await craftsOf(userId, conn)), owned: new Set(owned), stock, open, have: await findsOf(userId, conn), tutorial, stars });
         if (block) return db.rollback({ status: 403, message: block });
         const seed = crypto.randomInt(1, 2147483647);
         const { rows } = await conn.query('INSERT INTO world_craft_runs (user_id, craft, seed) VALUES ($1, $2, $3) RETURNING id', [userId, craftId, seed]);
@@ -141,8 +146,9 @@ async function startCraft(userId, craftId, owned, chapters, stars = 0) {
 }
 
 // Fin d'un assemblage : le serveur vérifie que les pièces couvrent le gabarit, puis prend les ressources et met la
-// création en réserve. L'assemblage ne se rend qu'une fois, même refusé. { made, craft } ou { status, message }
-function finishCraft(userId, runId, layout, owned, chapters, stars = 0) {
+// création en réserve, count fois (un seul casse-tête pour plusieurs pièces : crafts.batchOf). L'assemblage ne se rend
+// qu'une fois, même refusé. { made, craft, count } ou { status, message }
+function finishCraft(userId, runId, layout, owned, chapters, stars = 0, count = 1) {
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
         const { rows } = await conn.query(
@@ -158,14 +164,13 @@ function finishCraft(userId, runId, layout, owned, chapters, stars = 0) {
         const { stock: paid, balance } = await payWith(userId, conn, stock);
         const open = crafts.tiersOpen(chapters, await epreuvesOf(userId, conn), stars);
         const tutorial = tutorialOf(await presenceOf(userId, conn)).has(c.id);
-        const block = crafts.blockOf(c, { made: madeOf(await craftsOf(userId, conn)), owned: new Set(owned), stock: paid, open, have: await findsOf(userId, conn), tutorial, stars });
+        const batch = crafts.batchOf(c, count);
+        const block = crafts.blockOf(batch, { made: madeOf(await craftsOf(userId, conn)), owned: new Set(owned), stock: paid, open, have: await findsOf(userId, conn), tutorial, stars });
         if (block) return { status: 409, message: block };
-        const n = r => c.cost[r] || 0;
-        await conn.query('UPDATE world_stock SET stone = stone - $2, wood = wood - $3, water = water - $4, food = food - $5 WHERE user_id = $1',
-            [userId, n('stone'), n('wood'), n('water'), n('food')]);
-        await spendFinds(userId, c.finds, conn);
-        await conn.query('INSERT INTO world_crafts (user_id, craft) VALUES ($1, $2)', [userId, craftId]);
-        return { made: c.name, craft: c.id, ...(balance !== undefined ? { coins: balance } : {}) };
+        await payStock(userId, batch.cost, conn);
+        await spendFinds(userId, batch.finds, conn);
+        await conn.query('INSERT INTO world_crafts (user_id, craft) SELECT $1, $2 FROM generate_series(1, $3)', [userId, craftId, count]);
+        return { made: c.name, craft: c.id, count, ...(balance !== undefined ? { coins: balance } : {}) };
     });
 }
 
@@ -197,9 +202,24 @@ async function placeCraft(userId, craftId, x, y, flip = false) {
         const { places } = await placesOf(userId, conn);
         const block = crafts.spotBlock(c, x, y, craftCtx({ levels, zones: await zonesOf(userId, conn), annexRows, rows, blocked: campCells, ground, places }));
         if (block) return db.rollback({ status: 400, message: block });
-        await conn.query('UPDATE world_crafts SET flip = $2 WHERE id = $1', [row.id, flip]);
+        await conn.query('UPDATE world_crafts SET flip = $2 WHERE id = $1', [row.id, c.id === crafts.DOOR ? doorFlip(ctx, x, y) : flip]);
         return setSpot(userId, conn, stock, row, x, y);
     });
+}
+
+// Paie cost au stock (l'appelant a vérifié qu'il suffit)
+function payStock(userId, cost, conn) {
+    const n = r => cost[r] || 0;
+    return conn.query('UPDATE world_stock SET stone = stone - $2, wood = wood - $3, water = water - $4, food = food - $5 WHERE user_id = $1',
+        [userId, n('stone'), n('wood'), n('water'), n('food')]);
+}
+// Une pièce fabriquée et payée en passant, sans assemblage (l'appelant a vérifié qu'il peut : crafts.blockOf) : sa ligne,
+// en réserve
+async function paidPiece(userId, conn, c) {
+    await payStock(userId, c.cost, conn);
+    await spendFinds(userId, c.finds, conn);
+    const { rows: added } = await conn.query('INSERT INTO world_crafts (user_id, craft) VALUES ($1, $2) RETURNING id', [userId, c.id]);
+    return { id: added[0].id, craft: c.id, x: null, y: null, flip: false, locked: false };
 }
 
 // Pose en ligne (un glisser, choix de l'auteur, 13 oct.) : une création « en ligne » (clôture, muret) sur chaque case de
@@ -245,12 +265,7 @@ async function placeLine(userId, craftId, cells, owned, chapters, stars = 0) {
                     stopped = lack;
                     break;
                 }
-                const n = r => c.cost[r] || 0;
-                await conn.query('UPDATE world_stock SET stone = stone - $2, wood = wood - $3, water = water - $4, food = food - $5 WHERE user_id = $1',
-                    [userId, n('stone'), n('wood'), n('water'), n('food')]);
-                await spendFinds(userId, c.finds, conn);
-                const { rows: added } = await conn.query('INSERT INTO world_crafts (user_id, craft) VALUES ($1, $2) RETURNING id', [userId, craftId]);
-                row = { id: added[0].id, craft: craftId, x: null, y: null, flip: false };
+                row = await paidPiece(userId, conn, c);
                 stock = await stockOf(userId, conn, true);
             }
             const done = await setSpot(userId, conn, stock, row, x, y);
@@ -262,6 +277,71 @@ async function placeLine(userId, craftId, cells, owned, chapters, stars = 0) {
         }
         if (!placed) return db.rollback({ status: 400, message: stopped || T.NOTHING_TO_PLACE });
         return { placed, ...(stopped ? { stopped } : {}), ...(coins !== undefined ? { coins } : {}) };
+    });
+}
+
+// Le sens d'une porte : le long de son mur (des murs à gauche et à droite : posée droite ; en haut et en bas : en miroir)
+const doorFlip = (ctx, x, y) => !(ctx.wall(x - 1, y) && ctx.wall(x + 1, y));
+
+// Pose une porte dans le mur d'un enclos (choix de l'auteur, 15 oct.) : sur un piquet ou un muret (il retourne dans la
+// réserve), ou dans un trou entre deux murs, sentiers compris (crafts.inWall). La réserve d'abord (une porte à verrou si
+// on en veut une, sinon une simple), puis fabriquée et payée en passant ; lock : avec son verrou, payé s'il n'y est pas
+// (crafts.LOCK_COST). owned, chapters, stars : comme startCraft. { coins? } ou { status, message }
+async function placeDoor(userId, x, y, lock, owned, chapters, stars = 0) {
+    const c = crafts.CRAFT_BY_ID[crafts.DOOR];
+    await migrate(userId);
+    return db.transaction(async conn => {
+        const { balance } = await payWith(userId, conn, await stockOf(userId, conn, true));
+        let stock = await stockOf(userId, conn, true);
+        const rows = await craftsOf(userId, conn);
+        const wall = placedOf(rows).find(r => r.x === x && r.y === y && crafts.LINE_CRAFTS.has(r.craft));
+        const { levels } = await levelsOf(userId, conn);
+        const annexRows = await annexesOf(userId, conn);
+        const campCells = cellsOfCamp(await campOfUser(userId, conn, { levels, annexRows, craftRows: rows }));
+        const { ground } = await roadsOf(userId, conn);
+        const { places } = await placesOf(userId, conn);
+        const ctx = craftCtx({ levels, zones: await zonesOf(userId, conn), annexRows, rows, skip: wall ? wall.id : null, blocked: campCells, ground, places });
+        const block = crafts.spotBlock(c, x, y, ctx);
+        if (block) return db.rollback({ status: 400, message: block });
+        const reserve = rows.filter(r => r.craft === c.id && r.x === null);
+        let row = reserve.find(r => r.locked === Boolean(lock)) || reserve[0];
+        if (!row) {
+            const presence = await presenceOf(userId, conn);
+            const open = crafts.tiersOpen(chapters, await epreuvesOf(userId, conn), stars);
+            const lack = crafts.blockOf(c, { made: madeOf(rows), owned: new Set(owned), stock, open, have: await findsOf(userId, conn), tutorial: tutorialOf(presence).has(c.id), stars });
+            if (lack) return db.rollback({ status: 409, message: lack });
+            row = await paidPiece(userId, conn, c);
+            stock = await stockOf(userId, conn, true);
+        }
+        if (lock && !row.locked) {
+            if (Object.entries(crafts.LOCK_COST).some(([r, n]) => (stock[r] || 0) < n)) return db.rollback({ status: 409, message: MISSING_RESOURCES });
+            await payStock(userId, crafts.LOCK_COST, conn);
+            await conn.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'verrou') ON CONFLICT DO NOTHING`, [userId, `${LOCK_PREFIX}${row.id}`]);
+            stock = await stockOf(userId, conn, true);
+        }
+        if (wall) await setSpot(userId, conn, stock, wall, null, null);
+        await conn.query('UPDATE world_crafts SET flip = $2 WHERE id = $1', [row.id, doorFlip(ctx, x, y)]);
+        const done = await setSpot(userId, conn, await stockOf(userId, conn, true), row, x, y);
+        const coins = done.coins !== undefined ? done.coins : balance;
+        return coins !== undefined && coins !== null ? { coins } : {};
+    });
+}
+
+// Le verrou d'une porte posée : posé (payé, crafts.LOCK_COST) ou ôté (sans remboursement). { coins? } ou { status, message }
+async function lockDoor(userId, x, y, lock) {
+    await migrate(userId);
+    return db.transaction(async conn => {
+        const { balance } = await payWith(userId, conn, await stockOf(userId, conn, true));
+        const stock = await stockOf(userId, conn, true);
+        const door = placedOf(await craftsOf(userId, conn)).find(r => r.x === x && r.y === y && r.craft === crafts.DOOR);
+        if (!door) return db.rollback({ status: 404, message: T.NO_CRAFT_HERE });
+        if (door.locked === Boolean(lock)) return db.rollback({ status: 409, message: lock ? T.ALREADY_LOCKED : T.NOT_LOCKED });
+        if (lock) {
+            if (Object.entries(crafts.LOCK_COST).some(([r, n]) => (stock[r] || 0) < n)) return db.rollback({ status: 409, message: MISSING_RESOURCES });
+            await payStock(userId, crafts.LOCK_COST, conn);
+            await conn.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'verrou')`, [userId, `${LOCK_PREFIX}${door.id}`]);
+        } else await conn.query('DELETE FROM world_items WHERE user_id = $1 AND item = $2', [userId, `${LOCK_PREFIX}${door.id}`]);
+        return balance !== undefined && balance !== null ? { coins: balance } : {};
     });
 }
 
@@ -366,5 +446,5 @@ async function turnCraft(userId, x, y, flip) {
 
 module.exports = {
     craftCtx, craftSpots, stowCrafts, epreuvesOf, craftsView, startCraft, finishCraft, placeCraft, placeLine, fenceRingOf, moveCraft,
-    storeCraft, unposeCraft, turnCraft
+    storeCraft, unposeCraft, turnCraft, placeDoor, lockDoor
 };

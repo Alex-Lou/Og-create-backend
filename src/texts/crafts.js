@@ -4,12 +4,13 @@
 // (services/world/creations.js).
 
 // Sols des règles de pose, en clair
-const GROUND_TEXT = { gm: 'sur l’herbe', s: 'sur le sable', n: 'sur la neige', lg: 'sur la lande', x: 'dans le marais', jg: 'dans la jungle', ar: 'sur la cendre ou la roche' };
+const GROUND_TEXT = { gm: 'sur l’herbe', s: 'sur le sable', n: 'sur la neige', lg: 'sur la lande', x: 'dans le marais', jg: 'dans la jungle', ar: 'sur la cendre ou la roche', gsmpk: 'sur l’herbe, le sable ou un chemin' };
 
 // Règle de pose (fiche) : rule (« Se pose » + les morceaux, séparés par des virgules), ou anywhere
 const PLACE = {
     climate: climate => `dans ${climate}`,
     path: 'au bord d’un chemin',
+    wall: 'dans une clôture, sentiers compris',
     near: (reach, name) => `à ${reach} cases au plus de « ${name} »`,
     rule: parts => `Se pose ${parts}.`,
     anywhere: 'Se pose sur n’importe quelle case libre.'
@@ -33,7 +34,8 @@ const SPOT = {
     climate: climate => `Se pose dans ${climate}.`,
     path: 'Se pose au bord d’un chemin.',
     far: 'Trop loin du bâtiment demandé.',
-    nearCraft: name => `Se pose près de « ${name} ».`
+    nearCraft: name => `Se pose près de « ${name} ».`,
+    wall: 'Se pose dans une clôture : entre deux piquets, un bâtiment ou l’eau.'
 };
 
 // Ce qui empêche de déplacer ou de ranger une création dont une autre a besoin
@@ -59,11 +61,14 @@ const WORKBENCH_FIRST = name => `Fabrique d’abord « ${name} » à l’établi
 const CELL_TAKEN = 'Case déjà prise.';
 const NOTHING_TO_PLACE = 'Rien à poser.';
 const NO_CRAFT_HERE = 'Aucune création sur cette case.';
+// (le verrou d'une porte, déjà posé, ou absent quand on veut l'ôter)
+const ALREADY_LOCKED = 'Cette porte a déjà son verrou.';
+const NOT_LOCKED = 'Cette porte n’a pas de verrou.';
 // (défaire un piquet : seulement pendant une leçon des clôtures du tutoriel)
 const UNPOSE_LESSON_ONLY = 'Un piquet ne se défait que pendant la leçon de l’enclos.';
 
 module.exports = {
     GROUND_TEXT, PLACE, TIER_LOCK, MAKE_FIRST, KNOW_HOW, NEED_FINDS, SPOT, LEAVE_BLOCK, ASSEMBLY_ERRORS, CRAFT_UNKNOWN,
     ASSEMBLY_RETURNED, ASSEMBLY_LATE, ASSEMBLY_REFUSED, NONE_IN_RESERVE, NOT_A_LINE, WORKBENCH_FIRST, CELL_TAKEN,
-    NOTHING_TO_PLACE, NO_CRAFT_HERE, UNPOSE_LESSON_ONLY
+    NOTHING_TO_PLACE, NO_CRAFT_HERE, UNPOSE_LESSON_ONLY, ALREADY_LOCKED, NOT_LOCKED
 };

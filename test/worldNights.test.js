@@ -178,14 +178,15 @@ test('la troisième nuit, un Esprit : repoussé d’un toucher, il revient par u
   assert.deepEqual(plan.filter(c => !c.back).map(c => c.kind), ['fantome', 'zombie', 'esprit']);
   const spirit = plan.find(c => c.kind === 'esprit' && !c.back);
   const back = plan.find(c => c.back === spirit.id);
+  // (touchés une demi-case après leur sortie : un égaré marche une case toutes les 20 s, il peut s'arrêter très tôt)
   // Pas encore repoussé (luciole ou arrivée) : son retour n'est pas dehors, ni à toucher
   const evening = await view(id, start - HOUR);
   assert.ok(evening.creatures.every(c => c.kind && c.pace));
   assert.ok(!evening.creatures.some(c => c.id === back.id) || ['barre', 'coq', 'camarade'].includes(evening.creatures.find(c => c.id === spirit.id).end));
-  if (!evening.creatures.some(c => c.id === back.id)) assert.equal((await worldNights.repelCreature(id, back.id, back.at + MINUTE)).status, 409);
+  if (!evening.creatures.some(c => c.id === back.id)) assert.equal((await worldNights.repelCreature(id, back.id, back.at + back.pace / 2)).status, 409);
   // Un toucher : il boude, puis revient
-  assert.deepEqual(await worldNights.repelCreature(id, spirit.id, spirit.at + MINUTE), { id: spirit.id, night });
-  const later = await view(id, back.at + MINUTE);
+  assert.deepEqual(await worldNights.repelCreature(id, spirit.id, spirit.at + spirit.pace / 2), { id: spirit.id, night });
+  const later = await view(id, back.at + back.pace / 2);
   assert.equal(later.creatures.find(c => c.id === back.id).back, spirit.id);
   // Au matin : trois égarés sortis (le retour ne compte pas pour un de plus), un Esprit revenu
   await settle(id, end + 10 * MINUTE);

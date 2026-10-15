@@ -75,20 +75,27 @@ const craftDone = async (res, owner, b, done, extra = {}) => {
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ ...extra, ...coinsOf(done), world: await worldView(owner, b) });
 };
+// Combien de pièces un assemblage fait d'un coup (1 par défaut ; crafts.BATCH_MAX au plus), ou null si invalide
+const countOf = body => {
+    const count = body.count === undefined ? 1 : Number(body.count);
+    return Number.isInteger(count) && count >= 1 && count <= crafts.BATCH_MAX ? count : null;
+};
 router.post('/world/craft/start', withAccount(async (req, res, owner, b) => {
     const craft = craftId(req.body);
-    if (!/^[a-z]{1,20}$/.test(craft)) return res.status(400).json({ message: INVALID.craft });
+    const count = countOf(req.body);
+    if (!/^[a-z]{1,20}$/.test(craft) || !count) return res.status(400).json({ message: INVALID.craft });
     const owned = await players.elements(owner);
-    const done = await world.startCraft(owner.id, craft, owned, bookPages.openChapters(b, owned), bookPages.starsOf(b, owned));
+    const done = await world.startCraft(owner.id, craft, owned, bookPages.openChapters(b, owned), bookPages.starsOf(b, owned), count);
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ run: done.run, ...coinsOf(done) });
 }));
 router.post('/world/craft/finish', withAccount(async (req, res, owner, b) => {
     const run = Number(req.body.run);
-    if (!Number.isSafeInteger(run) || run <= 0 || !Array.isArray(req.body.layout) || req.body.layout.length > 40) return res.status(400).json({ message: INVALID.layout });
+    const count = countOf(req.body);
+    if (!Number.isSafeInteger(run) || run <= 0 || !Array.isArray(req.body.layout) || req.body.layout.length > 40 || !count) return res.status(400).json({ message: INVALID.layout });
     const owned = await players.elements(owner);
-    const done = await world.finishCraft(owner.id, run, req.body.layout, owned, bookPages.openChapters(b, owned), bookPages.starsOf(b, owned));
-    await craftDone(res, owner, b, done, { made: done.made, craft: done.craft });
+    const done = await world.finishCraft(owner.id, run, req.body.layout, owned, bookPages.openChapters(b, owned), bookPages.starsOf(b, owned), count);
+    await craftDone(res, owner, b, done, { made: done.made, craft: done.craft, count: done.count });
 }));
 router.post('/world/craft/place', withAccount(async (req, res, owner, b) => {
     const craft = craftId(req.body);
@@ -128,6 +135,18 @@ router.post('/world/craft/store', withAccount(async (req, res, owner, b) => {
     const x = Number(req.body.x), y = Number(req.body.y);
     if (!cellOk(x, y)) return res.status(400).json({ message: INVALID.cell });
     await craftDone(res, owner, b, await world.storeCraft(owner.id, x, y));
+}));
+// Une porte dans le mur d'un enclos, avec son verrou ou non (lock) ; puis le verrou d'une porte posée, posé ou ôté
+router.post('/world/craft/door', withAccount(async (req, res, owner, b) => {
+    const x = Number(req.body.x), y = Number(req.body.y);
+    if (!cellOk(x, y) || typeof req.body.lock !== 'boolean') return res.status(400).json({ message: INVALID.pose });
+    const owned = await players.elements(owner);
+    await craftDone(res, owner, b, await world.placeDoor(owner.id, x, y, req.body.lock, owned, bookPages.openChapters(b, owned), bookPages.starsOf(b, owned)));
+}));
+router.post('/world/craft/lock', withAccount(async (req, res, owner, b) => {
+    const x = Number(req.body.x), y = Number(req.body.y);
+    if (!cellOk(x, y) || typeof req.body.lock !== 'boolean') return res.status(400).json({ message: INVALID.pose });
+    await craftDone(res, owner, b, await world.lockDoor(owner.id, x, y, req.body.lock));
 }));
 // Un piquet défait pendant une leçon des clôtures : rendu à la réserve (celui d'une caisse), ou son coût rendu → { refund? }
 router.post('/world/craft/unpose', withAccount(async (req, res, owner, b) => {
