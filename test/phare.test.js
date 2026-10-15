@@ -36,22 +36,32 @@ test('les scènes de l’arc : pas avant leur quête, puis vues une fois par com
   const view = async () => (await api('GET', '/play/world', null, player)).data;
   const seen = id => api('POST', '/play/world/scene', { id }, player);
   const start = await view();
-  assert.deepEqual([start.brume.scenes, start.brume.goal], [[], null]);
+  assert.deepEqual([start.brume.scenes, start.brume.goal], [{ seen: [], due: [] }, null]);
   assert.equal((await seen('nulle')).status, 404);
   assert.equal((await seen('DROP')).status, 400);
   assert.equal((await seen('conseil')).status, 409);
   // Le tutoriel fini (le premier chemin) : le conseil se joue ; l'objectif de fond paraît
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'chemin')`, [player.userId]);
+  assert.deepEqual((await view()).brume.scenes, { seen: [], due: ['conseil'] });
   const twice = await Promise.all([seen('conseil'), seen('conseil')]);
   assert.deepEqual(twice.map(r => r.status), [200, 200]);
   const after = await view();
-  assert.deepEqual([after.brume.scenes, after.brume.goal.act, after.stock], [['conseil'], 'I', start.stock]);
+  assert.deepEqual([after.brume.scenes, after.brume.goal.act, after.stock], [{ seen: ['conseil'], due: [] }, 'I', start.stock]);
   assert.equal((await api('GET', '/play/world/brume', null, player)).data.goal.label, 'Rallumer le phare');
   // La traversée manquée : au Bateau écrit (souvenir-aster)
   assert.equal((await seen('traversee')).status, 409);
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'souvenir-aster')`, [player.userId]);
+  assert.deepEqual((await view()).brume.scenes.due, ['traversee']);
   assert.equal((await seen('traversee')).status, 200);
-  assert.deepEqual((await view()).brume.scenes, ['conseil', 'traversee']);
+  assert.deepEqual((await view()).brume.scenes, { seen: ['conseil', 'traversee'], due: [] });
+});
+
+test('la traversée manquée n’est plus due une fois l’acte IV fini (un compte déjà plus loin ne la voit pas)', async () => {
+  const player = await newPlayer();
+  const lastOfIV = quests.QUESTS.filter(q => q.act === 'IV').pop().id;
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, $2)`, [player.userId, lastOfIV]);
+  const scenes = (await api('GET', '/play/world', null, player)).data.brume.scenes;
+  assert.deepEqual(scenes, { seen: [], due: ['conseil'] });
 });
 
 test('rallumer un feu : un lieu découvert, une fois, gratuit ; le Lac de lave n’en a pas', async () => {

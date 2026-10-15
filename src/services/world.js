@@ -237,14 +237,23 @@ async function tutorialOf(userId, conn = db) {
     return { tutorial: true, skipped: quests.firstNightDoneOf(await claimedOf(userId, conn)) && items.has(PROLOGUE_SKIP) };
 }
 // Les scènes de l'arc du Phare (choix de l'auteur, 15 oct. : une fois par compte, sur tous ses appareils ; rejouables
-// depuis « Revoir le prologue ») : chacune vient avec sa quête (le conseil à la fin du tutoriel, la traversée manquée au
-// Bateau écrit) ; vue, une ligne de world_items (SCENE_PREFIX + id). Elles ne donnent ni ne retirent rien
-const STORY_SCENES = { conseil: quests.TUTORIAL_LAST, traversee: 'souvenir-aster' };
+// depuis « Revoir le prologue ») : chacune vient avec sa quête (after : le conseil à la fin du tutoriel, la traversée
+// manquée au Bateau écrit), et n'est plus due une fois son acte fini (until : la traversée, l'acte IV) ; vue, une ligne
+// de world_items (SCENE_PREFIX + id). Elles ne donnent ni ne retirent rien
+const STORY_SCENES = { conseil: { after: quests.TUTORIAL_LAST }, traversee: { after: 'souvenir-aster', until: 'IV' } };
 const SCENE_PREFIX = 'scene:';
-const scenesSeenOf = items => Object.keys(STORY_SCENES).filter(id => items.has(`${SCENE_PREFIX}${id}`));
+// { seen, due } : les scènes vues par le compte, celles à jouer maintenant (dans l'ordre de l'histoire)
+function scenesOf(items, claimed) {
+    const done = quests.doneOf(claimed);
+    const acts = quests.actsDoneOf(done);
+    const seen = Object.keys(STORY_SCENES).filter(id => items.has(`${SCENE_PREFIX}${id}`));
+    const due = Object.entries(STORY_SCENES)
+        .filter(([id, s]) => !seen.includes(id) && done.has(s.after) && !(s.until && acts.includes(s.until))).map(([id]) => id);
+    return { seen, due };
+}
 async function seeScene(userId, id) {
     if (!Object.hasOwn(STORY_SCENES, id)) return { status: 404, message: W.SCENE_UNKNOWN };
-    if (!quests.doneOf(await claimedOf(userId)).has(STORY_SCENES[id])) return { status: 409, message: W.SCENE_TOO_EARLY };
+    if (!quests.doneOf(await claimedOf(userId)).has(STORY_SCENES[id].after)) return { status: 409, message: W.SCENE_TOO_EARLY };
     await db.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'histoire') ON CONFLICT DO NOTHING`, [userId, `${SCENE_PREFIX}${id}`]);
     return { scene: id };
 }
@@ -588,8 +597,8 @@ async function view(userId, owned, book) {
                 ...boardWith(claimed, facts, book.openChapters),
                 tutorial: true,
                 skipped: firstNightDone && items.has(PROLOGUE_SKIP),
-                // Les scènes de l'arc du Phare déjà vues par le compte (seeScene)
-                scenes: scenesSeenOf(items),
+                // Les scènes de l'arc du Phare : vues par le compte (seeScene), et à jouer maintenant
+                scenes: scenesOf(items, claimed),
                 // Les emplacements que l'histoire donne à l'Athanor (le jeu garde le plus grand, avec ceux des familles)
                 athanor: athanorFrom(claimed)
             };
