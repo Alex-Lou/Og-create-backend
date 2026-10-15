@@ -301,7 +301,8 @@ router.post('/world/nights/start', withAccount(async (req, res, owner, b) => {
 // Repousser un égaré d'un toucher, la nuit, sur son chemin → { id, world }
 router.post('/world/nights/repel', withAccount(async (req, res, owner, b) => {
     const id = String(req.body.id || '');
-    if (!/^\d{4}-\d{2}-\d{2}:\d$/.test(id)) return res.status(400).json({ message: INVALID.stray });
+    // (« nuit:rang », la nuit étant le n° de son cycle, services/gameClock.js ; « :retour » : l'Esprit qui revient)
+    if (!/^\d{1,9}:\d(:retour)?$/.test(id)) return res.status(400).json({ message: INVALID.stray });
     const done = await world.repelCreature(owner.id, id);
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ id: done.id, world: await worldView(owner, b) });

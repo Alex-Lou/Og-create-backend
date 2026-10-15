@@ -1,7 +1,9 @@
 // La météo de l'île, comme le jeu la montre (src/world/sky.js du front : même graine, mêmes créneaux de 6 h) : le
-// temps d'un créneau se déduit de la date seule, sans état. Ici, à l'heure de Paris (celle des nuits : nights.js) ;
-// les nuits n'en lisent que la pluie (choix de l'auteur, 14 oct. : sous la pluie, le feu de camp porte moins loin)
-const DAY_MS = 86400000;
+// temps d'un créneau se déduit de l'instant seul, sans état. Sur l'horloge du jeu (choix de l'auteur, 15 oct. :
+// services/gameClock.js, celle des nuits) ; les nuits n'en lisent que la pluie (choix de l'auteur, 14 oct. : sous la
+// pluie, le feu de camp porte moins loin)
+const clock = require('./gameClock');
+
 const SLOT_H = 6;
 const hash = (a, b) => {
     const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
@@ -25,15 +27,10 @@ function slotKind(day, slot) {
     return hash(day, 11 + slot) < 0.68 ? base : TURNS[base];
 }
 
-// L'heure de Paris d'un instant, lue comme une date UTC (ses champs sont ceux de Paris)
-const PARIS = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit' });
-function parisOf(ms) {
-    const p = Object.fromEntries(PARIS.formatToParts(new Date(ms)).map(part => [part.type, part.value]));
-    return { day: Math.round((Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day)) - Date.UTC(2026, 0, 1)) / DAY_MS), hour: Number(p.hour) };
-}
-// Le temps qu'il fait à un instant (le créneau, sans les transitions que le jeu adoucit), et s'il pleut
+// Le temps qu'il fait à un instant (le créneau de 6 h de l'horloge du jeu, sans les transitions que le jeu adoucit), et
+// s'il pleut
 function kindAt(ms) {
-    const { day, hour } = parisOf(ms);
+    const { day, hour } = clock.dayHourOf(ms);
     return slotKind(day, Math.floor(hour / SLOT_H));
 }
 const rainAt = ms => RAINY.has(kindAt(ms));

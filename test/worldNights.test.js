@@ -1,12 +1,14 @@
 // Les nuits de créatures, avec la base (bible du dépôt front, § 6.15, v6) : présentées par Brume, un jour de grâce, une
 // panne au plus et un seul bâtiment embrumé à la fois, défenses, camarades, toucher, réparation, production arrêtée,
-// Anya qui guérit. Les heures sont fixées (now) : les nuits sont choisies dans le futur, que l'horloge réelle n'atteint pas
+// Anya qui guérit, sur l'horloge du jeu (cycles d'1 h 30). Les heures sont fixées (now) : les nuits sont choisies dans le
+// futur, que l'horloge réelle n'atteint pas
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { startServer, api, sql, newPlayer } = require('./helpers');
 const db = require('../src/config/db');
 const nights = require('../src/services/nights');
 const anya = require('../src/services/anya');
+const clock = require('../src/services/gameClock');
 const worldNights = require('../src/services/world/nights');
 const { stockOf } = require('../src/services/world/reads');
 
@@ -17,6 +19,7 @@ test.after(async () => { server?.kill(); await db.pool.end(); });
 const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
+const CYCLE = clock.CYCLE_MS;
 const iso = ms => new Date(ms).toISOString();
 const settle = (userId, now) => db.transaction(async conn => worldNights.settleNights(userId, conn, await stockOf(userId, conn, true), now));
 const view = (userId, now) => worldNights.nightsView(userId, db, now);
@@ -44,17 +47,17 @@ async function islandPlayer() {
 }
 // Le plan d'une nuit tel que le serveur le tire, les nuits présentées juste avant (startBefore : la n-ième, index ; la
 // première, celle des trois Sans-Nom, par défaut ; le Puits bâti, le Noyé peut sortir)
-const planAt = (userId, night, index) => nights.planOf(userId, night, { ...ISLAND, first: nights.boundsOf(night).start - MINUTE - index * DAY, unlocks: { noye: 0 } });
+const planAt = (userId, night, index) => nights.planOf(userId, night, { ...ISLAND, first: nights.boundsOf(night).start - MINUTE - index * CYCLE, unlocks: { noye: 0 } });
 // La première nuit, dès from, où pick(plan) est vrai (le plan tiré de la graine du joueur)
 function nightWhere(userId, from, pick, index = 0) {
-  for (let night = nights.nightNear(from), i = 0; i < 90; night = nights.nextDay(night), i++) {
+  for (let night = nights.nightNear(from), i = 0; i < 90; night += 1, i++) {
     const plan = planAt(userId, night, index);
     if (pick(plan)) return { night, plan, ...nights.boundsOf(night) };
   }
   throw new Error('aucune nuit qui convienne');
 }
-// Les nuits présentées juste avant celle-ci (sa veille est encore la grâce)
-const startBefore = (userId, start, index = 0) => sql('UPDATE world_nights SET started_at = $2, seen_until = $2 WHERE user_id = $1', [userId, iso(start - DAY - MINUTE - index * DAY)]);
+// Les nuits présentées juste avant celle-ci (le cycle d'avant est encore la grâce)
+const startBefore = (userId, start, index = 0) => sql('UPDATE world_nights SET started_at = $2, seen_until = $2 WHERE user_id = $1', [userId, iso(start - CYCLE - MINUTE - index * CYCLE)]);
 
 test('pas de nuit avant que Brume les présente, puis un jour de grâce ; ensuite une panne au plus, le premier arrivé', async () => {
   const player = await islandPlayer();
@@ -72,21 +75,21 @@ test('pas de nuit avant que Brume les présente, puis un jour de grâce ; ensuit
   const { night, plan, start, end } = nightWhere(id, Date.now() + 2 * DAY, p => nights.outcomeOf(p, FIRE).panne);
   const { panne } = nights.outcomeOf(plan, FIRE);
   // Présentées trop tard pour cette nuit (la grâce la couvre) : rien au matin
-  await sql('UPDATE world_nights SET started_at = $2, seen_until = $2 WHERE user_id = $1', [id, iso(start - 12 * HOUR)]);
-  await settle(id, end + HOUR);
-  assert.equal((await view(id, end + HOUR)).blight, null);
-  // Présentées la veille : la nuit vient
+  await sql('UPDATE world_nights SET started_at = $2, seen_until = $2 WHERE user_id = $1', [id, iso(start - 30 * MINUTE)]);
+  await settle(id, end + 10 * MINUTE);
+  assert.equal((await view(id, end + 10 * MINUTE)).blight, null);
+  // Présentées un cycle plus tôt : la nuit vient
   await startBefore(id, start);
   // Le soir, on voit par où ils viendront, et ce qu'ils embrumeraient ; rien n'est encore réglé
   const evening = await view(id, start - HOUR);
   assert.deepEqual(evening.night, { id: night, start, end });
   assert.deepEqual(evening.creatures.map(c => c.id), plan.map(c => c.id));
   assert.deepEqual(evening.panne, panne);
-  await settle(id, start + HOUR);
-  assert.equal((await view(id, start + HOUR)).blight, null);
+  await settle(id, start + 10 * MINUTE);
+  assert.equal((await view(id, start + 10 * MINUTE)).blight, null);
   // Au matin : le premier arrivé a embrumé son bâtiment
-  await settle(id, end + HOUR);
-  const morning = await view(id, end + HOUR);
+  await settle(id, end + 10 * MINUTE);
+  const morning = await view(id, end + 10 * MINUTE);
   assert.deepEqual(morning.blight, { site: panne.site, since: panne.at, repair: nights.repairOf(panne.site, 1) });
   // Brume en fait le bilan au matin : le sort de chacun, le bâtiment embrumé
   assert.deepEqual(morning.last, { id: night, counts: countsOf(nights.outcomeOf(plan, FIRE)), kinds: { fantome: 3 }, panne: panne.site });
@@ -108,8 +111,8 @@ test('une lumière près du Puits change en lucioles ceux qui y vont : aucune pa
   const evening = await view(id, start - HOUR);
   assert.ok(evening.creatures.filter(c => c.site === 'puits').every(c => c.end === 'luciole'));
   assert.equal(evening.panne, null);
-  await settle(id, end + HOUR);
-  assert.equal((await view(id, end + HOUR)).blight, null);
+  await settle(id, end + 10 * MINUTE);
+  assert.equal((await view(id, end + 10 * MINUTE)).blight, null);
 });
 
 test('un camarade content repousse un égaré par nuit', async () => {
@@ -124,8 +127,8 @@ test('un camarade content repousse un égaré par nuit', async () => {
   const expected = nights.outcomeOf(plan, FIRE, new Set(['puits']));
   const evening = await view(id, start - HOUR);
   assert.ok(evening.creatures.some(c => c.end === 'camarade'));
-  await settle(id, end + HOUR);
-  const morning = await view(id, end + HOUR);
+  await settle(id, end + 10 * MINUTE);
+  const morning = await view(id, end + 10 * MINUTE);
   assert.deepEqual(morning.blight && { site: morning.blight.site, at: morning.blight.since }, expected.panne);
 });
 
@@ -150,8 +153,8 @@ test('d’un toucher, la nuit, on repousse un égaré sur son chemin ; pas le jo
   assert.deepEqual(during.creatures.find(c => c.id === first.id).end, 'touche');
   // Au matin, la nuit se règle sans lui
   const expected = nights.outcomeOf(plan, FIRE, new Set(), new Set([first.id]));
-  await settle(id, end + HOUR);
-  const morning = await view(id, end + HOUR);
+  await settle(id, end + 10 * MINUTE);
+  const morning = await view(id, end + 10 * MINUTE);
   assert.deepEqual(morning.blight && { site: morning.blight.site, at: morning.blight.since }, expected.panne);
   // Le bilan du matin compte celui qu'on a repoussé (gardé un jour après la nuit)
   assert.equal(morning.last.counts.touche, 1);
@@ -182,8 +185,8 @@ test('la troisième nuit, un Esprit : repoussé d’un toucher, il revient par u
   const later = await view(id, back.at + MINUTE);
   assert.equal(later.creatures.find(c => c.id === back.id).back, spirit.id);
   // Au matin : trois égarés sortis (le retour ne compte pas pour un de plus), un Esprit revenu
-  await settle(id, end + HOUR);
-  const morning = await view(id, end + HOUR);
+  await settle(id, end + 10 * MINUTE);
+  const morning = await view(id, end + 10 * MINUTE);
   assert.deepEqual(morning.last.kinds, { fantome: 1, zombie: 1, esprit: 1 });
   assert.equal(morning.last.counts.revenu, 1);
 });
@@ -237,8 +240,8 @@ test('Anya, le jour de son passage, guérit le bâtiment embrumé', async () => 
   await sql(`INSERT INTO world_nights (user_id, started_at, seen_until, blights) VALUES ($1, $2, $3, $4)`,
     [id, iso(since + 30 * DAY), iso(since), JSON.stringify([{ site: 'puits', since: iso(since), until: null }])]);
   const passage = [...Array(10).keys()].map(k => nights.dayOf(since + k * DAY))
-    .map(day => anya.slotOn(id, day) && nights.parisAt(day, nights.ANYA_HOURS[anya.slotOn(id, day)]))
-    .find(at => at && at > since);
+    .flatMap(day => (anya.slotOn(id, day) ? nights.anyaTimesOn(day, anya.slotOn(id, day)) : []))
+    .find(at => at > since);
   // Pas encore révélée : elle n'erre pas
   await settle(id, since + 9 * DAY);
   assert.equal((await view(id, since + 9 * DAY)).blight.site, 'puits');

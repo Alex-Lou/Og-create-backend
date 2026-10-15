@@ -1,13 +1,14 @@
 // Les nuits de créatures, avec la base (v6, § 6.15 ; règles pures : services/nights.js). Une ligne world_nights par
 // joueur, née quand Brume les présente (startNights). Les nuits se règlent au passage suivant (settleNights, appelé par
 // migrate), dans l'ordre du temps :
-// - la première nuit vient un jour après la présentation ;
+// - la première nuit vient un jour du jeu après la présentation (services/gameClock.js) ;
 // - un seul bâtiment embrumé à la fois : une nuit n'en embrume un que si aucun ne l'est déjà ;
-// - Anya, révélée, guérit le bâtiment embrumé le jour de son passage.
+// - Anya, révélée, guérit le bâtiment embrumé à son passage (un jour de Paris, à l'aube ou au crépuscule du jeu).
 // L'île (quartiers, bâtiments, défenses, camarades) compte telle qu'elle est au règlement : au premier passage après la
 // nuit, avant tout changement (chaque action passe d'abord par migrate)
 const db = require('../../config/db');
 const nights = require('../nights');
+const clock = require('../gameClock');
 const anya = require('../anya');
 const map = require('../worldMap');
 const quests = require('../quests');
@@ -23,8 +24,8 @@ const { campOfUser } = require('./camp');
 const T = require('../../texts/nights');
 const { BUILDING_UNKNOWN } = require('../../texts/world');
 
-// Un jour de grâce entre la présentation et la première nuit
-const GRACE_MS = 24 * 3600 * 1000;
+// Un jour du jeu de grâce entre la présentation et la première nuit
+const GRACE_MS = clock.CYCLE_MS;
 const DAY_MS = 24 * 3600 * 1000;
 const msOf = t => new Date(t).getTime();
 const iso = ms => new Date(ms).toISOString();
@@ -85,8 +86,7 @@ function passagesOf(userId, from, to) {
     const last = nights.dayOf(to);
     for (let day = nights.dayOf(Math.max(from, to - 15 * DAY_MS)); day <= last; day = nights.nextDay(day)) {
         const slot = anya.slotOn(userId, day);
-        const at = slot && nights.parisAt(day, nights.ANYA_HOURS[slot]);
-        if (at && at > from && at <= to) out.push(at);
+        if (slot) out.push(...nights.anyaTimesOn(day, slot).filter(at => at > from && at <= to));
     }
     return out;
 }
@@ -126,8 +126,8 @@ async function settleNights(userId, conn, stock, now = Date.now()) {
         }
     }
     const kept = blights.filter(b => !spent(b));
-    // (gardés un jour après leur nuit : le bilan de Brume au matin les compte)
-    const repelled = row.repelled.night && nights.boundsOf(row.repelled.night).end + DAY_MS > now ? row.repelled : {};
+    // (gardés un jour du jeu après leur nuit : le bilan de Brume au matin les compte)
+    const repelled = row.repelled.night && nights.boundsOf(row.repelled.night).end + clock.CYCLE_MS > now ? row.repelled : {};
     await conn.query('UPDATE world_nights SET seen_until = $2, blights = $3, repelled = $4 WHERE user_id = $1',
         [userId, iso(Math.max(seen, now)), JSON.stringify(kept), JSON.stringify(repelled)]);
 }
@@ -197,7 +197,7 @@ async function repairSite(userId, site, now = Date.now()) {
 // touche, arrive, revenu (les Esprits revenus) }, kinds: { espèce: nombre } (ceux sortis, sans les retours), panne (le
 // bâtiment qu'elle a embrumé, ou null) }, ou null avant la première nuit
 function lastOf(userId, row, first, { island, defense, helpersAt, watchAt }, now) {
-    const night = nights.endedBetween(now - 2 * DAY_MS, now).pop();
+    const night = nights.endedBetween(now - 2 * clock.CYCLE_MS, now).pop();
     if (!night) return null;
     const { start, end } = nights.boundsOf(night);
     if (start < first) return null;

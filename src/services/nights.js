@@ -1,6 +1,7 @@
 // Les nuits de créatures (HISTOIRE.md du dépôt front, § 6.15, v6 ; décisions du 6 octobre 2026) : règles pures, sans
-// base. Chaque nuit (21 h à 6 h, heure de Paris), des égarés sortent de la brume voisine, au bord de l'île à soi, et
-// marchent vers le bâtiment le plus proche :
+// base. Chaque nuit de l'horloge du jeu (choix de l'auteur, 15 oct. : 20 minutes par cycle d'1 h 30, la même pour tous ;
+// services/gameClock.js), des égarés sortent de la brume voisine, au bord de l'île à soi, et marchent vers le bâtiment
+// le plus proche :
 // - une clôture ou un muret barre sa case, même dans la lumière (choix de l'auteur, 13 oct. : la barrière d'abord, l'enclos
 //   du Feu sert vraiment) ;
 // - une lumière (le feu du Foyer, une lanterne, un brasero : 3 cases ; une torche : 2) change en luciole celui qui passe
@@ -16,9 +17,8 @@
 const crypto = require('node:crypto');
 const map = require('./worldMap');
 const { STATIC, footprintAt } = require('./world/places');
+const clock = require('./gameClock');
 
-const START_HOUR = 21;
-const END_HOUR = 6;
 const LIGHT_REACH = 3;
 const LIGHTS = new Set(['lanterne', 'brasero', 'torche']);
 // La portée d'une lumière, en cases (LIGHT_REACH, sinon)
@@ -29,8 +29,8 @@ const COQ_SIGHT = 4;
 // Sous la pluie, le feu de camp à découvert ne porte qu'à tant de cases ; le Foyer l'abrite dès ce palier
 const RAIN_REACH = 1;
 const SHELTER_LEVEL = 2;
-// Un égaré marche une case toutes les 2 minutes (3 avant la grande carte : les chemins y sont 1,5 fois plus longs)
-const MS_PER_CELL = 2 * 60 * 1000;
+// Un égaré marche une case toutes les 20 secondes : il traverse la nuit sous les yeux du joueur
+const MS_PER_CELL = 20 * 1000;
 // Une nuit à la fois : 3 égarés avant l'acte I fini, un de plus par acte, 8 au plus (choix de l'auteur, 13 oct.)
 const countOf = acts => Math.min(8, 3 + acts);
 
@@ -47,7 +47,7 @@ const SIGHT = 5;
 const PACE = { zombie: 1.5, bete: 0.75 };
 const paceOf = kind => Math.round(MS_PER_CELL * (PACE[kind] || 1));
 // L'Esprit revient tant après l'instant où il serait arrivé ; ce qui le fait revenir
-const RETURN_MS = 30 * 60 * 1000;
+const RETURN_MS = 3 * 60 * 1000;
 const RETURNS = new Set(['touche', 'barre', 'coq', 'camarade']);
 // Les premières nuits, écrites (la n-ième nuit depuis la présentation) ; au-delà, des Sans-Nom
 const SCRIPT = [['fantome', 'fantome', 'fantome'], ['fantome', 'zombie', 'fantome'], ['fantome', 'zombie', 'esprit']];
@@ -59,7 +59,8 @@ const THEME_ODDS = 6;
 const THEME_WEIGHT = 4;
 const RAIN_WEIGHT = 2;
 
-// Heure de Paris → instant : midi d'un jour 'AAAA-MM-JJ' + heures (changements d'heure compris)
+// Heure de Paris → instant : un jour 'AAAA-MM-JJ' + heures (changements d'heure compris). Les nuits suivent l'horloge du
+// jeu ; les jours de Paris restent ceux des passages d'Anya (services/anya.js)
 const PARIS = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
 function wallOf(ms) {
     const p = Object.fromEntries(PARIS.formatToParts(new Date(ms)).map(part => [part.type, part.value]));
@@ -73,27 +74,21 @@ function parisAt(day, hour) {
 }
 const dayOf = ms => new Date(wallOf(ms)).toISOString().slice(0, 10);
 const nextDay = day => new Date(Date.parse(`${day}T12:00:00Z`) + 24 * 3600 * 1000).toISOString().slice(0, 10);
-const previousDay = day => new Date(Date.parse(`${day}T12:00:00Z`) - 24 * 3600 * 1000).toISOString().slice(0, 10);
 
-// Une nuit se nomme par le jour où elle commence : { start, end } (instants)
-const boundsOf = night => ({ start: parisAt(night, START_HOUR), end: parisAt(nextDay(night), END_HOUR) });
+// Une nuit se nomme par le n° de son cycle (gameClock) : { start, end } (instants)
+const boundsOf = night => clock.nightOf(Number(night));
 // La nuit en cours à un instant, ou null (le jour)
 function nightAt(ms) {
-    const hour = new Date(wallOf(ms)).getUTCHours();
-    if (hour >= START_HOUR) return dayOf(ms);
-    if (hour < END_HOUR) return previousDay(dayOf(ms));
-    return null;
+    const cycle = clock.cycleOf(ms);
+    return ms >= boundsOf(cycle).start ? cycle : null;
 }
-// La nuit en cours, ou la prochaine (le soir, on voit déjà par où ils viendront)
-const nightNear = ms => nightAt(ms) || (new Date(wallOf(ms)).getUTCHours() < START_HOUR ? dayOf(ms) : nextDay(dayOf(ms)));
+// La nuit en cours, ou la prochaine (le jour, on voit déjà par où ils viendront) : celle du cycle
+const nightNear = ms => clock.cycleOf(ms);
 // Les nuits finies dans ]from, to], dans l'ordre (14 au plus : au-delà, rien ne change, un seul bâtiment s'embrume)
 function endedBetween(from, to) {
+    const last = clock.cycleOf(to) - 1;
     const out = [];
-    for (let night = previousDay(dayOf(to)); out.length < 14; night = previousDay(night)) {
-        const { end } = boundsOf(night);
-        if (end <= from) break;
-        if (end <= to) out.unshift(night);
-    }
+    for (let night = Math.max(clock.cycleOf(from), last - 13); night <= last; night++) out.push(night);
     return out;
 }
 
@@ -169,9 +164,8 @@ function originsOf(owned) {
 }
 // La n-ième nuit depuis first (l'instant de la première nuit possible), 0 pour la première
 function indexOf(night, first) {
-    let zero = nightNear(first);
-    if (boundsOf(zero).start < first) zero = nextDay(zero);
-    return Math.round((Date.parse(`${night}T12:00:00Z`) - Date.parse(`${zero}T12:00:00Z`)) / (24 * 3600 * 1000));
+    const zero = boundsOf(clock.cycleOf(first)).start < first ? clock.cycleOf(first) + 1 : clock.cycleOf(first);
+    return Number(night) - zero;
 }
 // Qui sort cette nuit : count espèces. island.first : l'instant de la première nuit possible (absent : le long terme) ;
 // island.unlocks : { noye, racine } (l'instant d'où ils peuvent sortir : le premier sort à coup sûr la première nuit
@@ -198,7 +192,7 @@ function kindsOf(userId, night, island, count) {
         });
     }
     // (le premier Noyé, la première Racine : la première nuit où ils peuvent sortir)
-    const firsts = ['noye', 'racine'].filter(kind => open(kind) && unlocks[kind] > boundsOf(previousDay(night)).start);
+    const firsts = ['noye', 'racine'].filter(kind => open(kind) && unlocks[kind] > boundsOf(Number(night) - 1).start);
     firsts.forEach((kind, k) => { if (k < count) kinds[k] = kind; });
     return kinds;
 }
@@ -331,16 +325,24 @@ function outcomeOf(plan, defense, helpers = new Set(), repelled = new Set(), wat
     return { fates, panne: first ? { site: first.site, at: first.arrives } : null };
 }
 
-// Anya, le jour de son passage (services/anya.js, slotOn), guérit le bâtiment embrumé : l'heure de Paris où elle est
-// passée, après le lever ou le coucher du soleil toute l'année (le front la montre autour, sky.js)
-const ANYA_HOURS = { aube: 10, crepuscule: 23 };
+// Anya, un jour de Paris de son passage (services/anya.js, slotOn : 'aube' ou 'crepuscule'), passe à chaque aube, ou à
+// chaque crépuscule, de l'horloge du jeu ce jour-là (le front la montre à ces moments, sky.js) ; la première après la
+// panne guérit le bâtiment embrumé. [instants], dans l'ordre
+function anyaTimesOn(day, slot) {
+    const from = parisAt(day, 0);
+    const to = parisAt(nextDay(day), 0);
+    const offset = slot === 'aube' ? 0 : clock.DUSK_MS;
+    const out = [];
+    for (let cycle = clock.cycleOf(from - 1) + 1; clock.startOf(cycle) < to; cycle++) out.push(clock.startOf(cycle) + offset);
+    return out;
+}
 
 // Réparer un bâtiment embrumé : de la pierre ou du bois selon le bâtiment, 3 au palier I, puis 2 de plus par palier
 const STONE_SITES = new Set(['carriere', 'puits', 'atelier', 'foyer']);
 const repairOf = (site, level) => ({ resource: STONE_SITES.has(site) ? 'stone' : 'wood', amount: 3 + 2 * (Math.max(1, level) - 1) });
 
 module.exports = {
-    START_HOUR, END_HOUR, LIGHT_REACH, REACH, COQ_SIGHT, RAIN_REACH, SHELTER_LEVEL, MS_PER_CELL, LIGHTS, FENCES, ANYA_HOURS, countOf,
+    LIGHT_REACH, REACH, COQ_SIGHT, RAIN_REACH, SHELTER_LEVEL, MS_PER_CELL, LIGHTS, FENCES, countOf, anyaTimesOn,
     KINDS, SIGHT, RETURN_MS, SCRIPT, paceOf, indexOf, kindsOf,
     parisAt, dayOf, nextDay, boundsOf, nightAt, nightNear, endedBetween, borderOf, lineOf, planOf, defenseOf, fateOf, outcomeOf, repairOf
 };

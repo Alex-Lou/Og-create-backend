@@ -1,40 +1,60 @@
-// Les nuits de créatures (bible du dépôt front, § 6.15, v6 ; décisions du 6 octobre 2026) : heures de Paris, chemins
+// Les nuits de créatures (bible du dépôt front, § 6.15, v6 ; décisions du 6 octobre 2026) : l'horloge du jeu, chemins
 // depuis la brume, défenses, camarades, toucher, une panne au plus, réparation (fonctions pures)
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const nights = require('../src/services/nights');
+const clock = require('../src/services/gameClock');
 const map = require('../src/services/worldMap');
 
 const at = s => Date.parse(s);
+const MIN = 60 * 1000;
+// Une nuit de l'horloge du jeu, n° de son cycle (services/gameClock.js) : la première d'octobre 2026, puis k après
+const N = k => clock.cycleOf(at('2026-10-06T12:00:00Z')) + k;
 const step = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
 
-test('une nuit va de 21 h à 6 h, heure de Paris, changements d’heure compris', () => {
-  // Hiver (UTC+1), été (UTC+2), et la nuit où l'on recule d'une heure (25 octobre 2026, 3 h → 2 h)
-  assert.deepEqual(nights.boundsOf('2026-01-10'), { start: at('2026-01-10T20:00:00Z'), end: at('2026-01-11T05:00:00Z') });
-  assert.deepEqual(nights.boundsOf('2026-07-10'), { start: at('2026-07-10T19:00:00Z'), end: at('2026-07-11T04:00:00Z') });
-  assert.deepEqual(nights.boundsOf('2026-10-24'), { start: at('2026-10-24T19:00:00Z'), end: at('2026-10-25T05:00:00Z') });
-  assert.deepEqual(nights.boundsOf('2026-03-28'), { start: at('2026-03-28T20:00:00Z'), end: at('2026-03-29T04:00:00Z') });
-  // La nuit en cours : le soir, celle du jour ; avant 6 h, celle de la veille ; le jour, aucune
-  assert.equal(nights.nightAt(at('2026-10-06T20:30:00Z')), '2026-10-06');
-  assert.equal(nights.nightAt(at('2026-10-07T03:59:00Z')), '2026-10-06');
-  assert.equal(nights.nightAt(at('2026-10-07T04:00:00Z')), null);
-  assert.equal(nights.nightAt(at('2026-10-07T12:00:00Z')), null);
-  // La nuit en cours, ou la prochaine
-  assert.equal(nights.nightNear(at('2026-10-07T12:00:00Z')), '2026-10-07');
-  assert.equal(nights.nightNear(at('2026-10-07T02:00:00Z')), '2026-10-06');
-  assert.equal(nights.nightNear(at('2026-10-07T22:00:00Z')), '2026-10-07');
+test('l’horloge du jeu : un cycle d’1 h 30, la même pour tous ; la nuit, ses 20 dernières minutes (21 h à 6 h sur l’île)', () => {
+  const c = clock.cycleOf(at('2026-10-15T12:00:00Z'));
+  const start = clock.startOf(c);
+  assert.equal(clock.CYCLE_MS, 90 * MIN);
+  assert.equal(clock.cycleOf(clock.EPOCH), 0);
+  assert.equal(clock.cycleOf(start), c);
+  assert.equal(clock.cycleOf(start - 1), c - 1);
+  // L'heure de l'île : l'aube de 6 h à 7 h (5 min), le jour jusqu'à 19 h (60 min), le crépuscule jusqu'à 21 h (5 min),
+  // la nuit jusqu'à 6 h (20 min) ; le jour de l'île change à minuit
+  assert.deepEqual([0, 5, 35, 65, 70, 90].map(clock.hourIn), [6, 7, 13, 19, 21, 30]);
+  assert.deepEqual([clock.dayHourOf(start).hour, clock.dayHourOf(start + 35 * MIN).hour], [6, 13]);
+  assert.equal(clock.dayHourOf(start + 80 * MIN).day, clock.dayHourOf(start).day + 1);
+  assert.ok(clock.dayHourOf(start + 80 * MIN).hour < 6);
+  // Une nuit se nomme par son cycle
+  assert.deepEqual(nights.boundsOf(c), { start: start + 70 * MIN, end: start + 90 * MIN });
+  // La nuit en cours ; le jour, aucune ; la nuit en cours ou la prochaine : celle du cycle
+  assert.equal(nights.nightAt(start + 70 * MIN), c);
+  assert.equal(nights.nightAt(start + 89 * MIN), c);
+  assert.equal(nights.nightAt(start + 69 * MIN), null);
+  assert.equal(nights.nightAt(start + 90 * MIN), null);
+  assert.deepEqual([start + 10 * MIN, start + 80 * MIN].map(nights.nightNear), [c, c]);
 });
 
 test('les nuits finies entre deux passages, dans l’ordre, quatorze au plus', () => {
+  const c = clock.cycleOf(at('2026-10-15T12:00:00Z'));
   const end = night => nights.boundsOf(night).end;
-  assert.deepEqual(nights.endedBetween(at('2026-10-06T12:00:00Z'), at('2026-10-07T12:00:00Z')), ['2026-10-06']);
+  assert.deepEqual(nights.endedBetween(clock.startOf(c) + MIN, clock.startOf(c + 1) + MIN), [c]);
   // La fin exacte compte une fois : exclue au départ, comprise à l'arrivée
-  assert.deepEqual(nights.endedBetween(end('2026-10-06'), end('2026-10-07')), ['2026-10-07']);
-  assert.deepEqual(nights.endedBetween(at('2026-10-06T12:00:00Z'), at('2026-10-06T23:00:00Z')), []);
-  assert.deepEqual(nights.endedBetween(at('2026-10-01T12:00:00Z'), at('2026-10-04T12:00:00Z')), ['2026-10-01', '2026-10-02', '2026-10-03']);
-  const long = nights.endedBetween(at('2026-01-01T12:00:00Z'), at('2026-10-07T12:00:00Z'));
+  assert.deepEqual(nights.endedBetween(end(c), end(c + 1)), [c + 1]);
+  assert.deepEqual(nights.endedBetween(clock.startOf(c) + MIN, clock.startOf(c) + 80 * MIN), []);
+  assert.deepEqual(nights.endedBetween(clock.startOf(c) + MIN, clock.startOf(c + 3) + MIN), [c, c + 1, c + 2]);
+  const long = nights.endedBetween(at('2026-01-01T12:00:00Z'), clock.startOf(c) + MIN);
   assert.equal(long.length, 14);
-  assert.equal(long[13], '2026-10-06');
+  assert.equal(long[13], c - 1);
+});
+
+test('Anya, un jour de son passage : à chaque aube, ou à chaque crépuscule, de l’horloge du jeu ce jour-là', () => {
+  const dawns = nights.anyaTimesOn('2026-10-15', 'aube');
+  const dusks = nights.anyaTimesOn('2026-10-15', 'crepuscule');
+  assert.equal(dawns.length, 16);
+  for (const t of dawns) assert.equal((t - clock.EPOCH) % clock.CYCLE_MS, 0);
+  assert.deepEqual(dusks.map(t => t - clock.DUSK_MS), dawns);
+  assert.ok(dawns[0] >= at('2026-10-14T22:00:00Z') && dawns.at(-1) < at('2026-10-15T22:00:00Z'));
 });
 
 test('ils sortent du bord de la brume et marchent droit vers le bâtiment le plus proche', () => {
@@ -51,15 +71,15 @@ test('ils sortent du bord de la brume et marchent droit vers le bâtiment le plu
   line.slice(1).forEach((c, i) => assert.equal(step(c, line[i]), 1));
 
   // (la première nuit, écrite : trois Sans-Nom, qui marchent du bord de la brume)
-  const island = { owned, sites: [{ id: 'foyer', level: 1 }, { id: 'puits', level: 1 }], acts: 0, first: nights.boundsOf('2026-10-06').start };
-  const plan = nights.planOf(42, '2026-10-06', island);
+  const island = { owned, sites: [{ id: 'foyer', level: 1 }, { id: 'puits', level: 1 }], acts: 0, first: nights.boundsOf(N(0)).start };
+  const plan = nights.planOf(42, N(0), island);
   // La même graine, le même plan (tous les appareils voient la même nuit) ; une autre nuit, un autre
-  assert.deepEqual(nights.planOf(42, '2026-10-06', island), plan);
-  assert.notDeepEqual(nights.planOf(42, '2026-10-07', island).map(c => c.path), plan.map(c => c.path));
+  assert.deepEqual(nights.planOf(42, N(0), island), plan);
+  assert.notDeepEqual(nights.planOf(42, N(1), island).map(c => c.path), plan.map(c => c.path));
   assert.equal(plan.length, nights.countOf(0));
-  const { start, end } = nights.boundsOf('2026-10-06');
+  const { start, end } = nights.boundsOf(N(0));
   for (const [k, c] of plan.entries()) {
-    assert.equal(c.id, `2026-10-06:${k}`);
+    assert.equal(c.id, `${N(0)}:${k}`);
     assert.ok(border.some(b => b.x === c.path[0].x && b.y === c.path[0].y));
     const f = map.footprintOf(c.site, 1);
     const last = c.path.at(-1);
@@ -71,7 +91,7 @@ test('ils sortent du bord de la brume et marchent droit vers le bâtiment le plu
   // Plus nombreux à chaque acte : 3, un de plus par acte, 8 au plus (choix de l'auteur, 13 oct.)
   assert.deepEqual([0, 1, 2, 4, 5, 8, 12].map(nights.countOf), [3, 4, 5, 7, 8, 8, 8]);
   // Ni bâtiment ni bord : personne
-  assert.deepEqual(nights.planOf(42, '2026-10-06', { ...island, sites: [] }), []);
+  assert.deepEqual(nights.planOf(42, N(0), { ...island, sites: [] }), []);
 });
 
 test('la lumière les change en lucioles (3 cases, la torche 2), la clôture barre sa case d’abord, le feu du Foyer éclaire', () => {
@@ -114,8 +134,12 @@ test('la météo du serveur est celle du jeu (même vecteur que tests/sky.test.j
   const weather = require('../src/services/weather');
   const days = Array.from({ length: 12 }, (_, i) => [0, 1, 2, 3].map(slot => weather.slotKind(280 + i, slot)[0]).join(''));
   assert.deepEqual(days.join(' '), 'ccbc vccc cvvc vvvv vvvv pppv vccv bcbb vccc vpvv cccc bccb');
-  // Le 13 octobre 2026 (jour 285), de 0 h à 18 h à Paris : la pluie ; à 18 h, le ciel se voile
-  assert.deepEqual([weather.kindAt(Date.parse('2026-10-13T08:00:00Z')), weather.rainAt(Date.parse('2026-10-13T08:00:00Z')), weather.rainAt(Date.parse('2026-10-13T17:00:00Z'))], ['pluie', true, false]);
+  // Sur l'horloge du jeu : le créneau de 6 h de l'heure de l'île (le jour de l'île change à minuit)
+  for (let t = at('2026-10-15T00:00:00Z'); t < at('2026-10-16T00:00:00Z'); t += 7 * MIN) {
+    const { day, hour } = clock.dayHourOf(t);
+    assert.equal(weather.kindAt(t), weather.slotKind(day, Math.floor(hour / 6)));
+    assert.equal(weather.rainAt(t), ['pluie', 'orage'].includes(weather.kindAt(t)));
+  }
 });
 
 test('une nuit embrume au plus un bâtiment : le premier arrivé ; un camarade content en repousse un, le toucher aussi', () => {
@@ -162,30 +186,30 @@ test('le coq chante une fois par nuit : le premier qui arriverait à sa vue (4 c
 });
 
 test('qui sort : les trois premières nuits écrites, puis un mélange de ce qui existe ; le premier Noyé, la première Racine', () => {
-  const island = { owned: new Set(['coeur', 'source']), sites: [{ id: 'foyer', level: 1 }], acts: 0, first: nights.boundsOf('2026-10-06').start };
+  const island = { owned: new Set(['coeur', 'source']), sites: [{ id: 'foyer', level: 1 }], acts: 0, first: nights.boundsOf(N(0)).start };
   const kinds = (night, more = {}) => nights.kindsOf(42, night, { ...island, ...more }, 3);
-  // La n-ième nuit depuis la première possible (présentées l'après-midi : celle du soir même ; le soir : la suivante)
-  assert.deepEqual(['2026-10-06', '2026-10-09'].map(n => nights.indexOf(n, island.first)), [0, 3]);
-  assert.equal(nights.indexOf('2026-10-07', nights.boundsOf('2026-10-06').start + 1), 0);
-  assert.deepEqual(['2026-10-06', '2026-10-07', '2026-10-08'].map(n => kinds(n)), nights.SCRIPT);
+  // La n-ième nuit depuis la première possible (présentées le jour : la nuit du cycle ; la nuit : la suivante)
+  assert.deepEqual([N(0), N(3)].map(n => nights.indexOf(n, island.first)), [0, 3]);
+  assert.equal(nights.indexOf(N(1), nights.boundsOf(N(0)).start + 1), 0);
+  assert.deepEqual([N(0), N(1), N(2)].map(n => kinds(n)), nights.SCRIPT);
   // Au-delà : jamais de Noyé ni de Racine tant qu'ils ne peuvent pas sortir
-  const later = Array.from({ length: 40 }, (_, k) => kinds(nights.nextDay(`2026-10-${String(9 + (k % 20)).padStart(2, '0')}`))).flat();
+  const later = Array.from({ length: 40 }, (_, k) => kinds(N(3 + k))).flat();
   assert.ok(later.every(k => nights.KINDS.includes(k) && !['noye', 'racine'].includes(k)));
   assert.ok(new Set(later).size >= 3);
-  // Pierrot arrivé le 20 au matin : la nuit du 20, le premier Noyé sort à coup sûr ; le Bosquet bâti le 21, la Racine
-  const unlocks = { noye: at('2026-10-20T08:00:00Z'), racine: at('2026-10-21T08:00:00Z') };
-  assert.notEqual(kinds('2026-10-19', { unlocks })[0], 'noye');
-  assert.equal(kinds('2026-10-20', { unlocks })[0], 'noye');
-  assert.equal(kinds('2026-10-21', { unlocks })[0], 'racine');
+  // Pierrot arrivé le jour du cycle N(20) : sa nuit, le premier Noyé sort à coup sûr ; le Bosquet bâti au N(21), la Racine
+  const unlocks = { noye: clock.startOf(N(20)) + 10 * MIN, racine: clock.startOf(N(21)) + 10 * MIN };
+  assert.notEqual(kinds(N(19), { unlocks })[0], 'noye');
+  assert.equal(kinds(N(20), { unlocks })[0], 'noye');
+  assert.equal(kinds(N(21), { unlocks })[0], 'racine');
   // (0 : depuis toujours, sans nuit « première »)
-  const always = Array.from({ length: 30 }, (_, k) => kinds(`2026-11-${String(k + 1).padStart(2, '0')}`, { unlocks: { noye: 0, racine: 0 } })).flat();
+  const always = Array.from({ length: 30 }, (_, k) => kinds(N(100 + k), { unlocks: { noye: 0, racine: 0 } })).flat();
   assert.ok(always.includes('noye') && always.includes('racine'));
 });
 
 test('d’où ils sortent et à quel pas : le Noyé de la mer, la Racine de la lisière ; le Dormeur lent, la bête vive', () => {
   const owned = new Set(['coeur', 'source', 'lisiere']);
   const island = { owned, sites: [{ id: 'foyer', level: 1 }, { id: 'puits', level: 1 }], acts: 5, unlocks: { noye: 0, racine: 0 } };
-  const all = Array.from({ length: 30 }, (_, k) => nights.planOf(7, `2026-11-${String(k + 1).padStart(2, '0')}`, island)).flat();
+  const all = Array.from({ length: 30 }, (_, k) => nights.planOf(7, N(200 + k), island)).flat();
   const near = (c, what) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => what(c.x + dx, c.y + dy));
   const of = kind => all.filter(c => c.kind === kind && !c.back);
   assert.ok(of('noye').length && of('noye').every(c => near(c.path[0], (x, y) => map.groundAt(x, y) === '~')));
