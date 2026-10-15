@@ -13,7 +13,7 @@ const ANNEX_EFFECTS = {
     rate: (rate, word, earn) => `+${rate} ${word} et +${earn} écus par heure`,
     cap: (hours, capHours) => `Garde ${hours} h de production au lieu de ${capHours}`,
     house: 'Loge un visiteur qui veut rester sur l’île',
-    hens: 'Un toit pour les poules de Marcelle'
+    hens: 'Un toit pour les poules d’Agathe'
 };
 
 // (site : « la Carrière », « le Bosquet »…)

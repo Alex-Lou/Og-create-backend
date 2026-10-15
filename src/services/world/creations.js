@@ -69,13 +69,13 @@ async function stowCrafts(userId, rows, levels, zones, annexRows, places = STATI
 const LESSON = 'deco';
 const questNow = presence => quests.QUESTS.find(q => !presence.done.has(q.id))?.id;
 const tutorialOf = presence => (questNow(presence) === LESSON ? crafts.TUTORIAL_CRAFTS : new Set());
-// L'enclos de Marcelle (choix de l'auteur, 13 oct.) : sa clôture se trace même sans en avoir jamais assemblé une (un
+// L'enclos d’Agathe (choix de l'auteur, 13 oct.) : sa clôture se trace même sans en avoir jamais assemblé une (un
 // compte d'avant les clôtures de Lorena y arrive sans piquet : il n'est jamais lâché)
 const FENCE_LESSON = 'enclos-cannelle';
 const freeTraceOf = presence => (questNow(presence) === FENCE_LESSON ? new Set(['cloture']) : new Set());
-// Les leçons des clôtures du tutoriel (l'enclos de Lorena, celui de Marcelle) : un piquet posé s'y défait (unposeCraft)
+// Les leçons des clôtures du tutoriel (l'enclos de Lorena, celui d’Agathe) : un piquet posé s'y défait (unposeCraft)
 const FENCE_LESSONS = new Set(['clotures', FENCE_LESSON]);
-// Une création en ligne se trace-t-elle ? (la première assemblée à la main, ou la leçon de l'enclos de Marcelle)
+// Une création en ligne se trace-t-elle ? (la première assemblée à la main, ou la leçon de l'enclos d’Agathe)
 const traceable = (id, made, free) => Boolean(made[id] || free.has(id));
 
 // Questions de l'Épreuve réussies (progress.timer_progress : niveau → catégorie → identifiants)
@@ -348,7 +348,7 @@ async function lockDoor(userId, x, y, lock) {
     });
 }
 
-// L'anneau d'un coin du camp (l'enclos de Marcelle, choix de l'auteur, 13 oct.) : les cases à une case de son coin, sauf
+// L'anneau d'un coin du camp (l'enclos d’Agathe, choix de l'auteur, 13 oct.) : les cases à une case de son coin, sauf
 // celles qui bordent le Feu (son enclos à lui, autour de sa grande emprise) ; have : celles qui ont déjà leur clôture,
 // need : have et celles où une clôture peut encore se poser (rien d'impossible n'est demandé). { have, need }
 async function fenceRingOf(userId, conn, who) {

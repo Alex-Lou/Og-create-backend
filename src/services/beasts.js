@@ -1,7 +1,7 @@
 // Les bêtes de ferme (HISTOIRE.md du dépôt front, § 6.16, v6 ; réglage « petit plus » choisi par l'auteur le 6 octobre
 // 2026) : règles pures, sans base. On nourrit une bête depuis sa fiche (2 vivres) ; nourrie, elle est contente un jour
 // et remplit sa bulle de nourriture, que l'on ramasse. La bulle garde un jour au plus. Les poules sont celles de
-// Marcelle (bible, § 6.16 et étape 8 : sauvées dans leur cage, elles vivent au camp, près du feu) : là dès la cage
+// Agathe (bible, § 6.16 et étape 8 : sauvées dans leur cage, elles vivent au camp, près du feu) : là dès la cage
 // ouverte, sans attendre le Potager ; Réglisse ne pond pas (« Elle juge. »). Les autres bêtes sont celles que le Potager
 // montre selon son palier (world/village.js du front) ; les variantes du Bestiaire restent des décors.
 // Le coq et la couvée (choix de l'auteur, 14 oct.) : Coquelicot échoue au camp quand le Foyer passe à l'Abri (la cage
@@ -12,7 +12,7 @@ const HOUR_MS = 3600 * 1000;
 const CONTENT_HOURS = 24;
 const DAY_MS = CONTENT_HOURS * HOUR_MS;
 const FEED_COST = { food: 2 };
-// L'espèce est celle du front ; level : le palier du Potager où elle arrive (les poules de Marcelle, camp : à la cage
+// L'espèce est celle du front ; level : le palier du Potager où elle arrive (les poules d’Agathe, camp : à la cage
 // ouverte) ; daily : vivres donnés par jour, contente (identifiants des poules gardés : rien ne se perd)
 const BEASTS = [
     { id: 'poule-rousse', species: 'hen', name: 'Caramel', camp: true, daily: 4 },
@@ -29,7 +29,7 @@ const BEASTS = [
     { id: 'chevre', species: 'goat', name: 'La chèvre', level: 6, daily: 6 }
 ];
 const BEAST_BY_ID = Object.fromEntries(BEASTS.map(b => [b.id, b]));
-// Les poules de Marcelle, sorties de la cage
+// Les poules d’Agathe, sorties de la cage
 const HENS = BEASTS.filter(b => b.camp && !b.rooster && !b.brood).map(b => b.id);
 // Le coq arrive quand le Foyer atteint ce palier (l'Abri) ; une poulette éclot tous les HATCH_DAYS jours, et reste
 // poussin GROW_DAYS jours

@@ -49,8 +49,8 @@ const QUEST_TEXTS = {
         say: 'Deux, ce soir, autour du feu. Dors : je veille.'
     },
     soupe: {
-        label: 'Une soupe pour Marcelle',
-        say: 'Marcelle a faim, et froid. Deux nuits sur les rochers, ça creuse.'
+        label: 'Une soupe pour Agathe',
+        say: 'Agathe a faim, et froid. Deux nuits sur les rochers, ça creuse.'
     },
     cage: {
         label: 'Ouvre la cage des poules',
@@ -58,18 +58,18 @@ const QUEST_TEXTS = {
     },
     poules: {
         label: 'Nourris les trois poules',
-        say: 'Elles ont faim. Marcelle les regarde comme si c’étaient ses filles. Ce sont ses filles.'
+        say: 'Elles ont faim. Agathe les regarde comme si c’étaient ses filles. Ce sont ses filles.'
     },
     poulailler: {
-        label: 'Pose le poulailler de Marcelle',
-        say: 'Il leur faut un toit, dans l’herbe, près de la cuisine. Marcelle a déjà choisi l’endroit.'
+        label: 'Pose le poulailler d’Agathe',
+        say: 'Il leur faut un toit, dans l’herbe, près de la cuisine. Agathe a déjà choisi l’endroit.'
     },
     'abri-cannelle': {
-        label: 'Un abri pour Marcelle',
+        label: 'Un abri pour Agathe',
         say: 'Elle dort sur une marmite renversée. Elle ne se plaint pas. Enfin, un peu.'
     },
     'enclos-cannelle': {
-        label: 'Entoure le coin de Marcelle',
+        label: 'Entoure le coin d’Agathe',
         say: 'Une cuisine brille toute la nuit. Les égarés le savent aussi.'
     },
     'nuit-cannelle': {
@@ -249,8 +249,8 @@ const QUEST_TEXTS = {
         say: 'Des toits dorment sous la brume, à l’est. Une baleine passe parfois au large.'
     },
     potion: {
-        label: 'Rends le goût à Marcelle : écris le Remède',
-        say: 'Marcelle repose sa cuillère. « Plus rien n’a de goût… Ce n’est pas la brume, c’est moi. » Le livre se souvient du Remède.'
+        label: 'Rends le goût à Agathe : écris le Remède',
+        say: 'Agathe repose sa cuillère. « Plus rien n’a de goût… Ce n’est pas la brume, c’est moi. » Le livre se souvient du Remède.'
     },
     alchimiste: {
         label: 'Bâtis la Maison de l’alchimiste',

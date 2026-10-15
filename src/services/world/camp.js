@@ -1,15 +1,15 @@
 // Le camp des naufragés sur la plage de Brumelune (dessins : design/bibliotheque/svg/decor/camp/camp.json) : l'épave de
-// l'Hirondelle, la cuisine de Marcelle, les coins de Lorena et de Jovin (débris, abri, cabanon), quelques objets ; les
-// voyageurs de l'acte IV y plantent leur tente et leur hamac, et le panneau SOS s'en va. La cage aux poules de Marcelle
+// l'Hirondelle, la cuisine d’Agathe, les coins de Lorena et de Jovin (débris, abri, cabanon), quelques objets ; les
+// voyageurs de l'acte IV y plantent leur tente et leur hamac, et le panneau SOS s'en va. La cage aux poules d’Agathe
 // (decor/camp/poules) y paraît avec elle, coincée sous les rochers ; ouverte, elle reste près du feu.
 // Chaque élément a sa place prévue (PLACES) ; si un objet du joueur l'occupe déjà, l'élément se pose sur la case libre
 // la plus proche : rien du joueur ne bouge, et le camp est toujours complet. Ses cases sont ensuite réservées (on n'y
 // pose ni annexe ni création). Fonctions pures, et campOfUser qui lit dans la base ce qui le décide.
 // Sur une île qui suit l'histoire (choix de l'auteur, 9 oct.), rien n'est là avant son personnage : l'épave seule tant
 // que Brume est seule avec le joueur ; le camp de Lorena (son coin, le SOS, les caisses, le filet, les rondins) avec
-// Lorena ; la cuisine avec Marcelle ; le coin de Jovin avec Jovin. Sur une île à la plage (world/places.js : une zone par
+// Lorena ; la cuisine avec Agathe ; le coin de Jovin avec Jovin. Sur une île à la plage (world/places.js : une zone par
 // personnage), le camp de Lorena et ce que la mer a laissé autour sont dans sa zone, au sud-ouest, le coin de Jovin dans
-// la sienne, au nord du Feu ; la cuisine de Marcelle reste sur la plage, sa zone, près de son Feu.
+// la sienne, au nord du Feu ; la cuisine d’Agathe reste sur la plage, sa zone, près de son Feu.
 const map = require('../worldMap');
 const landmarks = require('../landmarks');
 const finds = require('../finds');
@@ -23,22 +23,22 @@ const { presenceOf, metOf } = require('./people');
 const { sheltersOf } = require('./shelters');
 
 const ZONE = 'coeur';
-// Le Foyer à l'Abri (palier II) : la cuisine de Marcelle devient son cabanon, les cabanons peuvent venir
+// Le Foyer à l'Abri (palier II) : la cuisine d’Agathe devient son cabanon, les cabanons peuvent venir
 const ABRI = 2;
 // Les places du camp sur une île à la plage (world/places.js) : dans la zone de chacun
 const BEACH_PLACES = {
     // (le camp de Lorena serré autour de son Ponton, contre l'épave : sa zone est petite)
     aster: { x: 90, y: 96 }, sos: { x: 90, y: 94 }, caisses: { x: 91, y: 95 }, filet: { x: 90, y: 98 }, rondins: { x: 92, y: 94 },
     rivet: { x: 93, y: 86 },
-    // (la cage des poules, échouée par la mer au bout de la plage, dans le coin de Marcelle : choix de l'auteur, 11 oct.)
+    // (la cage des poules, échouée par la mer au bout de la plage, dans le coin d’Agathe : choix de l'auteur, 11 oct.)
     cage: { x: 101, y: 98 }
 };
 
 // Place prévue (coin haut-gauche), taille (2 : 2 × 2 cases, sinon 1), dessin selon l'avancée (null : pas encore, ou
 // plus). at : { acts (actes finis), levels (paliers des bâtiments), cage ('coincee', 'ouverte' ou null), here (le
-// personnage est là ? id de son bâtiment : ponton Lorena, foyer Marcelle, atelier Jovin) }. Un camp sobre, qui libère la plage : l'épave et
+// personnage est là ? id de son bâtiment : ponton Lorena, foyer Agathe, atelier Jovin) }. Un camp sobre, qui libère la plage : l'épave et
 // trois objets restent ; le coin de Lorena s'en va quand son Ponton est bâti, celui de Jovin avec son Atelier, la cuisine
-// de Marcelle devient son cabanon à l'Abri (elle le garde) ; le SOS, quand les voyageurs arrivent (acte IV) avec leur tente et leur hamac
+// d’Agathe devient son cabanon à l'Abri (elle le garde) ; le SOS, quand les voyageurs arrivent (acte IV) avec leur tente et leur hamac
 const has = (at, act) => at.acts.includes(act);
 const foyer = at => at.levels.foyer || 0;
 // Le camp de Lorena (et ce que la mer a laissé autour) arrive avec elle

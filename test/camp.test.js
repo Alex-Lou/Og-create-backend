@@ -13,7 +13,7 @@ test.after(() => server?.kill());
 const ids = list => list.map(c => c.art);
 const SIZE = map.SIZE;
 
-test('au début : l’épave, la cuisine de Marcelle, les débris de Lorena et de Jovin, le SOS et trois objets, à leur place', () => {
+test('au début : l’épave, la cuisine d’Agathe, les débris de Lorena et de Jovin, le SOS et trois objets, à leur place', () => {
   const start = camp.campOf({});
   assert.deepEqual(ids(start), ['hirondelle', 'cannelle_debris', 'aster_debris', 'rivet_debris', 'sos', 'caisses', 'filet', 'rondins']);
   for (const c of start) {
@@ -26,7 +26,7 @@ test('au début : l’épave, la cuisine de Marcelle, les débris de Lorena et d
 
 test('il change avec l’histoire, et libère la plage de Brumelune', () => {
   assert.deepEqual(ids(camp.campOf({ acts: ['I'], levels: { foyer: 1 } })).slice(2, 4), ['aster_abri', 'rivet_abri']);
-  // Pas de cabanon avant l'Abri ; à l'Abri, la cuisine de Marcelle devient son cabanon
+  // Pas de cabanon avant l'Abri ; à l'Abri, la cuisine d’Agathe devient son cabanon
   assert.equal(camp.campOf({ acts: ['I', 'II'], levels: { foyer: 1 } }).find(c => c.id === 'aster').art, 'aster_abri');
   const abri = camp.campOf({ acts: ['I', 'II'], levels: { foyer: 2 } });
   assert.deepEqual([abri.find(c => c.id === 'aster').art, abri.find(c => c.id === 'cannelle').art], ['aster_cabanon', 'cannelle_cabanon']);

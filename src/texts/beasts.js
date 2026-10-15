@@ -2,7 +2,7 @@
 // (services/world/beasts.js ; name : le nom de la bête).
 
 const CAGE_OPEN = 'La cage est déjà ouverte.';
-const NO_CAGE_YET = 'Pas encore de cage : Marcelle n’est pas arrivée.';
+const NO_CAGE_YET = 'Pas encore de cage : Agathe n’est pas arrivée.';
 const BEAST_UNKNOWN = 'Bête inconnue.';
 const OPEN_CAGE_FIRST = 'Ouvre d’abord la cage des poules, au camp.';
 const NOT_HUNGRY = name => `${name} n’a pas encore faim.`;

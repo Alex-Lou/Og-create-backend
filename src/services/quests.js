@@ -11,7 +11,7 @@
 // - wake : un habitant réveillé (amitié > 0) ; heart : un cœur ;
 // - expedition : expéditions revenues ; landmark : lieux découverts (ou un lieu précis) ; gather : gisements ramassés ;
 // - pickup : trouvailles de la plage de Brumelune ramassées (bois flotté, galets, coquillages : services/pickups.js) ;
-// - hens : poules de Marcelle nourries et encore rassasiées ; crate : la caisse d'un personnage ouverte (world/chests.js) ;
+// - hens : poules d’Agathe nourries et encore rassasiées ; crate : la caisse d'un personnage ouverte (world/chests.js) ;
 // - visitor : voyageurs comblés ; settle : voyageurs installés ; name : le peuple a un nom.
 // chest : la dernière quête des actes donne aussi un coffre de cette rareté (loot.js), à ouvrir une fois réclamée.
 //
@@ -55,16 +55,16 @@ const QUESTS = [
     q('clotures', 'T', { kind: 'craft', craft: 'cloture', need: ENCLOS }, 15),
     q('portes', 'T', { kind: 'craft', craft: 'porte', need: ENCLOS_DOORS }, 10),
     // La deuxième nuit (choix de l'auteur, 10 oct. : un personnage par jour) : la journée de Lorena finit autour du feu ;
-    // Marcelle arrivera au matin
+    // Agathe arrivera au matin
     q('veille', 'T', { kind: 'sleep', site: 'foyer' }, 0),
     q('soupe', 'T', { kind: 'need', villager: 'foyer', what: 'manger' }, 15),
-    // Le jour de Marcelle (choix de l'auteur, 11 oct.) : la cage de ses poules arrive par la mer, au bout de la plage ; on
+    // Le jour d’Agathe (choix de l'auteur, 11 oct.) : la cage de ses poules arrive par la mer, au bout de la plage ; on
     // l'ouvre, on attrape les poules (le jeu), on les nourrit toutes les trois ; puis leur poulailler, sa leçon à elle
     // (poser une annexe) ; et la troisième nuit, avant Jovin. (Les œufs viendront plus tard, avec le coq.)
     q('cage', 'T', { kind: 'cage' }, 10),
     q('poules', 'T', { kind: 'hens', need: 3 }, 10),
     q('poulailler', 'T', { kind: 'coop' }, 15),
-    // L'abri de Marcelle, puis son enclos (choix de l'auteur, 13 oct.) : son coin passe des débris à l'abri (payé :
+    // L'abri d’Agathe, puis son enclos (choix de l'auteur, 13 oct.) : son coin passe des débris à l'abri (payé :
     // world/shelters.js), puis le joueur fabrique et paie les piquets qui l'entourent (son anneau, du moment :
     // world/creations.js, fenceRingOf)
     q('abri-cannelle', 'T', { kind: 'shelter', who: 'cannelle', villager: 'foyer' }, 15),
@@ -121,7 +121,7 @@ const QUESTS = [
     q('coeur', 'IV', { kind: 'heart', need: 1 }, 60),
     q('trouvaille', 'IV', { kind: 'gather', need: 1 }, 60),
     q('serre', 'IV', { kind: 'level', site: 'potager', need: 2 }, 120, 'epique'),
-    // Acte V : le foyer, se nommer (les voyageurs restent, le goût de Marcelle)
+    // Acte V : le foyer, se nommer (les voyageurs restent, le goût d’Agathe)
     q('maison', 'V', { kind: 'level', site: 'foyer', need: 3 }, 150),
     q('une-maison', 'V', { kind: 'house', need: 1 }, 100),
     q('installe', 'V', { kind: 'settle', need: 1 }, 120),
@@ -219,7 +219,7 @@ const HAVE = {
     gather: (goal, facts) => facts.gathered,
     pickup: (goal, facts) => facts.pickups,
     hens: (goal, facts) => facts.hensFed,
-    // La cage ouverte (ses poules libérées) ; le poulailler de Marcelle posé
+    // La cage ouverte (ses poules libérées) ; le poulailler d’Agathe posé
     cage: (goal, facts) => (facts.hensFreed ? 1 : 0),
     coop: (goal, facts) => (facts.coops ? 1 : 0),
     // L'abri d'un coin bâti ; les piquets posés autour de lui (son anneau : facts.fences[qui] = { have, need })

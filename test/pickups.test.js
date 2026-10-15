@@ -1,5 +1,5 @@
 // Le tutoriel de l'île neuve (bible du dépôt front, § 9) : la plage de Brumelune, le feu bâti avec Brume, puis Lorena et sa Récolte ;
-// un compte d'avant la v6 garde ses règles (le feu allumé d'office, Marcelle après la Récolte, Jovin
+// un compte d'avant la v6 garde ses règles (le feu allumé d'office, Agathe après la Récolte, Jovin
 // après la soupe) et ne recule jamais
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -20,7 +20,7 @@ test('ramasser sur la plage de Brumelune : une fois, puis la mer en rapporte ; c
   assert.equal((await pick(player, 'greve-bois-9')).status, 404);
   for (const bad of ['', 'cratere-1', 'greve-BOIS-1', 'greve-bois-12']) assert.equal((await pick(player, bad)).status, 400, JSON.stringify(bad));
   assert.equal((await api('POST', '/play/world/pickup', { id: 'greve-galet-1' }, { cookies: {} })).status, 401);
-  // Le premier soir : deux bois flottés et un galet, le prix du feu ; les coquillages attendent le jour de Marcelle
+  // Le premier soir : deux bois flottés et un galet, le prix du feu ; les coquillages attendent le jour d’Agathe
   assert.deepEqual((await view(player)).pickups.map(p => p.id), ['greve-bois-1', 'greve-galet-1', 'greve-bois-2']);
   assert.equal((await pick(player, 'greve-coquillage-1')).status, 404);
   // Deux touchers à la fois : un seul ramassage versé
@@ -36,7 +36,7 @@ test('ramasser sur la plage de Brumelune : une fois, puis la mer en rapporte ; c
   await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'cloture', 95, 98)`, [id]);
   assert.equal((await view(player)).pickups.some(p => p.id === 'greve-bois-1'), false);
   assert.equal((await pick(player, 'greve-bois-1')).status, 404);
-  // Au jour de Marcelle, les coquillages
+  // Au jour d’Agathe, les coquillages
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'veille')`, [id]);
   assert.deepEqual((await view(player)).pickups.filter(p => p.kind === 'coquillage').map(p => p.id), ['greve-coquillage-1', 'greve-coquillage-2']);
   assert.deepEqual((await pick(player, 'greve-coquillage-1')).data.gives, { food: 5 });
@@ -47,14 +47,14 @@ test('ramasser sur la plage de Brumelune : une fois, puis la mer en rapporte ; c
   assert.deepEqual([trouvaille.id, trouvaille.done], ['trouvaille', false]);
 });
 
-test('les trouvailles de la plage paient chacune leur leçon : deux bois et un galet le feu, deux coquillages la soupe de Marcelle', () => {
+test('les trouvailles de la plage paient chacune leur leçon : deux bois et un galet le feu, deux coquillages la soupe d’Agathe', () => {
     const pickups = require('../src/services/pickups');
     const villagers = require('../src/services/villagers');
     const gives = (after, resource) => pickups.SPOTS.filter(s => (s.after || null) === after).reduce((n, s) => n + (pickups.KINDS[s.kind].gives[resource] || 0), 0);
     assert.ok(gives('veille', 'food') >= villagers.NEEDS.manger.cost.food);
 });
 
-test('un nouveau compte bâtit son feu ; Lorena vient au matin, Marcelle après sa Récolte, Jovin après la troisième nuit', async () => {
+test('un nouveau compte bâtit son feu ; Lorena vient au matin, Agathe après sa Récolte, Jovin après la troisième nuit', async () => {
   const player = await newPlayer();
   const id = player.userId;
   const first = await view(player);
@@ -70,7 +70,7 @@ test('un nouveau compte bâtit son feu ; Lorena vient au matin, Marcelle après 
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'pages'), ($1, 'ramasser')`, [id]);
   assert.deepEqual([met(await view(player)), (await view(player)).brume.quest.id], [[], 'feu']);
   assert.equal((await api('POST', '/play/world/beasts/cage', {}, player)).status, 403);
-  // Le feu réclamé : personne encore ; la première nuit passée : Lorena, puis sa Récolte fait venir Marcelle. La
+  // Le feu réclamé : personne encore ; la première nuit passée : Lorena, puis sa Récolte fait venir Agathe. La
   // soupe seule n'amène plus Jovin.
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'feu')`, [id]);
   assert.deepEqual(met(await view(player)), []);
@@ -79,7 +79,7 @@ test('un nouveau compte bâtit son feu ; Lorena vient au matin, Marcelle après 
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'recolte'), ($1, 'veille'), ($1, 'soupe')`, [id]);
   const after = await view(player);
   assert.deepEqual([met(after).includes('ponton'), met(after).includes('foyer'), met(after).includes('atelier')], [true, true, false]);
-  // Le jour de Marcelle (la cage, ses poules, leur poulailler) ne fait pas encore venir Jovin : sa troisième nuit, si
+  // Le jour d’Agathe (la cage, ses poules, leur poulailler) ne fait pas encore venir Jovin : sa troisième nuit, si
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'cage'), ($1, 'poules'), ($1, 'poulailler')`, [id]);
   assert.equal(met(await view(player)).includes('atelier'), false);
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'nuit-cannelle')`, [id]);

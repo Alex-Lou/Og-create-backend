@@ -2,7 +2,7 @@
 // où je veux »). Chaque bâtiment a sa grande emprise (3 × 3 cases, palier IV et plus) ; avant, il n'en occupe que le coin
 // avant (2 × 2). Sa place : celle de la carte (worldMap.SITE_BIG), sauf
 //  - sur une île à la plage (créée ou recommencée depuis le 9 oct. : la marque PLAGE) : le Feu de camp brûle près de
-//    l'épave, au bout du sentier (là où était le coin de la cuisine de Marcelle, qui prend l'ancienne place du Feu :
+//    l'épave, au bout du sentier (là où était le coin de la cuisine d’Agathe, qui prend l'ancienne place du Feu :
 //    world/camp.js) ;
 //  - là où le joueur l'a déplacé (world_site_places).
 // Le quartier d'un bâtiment reste celui de la carte (map.siteZone : l'acheter permet de le bâtir), où qu'il soit posé.
@@ -17,7 +17,7 @@ const BIG = 3;
 const SMALL = 2;
 // Une île à la plage (choix de l'auteur, 10 oct.) : une zone par personnage, qui ne se découvre qu'avec lui, et son
 // bâtiment au milieu, avec la place autour pour ses annexes, ses objets et deux bâtiments à venir (le jeu dessine les
-// zones : src/world/zones.js, mêmes cases). Le Feu, bâtiment de Marcelle, sur la plage (sa porte, le bas de son emprise,
+// zones : src/world/zones.js, mêmes cases). Le Feu, bâtiment d’Agathe, sur la plage (sa porte, le bas de son emprise,
 // y = 95, touche le bout du sentier : world/paths.js, SENTIER_BEACH, à tous ses paliers) ; le Ponton de Lorena au
 // sud-ouest, contre la mer ; l'Atelier de Jovin au nord du Feu ; le Puits de Pierrot à l'ouest, près du ruisseau ; ceux
 // des actes suivants au bord de leur quartier (celui qu'il faut acheter pour les bâtir : map.siteZone)

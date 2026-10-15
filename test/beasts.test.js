@@ -1,4 +1,4 @@
-// Les bêtes de ferme (bible du dépôt front, § 6.16, v6 ; réglage « petit plus ») : les poules de Marcelle, la cage
+// Les bêtes de ferme (bible du dépôt front, § 6.16, v6 ; réglage « petit plus ») : les poules d’Agathe, la cage
 // ouverte, puis celles du Potager selon son palier ; contentes un jour une fois nourries, leur bulle d'un jour au plus
 // (fonctions pures)
 const test = require('node:test');
@@ -10,7 +10,7 @@ const T = Date.parse('2026-10-06T08:00:00Z');
 const hen = beasts.BEAST_BY_ID['poule-rousse'];
 const cow = beasts.BEAST_BY_ID.vache;
 
-test('les poules de Marcelle, la cage ouverte ; les bêtes du Potager selon son palier, comme le front les montre', () => {
+test('les poules d’Agathe, la cage ouverte ; les bêtes du Potager selon son palier, comme le front les montre', () => {
   const ids = (level, freed) => beasts.beastsOf(level, freed).map(b => b.id);
   assert.deepEqual(ids(0, false), []);
   assert.deepEqual(ids(1, false), []);

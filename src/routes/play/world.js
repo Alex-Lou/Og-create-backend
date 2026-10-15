@@ -114,7 +114,7 @@ router.post('/world/craft/line', withAccount(async (req, res, owner, b) => {
     const done = await world.placeLine(owner.id, craft, cells.map(([x, y]) => [Number(x), Number(y)]), owned, bookPages.openChapters(b, owned), bookPages.starsOf(b, owned));
     await craftDone(res, owner, b, done, { placed: done.placed, ...(done.stopped ? { stopped: done.stopped } : {}) });
 }));
-// L'abri d'un coin du camp (celui de Marcelle) : bâti et payé
+// L'abri d'un coin du camp (celui d’Agathe) : bâti et payé
 router.post('/world/shelter', withAccount(async (req, res, owner, b) => {
     const who = String(req.body.who || '');
     if (!/^[a-z]{1,20}$/.test(who)) return res.status(400).json({ message: INVALID.shelter });

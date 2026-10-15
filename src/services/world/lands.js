@@ -133,7 +133,7 @@ async function pickUp(userId, spotId, now = Date.now()) {
     await migrate(userId);
     return db.transaction(async conn => {
         await stockOf(userId, conn, true);
-        // (pas encore rendue par la mer : les coquillages attendent le jour de Marcelle)
+        // (pas encore rendue par la mer : les coquillages attendent le jour d’Agathe)
         if (!pickups.shownFor(spot, (await presenceOf(userId, conn)).done)) return db.rollback({ status: 404, message: T.NOTHING_HERE });
         if (!(await zonesOf(userId, conn)).has(map.zoneAt(spot.x, spot.y))) return db.rollback({ status: 403, message: BUY_ZONE_FIRST });
         // (une annexe ou une création posée sur sa case la cache : rien à ramasser)

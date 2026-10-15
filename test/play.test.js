@@ -1484,9 +1484,9 @@ test('habitants : on leur parle et on les gâte une fois par jour ; chaque cœur
   const gift = (villager, resource) => api('POST', '/play/world/villager/gift', { villager, resource }, player);
   const view = (await api('GET', '/play/world', null, player)).data;
   // Le tutoriel joué, la troupe vit sur l'île (bible, § 6.6) : Pierrot, Lorena et Jovin au camp tant que leur bâtiment n'est
-  // pas là ; Marcelle au Foyer
+  // pas là ; Agathe au Foyer
   assert.deepEqual(view.villagers.map(w => [w.id, w.name, w.hearts, w.talked, w.gifted, w.built]),
-    [['puits', 'Pierrot', 0, false, false, false], ['ponton', 'Lorena', 0, false, false, false], ['atelier', 'Jovin', 0, false, false, false], ['foyer', 'Marcelle', 0, false, false, true]]);
+    [['puits', 'Pierrot', 0, false, false, false], ['ponton', 'Lorena', 0, false, false, false], ['atelier', 'Jovin', 0, false, false, false], ['foyer', 'Agathe', 0, false, false, true]]);
   assert.deepEqual(view.friendship.hearts, [30, 80, 150, 250, 400]);
   assert.equal((await talk('potager')).status, 403);
   // Bavarder : +8, une fois par jour
@@ -1495,7 +1495,7 @@ test('habitants : on leur parle et on les gâte une fois par jour ; chaque cœur
   assert.deepEqual([hello.data.gained, hello.data.hearts, hello.data.rewards], [8, 0, []]);
   assert.equal(hello.data.world.villagers.find(v => v.id === 'foyer').talked, true);
   assert.equal((await talk('foyer')).status, 409);
-  // Cadeau : 15 ressources ; Marcelle adore la nourriture (+30) : premier cœur, 40 écus
+  // Cadeau : 15 ressources ; Agathe adore la nourriture (+30) : premier cœur, 40 écus
   assert.equal((await gift('foyer', 'food')).status, 400);
   await sql('UPDATE world_stock SET food = 100, water = 100 WHERE user_id = $1', [player.userId]);
   const loved = await gift('foyer', 'food');
@@ -1547,7 +1547,7 @@ test('Savoirs des maîtres : un indice par jour en bavardant, la famille puis l�
   assert.equal(hint.ingredient, undefined);
   // Une fois par jour : le bavardage refusé ne souffle rien
   assert.equal((await talk('ponton')).status, 409);
-  // Marcelle : son chapitre (V) est scellé, rien à souffler
+  // Agathe : son chapitre (V) est scellé, rien à souffler
   assert.equal((await talk('foyer')).data.savoir, null);
   // Deux cœurs : un ingrédient, celui que révèle l'Encre ; l'appareil qui l'a déjà en reçoit un autre
   await sql(`UPDATE world_friends SET talked_on = NULL, points = 80 WHERE user_id = $1 AND villager = 'ponton'`, [player.userId]);
@@ -1582,7 +1582,7 @@ test('Anya : la Révélation une seule fois, le Souffle une fois par passage, la
   const talk = (body = {}) => api('POST', '/play/world/villager/talk', { villager: 'anya', ...body }, player);
   const reveal = () => api('POST', '/play/world/anya/reveal', {}, player);
   const view = async () => (await api('GET', '/play/world', null, player)).data;
-  // Elle dort : ni Révélation, ni Souffle ; Marcelle, affamée et sans décor autour du Foyer, est triste
+  // Elle dort : ni Révélation, ni Souffle ; Agathe, affamée et sans décor autour du Foyer, est triste
   await sql(`INSERT INTO world_needs (user_id, villager, need, filled_at) VALUES ($1, 'foyer', 'manger', NOW() - INTERVAL '30 days')
              ON CONFLICT (user_id, villager, need) DO UPDATE SET filled_at = EXCLUDED.filled_at`, [player.userId]);
   const asleep = await view();
@@ -1650,7 +1650,7 @@ test('Anya : la Révélation une seule fois, le Souffle une fois par passage, la
   const deposit = (await view()).deposits[0];
   await sql(`INSERT INTO world_deposits (user_id, deposit, gathered_at) VALUES ($1, $2, NOW() - INTERVAL '4 hours 1 minute')`, [player.userId, deposit.id]);
   assert.equal((await view()).deposits.find(d => d.id === deposit.id).readyIn, 0);
-  // Marcelle a toujours faim, mais ne descend plus sous « content »
+  // Agathe a toujours faim, mais ne descend plus sous « content »
   assert.equal((await view()).villagers.find(v => v.id === 'foyer').mood, 'content');
 });
 
@@ -1695,7 +1695,7 @@ test('besoins des habitants : manger, travailler, se distraire ; l’humeur chan
     [player.userId, villager, need, hours]);
   const who = (world, id) => world.villagers.find(v => v.id === id);
   const deco = v => v.needs.find(n => n.id === 'deco');
-  // Marcelle arrive comblée : manger tient 24 h ; sans décoration autour du Foyer, elle n'est que contente
+  // Agathe arrive comblée : manger tient 24 h ; sans décoration autour du Foyer, elle n'est que contente
   const first = await view();
   const paulette = who(first, 'foyer');
   assert.deepEqual(paulette.needs.map(n => [n.id, n.met]), [['manger', true], ['deco', false]]);
@@ -1704,7 +1704,7 @@ test('besoins des habitants : manger, travailler, se distraire ; l’humeur chan
   assert.deepEqual([paulette.mood, paulette.moodEffect, paulette.happyEffect], ['content', null, 'Une partie de Récolte revient 3 min plus vite']);
   assert.deepEqual(first.needs.kinds.manger, { label: 'Manger', hours: 24, cost: { food: 10 } });
   assert.deepEqual(first.needs.kinds.deco, { label: 'Se distraire', decos: 3, reach: 6 });
-  // La troupe (Pierrot, Lorena, Jovin, Marcelle) arrive comblée
+  // La troupe (Pierrot, Lorena, Jovin, Agathe) arrive comblée
   assert.equal((await sql('SELECT COUNT(*)::int AS n FROM world_needs WHERE user_id = $1', [player.userId]))[0].n, 4);
   // Pas encore faim ; à mi-chemin, on peut la nourrir : 10 vivres
   assert.equal((await fill('foyer', 'manger')).status, 409);
@@ -1748,7 +1748,7 @@ test('besoins des habitants : manger, travailler, se distraire ; l’humeur chan
   assert.deepEqual([potager(gloomy).moodBonus, potager(gloomy).pending, potager(gloomy).perHour], [-10, { coins: 15, food: 22 }, { amount: 2.7, coins: 1.8 }]);
   const collected = await api('POST', '/play/world/collect', {}, player);
   assert.deepEqual([collected.data.gained, collected.data.stock.food], [15, 22]);
-  // Tout combler : Flore et Marcelle mangent (20 vivres), puis plus rien à faire
+  // Tout combler : Flore et Agathe mangent (20 vivres), puis plus rien à faire
   await ago('foyer', 'manger', 20);
   const all = await fillAll();
   assert.equal(all.status, 200);
@@ -1906,7 +1906,7 @@ test('ce qui attend dans les bâtiments paie tout : expédition, établi, bête,
   const made = await api('POST', '/play/world/craft/finish', { run: run.id, layout: solveCraft(run) }, player);
   assert.equal(made.status, 200);
   near(made.data.world.stock.wood, pending.wood - 8, 'bûches de la Clôture');
-  // Une poule (2 vivres) : la cage de Marcelle ouverte (ses poules affamées)
+  // Une poule (2 vivres) : la cage d’Agathe ouverte (ses poules affamées)
   await sql(`INSERT INTO world_beasts (user_id, beast, fed_at, collected_at) VALUES ($1, 'poule-rousse', NOW() - INTERVAL '2 days', NOW())`, [player.userId]);
   pending = await empty();
   const hen = await api('POST', '/play/world/beast/feed', { beast: 'poule-rousse' }, player);
@@ -1935,7 +1935,7 @@ test('ce qui attend dans les bâtiments paie tout : expédition, établi, bête,
   near(bought.data.coins, before + pending.coins - 350, 'écus après le Cercle de menhirs');
 });
 
-test('une Récolte quittée sans jouer ne compte pas ; Marcelle nourrie, la soupe reste faite même si elle a de nouveau faim', async () => {
+test('une Récolte quittée sans jouer ne compte pas ; Agathe nourrie, la soupe reste faite même si elle a de nouveau faim', async () => {
   const player = await newPlayer();
   const claim = id => api('POST', '/play/world/quest', { id }, player);
   const start = async () => (await api('POST', '/play/world/harvest/start', {}, player)).data;
@@ -1952,7 +1952,7 @@ test('une Récolte quittée sans jouer ne compte pas ; Marcelle nourrie, la soup
   assert.equal(played.data.world.brume.quest.done, true);
   assert.equal((await claim('recolte')).status, 200);
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'premier-ponton'), ($1, 'chemin-aster'), ($1, 'clotures'), ($1, 'portes')`, [player.userId]);
-  // La journée de Lorena terminée (sa Récolte, son Ponton), puis la deuxième nuit, font arriver Marcelle, affamée : sa faim d'arrivée ne fait pas
+  // La journée de Lorena terminée (sa Récolte, son Ponton), puis la deuxième nuit, font arriver Agathe, affamée : sa faim d'arrivée ne fait pas
   // la quête ; nourrie, si.
   assert.equal((await api('POST', '/play/world/sleep', {}, player)).status, 200);
   const hungry = (await api('GET', '/play/world', null, player)).data;
@@ -1960,7 +1960,7 @@ test('une Récolte quittée sans jouer ne compte pas ; Marcelle nourrie, la soup
   await sql('UPDATE world_stock SET food = 10 WHERE user_id = $1', [player.userId]);
   const fed = await api('POST', '/play/world/villager/need', { villager: 'foyer', need: 'manger' }, player);
   assert.equal(fed.data.world.brume.quest.done, true);
-  // Un jour et demi passe sans réclamer : Marcelle a de nouveau faim, la quête reste faite
+  // Un jour et demi passe sans réclamer : Agathe a de nouveau faim, la quête reste faite
   await sql(`UPDATE world_needs SET filled_at = filled_at - INTERVAL '36 hours' WHERE user_id = $1`, [player.userId]);
   await sql(`UPDATE world_quests SET claimed_at = claimed_at - INTERVAL '36 hours' WHERE user_id = $1`, [player.userId]);
   const later = (await api('GET', '/play/world', null, player)).data;
@@ -2390,7 +2390,7 @@ test('butins : chapitres ouverts, quêtes réclamées et bouteille donnent leur 
   assert.equal((await api('POST', '/play/world/chest', { source: 'jour' }, await guest())).status, 402);
 });
 
-test('l’enclos de Marcelle se trace même sans clôture jamais assemblée (un compte d’avant les clôtures de Lorena n’est pas lâché)', async () => {
+test('l’enclos d’Agathe se trace même sans clôture jamais assemblée (un compte d’avant les clôtures de Lorena n’est pas lâché)', async () => {
   const player = await newPlayer();
   const view = async () => (await api('GET', '/play/world', null, player)).data;
   await view();
@@ -2403,7 +2403,7 @@ test('l’enclos de Marcelle se trace même sans clôture jamais assemblée (un 
   assert.equal((await api('POST', '/play/world/craft/line', { craft: 'cloture', cells: [[93, 93]] }, player)).status, 409);
   // (hors d'une leçon des clôtures, un piquet ne se défait pas)
   assert.equal((await api('POST', '/play/world/craft/unpose', { x: 93, y: 93 }, player)).status, 409);
-  // À l'enclos de Marcelle : le trait est permis, ses piquets fabriqués et payés en passant
+  // À l'enclos d’Agathe : le trait est permis, ses piquets fabriqués et payés en passant
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'abri-cannelle')`, [player.userId]);
   const yard = await view();
   const fence = yard.crafts.catalog.find(c => c.id === 'cloture');
@@ -2525,7 +2525,7 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Lorena ouvre 
   const who = (world, id) => world.villagers.find(v => v.id === id);
   // Le chapitre II est scellé jusqu'à la 3e découverte
   assert.deepEqual((await api('GET', '/play/book', null, player)).data.chapters.slice(0, 2).map(c => [c.need, c.open]), [[0, true], [3, false]]);
-  // Au compte : Brume seule ; Lorena et Marcelle ne sont pas encore rencontrées.
+  // Au compte : Brume seule ; Lorena et Agathe ne sont pas encore rencontrées.
   const first = await view();
   assert.deepEqual(first.villagers.map(v => [v.id, v.built, v.asleep]), []);
   assert.equal((await talk('foyer')).status, 403);
@@ -2545,13 +2545,13 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Lorena ouvre 
   const third = await pick('greve-galet-1');
   assert.deepEqual([third.data.world.stock.wood, third.data.world.stock.stone, third.data.world.stock.food, third.data.world.brume.quest.done], [4, 2, 0, true]);
   assert.equal((await claim('ramasser')).status, 200);
-  // Le Brasier n'est appris qu'au moment de bâtir. Le feu ferme la leçon de Brume et fait arriver Lorena, pas Marcelle.
+  // Le Brasier n'est appris qu'au moment de bâtir. Le feu ferme la leçon de Brume et fait arriver Lorena, pas Agathe.
   await write(['Brasier']);
   const fire = await api('POST', '/play/world/build', { site: 'foyer' }, player);
   assert.deepEqual([fire.status, fire.data.world.stock.wood, fire.data.world.stock.stone], [200, 0, 0]);
   assert.equal(fire.data.world.brume.quest.done, true);
   assert.equal((await claim('feu')).status, 200);
-  // La première nuit : personne ; dormir fait venir Lorena au matin, pas Marcelle
+  // La première nuit : personne ; dormir fait venir Lorena au matin, pas Agathe
   const night = await view();
   assert.deepEqual([night.brume.quest.id, night.villagers.map(v => v.id)], ['nuit', []]);
   // (la caisse de Lorena n'a pas encore échoué)
@@ -2632,7 +2632,7 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Lorena ouvre 
   const shut = await view();
   assert.deepEqual([shut.brume.quest.done, shut.stock.stone, shut.crafts.placed.filter(c => c.craft === 'porte').every(c => c.locked)], [true, stone, true]);
   assert.equal((await claim('portes')).status, 200);
-  // Sa journée finit par une deuxième nuit (un personnage par jour), et Marcelle arrive au matin, dans sa propre séquence
+  // Sa journée finit par une deuxième nuit (un personnage par jour), et Agathe arrive au matin, dans sa propre séquence
   const evening = await view();
   assert.deepEqual([evening.brume.quest.id, who(evening, 'foyer')], ['veille', undefined]);
   assert.equal((await api('POST', '/play/world/sleep', {}, player)).status, 200);
@@ -2645,7 +2645,7 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Lorena ouvre 
   const fed = await api('POST', '/play/world/villager/need', { villager: 'foyer', need: 'manger' }, player);
   assert.equal(fed.data.world.brume.quest.done, true);
   assert.equal((await claim('soupe')).status, 200);
-  // Le jour de Marcelle : la cage échouée s'ouvre (sa quête), les trois poules se nourrissent, leur poulailler se pose
+  // Le jour d’Agathe : la cage échouée s'ouvre (sa quête), les trois poules se nourrissent, leur poulailler se pose
   // (une annexe du Feu, offerte), puis la troisième nuit ; Jovin arrive après elle
   const caged = await api('POST', '/play/world/beasts/cage', {}, player);
   assert.deepEqual([caged.status, caged.data.world.brume.quest.id, caged.data.world.brume.quest.done], [200, 'cage', true]);
@@ -2673,7 +2673,7 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Lorena ouvre 
   const coop = await api('POST', '/play/world/annex', { annex: 'poulailler', x: coopSpots[0].x, y: coopSpots[0].y }, player);
   assert.deepEqual([coop.status, coop.data.world.brume.quest.id, coop.data.world.brume.quest.done], [200, 'poulailler', true], JSON.stringify(coop.data));
   assert.equal((await claim('poulailler')).status, 200);
-  // L'abri de Marcelle : refusé sans de quoi le payer ; payé, son coin devient un abri (une seule fois)
+  // L'abri d’Agathe : refusé sans de quoi le payer ; payé, son coin devient un abri (une seule fois)
   const [kept] = await sql('SELECT wood, stone FROM world_stock WHERE user_id = $1', [player.userId]);
   await sql('UPDATE world_stock SET wood = 0, stone = 0 WHERE user_id = $1', [player.userId]);
   assert.equal((await api('POST', '/play/world/shelter', { who: 'cannelle' }, player)).status, 409);

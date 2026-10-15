@@ -68,7 +68,7 @@ const SIGN = require('../texts/signs');
 const { AVATAR_UNKNOWN } = require('../texts/avatar');
 const { NEED_COINS, MISSING_RESOURCES } = require('../texts/errors');
 
-// Un habitant arrive comblé (Marcelle, pendant le prologue, affamée : hungryOf) : la première vue de l'île après son
+// Un habitant arrive comblé (Agathe, pendant le prologue, affamée : hungryOf) : la première vue de l'île après son
 // arrivée inscrit l'heure de ses besoins (ou de celui qui apparaît, travailler avec l'Atelier), une seule fois
 async function welcome(userId, moods, filled, presence, now = Date.now()) {
     const fresh = Object.entries(moods).flatMap(([id, m]) => m.needs.filter(n => n.cost && !filled[id]?.[n.id]).map(n => [id, n.id]));
@@ -96,7 +96,7 @@ async function factsOf(userId, owned, stars, conn = db, moods = null) {
         // (les gisements de climat ; ce que la mer rend sur la plage de Brumelune compte à part)
         count('SELECT COUNT(*)::int AS n FROM world_deposits WHERE user_id = $1 AND deposit NOT LIKE $2', [userId, `${pickups.PREFIX}%`]),
         count('SELECT COUNT(*)::int AS n FROM world_deposits WHERE user_id = $1 AND deposit LIKE $2', [userId, `${pickups.PREFIX}%`]),
-        // Les poules de Marcelle nourries, encore rassasiées (ouvrir la cage les laisse affamées : seul un repas compte)
+        // Les poules d’Agathe nourries, encore rassasiées (ouvrir la cage les laisse affamées : seul un repas compte)
         count(`SELECT COUNT(*)::int AS n FROM world_beasts WHERE user_id = $1 AND beast = ANY($2)
             AND fed_at > NOW() - make_interval(secs => $3)`, [userId, beastRules.HENS, beastRules.DAY_MS / 1000]),
         count('SELECT COUNT(*)::int AS n FROM world_visitors WHERE user_id = $1 AND satisfied_at IS NOT NULL', [userId]),
@@ -104,7 +104,7 @@ async function factsOf(userId, owned, stars, conn = db, moods = null) {
         namesOf(userId, conn),
         // Les caisses des personnages ouvertes (world/chests.js : CRATES)
         conn.query(`SELECT source FROM world_chests WHERE user_id = $1 AND source LIKE 'caisse:%'`, [userId]),
-        // La cage des poules ouverte (chacune a sa ligne : world/beasts.js) ; le poulailler de Marcelle posé
+        // La cage des poules ouverte (chacune a sa ligne : world/beasts.js) ; le poulailler d’Agathe posé
         count('SELECT COUNT(*)::int AS n FROM world_beasts WHERE user_id = $1 AND beast = ANY($2)', [userId, beastRules.HENS]),
         count('SELECT COUNT(*)::int AS n FROM world_annexes WHERE user_id = $1 AND annex = $2', [userId, 'poulailler'])
     ]);
@@ -117,7 +117,7 @@ async function factsOf(userId, owned, stars, conn = db, moods = null) {
         moods = moodsOf(residents, levels, zones, placed, filled, presence, Date.now(), places);
     }
     // Un besoin comblé depuis l'ouverture de la quête en cours (la dernière réclamée) reste fait pour elle, même s'il
-    // revient avant qu'on la réclame. La faim de Marcelle à son arrivée (welcome, datée d'avant) ne compte pas
+    // revient avant qu'on la réclame. La faim d’Agathe à son arrivée (welcome, datée d'avant) ne compte pas
     const [last] = lastRows.rows;
     const fedSince = Object.entries(filled).flatMap(([id, needs]) => Object.entries(needs)
         .filter(([, at]) => !last.at || new Date(at) >= last.at).map(([need]) => `${id}:${need}`));

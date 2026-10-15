@@ -16,7 +16,7 @@ test('trois annexes par bâtiment : petite (palier II), réserve (IV), grande (V
   }
   assert.deepEqual(annexes.ANNEXES.filter(a => a.kind === 'house').map(a => [a.id, a.site]), [['maison', 'foyer']]);
   assert.equal(new Set(annexes.ANNEXES.map(a => a.id)).size, 29);
-  // Le poulailler de Marcelle (sa leçon : poser une annexe) : un seul, dès le Feu bâti, gratuit
+  // Le poulailler d’Agathe (sa leçon : poser une annexe) : un seul, dès le Feu bâti, gratuit
   const coop = annexes.ANNEX_BY_ID.poulailler;
   assert.deepEqual([coop.site, coop.kind, annexes.maxOf(coop), annexes.levelFor(coop, 0)], ['foyer', 'coop', 1, 1]);
   assert.deepEqual(annexes.priceOf(coop, 0), { cost: {}, coins: 0, finds: {} });

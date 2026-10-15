@@ -1,4 +1,4 @@
-// Les abris des coins du camp (choix de l'auteur, 13 oct.) : le coin de Marcelle, la cuisine de l'épave, devient un abri
+// Les abris des coins du camp (choix de l'auteur, 13 oct.) : le coin d’Agathe, la cuisine de l'épave, devient un abri
 // que le joueur bâtit et paie, une fois sa quête venue (après le poulailler). Une ligne de world_items « abri:<qui> » ;
 // le camp le dessine (world/camp.js), la quête le compte (quests.js : shelter).
 const db = require('../../config/db');

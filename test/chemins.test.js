@@ -20,7 +20,7 @@ test('une île neuve n’a que son sentier ; une île d’avant garde ses routes
     const fresh = await newPlayer();
     const w = await view(fresh);
     // La grande route de la plage (rangées 90-91) est redevenue de l'herbe ; le sentier descend de la cuisine de
-    // Marcelle au rivage, puis d'une case jusqu'à la porte du Feu, qui brûle près de l'épave (île à la plage)
+    // Agathe au rivage, puis d'une case jusqu'à la porte du Feu, qui brûle près de l'épave (île à la plage)
     assert.equal(at(w, 90, 90), 'g');
     for (let y = 89; y <= 95; y++) assert.equal(at(w, 95, y), 'p', `sentier ${y}`);
     assert.equal(at(w, 96, 95), 'p');

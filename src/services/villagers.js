@@ -14,7 +14,7 @@ const VILLAGERS = {
     puits: { name: 'Pierrot', role: 'Petit sourcier', loves: 'water', likes: 'food' },
     ponton: { name: 'Lorena', role: 'Navigatrice', loves: 'wood', likes: 'food' },
     atelier: { name: 'Jovin', role: 'Horloger-artificier', loves: 'stone', likes: 'wood' },
-    foyer: { name: 'Marcelle', role: 'Cuisinière-guérisseuse', loves: 'food', likes: 'water' }
+    foyer: { name: 'Agathe', role: 'Cuisinière-guérisseuse', loves: 'food', likes: 'water' }
 };
 const RESOURCES = ['stone', 'wood', 'water', 'food'];
 const LABELS = { stone: 'pierre', wood: 'bois', water: 'eau', food: 'nourriture' };

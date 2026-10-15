@@ -22,7 +22,7 @@ test('la troupe de la bible (HISTOIRE.md § 8.1) : prénom, rôle, cadeau adoré
     puits: ['Pierrot', 'Petit sourcier', 'water', 'food'],
     ponton: ['Lorena', 'Navigatrice', 'wood', 'food'],
     atelier: ['Jovin', 'Horloger-artificier', 'stone', 'wood'],
-    foyer: ['Marcelle', 'Cuisinière-guérisseuse', 'food', 'water']
+    foyer: ['Agathe', 'Cuisinière-guérisseuse', 'food', 'water']
   });
 });
 

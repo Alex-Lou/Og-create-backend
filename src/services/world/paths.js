@@ -22,7 +22,7 @@ const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 const isPath = g => g === 'p' || g === 'k';
 
 // Le sentier d'une île neuve : de la porte du Feu (sous son emprise) jusqu'au sable de l'épave. Sur une île à la
-// plage (world/places.js : le Feu contre l'épave, la cuisine de Marcelle à son ancienne place), il part de la cuisine
+// plage (world/places.js : le Feu contre l'épave, la cuisine d’Agathe à son ancienne place), il part de la cuisine
 // et finit d'une case de plus, devant la porte du Feu (le bas de son emprise : world/places.js, BEACH)
 const SENTIER = [89, 90, 91, 92, 93, 94, 95].map(y => ({ x: 95, y }));
 const SENTIER_BEACH = [...SENTIER, { x: 96, y: 95 }, { x: 97, y: 95 }, { x: 98, y: 95 }];

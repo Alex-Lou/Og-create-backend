@@ -33,7 +33,7 @@ function decosNear(tiles, siteId, level, reach, places = STATIC) {
 // Identifiant d'un visiteur installé, parmi les habitants : 'v<numéro de sa visite>'
 const SETTLER_ID = /^v\d{1,9}$/;
 const knownResident = id => Object.hasOwn(villagers.VILLAGERS, id) || SETTLER_ID.test(id);
-// La troupe est là dès sa rencontre (bible, § 6.6), un personnage par jour : Lorena après la première nuit, Marcelle
+// La troupe est là dès sa rencontre (bible, § 6.6), un personnage par jour : Lorena après la première nuit, Agathe
 // après la deuxième, Jovin après la troisième (après les poules), Pierrot après la quatrième (choix de l'auteur, 13 oct. :
 // jamais le même jour que Jovin). Les quatre dormeurs
 // (SLEEPERS) apparaissent dès que leur quartier est à soi. presence : { done (quêtes faites, quests.doneOf), blessed }
@@ -61,7 +61,7 @@ function residentsOf(levels, zones, settlers, presence) {
     }));
     return [...base, ...settled];
 }
-// Marcelle a faim en arrivant, pendant le prologue (la quête « soupe » : bible, § 9, étape 3) ; les autres arrivent
+// Agathe a faim en arrivant, pendant le prologue (la quête « soupe » : bible, § 9, étape 3) ; les autres arrivent
 // comblés
 const hungryOf = (id, presence) => id === 'foyer' && !presence.done.has('soupe');
 const HUNGRY_AGO = (villagers.NEEDS.manger.hours * 60 + 1) * 60 * 1000;

@@ -58,7 +58,7 @@ test('« Recommencer l’île » : confirmé en toutes lettres ; tout repart de 
     const items = (await sql('SELECT item FROM world_items WHERE user_id = $1 ORDER BY item', [id])).map(r => r.item);
     // (l'île recommencée part de ses sentiers, son Feu sur la plage : world/places.js)
     assert.deepEqual(items, ['ile:plage', 'ile:recommencee', 'ile:sentiers']);
-    // Les habitants arrivent un à un, un par jour : personne pendant la première nuit, Lorena au matin, Marcelle après
+    // Les habitants arrivent un à un, un par jour : personne pendant la première nuit, Lorena au matin, Agathe après
     // la deuxième nuit (pas dès la Récolte de Lorena)
     await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'pages'), ($1, 'ramasser'), ($1, 'feu')`, [id]);
     assert.deepEqual((await view(player)).villagers.map(v => v.id), []);

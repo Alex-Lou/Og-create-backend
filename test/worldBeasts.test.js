@@ -1,4 +1,4 @@
-// Les bêtes de ferme, avec la base et l'API (bible du dépôt front, § 6.16, v6) : la cage des poules de Marcelle, la
+// Les bêtes de ferme, avec la base et l'API (bible du dépôt front, § 6.16, v6) : la cage des poules d’Agathe, la
 // fiche, nourrir, la bulle, ramasser
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -10,22 +10,22 @@ test.after(() => server?.kill());
 
 const herdOf = async player => (await api('GET', '/play/world', null, player)).data.beasts;
 
-// Marcelle est là après la première Récolte de Lorena ; les quêtes d'avant comptent comme faites.
+// Agathe est là après la première Récolte de Lorena ; les quêtes d'avant comptent comme faites.
 const withCannelle = id => sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'recolte'), ($1, 'veille') ON CONFLICT DO NOTHING`, [id]);
 const cageOf = async player => ((await api('GET', '/play/world', null, player)).data.camp || []).find(c => c.id === 'cage') || null;
 
-test('la cage de Marcelle : échouée au bout de la plage une fois sa soupe faite, ouverte une fois ; Caramel, Flocon et Réglisse en sortent', async () => {
-  // Un compte d'après la bible (un ancien compte a déjà Marcelle, et la cage à ouvrir)
+test('la cage d’Agathe : échouée au bout de la plage une fois sa soupe faite, ouverte une fois ; Caramel, Flocon et Réglisse en sortent', async () => {
+  // Un compte d'après la bible (un ancien compte a déjà Agathe, et la cage à ouvrir)
   const player = await newPlayer();
   const id = player.userId;
   const open = () => api('POST', '/play/world/beasts/cage', {}, player);
-  // Avant Marcelle : ni cage ni poules
+  // Avant Agathe : ni cage ni poules
   assert.equal(await cageOf(player), null);
   assert.deepEqual((await herdOf(player)).list, []);
   assert.equal((await open()).status, 403);
   assert.deepEqual([(await api('POST', '/play/world/beast/feed', { beast: 'poule-rousse' }, player)).data.message], ['Ouvre d’abord la cage des poules, au camp.']);
-  // Marcelle est là, affamée : pas encore de cage (son jour commence par la soupe) ; la soupe faite, la cage s'échoue
-  // au bout de la plage, dans le coin de Marcelle
+  // Agathe est là, affamée : pas encore de cage (son jour commence par la soupe) ; la soupe faite, la cage s'échoue
+  // au bout de la plage, dans le coin d’Agathe
   await withCannelle(id);
   assert.equal(await cageOf(player), null);
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'soupe')`, [id]);
