@@ -311,4 +311,20 @@ const LEGACY_LABELS = {
     legendes: 'Achète L’Île des Légendes'
 };
 
-module.exports = { QUEST_TEXTS, LEGACY_LABELS };
+// L'objectif de fond (l'arc du Phare, choix de l'auteur, 15 oct. : ecriture/arc_phare.md § 3) : son titre, l'étape de
+// chaque acte (celle de l'acte en cours se lit dans le Carnet), et quand il est atteint. Textes à valider
+const PHARE_GOAL = {
+    label: 'Rallumer le phare',
+    steps: {
+        I: 'Tenir sur l’île, et allumer les premières lumières.',
+        II: 'Lire les pierres des Anciens, sur la Colline.',
+        III: 'Voir le phare de près, depuis les Hauteurs.',
+        IV: 'Prendre la mer vers l’îlot.',
+        V: 'Gagner l’Îlot aux Mouettes.',
+        VI: 'Entrer dans le phare.',
+        VII: 'Rallumer sa lumière, chez nous.'
+    },
+    done: 'Le phare brille.'
+};
+
+module.exports = { QUEST_TEXTS, LEGACY_LABELS, PHARE_GOAL };

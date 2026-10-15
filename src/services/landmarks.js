@@ -96,4 +96,11 @@ function bonusesOf(found) {
     return out;
 }
 
-module.exports = { LANDMARKS, LANDMARK_BY_ID, PRODUCERS, isLandmark, effectText, bonusesOf };
+// La Route des feux (arc du Phare, choix de l'auteur, 15 oct. : ecriture/arc_phare.md § 4) : chaque lieu remarquable a
+// le feu des Anciens, que le Voile a soufflé, sauf le Lac de lave (« Ce qui est tombé dort encore ») ; une fois le lieu
+// découvert, un geste le rallume (world/lands.js : lightFire), retenu dans world_items (FIRE_PREFIX + id)
+const NO_FIRE = new Set(['cratere']);
+const FIRE_PREFIX = 'feu:';
+const hasFire = id => Object.hasOwn(LANDMARK_BY_ID, id) && !NO_FIRE.has(id);
+
+module.exports = { LANDMARKS, LANDMARK_BY_ID, PRODUCERS, FIRE_PREFIX, isLandmark, hasFire, effectText, bonusesOf };

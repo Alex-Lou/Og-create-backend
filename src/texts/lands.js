@@ -33,8 +33,11 @@ const KNOW_FIRST = (find, key) => `${find} : il faut d’abord connaître « ${k
 const DEPOSIT_REGROWS = minutes => `Ce gisement repousse : reviens dans ${minutes} min.`;
 const NOTHING_HERE = 'Il n’y a rien à ramasser ici.';
 const SEA_BRINGS_MORE = minutes => `La mer en rapportera d’autres : reviens dans ${minutes} min.`;
+// La Route des feux (arc du Phare, § 4) : un lieu sans feu ; un lieu pas encore découvert
+const FIRE_NONE = 'Ici, aucun feu ne se rallume.';
+const FIRE_FIND_FIRST = 'Découvre d’abord ce lieu.';
 
 module.exports = {
     LANDMARK_TEXTS, ZONE_DISCOVERED, EXPEDITION_GOING, CORE_MISSING, NOT_NEIGHBOR, EXPEDITION_COST, EXPEDITION_CHARGE,
-    LANDMARK_UNKNOWN, DEPOSIT_UNKNOWN, KNOW_FIRST, DEPOSIT_REGROWS, NOTHING_HERE, SEA_BRINGS_MORE
+    LANDMARK_UNKNOWN, DEPOSIT_UNKNOWN, KNOW_FIRST, DEPOSIT_REGROWS, NOTHING_HERE, SEA_BRINGS_MORE, FIRE_NONE, FIRE_FIND_FIRST
 };

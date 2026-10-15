@@ -352,6 +352,15 @@ router.post('/world/landmark', withAccount(async (req, res, owner, b) => {
     res.json({ landmark: done.landmark, fresh: done.fresh, world: await worldView(owner, b) });
 }));
 
+// La Route des feux (arc du Phare) : rallumer le feu d'un lieu découvert → { landmark, fresh, world }
+router.post('/world/landmark/fire', withAccount(async (req, res, owner, b) => {
+    const id = String(req.body.id || '');
+    if (!/^[a-z]{1,20}$/.test(id)) return res.status(400).json({ message: INVALID.landmark });
+    const done = await world.lightFire(owner.id, id);
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json({ landmark: done.landmark, fresh: done.fresh, world: await worldView(owner, b) });
+}));
+
 // Gisement d'un quartier de climat à soi (lot 9d) : ramasser ses trouvailles → { find, amount, world }
 router.post('/world/deposit', withAccount(async (req, res, owner, b) => {
     const id = String(req.body.id || '');
@@ -556,6 +565,15 @@ router.get('/world/brume', withAccount(async (req, res, owner, b) => {
 // « Passer le tutoriel » : retenu sur le compte → { skipped: true }
 router.post('/world/prologue/skip', withAccount(async (req, res, owner) => {
     const done = await world.skipPrologue(owner.id);
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json(done);
+}));
+
+// Une scène de l'arc du Phare vue (le conseil, la traversée manquée), retenue sur le compte → { scene }
+router.post('/world/scene', withAccount(async (req, res, owner) => {
+    const id = String(req.body.id || '');
+    if (!/^[a-z]{1,20}$/.test(id)) return res.status(400).json({ message: INVALID.scene });
+    const done = await world.seeScene(owner.id, id);
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json(done);
 }));

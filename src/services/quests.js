@@ -19,7 +19,7 @@
 // (sans récompense) ; les anciennes quêtes (LEGACY) se rangent à leur place dans la nouvelle chaîne, et leurs coffres
 // encore fermés restent dus. Un joueur ne recule donc jamais.
 
-const { QUEST_TEXTS, LEGACY_LABELS } = require('../texts/quests');
+const { QUEST_TEXTS, LEGACY_LABELS, PHARE_GOAL } = require('../texts/quests');
 
 // Les bêtes du Bestiaire (éléments du Grimoire, § 1.2 de la bible)
 const BEASTS = ['Poisson', 'Méduse', 'Grenouille', 'Oiseau', 'Tortue', 'Papillon', 'Poule', 'Luciole', 'Abeille', 'Hibou', 'Renard',
@@ -278,9 +278,22 @@ function tutorialStepsOf(claimed) {
 }
 const inTutorial = id => TUTORIAL.some(quest => quest.id === id);
 
+// L'objectif de fond (l'arc du Phare, choix de l'auteur, 15 oct.) : « Rallumer le phare », dès la fin du tutoriel, avec
+// l'étape de l'acte en cours (le premier qui n'est pas fini), puis atteint ; rien n'est stocké. { label, act, step } (act
+// null une fois atteint), ou null pendant le tutoriel
+function goalOf(done) {
+    if (!done.has(TUTORIAL_LAST)) return null;
+    const finished = actsDoneOf(done);
+    const act = ACTS.find(a => a !== 'T' && !finished.includes(a)) || null;
+    return { label: PHARE_GOAL.label, act, step: act ? PHARE_GOAL.steps[act] : PHARE_GOAL.done };
+}
+
 function boardOf(claimed, facts) {
     const done = doneOf(claimed);
-    return { quest: active(claimed, facts), done: QUESTS.filter(quest => done.has(quest.id)).length, total: QUESTS.length, acts: actsDoneOf(done), rested: RESTED };
+    return {
+        quest: active(claimed, facts), done: QUESTS.filter(quest => done.has(quest.id)).length, total: QUESTS.length, acts: actsDoneOf(done), rested: RESTED,
+        goal: goalOf(done)
+    };
 }
 // Début de chaque acte commencé (les mots d'Héliane, bible § 6.13) : l'heure où la dernière quête des actes d'avant a été
 // réclamée (0 si rien n'a été réclamé avant lui). rows : [{ quest, at (ms) }]. { acte: ms } pour les actes I à VII
@@ -305,5 +318,6 @@ const { RESTED } = require('../texts/brume');
 
 module.exports = {
     QUESTS, ENCLOS, ENCLOS_DOORS, LEGACY, QUEST_CHESTS, BEASTS, GUIDED_INK, FIRST_NIGHT_DONE,
-    reachOf, doneOf, firstNightDoneOf, currentOf, progressOf, active, boardOf, actsDoneOf, actStartsOf, tutorialStepsOf, inTutorial
+    TUTORIAL_LAST, reachOf, doneOf, firstNightDoneOf, currentOf, progressOf, active, boardOf, goalOf, actsDoneOf, actStartsOf, tutorialStepsOf,
+    inTutorial
 };

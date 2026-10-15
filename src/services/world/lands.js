@@ -80,6 +80,20 @@ async function findLandmark(userId, landmarkId, now = Date.now()) {
     });
 }
 
+// Rallume le feu d'un lieu remarquable découvert (la Route des feux, arc du Phare, choix de l'auteur, 15 oct.) : gratuit,
+// une fois (redemander ne fait rien), retenu dans world_items. { landmark, fresh } ou { status, message }
+async function lightFire(userId, landmarkId) {
+    if (!Object.hasOwn(landmarks.LANDMARK_BY_ID, landmarkId)) return { status: 404, message: T.LANDMARK_UNKNOWN };
+    if (!landmarks.hasFire(landmarkId)) return { status: 409, message: T.FIRE_NONE };
+    await migrate(userId);
+    return db.transaction(async conn => {
+        if (!(await foundOf(userId, conn)).has(landmarkId)) return db.rollback({ status: 409, message: T.FIRE_FIND_FIRST });
+        const added = await conn.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'feu') ON CONFLICT DO NOTHING RETURNING item`,
+            [userId, `${landmarks.FIRE_PREFIX}${landmarkId}`]);
+        return { landmark: landmarkId, fresh: added.rows.length > 0 };
+    });
+}
+
 // Trouvailles de plus à chaque ramassage d'un quartier : une par création de climat posée dans ce quartier, plafonnée
 const craftBonusOf = (placed, zoneId) => Math.min(finds.CRAFT_BONUS_MAX,
     placed.filter(r => crafts.CRAFT_BY_ID[r.craft]?.place.climate && map.zoneAt(r.x, r.y) === zoneId).length);
@@ -139,4 +153,4 @@ async function pickUp(userId, spotId, now = Date.now()) {
     });
 }
 
-module.exports = { isKnown, coreMissing, expeditionCost, expeditionOf, startExpedition, findLandmark, craftBonusOf, gatherDeposit, pickUp };
+module.exports = { isKnown, coreMissing, expeditionCost, expeditionOf, startExpedition, findLandmark, lightFire, craftBonusOf, gatherDeposit, pickUp };

@@ -46,7 +46,7 @@ const {
 const { bonusesFor, gather, payWith, collect } = require('./world/produce');
 const { anyaOf, breathRefused, brumeSavoirOf, talkBrume, revealAnya, breatheAnya } = require('./world/anyaBrume');
 const {
-    isKnown, coreMissing, expeditionCost, expeditionOf, startExpedition, findLandmark, craftBonusOf, gatherDeposit, pickUp
+    isKnown, coreMissing, expeditionCost, expeditionOf, startExpedition, findLandmark, lightFire, craftBonusOf, gatherDeposit, pickUp
 } = require('./world/lands');
 const {
     craftCtx, stowCrafts, epreuvesOf, craftsView, startCraft, finishCraft, placeCraft, placeLine, fenceRingOf, moveCraft, storeCraft, unposeCraft, turnCraft, placeDoor, lockDoor
@@ -235,6 +235,18 @@ const PROLOGUE_SKIP = 'prologue:passe';
 async function tutorialOf(userId, conn = db) {
     const items = await itemsOf(userId, conn);
     return { tutorial: true, skipped: quests.firstNightDoneOf(await claimedOf(userId, conn)) && items.has(PROLOGUE_SKIP) };
+}
+// Les scènes de l'arc du Phare (choix de l'auteur, 15 oct. : une fois par compte, sur tous ses appareils ; rejouables
+// depuis « Revoir le prologue ») : chacune vient avec sa quête (le conseil à la fin du tutoriel, la traversée manquée au
+// Bateau écrit) ; vue, une ligne de world_items (SCENE_PREFIX + id). Elles ne donnent ni ne retirent rien
+const STORY_SCENES = { conseil: quests.TUTORIAL_LAST, traversee: 'souvenir-aster' };
+const SCENE_PREFIX = 'scene:';
+const scenesSeenOf = items => Object.keys(STORY_SCENES).filter(id => items.has(`${SCENE_PREFIX}${id}`));
+async function seeScene(userId, id) {
+    if (!Object.hasOwn(STORY_SCENES, id)) return { status: 404, message: W.SCENE_UNKNOWN };
+    if (!quests.doneOf(await claimedOf(userId)).has(STORY_SCENES[id])) return { status: 409, message: W.SCENE_TOO_EARLY };
+    await db.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'histoire') ON CONFLICT DO NOTHING`, [userId, `${SCENE_PREFIX}${id}`]);
+    return { scene: id };
 }
 async function skipPrologue(userId) {
     if (!quests.firstNightDoneOf(await claimedOf(userId))) {
@@ -470,7 +482,9 @@ async function view(userId, owned, book) {
         // ceux des quartiers inconnus ne disent rien, sinon qu'ils existent
         landmarks: landmarks.LANDMARKS.map(l => (isKnown(map.ZONE_BY_ID[l.zone], discovered) ? {
             id: l.id, name: l.name, zone: l.zone, x: l.x, y: l.y, text: l.text, effect: landmarks.effectText(l), chest: l.chest,
-            found: found.has(l.id), foundAt: found.get(l.id) || null
+            found: found.has(l.id), foundAt: found.get(l.id) || null,
+            // (la Route des feux : le lieu a son feu ; rallumé)
+            fire: landmarks.hasFire(l.id), lit: items.has(`${landmarks.FIRE_PREFIX}${l.id}`)
         } : { id: l.id, zone: l.zone, known: false })),
         // Trouvailles de climat (réserve à part) : nom, climat, nombre ; leur clé du Grimoire, connue ou non, et les pages
         // jusqu'à elle (le verrou parlant), pour un climat dont un quartier est connu
@@ -574,6 +588,8 @@ async function view(userId, owned, book) {
                 ...boardWith(claimed, facts, book.openChapters),
                 tutorial: true,
                 skipped: firstNightDone && items.has(PROLOGUE_SKIP),
+                // Les scènes de l'arc du Phare déjà vues par le compte (seeScene)
+                scenes: scenesSeenOf(items),
                 // Les emplacements que l'histoire donne à l'Athanor (le jeu garde le plus grand, avec ceux des familles)
                 athanor: athanorFrom(claimed)
             };
@@ -1065,7 +1081,7 @@ module.exports = {
     SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, pendingOf, chargesAt, effectsOf, productionOf,
     view, build, buyZone, buyItem, undoItem, harvestCap, chooseSkin, startRun, finishRun, collect, migrate, claimQuest, sleep, board, openChest, openAll,
     placeAnnex, moveAnnex, poseAnnex, annexSpotOk, siteSpots, moveSite, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople, namePlayer, chooseAvatar, arianeTargets, elementHintOf, guidedInkOf, guidedPageOf, athanorOf, bookFor, restartIsland,
-    refundDecorations, startCraft, finishCraft, placeCraft, placeLine, buildShelter, moveCraft, storeCraft, unposeCraft, turnCraft, placeDoor, lockDoor, startExpedition, findLandmark, gatherDeposit, pickUp,
-    anyaOf, breathRefused, revealAnya, breatheAnya, brumeSavoirOf, talkBrume, startNights, repelCreature, repairSite, skipPrologue, layPaths,
+    refundDecorations, startCraft, finishCraft, placeCraft, placeLine, buildShelter, moveCraft, storeCraft, unposeCraft, turnCraft, placeDoor, lockDoor, startExpedition, findLandmark, lightFire, gatherDeposit, pickUp,
+    anyaOf, breathRefused, revealAnya, breatheAnya, brumeSavoirOf, talkBrume, startNights, repelCreature, repairSite, skipPrologue, seeScene, layPaths,
     feedBeast, collectBeasts, openCage
 };

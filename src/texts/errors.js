@@ -40,6 +40,7 @@ const INVALID = {
     stray: 'Égaré invalide',
     site: 'Bâtiment invalide',
     landmark: 'Lieu invalide',
+    scene: 'Scène invalide',
     deposit: 'Gisement invalide',
     find: 'Trouvaille invalide',
     worksite: 'Chantier invalide',
