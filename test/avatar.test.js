@@ -24,6 +24,10 @@ test('choix : complétés par défaut ; inconnus, mal formés ou pas encore gagn
   assert.deepEqual([femme.barbe, femme.moustache, femme.menton], ['sans', 'sans', 'doux']);
   const homme = cleanChoices({ genre: 'homme', barbe: 'pleine', moustache: 'epaisse', menton: 'fendu' }).choices;
   assert.deepEqual([homme.barbe, homme.moustache, homme.menton], ['pleine', 'epaisse', 'fendu']);
+  // L'expression (15 oct.) : neutre par défaut, au choix du joueur ; une expression inconnue est refusée
+  assert.equal(cleanChoices({}).choices.expression, 'neutre');
+  assert.equal(cleanChoices({ expression: 'triste' }).choices.expression, 'triste');
+  assert.equal(cleanChoices({ expression: 'rire' }).status, 400);
   // Les coupes de femme ajoutées (pixie, demi-queue, tresse sur le côté, puffs, locks longues) sont acceptées
   for (const coupe of ['pixie', 'demiQueue', 'tresseCote', 'puffs', 'locksLongues']) assert.equal(cleanChoices({ genre: 'femme', coupe }).choices.coupe, coupe);
   const refused = [
