@@ -123,6 +123,10 @@ test.describe('île', () => {
     assert.deepEqual(start.sites.filter(s => !s.hidden).map(s => s.id), ['foyer']);
     // (l'épave et sa poupe, le décor de l'ancienne butte ; personne encore)
     assert.deepEqual(start.camp.map(c => c.id), ['hirondelle', 'poupe', 'palmier-1', 'palmier-2', 'etoile-1', 'etoile-2']);
+    // (la végétation gagne l'épave avec les jours depuis la naissance de l'île : douze jours, le deuxième stade)
+    assert.equal(start.camp[0].stade, 0);
+    await sql(`UPDATE world_items SET bought_at = now() - interval '12 days' WHERE user_id = $1 AND item = 'ile:plage'`, [player.userId]);
+    assert.equal((await view()).camp.find(c => c.id === 'hirondelle').stade, 2);
     // Le suivi des quêtes montre tout le tutoriel : vingt-deux étapes, de la première page au premier chemin
     assert.deepEqual([start.brume.steps.length, start.brume.steps[0].id, start.brume.steps.at(-1).id], [25, 'pages', 'chemin']);
     assert.ok(start.brume.steps.every(st => st.label && st.done === false));

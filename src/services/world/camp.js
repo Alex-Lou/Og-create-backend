@@ -18,7 +18,7 @@ const { SIZE } = require('./rules');
 const { annexesOf, levelsOf, claimedOf, craftsOf, zonesOf } = require('./reads');
 const { cageOf } = require('./beasts');
 const { roadsOf } = require('./paths');
-const { STATIC, inSiteAt, placesOf } = require('./places');
+const { PLAGE, STATIC, inSiteAt, placesOf } = require('./places');
 const { presenceOf, metOf } = require('./people');
 const { sheltersOf } = require('./shelters');
 
@@ -147,9 +147,9 @@ async function campOfUser(userId, conn, { levels, annexRows, craftRows } = {}) {
     const presence = await presenceOf(userId, conn);
     const zones = await zonesOf(userId, conn);
     const met = new Set(['ponton', 'foyer', 'atelier'].filter(id => metOf(id, lv, zones, presence)));
-    // (les jours depuis le début de l'île : la végétation de l'épave)
-    const { rows: [night] } = await conn.query('SELECT started_at FROM world_nights WHERE user_id = $1', [userId]);
-    const days = night ? Math.max(0, Math.floor((Date.now() - new Date(night.started_at).getTime()) / 86400000)) : 0;
+    // (les jours depuis la naissance de l'île à la plage, quand l'épave s'est échouée : sa végétation)
+    const { rows: [born] } = await conn.query('SELECT bought_at FROM world_items WHERE user_id = $1 AND item = $2', [userId, PLAGE]);
+    const days = born ? Math.max(0, Math.floor((Date.now() - new Date(born.bought_at).getTime()) / 86400000)) : 0;
     return campOf({ acts, levels: lv, taken, cage: await cageOf(userId, conn), met, places, beach, shelters: await sheltersOf(userId, conn), days });
 }
 
