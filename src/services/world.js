@@ -165,13 +165,13 @@ async function guidedInkOf(userId) {
     return Boolean(quest && quests.GUIDED_INK.has(quest.id));
 }
 // La page que marque le ruban pendant le tutoriel n'a pas de leurre (choix de l'auteur, 9 oct.) : le Brasier du feu de
-// camp (Feu + Feu, sans Encre). La Pluie de Pierrot garde ses leurres : l'Encre s'y apprend (choix de l'auteur, 12 oct.)
+// camp (Feu + Feu, sans Encre). La Pluie de Léo garde ses leurres : l'Encre s'y apprend (choix de l'auteur, 12 oct.)
 async function guidedPageOf(userId) {
     const quest = quests.currentOf(await claimedOf(userId));
     return Boolean(quest && (quest.id === 'feu' || await brasierFirst(userId, quest)));
 }
 // L'Athanor grandit avec l'histoire (choix de l'auteur, 12 oct.), en plus des familles : un emplacement de plus quand
-// le Puits de Pierrot est réclamé, la fin du tutoriel ; quatre quand Freya arrive, juste avant la Vie
+// le Puits de Léo est réclamé, la fin du tutoriel ; quatre quand Freya arrive, juste avant la Vie
 const ATHANOR = [['eveil-sylve', 4], ['puits-ondin', 3]];
 const athanorFrom = claimed => {
     const done = quests.doneOf(claimed);
@@ -238,7 +238,7 @@ async function tutorialOf(userId, conn = db) {
 }
 // Les scènes de l'arc du Phare (choix de l'auteur, 15 oct. : une fois par compte, sur tous ses appareils ; le conseil
 // se rejoue depuis « Revoir le prologue ») : chacune vient avec sa quête (after : le conseil à la fin du tutoriel, la
-// traversée manquée au Bateau écrit, l'intérieur du phare à la clé trouvée, le navire des parents de Pierrot au Phare
+// traversée manquée au Bateau écrit, l'intérieur du phare à la clé trouvée, le navire des parents de Léo au Phare
 // de Brume allumé), et n'est plus due une fois son acte fini (until : la traversée, l'acte IV ; le phare, l'acte VI) ;
 // vue, une ligne de world_items (SCENE_PREFIX + id). Elles ne donnent ni ne retirent rien
 const STORY_SCENES = {

@@ -34,7 +34,7 @@ function decosNear(tiles, siteId, level, reach, places = STATIC) {
 const SETTLER_ID = /^v\d{1,9}$/;
 const knownResident = id => Object.hasOwn(villagers.VILLAGERS, id) || SETTLER_ID.test(id);
 // La troupe est là dès sa rencontre (bible, § 6.6), un personnage par jour : Lorena après la première nuit, Agathe
-// après la deuxième, Jovin après la troisième (après les poules), Pierrot après la quatrième (choix de l'auteur, 13 oct. :
+// après la deuxième, Jovin après la troisième (après les poules), Léo après la quatrième (choix de l'auteur, 13 oct. :
 // jamais le même jour que Jovin). Les quatre dormeurs
 // (SLEEPERS) apparaissent dès que leur quartier est à soi. presence : { done (quêtes faites, quests.doneOf), blessed }
 const SLEEPERS = ['puits', 'bosquet', 'carriere', 'potager'];

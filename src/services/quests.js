@@ -76,7 +76,7 @@ const QUESTS = [
     // (ses trois torches, une par côté d'où venaient les égarés de la veillée : choix de l'auteur, 13 oct.)
     q('torches-rivet', 'T', { kind: 'craft', craft: 'torche', need: 3 }, 15),
     // La quatrième nuit (choix de l'auteur, 13 oct. : chaque personnage son jour, le suivant quand le joueur choisit de
-    // dormir) : le jour de Jovin finit autour du feu ; Pierrot sera trouvé au matin
+    // dormir) : le jour de Jovin finit autour du feu ; Léo sera trouvé au matin
     q('nuit-rivet', 'T', { kind: 'sleep', site: 'foyer' }, 0),
     q('eveil-ondin', 'T', { kind: 'wake', villager: 'puits' }, 10),
     q('souvenir-ondin', 'T', { kind: 'element', element: 'Pluie' }, 20),
@@ -147,7 +147,7 @@ const INDEX = new Map(QUESTS.map((quest, i) => [quest.id, i]));
 // Anciennes quêtes (avant la chaîne de la bible) : où elles se rangent dans la nouvelle chaîne (les mêmes identifiants
 // s'y rangent tout seuls), et leurs coffres. Une ancienne quête réclamée vaut celle-ci comme « plus avancée ».
 const LEGACY = {
-    // (à la quatrième nuit, ajoutée après elle le 13 oct. : ces comptes trouvent Pierrot comme avant, sans dormir de plus)
+    // (à la quatrième nuit, ajoutée après elle le 13 oct. : ces comptes trouvent Léo comme avant, sans dormir de plus)
     source: { at: 'nuit-rivet', label: LEGACY_LABELS.source, chest: 'rare' },
     puits: { at: 'puits-ondin', label: LEGACY_LABELS.puits },
     livre5: { at: 'cabane', label: LEGACY_LABELS.livre5 },
@@ -196,7 +196,7 @@ function currentOf(claimed) {
 // depuis la dernière quête réclamée), awake: Set, hearts (cœurs du meilleur ami), expeditions, landmarks: Set,
 // gathered, visitors, settled, named, links: Set ('puits-foyer' : bâtiments reliés par un chemin) }
 // Quêtes du tutoriel qui passent par le Grimoire : la page que marque le ruban a son Encre offerte (le joueur, qui a
-// peu d'écus, n'est jamais bloqué devant une énigme) : le Puits de Pierrot, dont la Boue (Eau + Terre), la première
+// peu d'écus, n'est jamais bloqué devant une énigme) : le Puits de Léo, dont la Boue (Eau + Terre), la première
 // recette à deux ingrédients différents. Pas le Brasier (Feu + Feu : l'énigme suffit, choix de l'auteur, 12 oct.)
 const GUIDED_INK = new Set(['souvenir-ondin']);
 

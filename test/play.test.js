@@ -1483,10 +1483,10 @@ test('habitants : on leur parle et on les gâte une fois par jour ; chaque cœur
   const talk = villager => api('POST', '/play/world/villager/talk', { villager }, player);
   const gift = (villager, resource) => api('POST', '/play/world/villager/gift', { villager, resource }, player);
   const view = (await api('GET', '/play/world', null, player)).data;
-  // Le tutoriel joué, la troupe vit sur l'île (bible, § 6.6) : Pierrot, Lorena et Jovin au camp tant que leur bâtiment n'est
+  // Le tutoriel joué, la troupe vit sur l'île (bible, § 6.6) : Léo, Lorena et Jovin au camp tant que leur bâtiment n'est
   // pas là ; Agathe au Foyer
   assert.deepEqual(view.villagers.map(w => [w.id, w.name, w.hearts, w.talked, w.gifted, w.built]),
-    [['puits', 'Pierrot', 0, false, false, false], ['ponton', 'Lorena', 0, false, false, false], ['atelier', 'Jovin', 0, false, false, false], ['foyer', 'Agathe', 0, false, false, true]]);
+    [['puits', 'Léo', 0, false, false, false], ['ponton', 'Lorena', 0, false, false, false], ['atelier', 'Jovin', 0, false, false, false], ['foyer', 'Agathe', 0, false, false, true]]);
   assert.deepEqual(view.friendship.hearts, [30, 80, 150, 250, 400]);
   assert.equal((await talk('potager')).status, 403);
   // Bavarder : +8, une fois par jour
@@ -1704,7 +1704,7 @@ test('besoins des habitants : manger, travailler, se distraire ; l’humeur chan
   assert.deepEqual([paulette.mood, paulette.moodEffect, paulette.happyEffect], ['content', null, 'Une partie de Récolte revient 3 min plus vite']);
   assert.deepEqual(first.needs.kinds.manger, { label: 'Manger', hours: 24, cost: { food: 10 } });
   assert.deepEqual(first.needs.kinds.deco, { label: 'Se distraire', decos: 3, reach: 6 });
-  // La troupe (Pierrot, Lorena, Jovin, Agathe) arrive comblée
+  // La troupe (Léo, Lorena, Jovin, Agathe) arrive comblée
   assert.equal((await sql('SELECT COUNT(*)::int AS n FROM world_needs WHERE user_id = $1', [player.userId]))[0].n, 4);
   // Pas encore faim ; à mi-chemin, on peut la nourrir : 10 vivres
   assert.equal((await fill('foyer', 'manger')).status, 409);
@@ -2422,7 +2422,7 @@ test('les mots d’Héliane : la première bouteille ouverte pendant un acte por
   const heliane = async () => (await api('GET', '/play/world', null, player)).data.heliane;
   // Le prologue n'a pas de mot
   assert.deepEqual(await heliane(), { found: [], next: null });
-  // Le prologue fini (le Puits de Pierrot réclamé il y a une heure, puis son chemin : la mer rend sa première bouteille) :
+  // Le prologue fini (le Puits de Léo réclamé il y a une heure, puis son chemin : la mer rend sa première bouteille) :
   // le mot de l'acte I attend
   await sql(`INSERT INTO world_quests (user_id, quest, claimed_at) VALUES ($1, 'puits-ondin', NOW() - INTERVAL '1 hour'), ($1, 'chemin', NOW() - INTERVAL '50 minutes')`, [player.userId]);
   assert.deepEqual(await heliane(), { found: [], next: 'I' });
@@ -2714,8 +2714,8 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Lorena ouvre 
   assert.deepEqual([torch.open, torch.cost, torch.block], [true, { wood: 2 }, null]);
   for (const x of [X(20), X(21), X(22)]) await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'torche', $2, $3)`, [player.userId, x, Y(20)]);
   assert.equal((await claim('torches-rivet')).status, 200);
-  // Le jour de Jovin finit : Pierrot n'est pas encore là ; la quatrième nuit (choix de l'auteur, 13 oct. : chaque
-  // personnage son jour), puis Pierrot dort au Puits (plus de quartier à acheter) : on le réveille en lui parlant
+  // Le jour de Jovin finit : Léo n'est pas encore là ; la quatrième nuit (choix de l'auteur, 13 oct. : chaque
+  // personnage son jour), puis Léo dort au Puits (plus de quartier à acheter) : on le réveille en lui parlant
   const rivetNight = await view();
   assert.deepEqual([rivetNight.brume.quest.id, who(rivetNight, 'puits')], ['nuit-rivet', undefined]);
   assert.equal((await api('POST', '/play/world/sleep', {}, player)).status, 200);
@@ -2738,7 +2738,7 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Lorena ouvre 
   assert.deepEqual(who(built.data.world, 'foyer').needs.map(n => n.id), ['manger', 'deco']);
   // (puis le premier chemin, du Puits au Feu : l'île neuve n'a que son sentier)
   assert.deepEqual([who(built.data.world, 'puits').built, built.data.world.brume.quest.id], [true, 'chemin']);
-  // (210 à la lanterne, les torches de Jovin 15, puis Pierrot : son réveil, sa Pluie, son Puits)
+  // (210 à la lanterne, les torches de Jovin 15, puis Léo : son réveil, sa Pluie, son Puits)
   assert.equal(await coinsOf(player), 220 + 15 + 10 + 20 + 40);
   // Lorena est là depuis le matin qui suit le premier feu ; le chemin ne conditionne plus son arrivée (son Ponton bâti
   // hors de La Crique ne l'y installe pas encore : people.livesHere)
@@ -2827,7 +2827,7 @@ test('le fil d’Ariane marque la bonne étape suivante : Pluie, Vie, Arbre, Bat
   // L'indice de la page marquée : le texte de la quête « fais naître un élément » (sa recette)
   const say = id => require('../src/services/quests').QUESTS.find(q => q.id === id).say;
   const marked = book => book.chapters.flatMap(c => c.pages.map(p => ({ ...p, chapter: c.id, open: c.open }))).filter(p => p.marked);
-  // La Pluie (le don de Pierrot, la clé du Puits) : une page du chapitre I, ouvert ; la page ne dit pas son nom ; elle
+  // La Pluie (le don de Léo, la clé du Puits) : une page du chapitre I, ouvert ; la page ne dit pas son nom ; elle
   // garde ses leurres (l'Encre s'y apprend, offerte)
   const pluie = await at('eveil-ondin', T);
   assert.deepEqual(pluie.ariane, { target: 'Pluie', remaining: 1, page: pageId('Pluie'), chapter: 'I', hint: say('souvenir-ondin') });

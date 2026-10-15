@@ -19,7 +19,7 @@ test('la troupe de la bible (HISTOIRE.md § 8.1) : prénom, rôle, cadeau adoré
     potager: ['Flore', 'Jardinière des lunes', 'water', 'food'],
     carriere: ['Saturnin', 'Tailleur de runes', 'food', 'stone'],
     bosquet: ['Freya', 'Gardienne des bois', 'water', 'food'],
-    puits: ['Pierrot', 'Petit sourcier', 'water', 'food'],
+    puits: ['Léo', 'Petit sourcier', 'water', 'food'],
     ponton: ['Lorena', 'Navigatrice', 'wood', 'food'],
     atelier: ['Jovin', 'Horloger-artificier', 'stone', 'wood'],
     foyer: ['Agathe', 'Cuisinière-guérisseuse', 'food', 'water']

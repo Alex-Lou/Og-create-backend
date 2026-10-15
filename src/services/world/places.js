@@ -19,7 +19,7 @@ const SMALL = 2;
 // bâtiment au milieu, avec la place autour pour ses annexes, ses objets et deux bâtiments à venir (le jeu dessine les
 // zones : src/world/zones.js, mêmes cases). Le Feu, bâtiment d’Agathe, sur la plage (sa porte, le bas de son emprise,
 // y = 95, touche le bout du sentier : world/paths.js, SENTIER_BEACH, à tous ses paliers) ; le Ponton de Lorena au
-// sud-ouest, contre la mer ; l'Atelier de Jovin au nord du Feu ; le Puits de Pierrot à l'ouest, près du ruisseau ; ceux
+// sud-ouest, contre la mer ; l'Atelier de Jovin au nord du Feu ; le Puits de Léo à l'ouest, près du ruisseau ; ceux
 // des actes suivants au bord de leur quartier (celui qu'il faut acheter pour les bâtir : map.siteZone)
 const BEACH = {
     foyer: { x: 98, y: 92 },

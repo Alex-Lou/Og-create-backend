@@ -12,7 +12,7 @@ test.after(() => server?.kill());
 const view = async player => (await api('GET', '/play/world', null, player)).data;
 const at = (w, x, y) => w.map.ground[y][x];
 const draw = (player, lay, erase = []) => api('POST', '/play/world/paths', { lay, erase }, player);
-// Du Puits de Pierrot (île à la plage : palier I, 2 × 2 en 89, 87, contre le village) au sentier du Feu : quatre cases
+// Du Puits de Léo (île à la plage : palier I, 2 × 2 en 89, 87, contre le village) au sentier du Feu : quatre cases
 // vers l'est, sous le Puits, jusqu'au haut du sentier (95, 89)
 const LINK = [[91, 89], [92, 89], [93, 89], [94, 89]];
 

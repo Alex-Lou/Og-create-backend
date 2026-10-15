@@ -39,7 +39,7 @@ const countOf = acts => Math.min(8, 3 + acts);
 // Les égarés, chacun sa manière (choix de l'auteur, 14 oct.) : ce que le Voile a effacé.
 // - fantome, le Sans-Nom (un nom) : il voit une lumière à SIGHT cases et dévie vers elle ;
 // - zombie, le Dormeur (des mots) : les yeux fermés, la lumière ne lui fait rien ; lent ; une clôture l'endort ('dort') ;
-// - noye, le Noyé de l'Hirondelle (le naufrage) : il sort de la mer, dès l'arrivée de Pierrot ;
+// - noye, le Noyé de l'Hirondelle (le naufrage) : il sort de la mer, dès l'arrivée de Léo ;
 // - racine, la Racine errante (un chemin) : elle sort de la lisière, passe sous les clôtures, dès le Bosquet bâti ;
 // - esprit, l'Esprit sylvestre revenant (la voix d'Anya) : repoussé, il revient une fois, par un autre chemin ;
 // - bete, la bête de brume (celle du climat d'où il sort, côté front) : vive.

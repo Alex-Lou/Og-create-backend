@@ -198,7 +198,7 @@ test('qui sort : les trois premières nuits écrites, puis un mélange de ce qui
   const later = Array.from({ length: 40 }, (_, k) => kinds(N(3 + k))).flat();
   assert.ok(later.every(k => nights.KINDS.includes(k) && !['noye', 'racine'].includes(k)));
   assert.ok(new Set(later).size >= 3);
-  // Pierrot arrivé le jour du cycle N(20) : sa nuit, le premier Noyé sort à coup sûr ; le Bosquet bâti au N(21), la Racine
+  // Léo arrivé le jour du cycle N(20) : sa nuit, le premier Noyé sort à coup sûr ; le Bosquet bâti au N(21), la Racine
   const unlocks = { noye: clock.startOf(N(20)) + 10 * MIN, racine: clock.startOf(N(21)) + 10 * MIN };
   assert.notEqual(kinds(N(19), { unlocks })[0], 'noye');
   assert.equal(kinds(N(20), { unlocks })[0], 'noye');

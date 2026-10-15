@@ -38,7 +38,7 @@ async function coopOf(userId, conn) {
     return cage ? { x: cage.x, y: cage.y } : null;
 }
 
-// D'où le Noyé et la Racine peuvent sortir (nights.kindsOf) : l'arrivée de Pierrot (la quête « nuit-rivet »), le Bosquet
+// D'où le Noyé et la Racine peuvent sortir (nights.kindsOf) : l'arrivée de Léo (la quête « nuit-rivet »), le Bosquet
 // bâti (la quête « bosquet ») ; 0 si le bâtiment est là sans la quête (les comptes d'avant) ; absent : pas encore
 const UNLOCKS = { noye: { quest: 'nuit-rivet', site: 'puits' }, racine: { quest: 'bosquet', site: 'bosquet' } };
 async function unlocksOf(userId, levels, conn) {

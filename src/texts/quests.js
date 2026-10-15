@@ -89,20 +89,20 @@ const QUEST_TEXTS = {
         say: 'Quatre, ce soir, autour du feu. Dors : je veille.'
     },
     'eveil-ondin': {
-        label: 'Réveille Pierrot',
+        label: 'Réveille Léo',
         say: 'Un enfant dort sur une planche. La vague l’a posé là. Doucement.'
     },
     'souvenir-ondin': {
         label: 'Écris la Pluie',
-        say: 'Sans pluie, la terre oublie l’eau. Et Pierrot aussi.'
+        say: 'Sans pluie, la terre oublie l’eau. Et Léo aussi.'
     },
     'puits-ondin': {
         label: 'Bâtis le Puits',
-        say: 'Pierrot sent l’eau sous ses pieds. Il chuchote qu’elle chante.'
+        say: 'Léo sent l’eau sous ses pieds. Il chuchote qu’elle chante.'
     },
     chemin: {
         label: 'Relie le Puits au feu',
-        say: 'Pierrot porte l’eau dans l’herbe mouillée. Les seaux arrivent à moitié vides.'
+        say: 'Léo porte l’eau dans l’herbe mouillée. Les seaux arrivent à moitié vides.'
     },
     lisiere: {
         label: 'Achète La Lisière',
@@ -270,7 +270,7 @@ const QUEST_TEXTS = {
     },
     cle: {
         label: 'Trouve la clé du phare',
-        say: '« J’ai laissé la clé du phare sous une pierre », écrivait H. Le Cercle de menhirs… Pierrot, ta baguette ?'
+        say: '« J’ai laissé la clé du phare sous une pierre », écrivait H. Le Cercle de menhirs… Léo, ta baguette ?'
     },
     tour: {
         label: 'Bâtis la Tour d’étude',

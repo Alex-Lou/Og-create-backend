@@ -13,7 +13,7 @@ test('les places : la carte, la plage, puis le joueur', () => {
   assert.deepEqual(places.STATIC.foyer, map.SITE_BIG.foyer);
   const beach = places.placesFrom({ beach: true });
   assert.deepEqual(beach.foyer, places.BEACH.foyer);
-  // Une île à la plage : chaque personnage a sa zone, son bâtiment au milieu (le Puits de Pierrot à l'ouest, près du
+  // Une île à la plage : chaque personnage a sa zone, son bâtiment au milieu (le Puits de Léo à l'ouest, près du
   // ruisseau) ; une île d'avant garde les places de la carte
   assert.deepEqual(beach.puits, { x: 88, y: 86 });
   assert.deepEqual(places.STATIC.puits, map.SITE_BIG.puits);

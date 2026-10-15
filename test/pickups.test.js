@@ -84,20 +84,20 @@ test('un nouveau compte bâtit son feu ; Lorena vient au matin, Agathe après sa
   assert.equal(met(await view(player)).includes('atelier'), false);
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'nuit-cannelle')`, [id]);
   assert.equal(met(await view(player)).includes('atelier'), true);
-  // Le jour de Jovin (sa lanterne) ne fait pas encore venir Pierrot : sa quatrième nuit, si (choix de l'auteur, 13 oct.)
+  // Le jour de Jovin (sa lanterne) ne fait pas encore venir Léo : sa quatrième nuit, si (choix de l'auteur, 13 oct.)
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'deco')`, [id]);
   assert.equal(met(await view(player)).includes('puits'), false);
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'nuit-rivet')`, [id]);
   assert.equal(met(await view(player)).includes('puits'), true);
 });
 
-test('au Grimoire, pendant la quête de Pierrot : la page que marque le ruban a son Encre offerte, elle seule', async () => {
+test('au Grimoire, pendant la quête de Léo : la page que marque le ruban a son Encre offerte, elle seule', async () => {
   const player = await newPlayer();
   const id = player.userId;
   await sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Vent", "Brasier"]'::jsonb WHERE user_id = $1`, [id]);
   const pages = async () => (await api('GET', '/play/book', null, player)).data.chapters.flatMap(c => c.pages);
   const ink = page => api('POST', '/play/ink', { page }, player);
-  // Réveiller Pierrot réclamé : la quête active écrit la Pluie (la clé du Puits), avec ses leurres
+  // Réveiller Léo réclamé : la quête active écrit la Pluie (la clé du Puits), avec ses leurres
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'eveil-ondin')`, [id]);
   const guided = await pages();
   const marked = guided.find(p => p.marked);
