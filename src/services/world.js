@@ -60,7 +60,7 @@ const { siteSpots, moveSite } = require('./world/moves');
 const gridLevels = require('./levels');
 const stars = require('./world/stars');
 const { startNights, repelCreature, repairSite, nightsView } = require('./world/nights');
-const { feedBeast, collectBeasts, beastsView, openCage } = require('./world/beasts');
+const { feedBeast, collectBeasts, beastsView, openCage, breakCage } = require('./world/beasts');
 const W = require('../texts/world');
 const G = require('../texts/games');
 const SHOP = require('../texts/shop');
@@ -1102,5 +1102,5 @@ module.exports = {
     placeAnnex, moveAnnex, poseAnnex, annexSpotOk, siteSpots, moveSite, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople, namePlayer, chooseAvatar, arianeTargets, elementHintOf, guidedInkOf, guidedPageOf, athanorOf, bookFor, restartIsland,
     refundDecorations, startCraft, finishCraft, placeCraft, placeLine, buildShelter, moveCraft, storeCraft, unposeCraft, turnCraft, placeDoor, lockDoor, startExpedition, findLandmark, lightFire, gatherDeposit, pickUp,
     anyaOf, breathRefused, revealAnya, breatheAnya, brumeSavoirOf, talkBrume, startNights, repelCreature, repairSite, skipPrologue, seeScene, layPaths,
-    feedBeast, collectBeasts, openCage
+    feedBeast, collectBeasts, openCage, breakCage
 };

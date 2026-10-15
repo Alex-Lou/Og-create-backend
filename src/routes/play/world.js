@@ -522,6 +522,12 @@ router.post('/world/beasts/cage', withAccount(async (req, res, owner, b) => {
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ hens: done.hens, world: await worldView(owner, b) });
 }));
+// La cage vide, le poulailler posé : la démonter (une fois), son bois au stock → { gives, world }
+router.post('/world/beasts/cage/break', withAccount(async (req, res, owner, b) => {
+    const done = await world.breakCage(owner.id);
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json({ gives: done.gives, world: await worldView(owner, b) });
+}));
 // Visiteur : combler sa demande (livrer, ou ses Récoltes faites) → { reward, coins, world }
 router.post('/world/visitor', withAccount(async (req, res, owner, b) => {
     const id = Number(req.body.id);

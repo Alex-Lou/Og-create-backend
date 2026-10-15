@@ -8,7 +8,7 @@
 const db = require('../../config/db');
 const beasts = require('../beasts');
 const map = require('../worldMap');
-const { stockOf, levelsOf, zonesOf } = require('./reads');
+const { stockOf, levelsOf, zonesOf, addStock } = require('./reads');
 const { migrate } = require('./migrate');
 const T = require('../../texts/beasts');
 const { payWith } = require('./produce');
@@ -41,10 +41,18 @@ async function herdOf(userId, conn, now = Date.now()) {
     }
     return { level, freed, rows, coqSince, herd: beasts.beastsOf(level, freed, coqSince, now) };
 }
+// La cage démontée (choix de l'auteur, 15 oct.) : le poulailler posé, les poules n'en ont plus besoin ; la démonter (un
+// toucher, une fois) rend son bois et l'ôte du camp. Une ligne de world_items « cage:demontee »
+const CAGE_GONE = 'cage:demontee';
+const CAGE_GIVES = { wood: 6 };
+const gone = async (userId, conn) => (await conn.query('SELECT 1 FROM world_items WHERE user_id = $1 AND item = $2', [userId, CAGE_GONE])).rows.length > 0;
+const coopBuilt = async (userId, conn) => (await conn.query('SELECT 1 FROM world_annexes WHERE user_id = $1 AND annex = $2 LIMIT 1', [userId, 'poulailler'])).rows.length > 0;
+
 // La cage des poules, au camp : 'ouverte', 'coincee' (dès qu’Agathe est là ; sur une île neuve, échouée par la mer
-// au bout de la plage une fois sa soupe faite : le jour d’Agathe, choix de l'auteur, 11 oct.), ou null (pas encore)
+// au bout de la plage une fois sa soupe faite : le jour d’Agathe, choix de l'auteur, 11 oct.), ou null (pas encore,
+// ou plus : démontée)
 async function cageOf(userId, conn = db) {
-    if (freedOf(await rowsOf(userId, conn))) return 'ouverte';
+    if (freedOf(await rowsOf(userId, conn))) return (await gone(userId, conn)) ? null : 'ouverte';
     const { levels } = await levelsOf(userId, conn);
     const presence = await presenceOf(userId, conn);
     if (!presence.done.has('soupe')) return null;
@@ -65,6 +73,20 @@ async function openCage(userId, now = Date.now()) {
              ON CONFLICT (user_id, beast) DO NOTHING`,
             [userId, iso(now - beasts.DAY_MS), iso(now), beasts.HENS]);
         return { hens: beasts.HENS.map(id => beasts.BEAST_BY_ID[id].name) };
+    });
+}
+
+// Démonter la cage vide (le poulailler posé) : son bois va au stock, elle quitte le camp. { gives } ou { status, message }
+async function breakCage(userId) {
+    await migrate(userId);
+    return db.transaction(async conn => {
+        await stockOf(userId, conn, true);
+        const cage = await cageOf(userId, conn);
+        if (!cage) return db.rollback({ status: 409, message: T.CAGE_GONE });
+        if (cage !== 'ouverte' || !(await coopBuilt(userId, conn))) return db.rollback({ status: 403, message: T.COOP_FIRST });
+        await conn.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'ile')`, [userId, CAGE_GONE]);
+        await addStock(userId, CAGE_GIVES, conn);
+        return { gives: CAGE_GIVES };
     });
 }
 
@@ -133,4 +155,4 @@ async function beastsView(userId, conn = db, now = Date.now()) {
     };
 }
 
-module.exports = { feedBeast, collectBeasts, beastsView, cageOf, openCage, coqSinceOf };
+module.exports = { feedBeast, collectBeasts, beastsView, cageOf, openCage, breakCage, coqSinceOf };

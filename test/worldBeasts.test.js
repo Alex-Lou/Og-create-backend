@@ -45,6 +45,32 @@ test('la cage d’Agathe : échouée au bout de la plage une fois sa soupe faite
   assert.deepEqual((await herdOf(player)).list.map(b => b.id), ['poule-rousse', 'poule-blanche', 'poule-noire', 'vache']);
 });
 
+test('la cage vide, le poulailler posé : on la démonte une fois, son bois au stock ; les poules restent', async () => {
+  const player = await newPlayer();
+  const id = player.userId;
+  const demonter = () => api('POST', '/play/world/beasts/cage/break', {}, player);
+  const woodOf = async () => (await sql('SELECT wood FROM world_stock WHERE user_id = $1', [id]))[0].wood;
+  await withCannelle(id);
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'soupe')`, [id]);
+  // Coincée, puis ouverte : les poules en ont encore besoin tant que leur poulailler n'est pas posé
+  assert.deepEqual([(await demonter()).status, (await demonter()).data.message], [403, 'Les poules en ont encore besoin : pose d’abord leur poulailler.']);
+  await api('POST', '/play/world/beasts/cage', {}, player);
+  assert.equal((await demonter()).status, 403);
+  assert.equal((await cageOf(player)).art, 'cage_ouverte');
+  // Le poulailler posé : démontée, son bois au stock ; elle quitte le camp, les poules restent
+  await sql(`INSERT INTO world_annexes (user_id, x, y, annex) VALUES ($1, 103, 92, 'poulailler')`, [id]);
+  const wood = await woodOf();
+  const done = await demonter();
+  assert.equal(done.status, 200);
+  assert.deepEqual(done.data.gives, { wood: 6 });
+  assert.equal(await woodOf(), wood + 6);
+  assert.equal(done.data.world.camp.find(c => c.id === 'cage'), undefined);
+  assert.deepEqual(done.data.world.beasts.list.map(b => b.id), ['poule-rousse', 'poule-blanche', 'poule-noire']);
+  // Une seule fois
+  assert.deepEqual([(await demonter()).status, (await demonter()).data.message], [409, 'La cage est déjà démontée.']);
+  assert.equal(await woodOf(), wood + 6);
+});
+
 test('nourrir une poule, voir sa bulle se remplir, ramasser les œufs ; Réglisse juge', async () => {
   const player = await newPlayer({ settled: true });
   const id = player.userId;
