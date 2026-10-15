@@ -202,7 +202,8 @@ async function placeCraft(userId, craftId, x, y, flip = false) {
         const campCells = cellsOfCamp(await campOfUser(userId, conn, { levels, annexRows, craftRows: rows }));
         const { ground } = await roadsOf(userId, conn);
         const { places } = await placesOf(userId, conn);
-        const block = crafts.spotBlock(c, x, y, craftCtx({ levels, zones: await zonesOf(userId, conn), annexRows, rows, blocked: campCells, ground, places }));
+        const ctx = craftCtx({ levels, zones: await zonesOf(userId, conn), annexRows, rows, blocked: campCells, ground, places });
+        const block = crafts.spotBlock(c, x, y, ctx);
         if (block) return db.rollback({ status: 400, message: block });
         await conn.query('UPDATE world_crafts SET flip = $2 WHERE id = $1', [row.id, c.id === crafts.DOOR ? doorFlip(ctx, x, y) : flip]);
         return setSpot(userId, conn, stock, row, x, y);

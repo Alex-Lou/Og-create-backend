@@ -67,3 +67,15 @@ test('poser une porte : dans un trou entre deux piquets ou à la place d’un pi
   const on = await lock(93, 94, true);
   assert.deepEqual([on.status, placedAt(on.data.world, 93, 94).locked, on.data.world.stock.stone], [200, true, 0]);
 });
+
+test('une porte de la réserve, posée par « Poser » : elle prend le sens de son mur (régression : la pose échouait)', async () => {
+  const player = await newPlayer();
+  const id = player.userId;
+  await api('GET', '/play/world', null, player);
+  await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'foyer', 1) ON CONFLICT (user_id, site) DO UPDATE SET level = 1`, [id]);
+  await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'cloture', 93, 93), ($1, 'cloture', 93, 95), ($1, 'porte', NULL, NULL)`, [id]);
+  const placed = await api('POST', '/play/world/craft/place', { craft: 'porte', x: 93, y: 94 }, player);
+  assert.equal(placed.status, 200, JSON.stringify(placed.data));
+  const door = placed.data.world.crafts.placed.find(c => c.x === 93 && c.y === 94);
+  assert.deepEqual([door.craft, door.flip], ['porte', true]);
+});
