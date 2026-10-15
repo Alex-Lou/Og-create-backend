@@ -3,7 +3,7 @@
 
 const CAGE_OPEN = 'La cage est déjà ouverte.';
 const NO_CAGE_YET = 'Pas encore de cage : Agathe n’est pas arrivée.';
-// (la cage démontée, le poulailler posé : choix de l'auteur, 15 oct.)
+// (la cage démontée, le poulailler posé : choix de l'auteur, 15 oct. ; textes validés)
 const CAGE_GONE = 'La cage est déjà démontée.';
 const COOP_FIRST = 'Les poules en ont encore besoin : pose d’abord leur poulailler.';
 const BEAST_UNKNOWN = 'Bête inconnue.';
