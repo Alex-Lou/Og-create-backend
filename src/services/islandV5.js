@@ -3,6 +3,8 @@
 // par case (légende : islandData.js et islandOuter.js) ; SITES : coin haut-gauche de l'emprise 3 × 3 de chaque bâtiment.
 // (Les SITES, eux, ont été regroupés en campement autour du Feu le 9 oct. — choix de l'auteur : worldMap.SITE_ZONE garde
 // le quartier d'origine de chacun.)
+// (Seule retouche à la main des calques : la butte devant le Feu, cases 101 à 103 × 96 et 97, aplatie en sable le 15 oct.
+// — choix de l'auteur ; test/recipeBook.test.js l'excepte de la v4.)
 
 const HEIGHT = [
     '                             222222222233333                                                                                                    ',
@@ -101,8 +103,8 @@ const HEIGHT = [
     '                  00000000000000000000000000000000000000                  0000000110001110000000000000000001000                                 ',
     '                  00000000000000000000000000000000000000                  0000000110001110000000000000000001000                                 ',
     '                          0000000000000000000000000000                        000111111111000000000000001110000                                 ',
-    '                    000000000011100000000000000000000                           00001111111111110000011100000                                   ',
-    '                   0000000000011100000000000000000000                           0000111111111111000001110000                                    ',
+    '                    000000000011100000000000000000000                           00001111111111110000000000000                                   ',
+    '                   0000000000011100000000000000000000                           0000111111111111000000000000                                    ',
     '             00000000000000000111110000000000000000                               00001111000000000000000                                       ',
     '            000000000000000000110000000000000000                                   0000000000                                                   ',
     '           0000000000000000000110000000000000000                                    00000000                                                    ',
@@ -248,8 +250,8 @@ const GROUND = [
     '~~~~~~~~~~~~~~~~~~xxxxxxxxxxxxxxxxxxxxxppxxxxxxtttxxxxxx~~~~~~~~~~~~~~~~~~fffgsswmmmmmgggggggggggggggggggssgsss~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
     '~~~~~~~~~~~~~~~~~~xxxxxxxxxxxxxxxxxxxxxppxxxxxxtttxxxxxx~~~~~~~~~~~~~~~~~~fffgsswmmmmmgggggggggggggggggggssgsss~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
     '~~~~~~~~~~~~~~~~~~~~~~~~~~ssssxxxxxxxxxppxxxxxxxxxxxxx~~~~~~~~~~~~~~~~~~~~~~~~sswggmmmmgggmmmggtggggggssgggssss~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
-    '~~~~~~~~~~~~~~~~~~~~ssssssssssdddxxxxxxppxxxxxxxxxxxx~~~~~~~~~~~~~~~~~~~~~~~~~~~wsssmmmgggmmmgggsssssgggsssss~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
-    '~~~~~~~~~~~~~~~~~~~sssssssssssdddxxxxxxppxxxxxxxxxxxx~~~~~~~~~~~~~~~~~~~~~~~~~~~wsssmmmgggmmmgggsssssgggssss~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
+    '~~~~~~~~~~~~~~~~~~~~ssssssssssdddxxxxxxppxxxxxxxxxxxx~~~~~~~~~~~~~~~~~~~~~~~~~~~wsssmmmgggmmmgggsssssssssssss~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
+    '~~~~~~~~~~~~~~~~~~~sssssssssssdddxxxxxxppxxxxxxxxxxxx~~~~~~~~~~~~~~~~~~~~~~~~~~~wsssmmmgggmmmgggssssssssssss~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
     '~~~~~~~~~~~~~sssssssssssssssssdddddxwwwppxxxxxxxxxx~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ssssggggsssssssssssssss~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
     '~~~~~~~~~~~~sssssssssssssssssddddsssssxppwxxxxxx~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ssssssssss~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
     '~~~~~~~~~~~ssssssssssssssssssddddsssssxppwxxxxxx~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ssssssss~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',

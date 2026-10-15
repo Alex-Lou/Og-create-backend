@@ -5,7 +5,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const map = require('../src/services/worldMap');
 const places = require('../src/services/world/places');
-const { campOf } = require('../src/services/world/camp');
+const { campOf, overgrowthOf } = require('../src/services/world/camp');
 const { moveBlock } = require('../src/services/world/moves');
 const { startServer, api, sql, newPlayer } = require('./helpers');
 
@@ -47,7 +47,15 @@ test('le camp : rien avant son personnage ; sur une île à la plage, chacun dan
   const beach = places.placesFrom({ beach: true });
   const camp = campOf({ met: new Set(['ponton', 'foyer', 'atelier']), places: beach, beach: true });
   const at = id => { const c = camp.find(e => e.id === id); return [c.x, c.y]; };
-  assert.deepEqual([at('cannelle'), at('aster'), at('rivet')], [[99, 96], [90, 96], [93, 86]]);
+  assert.deepEqual([at('cannelle'), at('aster'), at('rivet')], [[99, 96], [90, 95], [93, 86]]);
+  // La grande Hirondelle (choix de l'auteur, 15 oct.) : 6 × 3 cases en travers de l'anse à l'ouest, sa poupe arrachée à
+  // l'ancienne place (elle ferme le coin de l'enclos du Feu) ; sur l'ancienne butte, deux palmiers et deux étoiles de mer
+  const ship = camp.find(c => c.id === 'hirondelle');
+  assert.deepEqual([ship.art, ship.x, ship.y, ship.w, ship.h, ship.stade, ship.lanterne], ['hirondelle', 86, 97, 6, 3, 0, true]);
+  assert.deepEqual([at('poupe'), at('palmier-1'), at('palmier-2'), at('etoile-1'), at('etoile-2')], [[96, 96], [103, 97], [104, 96], [102, 97], [103, 96]]);
+  // (sa végétation : un stade aux jours 3, 10 et 30 ; la lanterne de Lorena, une fois Lorena là)
+  assert.deepEqual([0, 2, 3, 9, 10, 29, 30, 99].map(overgrowthOf), [0, 0, 1, 1, 2, 2, 3, 3]);
+  assert.equal(campOf({ met: new Set(), places: beach, beach: true }).find(c => c.id === 'hirondelle').lanterne, false);
   // Un compte d'avant la bible (met : null) : tout, comme avant
   assert.ok(ids(campOf({})).includes('cannelle') && ids(campOf({})).includes('rivet'));
   // Rien du camp sur la grande emprise du Feu (les caisses et la cage s'écartent)
@@ -113,7 +121,8 @@ test.describe('île', () => {
     const foyer = start.sites.find(s => s.id === 'foyer');
     assert.deepEqual([foyer.x, foyer.y, foyer.hidden], [99, 93, false]);
     assert.deepEqual(start.sites.filter(s => !s.hidden).map(s => s.id), ['foyer']);
-    assert.deepEqual(start.camp.map(c => c.id), ['hirondelle']);
+    // (l'épave et sa poupe, le décor de l'ancienne butte ; personne encore)
+    assert.deepEqual(start.camp.map(c => c.id), ['hirondelle', 'poupe', 'palmier-1', 'palmier-2', 'etoile-1', 'etoile-2']);
     // Le suivi des quêtes montre tout le tutoriel : vingt-deux étapes, de la première page au premier chemin
     assert.deepEqual([start.brume.steps.length, start.brume.steps[0].id, start.brume.steps.at(-1).id], [25, 'pages', 'chemin']);
     assert.ok(start.brume.steps.every(st => st.label && st.done === false));

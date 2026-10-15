@@ -14,8 +14,9 @@ const ids = list => list.map(c => c.art);
 const SIZE = map.SIZE;
 
 test('au début : l’épave, la cuisine d’Agathe, les débris de Lorena et de Nathan, le SOS et trois objets, à leur place', () => {
+  // (une île d'avant la plage : la petite épave d'origine, à sa place)
   const start = camp.campOf({});
-  assert.deepEqual(ids(start), ['hirondelle', 'cannelle_debris', 'aster_debris', 'rivet_debris', 'sos', 'caisses', 'filet', 'rondins']);
+  assert.deepEqual(ids(start), ['hirondelle_petite', 'cannelle_debris', 'aster_debris', 'rivet_debris', 'sos', 'caisses', 'filet', 'rondins']);
   for (const c of start) {
     const place = camp.PLACES.find(p => p.id === c.id);
     assert.deepEqual([c.x, c.y], [place.x, place.y], c.id);
@@ -35,7 +36,7 @@ test('il change avec l’histoire, et libère la plage de Brumelune', () => {
   assert.ok(!built.some(c => c.id === 'aster' || c.id === 'rivet'));
   // Acte IV : les voyageurs arrivent (tente, hamac), le SOS s'en va
   const later = camp.campOf({ acts: ['I', 'II', 'III', 'IV'], levels: { foyer: 3, ponton: 2, atelier: 2 } });
-  assert.deepEqual(ids(later), ['hirondelle', 'cannelle_cabanon', 'tente', 'hamac', 'caisses', 'filet', 'rondins']);
+  assert.deepEqual(ids(later), ['hirondelle_petite', 'cannelle_cabanon', 'tente', 'hamac', 'caisses', 'filet', 'rondins']);
 });
 
 test('une place prise par le joueur : l’élément se pose au plus près, rien ne se chevauche', () => {

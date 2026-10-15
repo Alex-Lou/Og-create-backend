@@ -52,6 +52,9 @@ test('les trouvailles de la plage paient chacune leur leçon : deux bois et un g
     const villagers = require('../src/services/villagers');
     const gives = (after, resource) => pickups.SPOTS.filter(s => (s.after || null) === after).reduce((n, s) => n + (pickups.KINDS[s.kind].gives[resource] || 0), 0);
     assert.ok(gives('veille', 'food') >= villagers.NEEDS.manger.cost.food);
+    // (les débris de la grande Hirondelle, sur l'ancienne butte : après le Feu, de quoi bâtir ; choix de l'auteur, 15 oct.)
+    assert.deepEqual([gives('feu', 'wood'), gives('feu', 'stone')], [6, 2]);
+    assert.ok(pickups.SPOTS.filter(s => s.after === 'feu').every(s => /^greve-[a-z]{1,12}-\d$/.test(s.id)));
 });
 
 test('un nouveau compte bâtit son feu ; Lorena vient au matin, Agathe après sa Récolte, Nathan après la troisième nuit', async () => {

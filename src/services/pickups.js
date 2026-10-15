@@ -12,7 +12,10 @@ const KINDS = {
     bois: { name: 'Bois flotté', gives: { wood: 2 } },
     // (deux coquillages : la soupe d’Agathe, dix vivres, le jour d’Agathe ; choix de l'auteur, 11 oct.)
     coquillage: { name: 'Coquillages', gives: { food: 5 } },
-    galet: { name: 'Galets', gives: { stone: 2 } }
+    galet: { name: 'Galets', gives: { stone: 2 } },
+    // (les débris de la grande Hirondelle, sur l'ancienne butte devant le Feu : de quoi bâtir ; choix de l'auteur, 15 oct.)
+    planche: { name: 'Planches de l\'Hirondelle', gives: { wood: 3 } },
+    ferraille: { name: 'Ferraille de l\'Hirondelle', gives: { stone: 2 } }
 };
 // Les cases de la plage : le sable au bord de l'eau, au pied du camp (le cœur de l'île, à soi dès le départ), toutes
 // sur le sable découvert dès l'arrivée. Le premier soir (choix de l'auteur, 11 oct.) : deux bois flottés et un galet,
@@ -21,7 +24,9 @@ const KINDS = {
 // plage, choix de l'auteur, 12 oct.) : rien du premier soir n'y est, ses coquillages paraissent avec elle
 const SPOTS = [
     ['greve-bois-1', 'bois', 95, 98], ['greve-galet-1', 'galet', 98, 98], ['greve-bois-2', 'bois', 97, 98],
-    ['greve-coquillage-1', 'coquillage', 102, 98, 'veille'], ['greve-coquillage-2', 'coquillage', 103, 98, 'veille']
+    ['greve-coquillage-1', 'coquillage', 102, 98, 'veille'], ['greve-coquillage-2', 'coquillage', 103, 98, 'veille'],
+    // (les débris de l'épave, après le Feu : le compte du premier soir ne change pas)
+    ['greve-planche-1', 'planche', 101, 97, 'feu'], ['greve-ferraille-1', 'ferraille', 104, 97, 'feu'], ['greve-planche-2', 'planche', 105, 96, 'feu']
 ].map(([id, kind, x, y, after]) => ({ id, kind, x, y, ...(after ? { after } : {}) }));
 // La trouvaille paraît-elle déjà ? done : les quêtes faites (quests.doneOf)
 const shownFor = (spot, done) => !spot.after || done.has(spot.after);

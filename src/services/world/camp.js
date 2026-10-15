@@ -28,7 +28,11 @@ const ABRI = 2;
 // Les places du camp sur une île à la plage (world/places.js) : dans la zone de chacun
 const BEACH_PLACES = {
     // (le camp de Lorena serré autour de son Ponton, contre l'épave : sa zone est petite)
-    aster: { x: 90, y: 96 }, sos: { x: 90, y: 94 }, caisses: { x: 91, y: 95 }, filet: { x: 90, y: 98 }, rondins: { x: 92, y: 94 },
+    aster: { x: 90, y: 95 }, sos: { x: 90, y: 94 }, caisses: { x: 91, y: 94 }, filet: { x: 90, y: 100 }, rondins: { x: 92, y: 94 },
+    // (la grande Hirondelle, couchée en travers de l'anse à l'ouest du camp, entre le bout sud des rochers et le Ponton ;
+    // sa poupe arrachée reste à l'ancienne place, au bout du sillon, et ferme toujours le coin de l'enclos du Feu : choix
+    // de l'auteur, 15 oct. ; le camp de Lorena se serre derrière elle, son filet devant)
+    hirondelle: { x: 86, y: 97, w: 6, h: 3 },
     rivet: { x: 93, y: 86 },
     // (la cage des poules, échouée par la mer au bout de la plage, dans le coin d’Agathe : choix de l'auteur, 11 oct.)
     cage: { x: 101, y: 98 }
@@ -49,8 +53,15 @@ const corner = (who, site) => at => {
     if (at.levels[site] || !at.here(site)) return null;
     return `${who}_${has(at, 'II') && foyer(at) >= ABRI ? 'cabanon' : has(at, 'I') ? 'abri' : 'debris'}`;
 };
+// La végétation qui gagne la grande Hirondelle (choix de l'auteur, 15 oct.) : un stade par seuil de jours depuis le
+// début de l'île (herbes et mousse, lianes et fleurs, jeunes palmiers sur le pont)
+const OVERGROWTH_DAYS = [3, 10, 30];
+const overgrowthOf = days => OVERGROWTH_DAYS.filter(d => days >= d).length;
 const PLACES = [
-    { id: 'hirondelle', x: 96, y: 96, size: 2, art: () => 'hirondelle' },
+    // (l'épave : sur une île à la plage, la grande Hirondelle (6 × 3, BEACH_PLACES) et sa poupe arrachée ; sur une île
+    // d'avant, la petite épave d'origine. extra : ce que le jeu dessine en plus, la végétation et la lanterne de Lorena)
+    { id: 'hirondelle', x: 96, y: 96, size: 2, art: at => (at.beach ? 'hirondelle' : 'hirondelle_petite'), extra: at => (at.beach ? { stade: overgrowthOf(at.days), lanterne: at.here('ponton') } : {}) },
+    { id: 'poupe', x: 96, y: 96, size: 2, art: at => (at.beach ? 'hirondelle_poupe' : null) },
     // (sa cuisine de l'épave, puis son abri, bâti par le joueur : world/shelters.js ; le Foyer à l'Abri, son cabanon :
     // choix de l'auteur, 14 oct.)
     { id: 'cannelle', x: 99, y: 96, size: 2, art: at => (!at.here('foyer') ? null : foyer(at) >= ABRI ? 'cannelle_cabanon' : at.shelters.has('cannelle') ? 'cannelle_abri' : 'cannelle_debris') },
@@ -63,7 +74,13 @@ const PLACES = [
     { id: 'caisses', x: 99, y: 93, art: at => (aster(at) ? 'caisses' : null) },
     { id: 'filet', x: 104, y: 95, art: at => (aster(at) ? 'filet' : null) },
     { id: 'rondins', x: 95, y: 92, art: at => (aster(at) ? 'rondins' : null) },
-    { id: 'cage', x: 98, y: 94, art: at => (at.cage ? `cage_${at.cage}` : null) }
+    { id: 'cage', x: 98, y: 94, art: at => (at.cage ? `cage_${at.cage}` : null) },
+    // (sur l'ancienne butte devant le Feu, aplatie : deux palmiers, deux étoiles de mer ; choix de l'auteur, 15 oct. ;
+    // hors de l'anneau de l'enclos du Feu)
+    { id: 'palmier-1', x: 103, y: 97, art: at => (at.beach ? 'palmier' : null) },
+    { id: 'palmier-2', x: 104, y: 96, art: at => (at.beach ? 'palmier' : null) },
+    { id: 'etoile-1', x: 102, y: 97, art: at => (at.beach ? 'etoile_de_mer' : null) },
+    { id: 'etoile-2', x: 103, y: 96, art: at => (at.beach ? 'etoile_de_mer' : null) }
 ];
 
 // Case où le camp peut se poser : sol constructible de la plage, hors des grandes emprises, des lieux remarquables et
@@ -71,19 +88,20 @@ const PLACES = [
 // (places : où sont les bâtiments ; leurs grandes emprises restent libres, quel que soit leur palier)
 const open = (x, y, taken, places) => x >= 0 && y >= 0 && x < SIZE && y < SIZE && map.zoneAt(x, y) === ZONE && map.buildable(x, y)
     && !inSiteAt(places, x, y) && !landmarks.isLandmark(x, y) && !finds.isDeposit(x, y) && !taken.has(y * SIZE + x);
-const cellsOf = (x, y, size) => Array.from({ length: size * size }, (_, i) => [x + (i % size), y + Math.floor(i / size)]);
-const fits = (x, y, size, taken, places) => cellsOf(x, y, size).every(([a, b]) => open(a, b, taken, places));
+// (w × h cases ; h : w par défaut, un carré)
+const cellsOf = (x, y, w, h = w) => Array.from({ length: w * h }, (_, i) => [x + (i % w), y + Math.floor(i / w)]);
+const fits = (x, y, w, h, taken, places) => cellsOf(x, y, w, h).every(([a, b]) => open(a, b, taken, places));
 
 // Où se pose un élément : sa place si elle est libre, sinon la plus proche qui l'est (à égalité : plus haut, puis plus
 // à gauche), ou null s'il n'y en a aucune à RADIUS cases
 const RADIUS = 8;
-function spotOf(place, size, taken, places) {
-    if (fits(place.x, place.y, size, taken, places)) return { x: place.x, y: place.y };
+function spotOf(place, w, h, taken, places) {
+    if (fits(place.x, place.y, w, h, taken, places)) return { x: place.x, y: place.y };
     let best = null;
     for (let y = place.y - RADIUS; y <= place.y + RADIUS; y++) {
         for (let x = place.x - RADIUS; x <= place.x + RADIUS; x++) {
             const d = (x - place.x) ** 2 + (y - place.y) ** 2;
-            if (d > RADIUS * RADIUS || !fits(x, y, size, taken, places)) continue;
+            if (d > RADIUS * RADIUS || !fits(x, y, w, h, taken, places)) continue;
             if (!best || d < best.d || (d === best.d && (y < best.y || (y === best.y && x < best.x)))) best = { x, y, d };
         }
     }
@@ -94,24 +112,25 @@ function spotOf(place, size, taken, places) {
 // des bâtiments ; taken : clés (y × SIZE + x) des cases occupées par ses annexes et ses créations posées ; cage : la
 // cage aux poules ; met : ids des bâtiments dont le personnage est là (null : tous) ;
 // places, beach : où sont les bâtiments, île à la plage (world/places.js)
-function campOf({ acts = [], levels = {}, taken = new Set(), cage = null, met = null, places = STATIC, beach = false, shelters = new Set() }) {
-    const at = { acts, levels, cage, shelters, here: site => !met || met.has(site) };
+function campOf({ acts = [], levels = {}, taken = new Set(), cage = null, met = null, places = STATIC, beach = false, shelters = new Set(), days = 0 }) {
+    const at = { acts, levels, cage, shelters, beach, days, here: site => !met || met.has(site) };
     const busy = new Set(taken);
     const out = [];
     for (const place of PLACES) {
         const art = place.art(at);
         if (!art) continue;
-        const size = place.size || 1;
-        const spot = spotOf(beach && BEACH_PLACES[place.id] ? { ...place, ...BEACH_PLACES[place.id] } : place, size, busy, places);
+        const where = beach && BEACH_PLACES[place.id] ? { ...place, ...BEACH_PLACES[place.id] } : place;
+        const w = where.w || where.size || 1, h = where.h || w;
+        const spot = spotOf(where, w, h, busy, places);
         if (!spot) continue;
-        cellsOf(spot.x, spot.y, size).forEach(([x, y]) => busy.add(y * SIZE + x));
-        out.push({ id: place.id, art, x: spot.x, y: spot.y, w: size, h: size });
+        cellsOf(spot.x, spot.y, w, h).forEach(([x, y]) => busy.add(y * SIZE + x));
+        out.push({ id: place.id, art, x: spot.x, y: spot.y, w, h, ...(place.extra ? place.extra(at) : {}) });
     }
     return out;
 }
 
 // Les cases du camp (clés), pour les réserver
-const cellsOfCamp = camp => new Set(camp.flatMap(c => cellsOf(c.x, c.y, c.w).map(([x, y]) => y * SIZE + x)));
+const cellsOfCamp = camp => new Set(camp.flatMap(c => cellsOf(c.x, c.y, c.w, c.h).map(([x, y]) => y * SIZE + x)));
 
 // Le camp d'un joueur, d'après la base : ses actes finis, ses paliers, ce qu'il a posé (déjà lus : levels, annexRows,
 // craftRows). conn : la transaction en cours
@@ -128,7 +147,10 @@ async function campOfUser(userId, conn, { levels, annexRows, craftRows } = {}) {
     const presence = await presenceOf(userId, conn);
     const zones = await zonesOf(userId, conn);
     const met = new Set(['ponton', 'foyer', 'atelier'].filter(id => metOf(id, lv, zones, presence)));
-    return campOf({ acts, levels: lv, taken, cage: await cageOf(userId, conn), met, places, beach, shelters: await sheltersOf(userId, conn) });
+    // (les jours depuis le début de l'île : la végétation de l'épave)
+    const { rows: [night] } = await conn.query('SELECT started_at FROM world_nights WHERE user_id = $1', [userId]);
+    const days = night ? Math.max(0, Math.floor((Date.now() - new Date(night.started_at).getTime()) / 86400000)) : 0;
+    return campOf({ acts, levels: lv, taken, cage: await cageOf(userId, conn), met, places, beach, shelters: await sheltersOf(userId, conn), days });
 }
 
-module.exports = { PLACES, campOf, cellsOfCamp, campOfUser };
+module.exports = { PLACES, OVERGROWTH_DAYS, overgrowthOf, campOf, cellsOfCamp, campOfUser };
