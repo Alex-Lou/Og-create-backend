@@ -22,6 +22,8 @@ test('l’horloge du jeu : un cycle d’1 h 30, la même pour tous ; la nuit, se
   // L'heure de l'île : l'aube de 6 h à 7 h (5 min), le jour jusqu'à 19 h (60 min), le crépuscule jusqu'à 21 h (5 min),
   // la nuit jusqu'à 6 h (20 min) ; le jour de l'île change à minuit
   assert.deepEqual([0, 5, 35, 65, 70, 90].map(clock.hourIn), [6, 7, 13, 19, 21, 30]);
+  // (même vecteur que tests/gameClock.test.js du jeu : l'île y voit la même heure)
+  assert.deepEqual(['2026-10-15T12:00:00Z', '2026-10-15T13:10:00Z'].map(t => clock.dayHourOf(at(t))), [{ day: 4600, hour: 6 }, { day: 4600, hour: 21 }]);
   assert.deepEqual([clock.dayHourOf(start).hour, clock.dayHourOf(start + 35 * MIN).hour], [6, 13]);
   assert.equal(clock.dayHourOf(start + 80 * MIN).day, clock.dayHourOf(start).day + 1);
   assert.ok(clock.dayHourOf(start + 80 * MIN).hour < 6);
