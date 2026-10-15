@@ -92,7 +92,8 @@ test('pas de nuit avant que Brume les présente, puis un jour de grâce ; ensuit
   const morning = await view(id, end + 10 * MINUTE);
   assert.deepEqual(morning.blight, { site: panne.site, since: panne.at, repair: nights.repairOf(panne.site, 1) });
   // Brume en fait le bilan au matin : le sort de chacun, le bâtiment embrumé
-  assert.deepEqual(morning.last, { id: night, counts: countsOf(nights.outcomeOf(plan, FIRE)), kinds: { fantome: 3 }, panne: panne.site });
+  const counts = countsOf(nights.outcomeOf(plan, FIRE));
+  assert.deepEqual(morning.last, { id: night, counts, kinds: { fantome: 3 }, lit: counts.luciole ? { fantome: counts.luciole } : {}, under: 0, panne: panne.site });
   // Les nuits suivantes n'en embrument pas un second tant qu'il n'est pas réparé
   await settle(id, end + 6 * DAY);
   assert.equal((await blightsOf(id)).length, 1);

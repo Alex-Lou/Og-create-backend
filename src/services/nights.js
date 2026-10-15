@@ -277,6 +277,8 @@ function fateOf(creature, defense) {
     }
     return out({ end: 'arrive', step: path.length - 1 });
 }
+// La Racine passée sous une clôture : une clôture sur son chemin, jusqu'à sa case d'arrêt (fate : son sort, outcomeOf)
+const underFence = (creature, fate, defense) => creature.kind === 'racine' && (fate.path || creature.path).slice(0, fate.step + 1).some(cell => defense.fences.has(key(cell)));
 // Celui que le coq chasse : parmi ceux qui arriveraient (fates), le premier à entrer dans sa vue (watch : sa place,
 // ou null) ; { id, step } (la case où il le voit), ou null
 function crowOf(plan, fates, watch) {
@@ -343,6 +345,6 @@ const repairOf = (site, level) => ({ resource: STONE_SITES.has(site) ? 'stone' :
 
 module.exports = {
     LIGHT_REACH, REACH, COQ_SIGHT, RAIN_REACH, SHELTER_LEVEL, MS_PER_CELL, LIGHTS, FENCES, countOf, anyaTimesOn,
-    KINDS, SIGHT, RETURN_MS, SCRIPT, paceOf, indexOf, kindsOf,
+    KINDS, SIGHT, RETURN_MS, SCRIPT, paceOf, indexOf, kindsOf, underFence,
     parisAt, dayOf, nextDay, boundsOf, nightAt, nightNear, endedBetween, borderOf, lineOf, planOf, defenseOf, fateOf, outcomeOf, repairOf
 };

@@ -245,6 +245,11 @@ test('chacun sa manière : le Sans-Nom dévie vers la lumière, le Dormeur s’e
   // La Racine passe sous la clôture ; la lumière la change
   assert.equal(nights.fateOf(walker('racine'), fence).end, 'arrive');
   assert.equal(nights.fateOf(walker('racine'), near).end, 'luciole');
+  // (au matin, Brume dit qu'elle est passée sous une clôture : seulement si une clôture était sur son chemin avant son arrêt)
+  const under = defense => nights.underFence(walker('racine'), nights.fateOf(walker('racine'), defense), defense);
+  const both = nights.defenseOf([{ craft: 'cloture', x: 14, y: 10 }, { craft: 'lanterne', x: 15, y: 12 }], {});
+  assert.deepEqual([under(fence), under(near), under(both)], [true, false, false]);
+  assert.equal(nights.underFence(walker('zombie'), nights.fateOf(walker('zombie'), fence), fence), false);
   // L'Esprit : repoussé (clôture, toucher), il revient ; changé en luciole, jamais
   const spirit = walker('esprit');
   const back = { ...walker('esprit'), id: 'n:0:retour', back: 'n:0', at: spirit.arrives + nights.RETURN_MS, arrives: spirit.arrives + nights.RETURN_MS + 10 * nights.MS_PER_CELL };
