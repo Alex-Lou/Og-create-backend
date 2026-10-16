@@ -52,6 +52,9 @@ test('les trouvailles de la plage paient chacune leur leçon : deux bois et un g
     const villagers = require('../src/services/villagers');
     const gives = (after, resource) => pickups.SPOTS.filter(s => (s.after || null) === after).reduce((n, s) => n + (pickups.KINDS[s.kind].gives[resource] || 0), 0);
     assert.ok(gives('veille', 'food') >= villagers.NEEDS.manger.cost.food);
+    // (les débris de la grande Hirondelle, sur l'ancienne butte : après le Feu, de quoi bâtir ; choix de l'auteur, 15 oct.)
+    assert.deepEqual([gives('feu', 'wood'), gives('feu', 'stone')], [6, 2]);
+    assert.ok(pickups.SPOTS.filter(s => s.after === 'feu').every(s => /^greve-[a-z]{1,12}-\d$/.test(s.id)));
 });
 
 test('un nouveau compte bâtit son feu ; Lorena vient au matin, Agathe après sa Récolte, Nathan après la troisième nuit', async () => {
@@ -180,8 +183,9 @@ test('après le tutoriel, la mer rend ses trouvailles ailleurs à chaque marée,
   const wreck = { x: 96, y: 96 };
   const shore = (userId, gathered = new Map(), free = () => true) => pickups.shoreOf({ userId, done, gathered, owned, free, wreck });
   const first = shore(7);
-  // les cinq, chacune sur sa case : du sable du cœur, au bord de l'eau (ou autour de l'épave, la source de « greve-galet-1 »)
-  assert.deepEqual(first.map(p => p.id), pickups.SPOTS.map(s => s.id));
+  // les cinq parues (les débris de l'épave attendent le Feu), chacune sur sa case : du sable du cœur, au bord de l'eau
+  // (ou autour de l'épave, la source de « greve-galet-1 »)
+  assert.deepEqual(first.map(p => p.id), pickups.SPOTS.filter(s => pickups.shownFor(s, done)).map(s => s.id));
   assert.equal(new Set(first.map(p => `${p.x},${p.y}`)).size, 5);
   for (const p of first) {
     assert.equal(map.groundAt(p.x, p.y), 's', p.id);
@@ -211,7 +215,23 @@ test('après le tutoriel, la mer rend ses trouvailles ailleurs à chaque marée,
   for (const p of first) assert.equal(pickups.kindOf({ userId: 7, done, spot: pickups.SPOT_BY_ID[p.id], at: null }), p.kind);
   // au tutoriel, rien ne bouge
   const tuto = pickups.shoreOf({ userId: 7, done: new Set(['veille']), gathered: new Map(), owned, free: () => true, wreck });
-  assert.deepEqual(tuto.map(p => [p.id, p.kind, p.x, p.y]), pickups.SPOTS.map(s => [s.id, s.kind, s.x, s.y]));
+  assert.deepEqual(tuto.map(p => [p.id, p.kind, p.x, p.y]), pickups.SPOTS.filter(s => pickups.shownFor(s, new Set(['veille']))).map(s => [s.id, s.kind, s.x, s.y]));
+});
+
+// Les débris de la grande Hirondelle (6 × 3) : après le tutoriel, ils reviennent autour d'elle, planches et ferraille
+test('après le tutoriel, les débris de la grande Hirondelle reviennent autour d’elle : planches et ferraille', () => {
+  const pickups = require('../src/services/pickups');
+  const map = require('../src/services/worldMap');
+  const wreck = { x: 86, y: 97, w: 6, h: 3 };
+  const shore = pickups.shoreOf({ userId: 7, done: new Set(['veille', 'feu', 'chemin']), gathered: new Map(), owned: new Set(['coeur']), free: () => true, wreck });
+  const debris = shore.filter(p => /^greve-(planche|ferraille)-/.test(p.id));
+  assert.equal(debris.length, 3);
+  for (const p of debris) {
+    assert.ok(Object.hasOwn(pickups.SOURCES.debris.weights, p.kind), p.id);
+    assert.equal(map.groundAt(p.x, p.y), 's', p.id);
+    const inWreck = p.x >= 86 && p.x <= 91 && p.y >= 97 && p.y <= 99;
+    assert.ok(!inWreck && p.x >= 83 && p.x <= 94 && p.y >= 94 && p.y <= 102, `${p.id} autour de l’épave`);
+  }
 });
 
 test('après le tutoriel, la plage de l’API : ramasser rend la sorte que la vue montrait, la trouvaille revient ailleurs', async () => {
@@ -220,7 +240,8 @@ test('après le tutoriel, la plage de l’API : ramasser rend la sorte que la vu
   const order = require('../src/services/quests').QUESTS.map(q => q.id);
   await sql(`INSERT INTO world_quests (user_id, quest) SELECT $1, unnest($2::text[]) ON CONFLICT DO NOTHING`, [id, order.slice(0, order.indexOf('chemin') + 1)]);
   const before = (await view(player)).pickups;
-  assert.equal(before.length, 5);
+  // (les cinq de la plage et les trois débris de l'épave, parus après le Feu)
+  assert.equal(before.length, 8);
   const one = before.find(p => !p.readyIn);
   const done = await pick(player, one.id);
   assert.equal(done.status, 200);
