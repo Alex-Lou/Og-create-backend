@@ -350,12 +350,15 @@ test('la très grande île : calques cohérents, le cœur intact, chantiers à p
   // sol et du même quartier (worldMap.fromV4)
   const v4 = require('../src/services/worldMapV4');
   const src = X => Math.floor((2 * X) / 3);
+  // (seule retouche à la main : la butte devant le Feu, aplatie en sable — choix de l'auteur, 15 oct. ; islandV5.js)
+  const retouche = (x, y) => x >= 101 && x <= 103 && (y === 96 || y === 97);
   assert.equal(map.SIZE, (v4.SIZE * 3) / 2);
   for (let y = 0; y < map.SIZE; y++) {
     for (let x = 0; x < map.SIZE; x++) {
       const [g, h, r] = [v4.GROUND[src(y)][src(x)], v4.HEIGHT[src(y)][src(x)], v4.REGION[src(y)][src(x)]];
       const raccord = map.GROUND[y][x] === 'p' && 'gsm'.includes(g) && (x % 3 === 1 || y % 3 === 1);
-      if (g !== '~') assert.deepEqual([raccord ? g : map.GROUND[y][x], map.HEIGHT[y][x], map.REGION[y][x]], [g, h, r === 'b' ? 'a' : r], `${x},${y}`);
+      if (retouche(x, y)) assert.deepEqual([map.GROUND[y][x], map.HEIGHT[y][x]], ['s', '0'], `${x},${y}`);
+      else if (g !== '~') assert.deepEqual([raccord ? g : map.GROUND[y][x], map.HEIGHT[y][x], map.REGION[y][x]], [g, h, r === 'b' ? 'a' : r], `${x},${y}`);
       else if (map.GROUND[y][x] !== '~') assert.ok('sgm'.includes(map.GROUND[y][x]), `${x},${y}`);
     }
   }
@@ -363,6 +366,7 @@ test('la très grande île : calques cohérents, le cœur intact, chantiers à p
     for (let x = 0; x < v4.SIZE; x++) {
       if (!v4.isLand(x, y)) continue;
       const [X, Y] = [map.fromV4(x), map.fromV4(y)];
+      if (retouche(X, Y)) continue;
       assert.deepEqual([map.groundAt(X, Y), map.zoneAt(X, Y)], [v4.groundAt(x, y), v4.zoneAt(x, y) === 'source' ? 'coeur' : v4.zoneAt(x, y)], `${x},${y}`);
     }
   }
