@@ -57,10 +57,13 @@ const corner = (who, site) => at => {
 // début de l'île (herbes et mousse, lianes et fleurs, jeunes palmiers sur le pont)
 const OVERGROWTH_DAYS = [3, 10, 30];
 const overgrowthOf = days => OVERGROWTH_DAYS.filter(d => days >= d).length;
+// Le sillon que la grande Hirondelle a ouvert derrière sa poupe jusqu'à la mer (le dessin : design/atelier/camp.mjs),
+// ses cases de sable (dx, dy depuis son coin) : de l'eau, rien n'y tient (ni trouvaille, ni annexe, ni création)
+const SILLON = [[6, 1], [7, 1]];
 const PLACES = [
     // (l'épave : sur une île à la plage, la grande Hirondelle (6 × 3, BEACH_PLACES) et sa poupe arrachée ; sur une île
     // d'avant, la petite épave d'origine. extra : ce que le jeu dessine en plus, la végétation et la lanterne de Lorena)
-    { id: 'hirondelle', x: 96, y: 96, size: 2, art: at => (at.beach ? 'hirondelle' : 'hirondelle_petite'), extra: at => (at.beach ? { stade: overgrowthOf(at.days), lanterne: at.here('ponton') } : {}) },
+    { id: 'hirondelle', x: 96, y: 96, size: 2, art: at => (at.beach ? 'hirondelle' : 'hirondelle_petite'), extra: at => (at.beach ? { stade: overgrowthOf(at.days), lanterne: at.here('ponton'), sillon: SILLON } : {}) },
     { id: 'poupe', x: 96, y: 96, size: 2, art: at => (at.beach ? 'hirondelle_poupe' : null) },
     // (sa cuisine de l'épave, puis son abri, bâti par le joueur : world/shelters.js ; le Foyer à l'Abri, son cabanon :
     // choix de l'auteur, 14 oct.)
@@ -130,7 +133,8 @@ function campOf({ acts = [], levels = {}, taken = new Set(), cage = null, met = 
 }
 
 // Les cases du camp (clés), pour les réserver
-const cellsOfCamp = camp => new Set(camp.flatMap(c => cellsOf(c.x, c.y, c.w, c.h).map(([x, y]) => y * SIZE + x)));
+// (et le sillon de l'épave)
+const cellsOfCamp = camp => new Set(camp.flatMap(c => [...cellsOf(c.x, c.y, c.w, c.h), ...(c.sillon || []).map(([dx, dy]) => [c.x + dx, c.y + dy])].map(([x, y]) => y * SIZE + x)));
 
 // Le camp d'un joueur, d'après la base : ses actes finis, ses paliers, ce qu'il a posé (déjà lus : levels, annexRows,
 // craftRows). conn : la transaction en cours

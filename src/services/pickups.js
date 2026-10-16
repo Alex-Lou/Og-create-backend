@@ -44,9 +44,14 @@ const WRECK_REACH = 3;
 const SOURCES = {
     laisse: { weights: { bois: 5, coquillage: 3, galet: 2 }, near: 'mer' },
     epave: { weights: { bois: 3, galet: 2 }, near: 'epave' },
-    anse: { weights: { coquillage: 4, galet: 1, bois: 1 }, near: 'mer' }
+    anse: { weights: { coquillage: 4, galet: 1, bois: 1 }, near: 'mer' },
+    // (les planches et la ferraille de la grande Hirondelle, autour d'elle : de quoi bâtir, choix de l'auteur, 15 oct.)
+    debris: { weights: { planche: 3, ferraille: 2 }, near: 'epave' }
 };
-const SOURCE_OF = { 'greve-bois-1': 'laisse', 'greve-bois-2': 'laisse', 'greve-galet-1': 'epave', 'greve-coquillage-1': 'anse', 'greve-coquillage-2': 'anse' };
+const SOURCE_OF = {
+    'greve-bois-1': 'laisse', 'greve-bois-2': 'laisse', 'greve-galet-1': 'epave', 'greve-coquillage-1': 'anse', 'greve-coquillage-2': 'anse',
+    'greve-planche-1': 'debris', 'greve-ferraille-1': 'debris', 'greve-planche-2': 'debris'
+};
 // La marée où la trouvaille revient : l'instant de son dernier ramassage (0 : jamais ramassée)
 const waveOf = at => (at ? new Date(at).getTime() : 0);
 // Empreinte d'un texte (FNV-1a, 32 bits)
@@ -111,12 +116,13 @@ function shoreOf({ userId, done, gathered, owned, free, wreck }) {
     }
     return SPOTS.map(spot => out.find(p => p.id === spot.id)).filter(Boolean);
 }
-// Le sable autour de l'épave (2 × 2 cases, coin haut-gauche wreck), en ordre de lecture
+// Le sable autour de l'épave (coin haut-gauche wreck, w × h cases : 2 × 2 sans taille), en ordre de lecture
 function aroundWreck(wreck) {
     const out = [];
-    for (let y = wreck.y - WRECK_REACH; y <= wreck.y + 1 + WRECK_REACH; y++) {
-        for (let x = wreck.x - WRECK_REACH; x <= wreck.x + 1 + WRECK_REACH; x++) {
-            const inWreck = x >= wreck.x && x <= wreck.x + 1 && y >= wreck.y && y <= wreck.y + 1;
+    const w = wreck.w || 2, h = wreck.h || 2;
+    for (let y = wreck.y - WRECK_REACH; y <= wreck.y + h - 1 + WRECK_REACH; y++) {
+        for (let x = wreck.x - WRECK_REACH; x <= wreck.x + w - 1 + WRECK_REACH; x++) {
+            const inWreck = x >= wreck.x && x < wreck.x + w && y >= wreck.y && y < wreck.y + h;
             if (!inWreck && map.groundAt(x, y) === 's') out.push({ x, y });
         }
     }
