@@ -40,7 +40,7 @@ const {
 const { migrate } = require('./world/migrate');
 const { openedOf, chestsView, grant, openChest, openAll, CRATE_COMPLETE, completeCrate } = require('./world/chests');
 const {
-    SLEEPERS, metOf, presenceOf, residentsOf, hungryOf, HUNGRY_AGO, moodsOf, withMoods, withLandmarks, withBlights, prodSteps,
+    SLEEPERS, metOf, presenceOf, arrivalsOf, residentsOf, hungryOf, HUNGRY_AGO, moodsOf, withMoods, withLandmarks, withBlights, prodSteps,
     runsSince, visitorNow, visitorView, befriend, fillNeeds, satisfyVisitor, settleVisitor
 } = require('./world/people');
 const { bonusesFor, gather, payWith, collect } = require('./world/produce');
@@ -344,9 +344,9 @@ async function layPaths(userId, lay, erase) {
 async function view(userId, owned, book) {
     await migrate(userId);
     // (lectures indépendantes, ensemble : la base est distante, chaque requête coûte un aller-retour)
-    const [{ levels, builtAt }, items, skins, signed, played, friends, named, annexRows, stock, zones, { places, beach }] = await Promise.all([
+    const [{ levels, builtAt }, items, skins, signed, played, friends, named, annexRows, stock, zones, { places, beach }, arrivals] = await Promise.all([
         levelsOf(userId), itemsOf(userId), skinsOf(userId), signsOf(userId), gamesOf(userId), friendsOf(userId), namesOf(userId),
-        annexesOf(userId), stockOf(userId), zonesOf(userId), placesOf(userId)
+        annexesOf(userId), stockOf(userId), zonesOf(userId), placesOf(userId), arrivalsOf(userId)
     ]);
     // (la caisse de Lorena d'avant l'enclos entier : complétée une fois, avant de lire les créations, chests.js)
     if (!items.has(CRATE_COMPLETE)) await completeCrate(userId);
@@ -567,6 +567,8 @@ async function view(userId, owned, book) {
                     built: v.built, asleep: SLEEPERS.includes(v.id) && !v.built && !friend.points,
                     next: villagers.HEARTS[hearts] ?? null, talked: friend.talked === day, gifted: friend.gifted === day,
                     needs, mood, moodEffect: villagers.moodEffect(v.site, produces, mood), happyEffect: villagers.moodEffect(v.site, produces, 'heureux'),
+                    // (quand il est arrivé, ou s'est réveillé : le journal de l'île n'écrit de lui qu'à partir de là)
+                    ...(settled ? {} : { since: arrivals[v.id] ?? null }),
                     ...(settled ? { seed: v.seed, home: home ? { x: home.x, y: home.y } : null } : {})
                 };
             });

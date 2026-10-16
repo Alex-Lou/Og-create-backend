@@ -51,6 +51,28 @@ async function presenceOf(userId, conn = db) {
     const blessed = anya.awakeOf(await zonesOf(userId, conn));
     return { done: quests.doneOf(await claimedOf(userId, conn)), blessed };
 }
+// Quand chacun est arrivé sur l'île (le journal de l'île : il n'écrit d'un camarade qu'à partir de son arrivée ; choix
+// de l'auteur, 16 oct.) : { habitant: ms }. La date de la quête qui le fait venir (metOf), celle de l'achat du quartier
+// d'un dormeur, et, pour qui dormait, son réveil (WAKE_PREFIX : retenu au premier bavardage, world_items) : la plus
+// tardive. Un camarade réveillé avant que son réveil soit retenu compte depuis son arrivée
+const ARRIVAL_QUESTS = { ponton: 'nuit', foyer: 'veille', atelier: 'nuit-cannelle', puits: 'nuit-rivet' };
+const WAKE_PREFIX = 'reveil:';
+async function arrivalsOf(userId, conn = db) {
+    const [quests, zones, woke] = await Promise.all([
+        conn.query('SELECT quest, claimed_at FROM world_quests WHERE user_id = $1 AND quest = ANY($2)', [userId, Object.values(ARRIVAL_QUESTS)]),
+        conn.query('SELECT zone, bought_at FROM world_zones WHERE user_id = $1', [userId]),
+        conn.query('SELECT item, bought_at FROM world_items WHERE user_id = $1 AND item LIKE $2', [userId, `${WAKE_PREFIX}%`])
+    ]);
+    const questAt = new Map(quests.rows.map(r => [r.quest, new Date(r.claimed_at).getTime()]));
+    const zoneAt = new Map(zones.rows.map(r => [r.zone, new Date(r.bought_at).getTime()]));
+    const wokeAt = new Map(woke.rows.map(r => [r.item.slice(WAKE_PREFIX.length), new Date(r.bought_at).getTime()]));
+    const out = {};
+    for (const id of Object.keys(villagers.VILLAGERS)) {
+        const met = ARRIVAL_QUESTS[id] ? questAt.get(ARRIVAL_QUESTS[id]) : zoneAt.get(map.siteZone(id));
+        if (met !== undefined) out[id] = Math.max(met, wokeAt.get(id) || 0);
+    }
+    return out;
+}
 // Habitants de l'île : la troupe rencontrée (built : son bâtiment est bâti, dans un quartier à soi), puis les
 // visiteurs installés, qui travaillent au bâtiment de leur métier : [{ id, name, role, loves, likes, site, built, seed? }]
 function residentsOf(levels, zones, settlers, presence) {
@@ -250,6 +272,10 @@ async function befriend(userId, villagerId, resource = null, now = Date.now()) {
             gained = villagers.giftPoints(villager, resource);
         }
         const points = Math.min(villagers.MAX_POINTS, friend.points + gained);
+        // (un dormeur qu'on réveille : son réveil est retenu, le journal de l'île l'écrit à partir de là ; arrivalsOf)
+        if (SLEEPERS.includes(villagerId) && !friend.points) {
+            await conn.query('INSERT INTO world_items (user_id, item, bought_at, source) VALUES ($1, $2, to_timestamp($3 / 1000.0), $4) ON CONFLICT DO NOTHING', [userId, `${WAKE_PREFIX}${villagerId}`, now, 'ile']);
+        }
         await conn.query(
             `INSERT INTO world_friends (user_id, villager, points, talked_on, gifted_on) VALUES ($1, $2, $3, $4::date, $5::date)
              ON CONFLICT (user_id, villager) DO UPDATE SET points = EXCLUDED.points,
@@ -374,7 +400,7 @@ async function settleVisitor(userId, visitorId, now = Date.now()) {
 }
 
 module.exports = {
-    livesHere, decosNear, SETTLER_ID, knownResident, SLEEPERS, metOf, presenceOf, residentsOf, hungryOf, HUNGRY_AGO,
+    livesHere, decosNear, SETTLER_ID, knownResident, SLEEPERS, metOf, presenceOf, arrivalsOf, WAKE_PREFIX, residentsOf, hungryOf, HUNGRY_AGO,
     moodsOf, withMoods, withLandmarks, withBlights, moodTimes, prodSteps, sameSteps, runsSince, visitorNow, visitorView,
     friendRewards, befriend, fillNeeds, satisfyVisitor, housesOf, settleVisitor
 };

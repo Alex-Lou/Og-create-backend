@@ -1478,6 +1478,30 @@ test('noms : un bâtiment se renomme dès son palier III, un quartier dès qu’
   assert.equal((await api('POST', '/play/world/name', { kind: 'zone', id: 'coeur', name: 'Ma Plage' }, await guest())).status, 402);
 });
 
+// Le journal de l'île n'écrit d'un camarade qu'à partir de son arrivée (choix de l'auteur, 16 oct.) : la date de la
+// quête qui le fait venir, ou du réveil d'un dormeur, retenu au premier bavardage (world_items : reveil:<habitant>)
+test('habitants : chacun dit depuis quand il est sur l’île ; un dormeur, depuis son réveil, retenu une seule fois', async () => {
+  const player = await newPlayer({ settled: true });
+  const since = async () => Object.fromEntries((await api('GET', '/play/world', null, player)).data.villagers.map(w => [w.id, w.since]));
+  const claimed = async quest => new Date((await sql('SELECT claimed_at FROM world_quests WHERE user_id = $1 AND quest = $2', [player.userId, quest]))[0].claimed_at).getTime();
+  const before = await since();
+  assert.equal(before.ponton, await claimed('nuit'));
+  assert.equal(before.foyer, await claimed('veille'));
+  assert.equal(before.puits, await claimed('nuit-rivet'));
+  // Léo réveillé (le premier bavardage) : son réveil est retenu
+  await sql(`UPDATE world_quests SET claimed_at = NOW() - INTERVAL '2 days' WHERE user_id = $1`, [player.userId]);
+  assert.equal((await api('POST', '/play/world/villager/talk', { villager: 'puits' }, player)).status, 200);
+  const woke = (await sql('SELECT bought_at FROM world_items WHERE user_id = $1 AND item = $2', [player.userId, 'reveil:puits']))[0];
+  assert.ok(woke);
+  const after = await since();
+  assert.equal(after.puits, new Date(woke.bought_at).getTime());
+  assert.ok(after.puits > after.ponton);
+  // (le lendemain, un autre bavardage ne le déplace pas)
+  await sql('UPDATE world_friends SET talked_on = NULL WHERE user_id = $1', [player.userId]);
+  assert.equal((await api('POST', '/play/world/villager/talk', { villager: 'puits' }, player)).status, 200);
+  assert.equal((await since()).puits, after.puits);
+});
+
 test('habitants : on leur parle et on les gâte une fois par jour ; chaque cœur est récompensé une seule fois', async () => {
   const player = await newPlayer({ settled: true });
   const talk = villager => api('POST', '/play/world/villager/talk', { villager }, player);
