@@ -30,8 +30,9 @@ const BEACH_PLACES = {
     // (le camp de Lorena serré autour de son Ponton, contre l'épave : sa zone est petite)
     aster: { x: 90, y: 95 }, sos: { x: 90, y: 94 }, caisses: { x: 91, y: 94 }, filet: { x: 90, y: 100 }, rondins: { x: 92, y: 94 },
     // (la grande Hirondelle, couchée en travers de l'anse à l'ouest du camp, entre le bout sud des rochers et le Ponton ;
-    // sa poupe arrachée, rejetée par la mer à l'ancienne place, ferme toujours le coin de l'enclos du Feu : choix
-    // de l'auteur, 15 oct. ; le camp de Lorena se serre derrière elle, son filet devant)
+    // le camp de Lorena se serre derrière elle, son filet devant. Sa poupe arrachée, qui restait à l'ancienne place, n'y
+    // est plus : choix de l'auteur, 16 oct. ; deux pièces de clôture ferment à sa place le coin de l'enclos du Feu,
+    // PLACES : coin-1, coin-2)
     hirondelle: { x: 86, y: 97, w: 6, h: 3 },
     rivet: { x: 93, y: 86 },
     // (la cage des poules, échouée par la mer au bout de la plage, dans le coin d’Agathe : choix de l'auteur, 11 oct.)
@@ -41,7 +42,7 @@ const BEACH_PLACES = {
     cannelle: { x: 99, y: 97 }
 };
 
-// Place prévue (coin haut-gauche), taille (2 : 2 × 2 cases, sinon 1), dessin selon l'avancée (null : pas encore, ou
+// Place prévue (coin haut-gauche), taille (2 : 2 × 2 cases, sinon 1), fixe (à sa place, ou pas du tout), dessin selon l'avancée (null : pas encore, ou
 // plus). at : { acts (actes finis), levels (paliers des bâtiments), cage ('coincee', 'ouverte' ou null), here (le
 // personnage est là ? id de son bâtiment : ponton Lorena, foyer Agathe, atelier Nathan) }. Un camp sobre, qui libère la plage : l'épave et
 // trois objets restent ; le coin de Lorena s'en va quand son Ponton est bâti, celui de Nathan avec son Atelier, la cuisine
@@ -64,10 +65,14 @@ const overgrowthOf = days => OVERGROWTH_DAYS.filter(d => days >= d).length;
 // ses cases de sable (dx, dy depuis son coin) : de l'eau, rien n'y tient (ni trouvaille, ni annexe, ni création)
 const SILLON = [[6, 1], [7, 1]];
 const PLACES = [
-    // (l'épave : sur une île à la plage, la grande Hirondelle (6 × 3, BEACH_PLACES) et sa poupe arrachée ; sur une île
-    // d'avant, la petite épave d'origine. extra : ce que le jeu dessine en plus, la végétation et la lanterne de Lorena)
+    // (l'épave : sur une île à la plage, la grande Hirondelle (6 × 3, BEACH_PLACES) ; sur une île d'avant, la petite épave
+    // d'origine. extra : ce que le jeu dessine en plus, la végétation et la lanterne de Lorena)
     { id: 'hirondelle', x: 96, y: 96, size: 2, art: at => (at.beach ? 'hirondelle' : 'hirondelle_petite'), extra: at => (at.beach ? { stade: overgrowthOf(at.days), lanterne: at.here('ponton'), sillon: SILLON } : {}) },
-    { id: 'poupe', x: 96, y: 96, size: 2, art: at => (at.beach ? 'hirondelle_poupe' : null) },
+    // (le coin de l'enclos du Feu que fermait la poupe de l'Hirondelle, à deux cases de la grande emprise du Feu : deux
+    // pièces de clôture, une fois le Feu bâti, sur l'île à la plage ; le jeu les dessine comme une clôture, raccordée aux
+    // piquets du joueur. fixe : à leur place ou pas du tout ; choix de l'auteur, 16 oct.)
+    { id: 'coin-1', x: 96, y: 96, fixe: true, art: at => (at.beach && foyer(at) ? 'cloture' : null) },
+    { id: 'coin-2', x: 97, y: 96, fixe: true, art: at => (at.beach && foyer(at) ? 'cloture' : null) },
     // (sa cuisine de l'épave, puis son abri, bâti par le joueur : world/shelters.js ; le Foyer à l'Abri, son cabanon :
     // choix de l'auteur, 14 oct.)
     { id: 'cannelle', x: 99, y: 96, size: 2, art: at => (!at.here('foyer') ? null : foyer(at) >= ABRI ? 'cannelle_cabanon' : at.shelters.has('cannelle') ? 'cannelle_abri' : 'cannelle_debris') },
@@ -127,7 +132,7 @@ function campOf({ acts = [], levels = {}, taken = new Set(), cage = null, met = 
         if (!art) continue;
         const where = beach && BEACH_PLACES[place.id] ? { ...place, ...BEACH_PLACES[place.id] } : place;
         const w = where.w || where.size || 1, h = where.h || w;
-        const spot = spotOf(where, w, h, busy, places);
+        const spot = where.fixe ? (fits(where.x, where.y, w, h, busy, places) ? { x: where.x, y: where.y } : null) : spotOf(where, w, h, busy, places);
         if (!spot) continue;
         cellsOf(spot.x, spot.y, w, h).forEach(([x, y]) => busy.add(y * SIZE + x));
         out.push({ id: place.id, art, x: spot.x, y: spot.y, w, h, ...(place.extra ? place.extra(at) : {}) });

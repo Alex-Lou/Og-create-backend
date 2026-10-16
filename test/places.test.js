@@ -49,11 +49,17 @@ test('le camp : rien avant son personnage ; sur une île à la plage, chacun dan
   const at = id => { const c = camp.find(e => e.id === id); return [c.x, c.y]; };
   // (la cuisine d’Agathe sous l'enclos du Feu, sur le sable du rivage : choix de l'auteur, 16 oct.)
   assert.deepEqual([at('cannelle'), at('aster'), at('rivet')], [[99, 97], [90, 95], [93, 86]]);
-  // La grande Hirondelle (choix de l'auteur, 15 oct.) : 6 × 3 cases en travers de l'anse à l'ouest, sa poupe arrachée à
-  // l'ancienne place (elle ferme le coin de l'enclos du Feu) ; sur l'ancienne butte, deux palmiers et deux étoiles de mer
+  // La grande Hirondelle (choix de l'auteur, 15 oct.) : 6 × 3 cases en travers de l'anse à l'ouest (sa poupe arrachée n'est
+  // plus à l'ancienne place : choix de l'auteur, 16 oct.) ; sur l'ancienne butte, deux palmiers et deux étoiles de mer
   const ship = camp.find(c => c.id === 'hirondelle');
   assert.deepEqual([ship.art, ship.x, ship.y, ship.w, ship.h, ship.stade, ship.lanterne], ['hirondelle', 86, 97, 6, 3, 0, true]);
-  assert.deepEqual([at('poupe'), at('palmier-1'), at('palmier-2'), at('etoile-1'), at('etoile-2')], [[96, 96], [103, 97], [104, 96], [102, 97], [103, 96]]);
+  assert.ok(!camp.some(c => c.id === 'poupe'));
+  // (à sa place, le coin de l'enclos du Feu : deux pièces de clôture, une fois le Feu bâti, à leur place ou pas du tout)
+  const coin = over => campOf({ met: new Set(['ponton', 'foyer', 'atelier']), places: beach, beach: true, ...over }).filter(c => c.id.startsWith('coin-')).map(c => [c.art, c.x, c.y]);
+  assert.deepEqual(coin({}), []);
+  assert.deepEqual(coin({ levels: { foyer: 1 } }), [['cloture', 96, 96], ['cloture', 97, 96]]);
+  assert.deepEqual(coin({ levels: { foyer: 1 }, taken: new Set([96 * map.SIZE + 97]) }), [['cloture', 96, 96]]);
+  assert.deepEqual([at('palmier-1'), at('palmier-2'), at('etoile-1'), at('etoile-2')], [[103, 97], [104, 96], [102, 97], [103, 96]]);
   // (sa végétation : un stade aux jours 3, 10 et 30 ; la lanterne de Lorena, une fois Lorena là)
   assert.deepEqual([0, 2, 3, 9, 10, 29, 30, 99].map(overgrowthOf), [0, 0, 1, 1, 2, 2, 3, 3]);
   assert.equal(campOf({ met: new Set(), places: beach, beach: true }).find(c => c.id === 'hirondelle').lanterne, false);
@@ -122,8 +128,8 @@ test.describe('île', () => {
     const foyer = start.sites.find(s => s.id === 'foyer');
     assert.deepEqual([foyer.x, foyer.y, foyer.hidden], [99, 93, false]);
     assert.deepEqual(start.sites.filter(s => !s.hidden).map(s => s.id), ['foyer']);
-    // (l'épave et sa poupe, le décor de l'ancienne butte ; personne encore)
-    assert.deepEqual(start.camp.map(c => c.id), ['hirondelle', 'poupe', 'palmier-1', 'palmier-2', 'etoile-1', 'etoile-2']);
+    // (l'épave, le décor de l'ancienne butte ; personne encore)
+    assert.deepEqual(start.camp.map(c => c.id), ['hirondelle', 'palmier-1', 'palmier-2', 'etoile-1', 'etoile-2']);
     // (la végétation gagne l'épave avec les jours depuis la naissance de l'île : douze jours, le deuxième stade)
     assert.equal(start.camp[0].stade, 0);
     await sql(`UPDATE world_items SET bought_at = now() - interval '12 days' WHERE user_id = $1 AND item = 'ile:plage'`, [player.userId]);
