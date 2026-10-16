@@ -47,7 +47,7 @@ test('le camp : rien avant son personnage ; sur une île à la plage, chacun dan
   const beach = places.placesFrom({ beach: true });
   const camp = campOf({ met: new Set(['ponton', 'foyer', 'atelier']), places: beach, beach: true });
   const at = id => { const c = camp.find(e => e.id === id); return [c.x, c.y]; };
-  assert.deepEqual([at('cannelle'), at('aster'), at('rivet')], [[99, 96], [90, 96], [93, 86]]);
+  assert.deepEqual([at('cannelle'), at('aster'), at('rivet')], [[99, 97], [90, 96], [93, 86]]);
   // Un compte d'avant la bible (met : null) : tout, comme avant
   assert.ok(ids(campOf({})).includes('cannelle') && ids(campOf({})).includes('rivet'));
   // Rien du camp sur la grande emprise du Feu (les caisses et la cage s'écartent)

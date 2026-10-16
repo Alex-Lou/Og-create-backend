@@ -31,7 +31,10 @@ const BEACH_PLACES = {
     aster: { x: 90, y: 96 }, sos: { x: 90, y: 94 }, caisses: { x: 91, y: 95 }, filet: { x: 90, y: 98 }, rondins: { x: 92, y: 94 },
     rivet: { x: 93, y: 86 },
     // (la cage des poules, échouée par la mer au bout de la plage, dans le coin d’Agathe : choix de l'auteur, 11 oct.)
-    cage: { x: 101, y: 98 }
+    cage: { x: 101, y: 98 },
+    // (sa cuisine, sous l'enclos du Feu, sur le sable du rivage : choix de l'auteur, 16 oct. ; c'est là que l'enclos de
+    // Lorena, planté avant qu'elle n'arrive, la laissait déjà)
+    cannelle: { x: 99, y: 97 }
 };
 
 // Place prévue (coin haut-gauche), taille (2 : 2 × 2 cases, sinon 1), dessin selon l'avancée (null : pas encore, ou
