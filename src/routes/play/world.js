@@ -156,13 +156,13 @@ router.post('/world/craft/unpose', withAccount(async (req, res, owner, b) => {
     await craftDone(res, owner, b, done, done.refund ? { refund: done.refund } : {});
 }));
 
-// Chemins : tracer et effacer des cases ([[x, y]] : world/paths.js)
+// Chemins : tracer, effacer, paver et dépaver des cases ([[x, y]] : world/paths.js)
 router.post('/world/paths', withAccount(async (req, res, owner, b) => {
-    const { lay = [], erase = [] } = req.body || {};
-    if (!Array.isArray(lay) || !Array.isArray(erase)) return res.status(400).json({ message: INVALID.trace });
-    const done = await world.layPaths(owner.id, lay, erase);
+    const { lay = [], erase = [], pave = [], unpave = [] } = req.body || {};
+    if (![lay, erase, pave, unpave].every(Array.isArray)) return res.status(400).json({ message: INVALID.trace });
+    const done = await world.layPaths(owner.id, lay, erase, pave, unpave);
     if (done.status) return res.status(done.status).json({ message: done.message });
-    res.json({ laid: done.laid, erased: done.erased, world: await worldView(owner, b) });
+    res.json({ laid: done.laid, erased: done.erased, paved: done.paved, unpaved: done.unpaved, world: await worldView(owner, b) });
 }));
 
 router.post('/world/collect', withAccount(async (req, res, owner, b) => {

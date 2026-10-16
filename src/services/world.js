@@ -310,8 +310,9 @@ async function restartIsland(userId) {
 }
 
 // Trace et efface des chemins (world/paths.js) : une pierre la case, les premières offertes ; une case effacée rend
-// sa pierre. lay, erase : [[x, y]]. {} ou { status, message }
-async function layPaths(userId, lay, erase) {
+// sa pierre. Pave et dépave (la Carrière bâtie : PAVE_STONE pierres la case, rendues). lay, erase, pave, unpave :
+// [[x, y]]. { laid, erased, paved, unpaved } ou { status, message }
+async function layPaths(userId, lay, erase, pave = [], unpave = []) {
     await migrate(userId);
     return db.transaction(async conn => {
         const { stock } = await payWith(userId, conn, await stockOf(userId, conn, true));
@@ -324,8 +325,9 @@ async function layPaths(userId, lay, erase) {
         const plan = paths.planOf(lay, erase, roads.laid, stock, {
             fresh: roads.fresh, ground: roads.ground, zones: await zonesOf(userId, conn), places: (await placesOf(userId, conn)).places, levels,
             taken: new Set([...annexRows.map(keyOf), ...placed.map(keyOf), ...camp]),
-            placedNeedingPath: placed.filter(r => crafts.CRAFT_BY_ID[r.craft]?.place.path).map(r => ({ x: r.x, y: r.y, name: crafts.CRAFT_BY_ID[r.craft].name }))
-        });
+            placedNeedingPath: placed.filter(r => crafts.CRAFT_BY_ID[r.craft]?.place.path).map(r => ({ x: r.x, y: r.y, name: crafts.CRAFT_BY_ID[r.craft].name })),
+            paved: roads.paved, paveOpen: paths.paveOpen(levels)
+        }, pave, unpave);
         if (plan.status) return db.rollback(plan);
         if (plan.remove.length) {
             await conn.query('DELETE FROM world_items WHERE user_id = $1 AND item = ANY($2)', [userId, plan.remove.map(c => `${paths.PREFIX}${c.x}:${c.y}`)]);
@@ -334,8 +336,15 @@ async function layPaths(userId, lay, erase) {
             await conn.query(`INSERT INTO world_items (user_id, item, source) SELECT $1, unnest($2::text[]), unnest($3::text[])`,
                 [userId, plan.add.map(c => `${paths.PREFIX}${c.x}:${c.y}`), plan.add.map(c => (c.free ? 'offert' : 'chemin'))]);
         }
+        if (plan.unpave.length) {
+            await conn.query('DELETE FROM world_items WHERE user_id = $1 AND item = ANY($2)', [userId, plan.unpave.map(c => `${paths.PAVE_PREFIX}${c.x}:${c.y}`)]);
+        }
+        if (plan.pave.length) {
+            await conn.query(`INSERT INTO world_items (user_id, item, source) SELECT $1, unnest($2::text[]), 'pave'`,
+                [userId, plan.pave.map(c => `${paths.PAVE_PREFIX}${c.x}:${c.y}`)]);
+        }
         if (plan.stone) await conn.query('UPDATE world_stock SET stone = stone - $2 WHERE user_id = $1', [userId, plan.stone]);
-        return { laid: plan.add.length, erased: plan.remove.length };
+        return { laid: plan.add.length, erased: plan.remove.length, paved: plan.pave.length, unpaved: plan.unpave.length };
     });
 }
 
@@ -542,7 +551,9 @@ async function view(userId, owned, book) {
         // qui reste offert
         roads: {
             laid: roads.laid.map(c => [c.x, c.y, c.free ? 1 : 0]), stone: 1, free: Math.max(0, paths.FREE - roads.laid.filter(c => c.free).length),
-            max: paths.MAX_CELLS
+            max: paths.MAX_CELLS,
+            // (le pavé : ses cases, ce qu'il coûte la case, s'il s'ouvre : la Carrière bâtie)
+            paved: roads.paved.map(c => [c.x, c.y]), pave: { stone: paths.PAVE_STONE, open: paths.paveOpen(levels) }
         },
         crafts: craftsView(craftRows, craftCtx({ levels, zones, annexRows, rows: craftRows, blocked: campCells, ground: roads.ground, places }), {
             owned: have, stock: paidStock, open: crafts.tiersOpen(book.openChapters || new Set(), epreuves, book.stars ?? 0), epreuves, stars: book.stars ?? 0, have: stockFinds, presence,
@@ -700,12 +711,13 @@ const BOAT_ELEMENT = 'Bateau';
 // Le Ponton à sa place de l'île à la plage (pas déplacé)
 const atBeachPlace = p => p.x === BEACH.ponton.x && p.y === BEACH.ponton.y;
 
-// Les chemins tracés dans l'emprise f { x, y, w, h } s'effacent ; leurs pierres (pas celles des cases offertes) reviennent
+// Les chemins tracés et le pavé dans l'emprise f { x, y, w, h } s'effacent ; leurs pierres (pas celles des cases offertes)
+// reviennent, et celles du pavé (paths.PAVE_STONE la case)
 async function clearGrown(userId, conn, f) {
     const items = [];
-    for (let y = f.y; y < f.y + f.h; y++) for (let x = f.x; x < f.x + f.w; x++) items.push(`${paths.PREFIX}${x}:${y}`);
+    for (let y = f.y; y < f.y + f.h; y++) for (let x = f.x; x < f.x + f.w; x++) items.push(`${paths.PREFIX}${x}:${y}`, `${paths.PAVE_PREFIX}${x}:${y}`);
     const { rows } = await conn.query('DELETE FROM world_items WHERE user_id = $1 AND item = ANY($2) RETURNING source', [userId, items]);
-    const back = rows.filter(r => r.source !== 'offert').length;
+    const back = rows.reduce((n, r) => n + (r.source === 'pave' ? paths.PAVE_STONE : r.source === 'offert' ? 0 : 1), 0);
     if (back) await conn.query('UPDATE world_stock SET stone = stone + $2 WHERE user_id = $1', [userId, back]);
 }
 
