@@ -1,15 +1,17 @@
 // Les annexes posées : cases permises, vue, pose et déplacement. Extrait de services/world.js (lot santé), sans
 // changement.
+const crypto = require('crypto');
 const db = require('../../config/db');
 const ledger = require('../ledger');
 const map = require('../worldMap');
 const annexes = require('../annexes');
+const crafts = require('../crafts');
 const landmarks = require('../landmarks');
 const finds = require('../finds');
-const { SIZE, CAP_HOURS, RESOURCES, CHAPTER_OF_LEVEL, WORDS, SITES } = require('./rules');
-const { annexesOf, levelsOf, stockOf, zonesOf, findsOf, spendFinds } = require('./reads');
+const { SIZE, CAP_HOURS, RESOURCES, CHAPTER_OF_LEVEL, WORDS, SITES, CRAFT_TTL_MS } = require('./rules');
+const { annexesOf, levelsOf, stockOf, zonesOf, findsOf, spendFinds, balanceOf } = require('./reads');
 const { migrate } = require('./migrate');
-const { gather } = require('./produce');
+const { payWith } = require('./produce');
 const { campOfUser, cellsOfCamp } = require('./camp');
 const { STATIC, inSiteAt, placesOf } = require('./places');
 const { roadsOf } = require('./paths');
@@ -17,6 +19,8 @@ const T = require('../../texts/annexes');
 const { SPOT_MESSAGE, LOOK_MESSAGE, CAMP_MESSAGE } = T;
 const { BUILD_FIRST, NEED_TIER } = require('../../texts/world');
 const { NEED_COINS, MISSING_RESOURCES } = require('../../texts/errors');
+const { ANNEX_UNKNOWN } = T;
+const { ASSEMBLY_ERRORS, ASSEMBLY_RETURNED, ASSEMBLY_LATE, ASSEMBLY_REFUSED } = require('../../texts/crafts');
 
 // Case où une annexe de ce bâtiment peut se poser (sans compter ce qui l'occupe) : sol constructible du quartier du
 // bâtiment, n'importe où dans ce quartier, hors des grandes emprises des bâtiments (où qu'ils soient : places) et des
@@ -53,6 +57,8 @@ function annexesView(siteId, rows) {
         const max = annexes.maxOf(a);
         return {
             id: a.id, name: a.name, kind: a.kind, max, built, looks: annexes.looksOf(a), effect: annexes.effectText(a, words, CAP_HOURS), gain: a.effect,
+            // (elle s'assemble avant de se poser : son casse-tête, startAnnexAssembly)
+            ...(a.assembly ? { assembly: true } : {}),
             levels: Array.from({ length: max }, (_, k) => annexes.levelFor(a, k)),
             next: built < max ? { level: annexes.levelFor(a, built), ...annexes.priceOf(a, built) } : null
         };
@@ -78,7 +84,72 @@ const lookOk = (a, look) => look === null || (Number.isInteger(look) && look >= 
 // autorisée, ressources et écus débités une seule fois (ligne de stock verrouillée : deux poses ne se croisent pas).
 // La production en cours est encaissée d'abord (l'annexe produit à partir de sa pose). pose : { flip, look } (miroir,
 // couleur choisie). { status, message } si refus
-async function placeAnnex(userId, annexId, x, y, { flip = false, look = null } = {}) {
+// L'exemplaire suivant de l'annexe a, s'il est permis (son bâtiment bâti dans un quartier à soi, un exemplaire de plus,
+// au palier qu'il demande) : { copy } (les exemplaires déjà posés), ou { status, message }
+async function nextCopyOf(userId, a, conn) {
+    const { levels } = await levelsOf(userId, conn);
+    const level = levels[a.site] || 0;
+    if (!level || !(await zonesOf(userId, conn)).has(map.siteZone(a.site))) return { status: 403, message: BUILD_FIRST };
+    const copy = (await annexesOf(userId, conn)).filter(r => r.annex === a.id).length;
+    if (copy >= annexes.maxOf(a)) return { status: 409, message: annexes.maxOf(a) > 1 ? T.ALL_COPIES_PLACED : T.ALREADY_PLACED };
+    const need = annexes.levelFor(a, copy);
+    if (level < need) return { status: 403, message: NEED_TIER(CHAPTER_OF_LEVEL[need - 1]) };
+    return { copy, levels };
+}
+
+// Ce qui manque en ressources ou en trouvailles pour payer l'exemplaire copy de a (stock : les réserves, ce qui
+// attendait dans les bâtiments compris), ou null (les écus : à part)
+async function priceBlock(userId, a, copy, stock, conn) {
+    const { cost, finds: spent } = annexes.priceOf(a, copy);
+    if (Object.entries(cost).some(([r, n]) => stock[r] < n)) return { status: 400, message: MISSING_RESOURCES };
+    const have = await findsOf(userId, conn);
+    const short = Object.entries(spent).find(([f, n]) => have[f] < n);
+    if (short) return { status: 400, message: T.NEED_FINDS(short[1], finds.FIND_BY_ID[short[0]].name.toLowerCase()) };
+    return null;
+}
+
+// Le casse-tête d'une annexe qui s'assemble (le poulailler d’Agathe, choix de l'auteur, 15 oct. : comme une création
+// de l'établi) : son exemplaire permis et de quoi la payer d'abord, puis une graine et ses pièces. Rien n'est payé : la
+// pose rend l'assemblage (placeAnnex). { run: { id, annex, shape, pieces, turned } } ou { status, message }
+async function startAnnexAssembly(userId, annexId) {
+    const a = Object.hasOwn(annexes.ANNEX_BY_ID, annexId) ? annexes.ANNEX_BY_ID[annexId] : null;
+    if (!a || !a.assembly) return { status: 404, message: ANNEX_UNKNOWN };
+    await migrate(userId);
+    return db.transaction(async conn => {
+        // (ce qui attend dans les bâtiments est encaissé d'abord : cela compte pour payer)
+        const { stock } = await payWith(userId, conn, await stockOf(userId, conn, true));
+        const next = await nextCopyOf(userId, a, conn);
+        if (next.status) return db.rollback(next);
+        const block = await priceBlock(userId, a, next.copy, stock, conn);
+        if (block) return db.rollback(block);
+        const { coins: price } = annexes.priceOf(a, next.copy);
+        if ((await balanceOf(userId, conn)) < price) return db.rollback({ status: 400, message: NEED_COINS(price) });
+        const { shape, tier } = a.assembly;
+        const seed = crypto.randomInt(1, 2147483647);
+        const { rows } = await conn.query('INSERT INTO world_craft_runs (user_id, craft, seed) VALUES ($1, $2, $3) RETURNING id', [userId, `${RUN_PREFIX}${a.id}`, seed]);
+        return { run: { id: Number(rows[0].id), annex: a.id, shape, pieces: crafts.piecesOf(shape, seed, tier), turned: crafts.TURNED[tier] } };
+    });
+}
+// (un assemblage d'annexe, dans world_craft_runs : « annexe:<id> »)
+const RUN_PREFIX = 'annexe:';
+
+// L'assemblage d'une annexe, rendu à sa pose (run : son numéro, layout : la disposition des pièces) : vérifié, puis
+// rendu (une fois). null s'il tient, sinon { status, message }
+async function returnAssembly(userId, a, run, layout, conn) {
+    if (!Number.isSafeInteger(run) || run <= 0) return { status: 400, message: ASSEMBLY_REFUSED(ASSEMBLY_ERRORS.missing) };
+    const { rows } = await conn.query(
+        'SELECT seed, created_at FROM world_craft_runs WHERE id = $1 AND user_id = $2 AND craft = $3 AND finished_at IS NULL FOR UPDATE', [run, userId, `${RUN_PREFIX}${a.id}`]);
+    if (!rows.length) return { status: 404, message: ASSEMBLY_RETURNED };
+    if (Date.now() - new Date(rows[0].created_at).getTime() > CRAFT_TTL_MS) return { status: 400, message: ASSEMBLY_LATE };
+    const { shape, tier } = a.assembly;
+    const done = crafts.check(shape, crafts.piecesOf(shape, rows[0].seed, tier), layout);
+    if (!done.ok) return { status: 400, message: ASSEMBLY_REFUSED(done.error) };
+    await conn.query('UPDATE world_craft_runs SET finished_at = NOW() WHERE id = $1', [run]);
+    return null;
+}
+
+// assembly : { run, layout }, pour une annexe qui s'assemble (son casse-tête, rendu à la pose : startAnnexAssembly)
+async function placeAnnex(userId, annexId, x, y, { flip = false, look = null } = {}, assembly = {}) {
     const a = annexes.ANNEX_BY_ID[annexId];
     if (!a) return { status: 404, message: T.ANNEX_UNKNOWN };
     if (!lookOk(a, look)) return { status: 400, message: LOOK_MESSAGE };
@@ -86,22 +157,21 @@ async function placeAnnex(userId, annexId, x, y, { flip = false, look = null } =
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
         if (!annexSpotOk(a.site, x, y, (await placesOf(userId, conn)).places, a.ground)) return db.rollback({ status: 400, message: SPOT_MESSAGE });
-        const { levels } = await levelsOf(userId, conn);
-        const level = levels[a.site] || 0;
-        if (!level || !(await zonesOf(userId, conn)).has(map.siteZone(a.site))) return db.rollback({ status: 403, message: BUILD_FIRST });
-        const copy = (await annexesOf(userId, conn)).filter(r => r.annex === a.id).length;
-        if (copy >= annexes.maxOf(a)) return db.rollback({ status: 409, message: annexes.maxOf(a) > 1 ? T.ALL_COPIES_PLACED : T.ALREADY_PLACED });
-        const need = annexes.levelFor(a, copy);
-        if (level < need) return db.rollback({ status: 403, message: NEED_TIER(CHAPTER_OF_LEVEL[need - 1]) });
+        const next = await nextCopyOf(userId, a, conn);
+        if (next.status) return db.rollback(next);
+        const { copy, levels } = next;
         if (await cellTaken(userId, x, y, conn)) return db.rollback({ status: 409, message: T.CELL_TAKEN });
         if (cellsOfCamp(await campOfUser(userId, conn, { levels })).has(y * SIZE + x)) return db.rollback({ status: 409, message: CAMP_MESSAGE });
+        // (une annexe qui s'assemble : son casse-tête, vérifié et rendu avant de rien payer)
+        if (a.assembly) {
+            const refused = await returnAssembly(userId, a, assembly.run, assembly.layout, conn);
+            if (refused) return db.rollback(refused);
+        }
         const { cost, coins: price, finds: spent } = annexes.priceOf(a, copy);
         // La production en cours est encaissée d'abord : elle compte pour payer
-        const gathered = await gather(userId, conn, stock);
-        if (Object.entries(cost).some(([r, n]) => stock[r] + (gathered.stock[r] || 0) < n)) return db.rollback({ status: 400, message: MISSING_RESOURCES });
-        const have = await findsOf(userId, conn);
-        const short = Object.entries(spent).find(([f, n]) => have[f] < n);
-        if (short) return db.rollback({ status: 400, message: T.NEED_FINDS(short[1], finds.FIND_BY_ID[short[0]].name.toLowerCase()) });
+        const { stock: paid } = await payWith(userId, conn, stock);
+        const block = await priceBlock(userId, a, copy, paid, conn);
+        if (block) return db.rollback(block);
         const coins = await ledger.debit(userId, price, `annexe:${a.id}:${copy + 1}`, conn);
         if (coins === null) return db.rollback({ status: 400, message: NEED_COINS(price) });
         await spendFinds(userId, spent, conn);
@@ -144,4 +214,4 @@ async function poseAnnex(userId, x, y, { flip, look }) {
     });
 }
 
-module.exports = { annexSpotOk, annexSpots, annexesView, annexAt, cellTaken, SPOT_MESSAGE, placeAnnex, moveAnnex, poseAnnex };
+module.exports = { annexSpotOk, annexSpots, annexesView, annexAt, cellTaken, SPOT_MESSAGE, placeAnnex, startAnnexAssembly, moveAnnex, poseAnnex };

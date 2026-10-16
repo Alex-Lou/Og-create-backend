@@ -262,9 +262,19 @@ router.post('/world/annex', withAccount(async (req, res, owner, b) => {
     const x = Number(req.body.x), y = Number(req.body.y);
     const pose = poseOf(req.body);
     if (!/^[a-z]{1,20}$/.test(annex) || !cellOk(x, y) || !pose) return res.status(400).json({ message: INVALID.annex });
-    const done = await world.placeAnnex(owner.id, annex, x, y, { flip: pose.flip ?? false, look: pose.look ?? null });
+    // (une annexe qui s'assemble rend son casse-tête : run, son numéro ; layout, la disposition des pièces)
+    const assembly = { run: Number(req.body.run), layout: req.body.layout };
+    const done = await world.placeAnnex(owner.id, annex, x, y, { flip: pose.flip ?? false, look: pose.look ?? null }, assembly);
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ built: done.built, coins: done.coins, world: await worldView(owner, b) });
+}));
+// Annexe qui s'assemble (le poulailler d’Agathe) : son casse-tête, avant la pose → { run }
+router.post('/world/annex/assemble', withAccount(async (req, res, owner) => {
+    const annex = String(req.body.annex || '');
+    if (!/^[a-z]{1,20}$/.test(annex)) return res.status(400).json({ message: INVALID.annex });
+    const done = await world.startAnnexAssembly(owner.id, annex);
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json({ run: done.run });
 }));
 
 // Annexe : déplacement gratuit vers une autre case libre autour de son bâtiment

@@ -2670,8 +2670,17 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Lorena ouvre 
   const sand = foyer.spots.find(c => worldMap.groundAt(c.x, c.y) === 's');
   assert.ok(sand, 'une case de sable parmi les cases du Feu');
   assert.equal((await api('POST', '/play/world/annex', { annex: 'poulailler', x: sand.x, y: sand.y }, player)).status, 400);
-  const coop = await api('POST', '/play/world/annex', { annex: 'poulailler', x: coopSpots[0].x, y: coopSpots[0].y }, player);
+  // Il s'assemble d'abord (choix de l'auteur, 15 oct.) : son casse-tête, rendu à la pose ; sans lui, ou faux, refusé
+  const spot = { x: coopSpots[0].x, y: coopSpots[0].y };
+  assert.equal((await api('POST', '/play/world/annex', { annex: 'poulailler', ...spot }, player)).data.message, 'Assemblage refusé : il manque des pièces.');
+  assert.equal((await api('POST', '/play/world/annex/assemble', { annex: 'jardin' }, player)).status, 404);
+  const { run } = (await api('POST', '/play/world/annex/assemble', { annex: 'poulailler' }, player)).data;
+  assert.deepEqual([run.annex, run.shape, run.turned, run.pieces.flat().length], ['poulailler', ['xx', 'xx', 'xx', 'xx'], false, 8]);
+  assert.equal((await api('POST', '/play/world/annex', { annex: 'poulailler', ...spot, run: run.id, layout: [{ piece: 0, rot: 0, x: 9, y: 9 }] }, player)).status, 400);
+  const coop = await api('POST', '/play/world/annex', { annex: 'poulailler', ...spot, run: run.id, layout: solveCraft(run) }, player);
   assert.deepEqual([coop.status, coop.data.world.brume.quest.id, coop.data.world.brume.quest.done], [200, 'poulailler', true], JSON.stringify(coop.data));
+  // (un seul poulailler, et un assemblage ne se rend qu'une fois)
+  assert.equal((await api('POST', '/play/world/annex/assemble', { annex: 'poulailler' }, player)).status, 409);
   assert.equal((await claim('poulailler')).status, 200);
   // L'abri d’Agathe : refusé sans de quoi le payer ; payé, son coin devient un abri (une seule fois)
   const [kept] = await sql('SELECT wood, stone FROM world_stock WHERE user_id = $1', [player.userId]);
