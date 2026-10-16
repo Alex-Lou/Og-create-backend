@@ -55,7 +55,7 @@ const { sheltersOf, sheltersView, buildShelter } = require('./world/shelters');
 const { annexSpotOk, annexSpots, annexesView, placeAnnex, startAnnexAssembly, moveAnnex, poseAnnex } = require('./world/annexPlots');
 const { campOfUser, cellsOfCamp } = require('./world/camp');
 const paths = require('./world/paths');
-const { PLAGE, BEACH_BEFORE, placesOf, footprintAt, inSiteAt } = require('./world/places');
+const { PLAGE, BEACH, BEACH_BEFORE, placesOf, footprintAt, inSiteAt } = require('./world/places');
 const { siteSpots, moveSite } = require('./world/moves');
 const gridLevels = require('./levels');
 const stars = require('./world/stars');
@@ -344,7 +344,7 @@ async function layPaths(userId, lay, erase) {
 async function view(userId, owned, book) {
     await migrate(userId);
     // (lectures indépendantes, ensemble : la base est distante, chaque requête coûte un aller-retour)
-    const [{ levels, builtAt }, items, skins, signed, played, friends, named, annexRows, stock, zones, { places }] = await Promise.all([
+    const [{ levels, builtAt }, items, skins, signed, played, friends, named, annexRows, stock, zones, { places, beach }] = await Promise.all([
         levelsOf(userId), itemsOf(userId), skinsOf(userId), signsOf(userId), gamesOf(userId), friendsOf(userId), namesOf(userId),
         annexesOf(userId), stockOf(userId), zonesOf(userId), placesOf(userId)
     ]);
@@ -407,6 +407,10 @@ async function view(userId, owned, book) {
         const open = level && level >= annexes.openLevelOf(id) && zones.has(zone);
         return {
             id, x: place.x, y: place.y, w: place.w, h: place.h, level, maxLevel: site.levels.length, zone,
+            // Le Ponton de Lorena (choix de l'auteur, 16 oct.) : au palier I, sur une île à la plage, le pré-ponton qu'elle
+            // bricole seule avant que Nathan ne l'aide (look ; dessiné pour le relief de sa place, il n'y est que là) ; son
+            // voilier ne paraît qu'avec son souvenir, le Bateau écrit
+            ...(id === 'ponton' ? { ...(beach && level === 1 && atBeachPlace(places.ponton) ? { look: 'preponton' } : {}), boat: have.has(BOAT_ELEMENT) } : {}),
             // (le Ponton du tutoriel, bâti hors de son quartier, n'est pas fermé : le palier II demande La Crique)
             locked: !zones.has(zone) && !(id === 'ponton' && level <= 1),
             // Un chantier dont le personnage n'est pas encore là ne se voit pas (choix de l'auteur, 9 oct. : rien avant
@@ -689,6 +693,10 @@ async function buyZone(userId, zoneId, openChapters) {
 // carnet de quart (dans sa caisse) tient lieu de plan, et son quartier (La Crique, acte IV) n'est pas encore à soi. Les
 // paliers suivants suivent la règle
 const tutorialPonton = (siteId, level) => siteId === 'ponton' && !level;
+// L'élément qui rend son voilier au Ponton : le souvenir de Lorena (la quête « souvenir-aster »)
+const BOAT_ELEMENT = 'Bateau';
+// Le Ponton à sa place de l'île à la plage (pas déplacé)
+const atBeachPlace = p => p.x === BEACH.ponton.x && p.y === BEACH.ponton.y;
 
 // Les chemins tracés dans l'emprise f { x, y, w, h } s'effacent ; leurs pierres (pas celles des cases offertes) reviennent
 async function clearGrown(userId, conn, f) {

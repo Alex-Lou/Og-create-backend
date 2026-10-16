@@ -163,6 +163,33 @@ test.describe('île', () => {
     await api('POST', '/play/world/restart', { confirm: 'RECOMMENCER' }, player);
     assert.deepEqual(await sql('SELECT 1 FROM world_site_places WHERE user_id = $1', [player.userId]), []);
   });
+
+  // Le Ponton de Lorena (choix de l'auteur, 16 oct.) : au palier I d'une île à la plage, le pré-ponton qu'elle bricole
+  // seule avant que Nathan ne l'aide ; son voilier attend son souvenir, le Bateau écrit
+  test('le Ponton : le pré-ponton de Lorena au palier I d’une île à la plage, son voilier avec le Bateau écrit', async () => {
+    const player = await newPlayer({ settled: true });
+    const ponton = async () => (await api('GET', '/play/world', null, player)).data.sites.find(s => s.id === 'ponton');
+    const look = p => [p.level, p.look || null, p.boat];
+    await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'ponton', 1) ON CONFLICT (user_id, site) DO UPDATE SET level = 1`, [player.userId]);
+    assert.deepEqual(look(await ponton()), [1, 'preponton', false]);
+    // (une île d'avant la plage : le Ponton de la carte, sans pré-ponton ; son dessin n'est pas fait pour ce relief)
+    await sql(`DELETE FROM world_items WHERE user_id = $1 AND item = 'ile:plage'`, [player.userId]);
+    assert.deepEqual(look(await ponton()), [1, null, false]);
+    await sql(`INSERT INTO world_items (user_id, item) VALUES ($1, 'ile:plage') ON CONFLICT DO NOTHING`, [player.userId]);
+    // (déplacé : le Ponton de la carte, le pré-ponton est dessiné pour le relief de sa place)
+    await sql(`INSERT INTO world_site_places (user_id, site, x, y) VALUES ($1, 'ponton', 90, 99)`, [player.userId]);
+    assert.deepEqual(look(await ponton()), [1, null, false]);
+    await sql(`DELETE FROM world_site_places WHERE user_id = $1`, [player.userId]);
+    assert.deepEqual(look(await ponton()), [1, 'preponton', false]);
+    // Le vrai Ponton (palier II) ; son voilier, le Bateau écrit
+    await sql(`UPDATE world_buildings SET level = 2 WHERE user_id = $1 AND site = 'ponton'`, [player.userId]);
+    assert.deepEqual(look(await ponton()), [2, null, false]);
+    await sql(`UPDATE progress SET infinite_elements = infinite_elements || '["Bateau"]'::jsonb WHERE user_id = $1`, [player.userId]);
+    assert.deepEqual(look(await ponton()), [2, null, true]);
+    // (avant d'être bâti : ni pré-ponton ni voilier)
+    await sql(`DELETE FROM world_buildings WHERE user_id = $1 AND site = 'ponton'`, [player.userId]);
+    assert.deepEqual(look(await ponton()).slice(0, 2), [0, null]);
+  });
 });
 
 test('le Bosquet, rapproché du Puits (choix de l’auteur, 14 oct.) : bâti là, il y reste ; bâti avant, il garde sa place', () => {

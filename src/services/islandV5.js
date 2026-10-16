@@ -3,8 +3,10 @@
 // par case (légende : islandData.js et islandOuter.js) ; SITES : coin haut-gauche de l'emprise 3 × 3 de chaque bâtiment.
 // (Les SITES, eux, ont été regroupés en campement autour du Feu le 9 oct. — choix de l'auteur : worldMap.SITE_ZONE garde
 // le quartier d'origine de chacun.)
-// (Seule retouche à la main des calques : la butte devant le Feu, cases 101 à 103 × 96 et 97, aplatie en sable le 15 oct.
-// — choix de l'auteur ; test/recipeBook.test.js l'excepte de la v4.)
+// (Retouches à la main des calques : la butte devant le Feu, cases 101 à 103 × 96 et 97, aplatie en sable le 15 oct.
+// — choix de l'auteur ; test/recipeBook.test.js l'excepte de la v4 ; le bout ouest de la plage, à gauche de l'épave :
+// cases 81,98 · 81,99 · 82,99 · 81,100 · 82,100 · 83,100, de la mer passées en sable le 16 oct. — choix de l'auteur : la
+// côte en escalier y coupait la plage à la verticale ; la mer devenue sable, le test l'accepte.)
 
 const HEIGHT = [
     '                             222222222233333                                                                                                    ',
@@ -105,9 +107,9 @@ const HEIGHT = [
     '                          0000000000000000000000000000                        000111111111000000000000001110000                                 ',
     '                    000000000011100000000000000000000                           00001111111111110000000000000                                   ',
     '                   0000000000011100000000000000000000                           0000111111111111000000000000                                    ',
-    '             00000000000000000111110000000000000000                               00001111000000000000000                                       ',
-    '            000000000000000000110000000000000000                                   0000000000                                                   ',
-    '           0000000000000000000110000000000000000                                    00000000                                                    ',
+    '             00000000000000000111110000000000000000                              000001111000000000000000                                       ',
+    '            000000000000000000110000000000000000                                 000000000000                                                   ',
+    '           0000000000000000000110000000000000000                                 00000000000                                                    ',
     '          00000000000000000111110000000000000                                                                                                   ',
     '         000000000000000110110000000000000000                                                                                                   ',
     '         000000000000000110110000000000000000                                                                                                   ',
@@ -252,9 +254,9 @@ const GROUND = [
     '~~~~~~~~~~~~~~~~~~~~~~~~~~ssssxxxxxxxxxppxxxxxxxxxxxxx~~~~~~~~~~~~~~~~~~~~~~~~sswggmmmmgggmmmggtggggggssgggssss~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
     '~~~~~~~~~~~~~~~~~~~~ssssssssssdddxxxxxxppxxxxxxxxxxxx~~~~~~~~~~~~~~~~~~~~~~~~~~~wsssmmmgggmmmgggsssssssssssss~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
     '~~~~~~~~~~~~~~~~~~~sssssssssssdddxxxxxxppxxxxxxxxxxxx~~~~~~~~~~~~~~~~~~~~~~~~~~~wsssmmmgggmmmgggssssssssssss~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
-    '~~~~~~~~~~~~~sssssssssssssssssdddddxwwwppxxxxxxxxxx~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ssssggggsssssssssssssss~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
-    '~~~~~~~~~~~~sssssssssssssssssddddsssssxppwxxxxxx~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ssssssssss~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
-    '~~~~~~~~~~~ssssssssssssssssssddddsssssxppwxxxxxx~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ssssssss~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
+    '~~~~~~~~~~~~~sssssssssssssssssdddddxwwwppxxxxxxxxxx~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~sssssggggsssssssssssssss~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
+    '~~~~~~~~~~~~sssssssssssssssssddddsssssxppwxxxxxx~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ssssssssssss~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
+    '~~~~~~~~~~~ssssssssssssssssssddddsssssxppwxxxxxx~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~sssssssssss~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
     '~~~~~~~~~~sssssssssssssssssssdppppppppppppppw~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
     '~~~~~~~~~sssssssssssssssssssssppssssssssssppp~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
     '~~~~~~~~~sssssssssssssssssssssppssssssssssppp~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
@@ -399,9 +401,9 @@ const REGION = [
     '..........................ssssqqqqqqqqqqqqqqqqqqqqqqqq........................aaaaaaaaaaaaaaaaaaaaaaaaaaajjjjjj.................................',
     '....................sssssssssssssqqqqqqqqqqqqqqqqqqqq...........................aaaaaaaaaaaaaaaaaaaaaaaaajjjj...................................',
     '...................ssssssssssssssqqqqqqqqqqqqqqqqqqqq...........................aaaaaaaaaaaaaaaaaaaaaaaaajjj....................................',
-    '.............ssssssssssssssssssssssqqqqqqqqqqqqqqqq...............................aaaaaaaaaaaaaaaaaaaaaaa.......................................',
-    '............ssssssssssssssssssssssssssqqqqqqqqqq...................................aaaaaaaaaa...................................................',
-    '...........sssssssssssssssssssssssssssqqqqqqqqqq....................................aaaaaaaa....................................................',
+    '.............ssssssssssssssssssssssqqqqqqqqqqqqqqqq..............................aaaaaaaaaaaaaaaaaaaaaaaa.......................................',
+    '............ssssssssssssssssssssssssssqqqqqqqqqq.................................aaaaaaaaaaaa...................................................',
+    '...........sssssssssssssssssssssssssssqqqqqqqqqq.................................aaaaaaaaaaa....................................................',
     '..........ssssssssssssssssssssssssssssssssssq...................................................................................................',
     '.........ssssssssssssssssssssssssssssssssssss...................................................................................................',
     '.........ssssssssssssssssssssssssssssssssssss...................................................................................................',
