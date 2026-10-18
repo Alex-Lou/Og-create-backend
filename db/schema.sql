@@ -405,7 +405,8 @@ CREATE TABLE IF NOT EXISTS world_friends (
     gifted_on DATE,
     PRIMARY KEY (user_id, villager)
 );
--- Visiteurs (services/visitors.js) : graine (allure, prénom), métier (bâtiment), demande, séjour, comblé ou non
+-- Visiteurs (services/visitors.js) : graine (allure, prénom), métier (bâtiment), demande, séjour, comblé ou non ; puis
+-- les arrivants, plus bas
 CREATE TABLE IF NOT EXISTS world_visitors (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -419,6 +420,18 @@ CREATE TABLE IF NOT EXISTS world_visitors (
 CREATE INDEX IF NOT EXISTS idx_world_visitors_user ON world_visitors (user_id, arrived_at);
 -- Lot 7d-2 : visiteur comblé resté sur l'île, dans une maison du Foyer (il devient habitant)
 ALTER TABLE world_visitors ADD COLUMN IF NOT EXISTS settled_at TIMESTAMPTZ;
+-- Les arrivants (choix de l'auteur, 18 oct. : ils remplacent les visiteurs de passage ; services/visitors.js) : le moment
+-- du récit qui l'a fait venir (ponton, maison, peuple, tour ; null : un visiteur d'avant), le prénom et l'allure choisis à
+-- l'accueil (null : ceux de sa graine). Un arrivant n'a ni demande ni départ, et choisit son métier à l'accueil.
+-- Ajouts seuls : les visiteurs d'avant gardent tout.
+ALTER TABLE world_visitors ADD COLUMN IF NOT EXISTS moment VARCHAR(20);
+ALTER TABLE world_visitors ADD COLUMN IF NOT EXISTS name VARCHAR(24);
+ALTER TABLE world_visitors ADD COLUMN IF NOT EXISTS look JSONB;
+ALTER TABLE world_visitors ALTER COLUMN site DROP NOT NULL;
+ALTER TABLE world_visitors ALTER COLUMN request DROP NOT NULL;
+ALTER TABLE world_visitors ALTER COLUMN leaves_at DROP NOT NULL;
+-- (un seul arrivant par moment : deux vues en même temps n'en font pas venir deux)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_world_visitors_moment ON world_visitors (user_id, moment) WHERE moment IS NOT NULL;
 -- Places des bâtiments déplacés par le joueur (services/world/places.js) : coin haut-gauche de la grande emprise
 -- (3 × 3) ; sans ligne, la place de la carte (ou celle de l'île à la plage). Ajout seul (9 oct.) : rien n'est effacé.
 CREATE TABLE IF NOT EXISTS world_site_places (

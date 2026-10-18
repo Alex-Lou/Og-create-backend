@@ -1,5 +1,5 @@
-// Les habitants : qui est là (présence, rencontre), humeurs et besoins, visiteurs ; amitié, besoins comblés, visiteurs
-// satisfaits et installés. Extrait de services/world.js (lot santé), sans changement.
+// Les habitants : qui est là (présence, rencontre), humeurs et besoins, les arrivants ; amitié, besoins comblés,
+// arrivants accueillis. Extrait de services/world.js (lot santé) ; les arrivants remplacent les visiteurs (18 oct.).
 const crypto = require('crypto');
 const db = require('../../config/db');
 const ledger = require('../ledger');
@@ -11,8 +11,10 @@ const visitors = require('../visitors');
 const anya = require('../anya');
 const { RESOURCES, WORDS, SITES } = require('./rules');
 const {
-    needRowsOf, settlersOf, levelsOf, stockOf, zonesOf, claimedOf, craftsOf, placedOf, balanceOf, PLAYED
+    needRowsOf, settlersOf, levelsOf, stockOf, zonesOf, claimedOf, craftsOf, placedOf, balanceOf, namesOf
 } = require('./reads');
+const { cleanName } = require('../naming');
+const { cleanChoices } = require('../avatarChoices');
 const { migrate } = require('./migrate');
 const { grant } = require('./chests');
 // Encaisser avant un changement d'humeur (produce.js, qui lit déjà ce module : chargé seulement à l'appel)
@@ -74,12 +76,14 @@ async function arrivalsOf(userId, conn = db) {
     return out;
 }
 // Habitants de l'île : la troupe rencontrée (built : son bâtiment est bâti, dans un quartier à soi), puis les
-// visiteurs installés, qui travaillent au bâtiment de leur métier : [{ id, name, role, loves, likes, site, built, seed? }]
+// arrivants accueillis (et les visiteurs installés d'avant), qui travaillent au bâtiment de leur métier :
+// [{ id, name, role, loves, likes, site, built, seed?, look? }] (look : ses choix d'allure, ou null : celle de sa graine)
 function residentsOf(levels, zones, settlers, presence) {
     const base = Object.entries(villagers.VILLAGERS).filter(([id]) => metOf(id, levels, zones, presence))
         .map(([id, v]) => ({ id, name: v.name, role: v.role, loves: v.loves, likes: v.likes, site: id, built: livesHere(id, levels, zones) }));
     const settled = settlers.map(row => ({
-        id: `v${row.id}`, name: visitors.nameOf(row.seed), role: visitors.ROLES[row.site].role, ...visitors.tastesOf(row.site), site: row.site, built: true, seed: row.seed
+        id: `v${row.id}`, name: row.name || visitors.nameOf(row.seed), role: visitors.ROLES[row.site].role, ...visitors.tastesOf(row.site), site: row.site,
+        built: true, seed: row.seed, look: row.look || null
     }));
     return [...base, ...settled];
 }
@@ -180,43 +184,44 @@ function sameSteps(a, b) {
         return Object.keys({ ...pa, ...pb }).every(site => (pa[site] || 0) === (pb[site] || 0));
     });
 }
-// Récoltes terminées depuis une date, en jouant au moins un coup (demande d'un visiteur)
-async function runsSince(userId, since, conn = db) {
-    const { rows } = await conn.query(`SELECT COUNT(*)::int AS n FROM world_runs WHERE user_id = $1 AND finished_at >= $2 AND ${PLAYED}`, [userId, since]);
-    return rows[0].n;
-}
-// Visiteur du moment : celui qui est là, ou un nouveau qui débarque (Ponton bâti, quelques heures après le dernier
-// départ). L'arrivée se décide dans une transaction verrouillée : deux vues en même temps n'en font pas venir deux.
-// Ligne de world_visitors, ou null
-async function visitorNow(userId, now = Date.now()) {
-    const lastOf = async conn => (await conn.query('SELECT * FROM world_visitors WHERE user_id = $1 ORDER BY arrived_at DESC LIMIT 1', [userId])).rows[0];
-    const here = row => row && !row.settled_at && now < new Date(row.leaves_at).getTime();
-    const seen = await lastOf(db);
-    if (here(seen)) return seen;
+// L'arrivant du moment : celui qui attend au Ponton, ou celui qu'un moment du récit fait venir (visitors.js : momentsOf ;
+// le Ponton bâti, dans un quartier à soi). Il vient dans une transaction verrouillée : deux vues en même temps n'en font
+// pas venir deux (et l'index idx_world_visitors_moment n'en garde qu'un par moment). Ligne de world_visitors, ou null
+async function arrivalNow(userId, now = Date.now()) {
+    const waitingOf = async conn => (await conn.query(
+        'SELECT * FROM world_visitors WHERE user_id = $1 AND moment IS NOT NULL AND settled_at IS NULL ORDER BY arrived_at LIMIT 1', [userId])).rows[0];
+    // Le prochain moment à faire venir, ou null
+    const dueOf = async conn => {
+        const [{ levels }, zones, names, rows] = await Promise.all([levelsOf(userId, conn), zonesOf(userId, conn), namesOf(userId, conn),
+            conn.query('SELECT moment FROM world_visitors WHERE user_id = $1 AND (moment IS NOT NULL OR settled_at IS NOT NULL)', [userId])]);
+        if (!livesHere('ponton', levels, zones)) return null;
+        const had = new Set(rows.rows.filter(r => r.moment).map(r => r.moment));
+        const legacy = rows.rows.filter(r => !r.moment).length;
+        return visitors.nextMoment(visitors.momentsOf({ levels, named: names.peuple }), had, legacy);
+    };
+    const seen = await waitingOf(db);
+    if (seen) return seen;
+    if (!(await dueOf(db))) return null;
     return db.transaction(async conn => {
         await stockOf(userId, conn, true);
-        const last = await lastOf(conn);
-        if (here(last)) return last;
-        const { levels } = await levelsOf(userId, conn);
-        const zones = await zonesOf(userId, conn);
-        if (!livesHere('ponton', levels, zones)) return null;
-        const gone = last && new Date(last.settled_at || last.leaves_at).getTime();
-        if (last && now < gone + visitors.GAP_HOURS * visitors.HOUR_MS) return null;
-        const seed = crypto.randomInt(1, 2147483647);
-        const v = visitors.visitorOf(seed, Object.keys(visitors.ROLES).filter(id => livesHere(id, levels, zones)), levels.ponton);
+        const waiting = await waitingOf(conn);
+        if (waiting) return waiting;
+        const moment = await dueOf(conn);
+        if (!moment) return null;
         const { rows } = await conn.query(
-            'INSERT INTO world_visitors (user_id, seed, site, request, arrived_at, leaves_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-            [userId, seed, v.site, JSON.stringify(v.request), new Date(now), new Date(now + v.days * 24 * visitors.HOUR_MS)]);
-        return rows[0];
+            `INSERT INTO world_visitors (user_id, seed, moment, arrived_at) VALUES ($1, $2, $3, $4)
+             ON CONFLICT (user_id, moment) WHERE moment IS NOT NULL DO NOTHING RETURNING *`,
+            [userId, crypto.randomInt(1, 2147483647), moment, new Date(now)]);
+        return rows[0] || null;
     });
 }
-// Ce que la vue montre d'un visiteur : prénom, métier, demande (et où elle en est), départ, comblé
-function visitorView(row, runs, now = Date.now()) {
+// Ce que la vue montre de l'arrivant qui attend : son moment, sa graine (l'allure que le jeu lui tire), un prénom
+// proposé, et les métiers qu'il peut prendre (les bâtiments bâtis, dans un quartier à soi) ; ou null
+function arrivalView(row, levels, zones) {
     if (!row) return null;
-    const request = row.request.kind === 'recolter' ? { ...row.request, have: Math.min(row.request.count, runs) } : row.request;
     return {
-        id: Number(row.id), seed: row.seed, name: visitors.nameOf(row.seed), site: row.site, role: visitors.ROLES[row.site].role,
-        request, leavesIn: Math.max(0, new Date(row.leaves_at).getTime() - now), satisfied: Boolean(row.satisfied_at)
+        id: Number(row.id), moment: row.moment, seed: row.seed, name: visitors.nameOf(row.seed), nameMax: visitors.NAME_MAX,
+        roles: Object.entries(visitors.ROLES).filter(([site]) => livesHere(site, levels, zones)).map(([site, r]) => ({ site, role: r.role }))
     };
 }
 
@@ -343,35 +348,6 @@ async function fillNeeds(userId, targets = null, now = Date.now()) {
     });
 }
 
-// Combler la demande du visiteur : livrer les ressources (prises au stock) ou avoir fait ses Récoltes depuis son
-// arrivée ; il remercie en écus, une seule fois. { reward, coins } ou { status, message }
-async function satisfyVisitor(userId, visitorId, now = Date.now()) {
-    await migrate(userId);
-    return db.transaction(async conn => {
-        const stock = await stockOf(userId, conn, true);
-        const { rows } = await conn.query('SELECT * FROM world_visitors WHERE id = $1 AND user_id = $2 FOR UPDATE', [visitorId, userId]);
-        const row = rows[0];
-        if (!row || now >= new Date(row.leaves_at).getTime()) return db.rollback({ status: 404, message: T.VISITOR_GONE });
-        const name = visitors.nameOf(row.seed);
-        if (row.satisfied_at) return db.rollback({ status: 409, message: T.VISITOR_SATISFIED(name) });
-        const r = row.request;
-        if (r.kind === 'livrer') {
-            if (!RESOURCES.includes(r.resource)) return db.rollback({ status: 400, message: T.REQUEST_INVALID });
-            // Ce qui attend dans les bâtiments est encaissé d'abord : cela compte pour la livraison
-            const { stock: paid } = await payWith(userId, conn, stock);
-            if (paid[r.resource] < r.amount) return db.rollback({ status: 400, message: T.VISITOR_COST(r.amount, WORDS[r.resource][0]) });
-            // r.resource est l'une des quatre colonnes du stock (vérifié ci-dessus)
-            await conn.query(`UPDATE world_stock SET ${r.resource} = ${r.resource} - $2 WHERE user_id = $1`, [userId, r.amount]);
-        } else {
-            const left = r.count - await runsSince(userId, row.arrived_at, conn);
-            if (left > 0) return db.rollback({ status: 403, message: T.HARVESTS_LEFT(left, name) });
-        }
-        await conn.query('UPDATE world_visitors SET satisfied_at = $2 WHERE id = $1', [visitorId, new Date(now)]);
-        const { coins } = await ledger.credit(userId, r.reward, 'visiteur', String(visitorId), conn);
-        return { reward: r.reward, coins };
-    });
-}
-
 // Maisons du Foyer posées et occupées : { total, used }
 async function housesOf(userId, conn) {
     const { rows } = await conn.query(
@@ -379,28 +355,37 @@ async function housesOf(userId, conn) {
                 (SELECT COUNT(*)::int FROM world_visitors WHERE user_id = $1 AND settled_at IS NOT NULL) AS used`, [userId]);
     return rows[0];
 }
-// Un visiteur comblé reste sur l'île : il prend une maison libre et devient habitant (pour toujours).
-// { settled: prénom } ou { status, message }
-async function settleVisitor(userId, visitorId, now = Date.now()) {
+// Accueillir l'arrivant qui attend au Ponton : son métier (un bâtiment bâti, dans un quartier à soi), son prénom (mêmes
+// règles que les autres noms, NAME_MAX), son allure (ses choix, vérifiés comme ceux de l'avatar, sans rien de gagné à
+// la boutique ni aux coffres : avatarChoices.js) ; il prend une maison libre et devient habitant (pour toujours).
+// { settled: prénom, coins? } ou { status, message }
+async function welcomeArrival(userId, arrivalId, { site, name, look } = {}, now = Date.now()) {
     await migrate(userId);
+    const named = cleanName(name, visitors.NAME_MAX);
+    if (!named) return { status: 400, message: T.ARRIVAL_NAME };
+    const chosen = cleanChoices(look);
+    if (chosen.status) return chosen;
+    if (typeof site !== 'string' || !Object.hasOwn(visitors.ROLES, site)) return { status: 400, message: T.ARRIVAL_SITE };
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
-        const { rows } = await conn.query('SELECT * FROM world_visitors WHERE id = $1 AND user_id = $2 FOR UPDATE', [visitorId, userId]);
+        const { rows } = await conn.query('SELECT * FROM world_visitors WHERE id = $1 AND user_id = $2 AND moment IS NOT NULL FOR UPDATE', [arrivalId, userId]);
         const row = rows[0];
-        if (!row || row.settled_at || now >= new Date(row.leaves_at).getTime()) return db.rollback({ status: 404, message: T.VISITOR_GONE });
-        const name = visitors.nameOf(row.seed);
-        if (!row.satisfied_at) return db.rollback({ status: 403, message: T.SATISFY_FIRST(name) });
+        if (!row || row.settled_at) return db.rollback({ status: 404, message: T.ARRIVAL_GONE });
+        const [{ levels }, zones] = await Promise.all([levelsOf(userId, conn), zonesOf(userId, conn)]);
+        if (!livesHere(site, levels, zones)) return db.rollback({ status: 403, message: T.ARRIVAL_SITE });
         const houses = await housesOf(userId, conn);
         if (houses.used >= houses.total) return db.rollback({ status: 409, message: T.NO_FREE_HOUSE });
         // Son humeur ne compte qu'à partir d'aujourd'hui : ce qui a été produit avant est encaissé d'abord
-        const coins = await gatherBefore(userId, conn, stock, island => ({ ...island, settlers: [...island.settlers, row] }));
-        await conn.query('UPDATE world_visitors SET settled_at = $2 WHERE id = $1', [visitorId, new Date(now)]);
-        return { settled: name, ...(coins !== undefined ? { coins } : {}) };
+        const settler = { ...row, site, name: named, look: chosen.choices };
+        const coins = await gatherBefore(userId, conn, stock, island => ({ ...island, settlers: [...island.settlers, settler] }));
+        await conn.query('UPDATE world_visitors SET site = $2, name = $3, look = $4, settled_at = $5 WHERE id = $1',
+            [arrivalId, site, named, JSON.stringify(chosen.choices), new Date(now)]);
+        return { settled: named, ...(coins !== undefined ? { coins } : {}) };
     });
 }
 
 module.exports = {
     livesHere, decosNear, SETTLER_ID, knownResident, SLEEPERS, metOf, presenceOf, arrivalsOf, WAKE_PREFIX, residentsOf, hungryOf, HUNGRY_AGO,
-    moodsOf, withMoods, withLandmarks, withBlights, moodTimes, prodSteps, sameSteps, runsSince, visitorNow, visitorView,
-    friendRewards, befriend, fillNeeds, satisfyVisitor, housesOf, settleVisitor
+    moodsOf, withMoods, withLandmarks, withBlights, moodTimes, prodSteps, sameSteps, arrivalNow, arrivalView,
+    friendRewards, befriend, fillNeeds, housesOf, welcomeArrival
 };

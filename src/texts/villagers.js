@@ -18,17 +18,13 @@ const NEED_COST = parts => `Il te faut ${parts.join(' et ')}.`;
 const NEEDS_SHORT = 'Il te manque des ressources pour combler leurs besoins : joue une Récolte.';
 const NOBODY_NEEDS = 'Personne n’a besoin de rien pour l’instant.';
 
-// Visiteurs
-const VISITOR_GONE = 'Ce visiteur est déjà reparti.';
-const VISITOR_SATISFIED = name => `${name} a déjà ce qu’il lui faut. Merci encore !`;
-const REQUEST_INVALID = 'Demande invalide.';
-const VISITOR_COST = (count, resource) => `Il te faut ${count} ${resource}.`;
-const HARVESTS_LEFT = (left, name) => `Encore ${left} Récolte${left > 1 ? 's' : ''} à faire pour ${name}.`;
-const SATISFY_FIRST = name => `Comble d’abord la demande de ${name}.`;
+// Arrivants
+const ARRIVAL_GONE = 'Personne n’attend au Ponton.';
+const ARRIVAL_NAME = 'Choisis-lui un prénom : des lettres, de 2 à 16.';
+const ARRIVAL_SITE = 'Il ne peut travailler qu’à un bâtiment déjà bâti.';
 const NO_FREE_HOUSE = 'Aucune maison libre : pose une Maison près du Foyer (annexes du Foyer).';
 
 module.exports = {
     VILLAGER_UNKNOWN, NOT_HERE_YET, GIFT_INVALID, ALREADY_TALKED, ALREADY_GIFTED, GIFT_COST, NEED_UNKNOWN, WORKSHOP_FIRST,
-    NO_NEED_YET, NEED_COST, NEEDS_SHORT, NOBODY_NEEDS, VISITOR_GONE, VISITOR_SATISFIED, REQUEST_INVALID, VISITOR_COST,
-    HARVESTS_LEFT, SATISFY_FIRST, NO_FREE_HOUSE
+    NO_NEED_YET, NEED_COST, NEEDS_SHORT, NOBODY_NEEDS, ARRIVAL_GONE, ARRIVAL_NAME, ARRIVAL_SITE, NO_FREE_HOUSE
 };

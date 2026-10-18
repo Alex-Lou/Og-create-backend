@@ -61,20 +61,26 @@ test('besoins : manger tient 24 h et se renouvelle à mi-chemin ; travailler vie
   assert.equal(v.moodEffect('potager', true, 'content'), null);
 });
 
-test('visiteurs : un métier parmi les bâtiments de l’île, 1 à 3 jours, une demande à la mesure du Ponton', () => {
+test('arrivants : quatre moments du récit, dans l’ordre ; un seul par moment ; les visiteurs d’avant tiennent les premiers', () => {
   const vis = require('../src/services/visitors');
-  const kinds = new Set();
-  for (let seed = 1; seed <= 300; seed++) {
-    const v = vis.visitorOf(seed, ['foyer', 'ponton'], 3);
-    assert.ok(['foyer', 'ponton'].includes(v.site));
-    assert.equal(v.role, vis.ROLES[v.site].role);
-    assert.ok(v.days >= 1 && v.days <= 3);
-    assert.equal(v.request.reward, 75);
-    if (v.request.kind === 'livrer') assert.deepEqual([v.request.resource, v.request.amount], [vis.ROLES[v.site].wants, 40]);
-    else assert.ok(vis.RUNS.includes(v.request.count));
-    kinds.add(v.request.kind);
-    assert.ok(vis.NAMES.includes(vis.nameOf(seed)));
-  }
-  assert.deepEqual([...kinds].sort(), ['livrer', 'recolter']);
-  assert.deepEqual(vis.visitorOf(42, ['foyer'], 1), vis.visitorOf(42, ['foyer'], 1));
+  const reached = levels => vis.momentsOf({ levels, named: false });
+  assert.deepEqual(reached({}), []);
+  assert.deepEqual(reached({ ponton: 1, foyer: 2 }), []);
+  assert.deepEqual(reached({ ponton: 2 }), ['ponton']);
+  assert.deepEqual(reached({ ponton: 2, foyer: 3 }), ['ponton', 'maison']);
+  assert.deepEqual(vis.momentsOf({ levels: { ponton: 2, foyer: 5 }, named: true }), ['ponton', 'maison', 'peuple', 'tour']);
+  const all = vis.MOMENTS;
+  // le premier moment pas encore venu ; aucun quand tous le sont
+  assert.equal(vis.nextMoment(all, new Set(), 0), 'ponton');
+  assert.equal(vis.nextMoment(all, new Set(['ponton', 'maison']), 0), 'peuple');
+  assert.equal(vis.nextMoment(all, new Set(all), 0), null);
+  assert.equal(vis.nextMoment(['ponton'], new Set(['ponton']), 0), null);
+  // deux visiteurs installés d'avant : les deux premiers moments sont à eux
+  assert.equal(vis.nextMoment(['ponton', 'maison'], new Set(), 2), null);
+  assert.equal(vis.nextMoment(all, new Set(), 2), 'peuple');
+  assert.equal(vis.nextMoment(all, new Set(), 4), null);
+  // un prénom proposé, toujours le même pour une graine ; le métier de chaque bâtiment, et ses goûts
+  for (let seed = 1; seed <= 100; seed++) assert.ok(vis.NAMES.includes(vis.nameOf(seed)));
+  assert.equal(vis.nameOf(42), vis.nameOf(42));
+  assert.deepEqual(vis.tastesOf('potager'), { loves: 'water', likes: 'food' });
 });

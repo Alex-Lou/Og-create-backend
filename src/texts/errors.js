@@ -52,7 +52,7 @@ const INVALID = {
     gift: 'Cadeau invalide',
     need: 'Besoin invalide',
     beast: 'Bête invalide',
-    visitor: 'Visiteur invalide',
+    arrival: 'Arrivant invalide',
     chest: 'Coffre invalide',
     quest: 'Quête invalide'
 };

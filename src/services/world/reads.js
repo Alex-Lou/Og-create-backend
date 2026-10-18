@@ -48,9 +48,10 @@ async function needRowsOf(userId, conn = db) {
     for (const r of rows) (out[r.villager] = out[r.villager] || {})[r.need] = r.filled_at;
     return out;
 }
-// Visiteurs installés (lot 7d), dans l'ordre où ils sont restés : [{ id, seed, site, settled_at }]
+// Habitants venus d'ailleurs (les arrivants accueillis, et les visiteurs installés du lot 7d), dans l'ordre où ils sont
+// restés : [{ id, seed, site, name, look, settled_at }] (name et look : null pour un visiteur d'avant)
 async function settlersOf(userId, conn = db) {
-    const { rows } = await conn.query('SELECT id, seed, site, settled_at FROM world_visitors WHERE user_id = $1 AND settled_at IS NOT NULL ORDER BY settled_at, id', [userId]);
+    const { rows } = await conn.query('SELECT id, seed, site, name, look, settled_at FROM world_visitors WHERE user_id = $1 AND settled_at IS NOT NULL ORDER BY settled_at, id', [userId]);
     return rows;
 }
 // Mini-jeux : réserve de parties de chaque jeu ({ jeu: { plays, plays_at } } ; absent : réserve pleine)

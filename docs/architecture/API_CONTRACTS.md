@@ -258,7 +258,7 @@ Toutes les routes passent par `withAccount` (401 `NO_PLAYER`, 402 `ACCOUNT`) et 
 Coordonnées : entiers de 0 à 143 (`W:202`, `S/worldMap.js:8`).
 
 **Clés de la vue** (`S/world.js:381-528`) :
-`size`, `map{ key, grid, height, ground, region, coreLeft, zones }`, `landmarks`, `finds`, `deposits`, `pickups`, `expedition`, `sites`, `stock`, `charges`, `harvest`, `rates`, `capHours`, `pending`, `pendingStock`, `roads`, `crafts`, `villagers`, `houses`, `friendship`, `visitor`, `needs`, `stages`, `games`, `signs`, `annexes`, `camp`, `people`, `player`, `avatar`, `brume`, `brumeSavoir`, `chests`, `heliane`, `anya`, `nights`, `beasts`.
+`size`, `map{ key, grid, height, ground, region, coreLeft, zones }`, `landmarks`, `finds`, `deposits`, `pickups`, `expedition`, `sites`, `stock`, `charges`, `harvest`, `rates`, `capHours`, `pending`, `pendingStock`, `roads`, `crafts`, `villagers`, `houses`, `friendship`, `arrival`, `needs`, `stages`, `games`, `signs`, `annexes`, `camp`, `people`, `player`, `avatar`, `brume`, `brumeSavoir`, `chests`, `heliane`, `anya`, `nights`, `beasts`.
 `GET /world` y ajoute `refund{ count, coins, balance }` une seule fois (`W:52`, `S/world.js:745-757`).
 
 | Route (POST sauf mention) | `W` | Corps (validation de la route) | Réponse | Erreurs | Front |
@@ -305,8 +305,7 @@ Coordonnées : entiers de 0 à 143 (`W:202`, `S/worldMap.js:8`).
 | `/world/beast/feed` | 434 | `beast` /^[a-z-]{1,20}$/ | `{ beast, collected, coins?, world }` | 400, 403, 404, 409 | `WV/folk.js:434,452` |
 | `/world/beasts/collect` | 442 | — | `{ food, world }` | — | `WV/folk.js:468` |
 | `/world/beasts/cage` | 447 | — | `{ hens, world }` | 403, 409 | `WV/folk.js:136` |
-| `/world/visitor` | 453 | `id` entier sûr > 0 | `{ reward, coins, world }` | 400, 403, 404, 409 | `WV/folk.js:186` |
-| `/world/visitor/settle` | 461 | `id` | `{ settled, coins?, world }` | 400, 403, 404, 409 | `WV/folk.js:204` |
+| `/world/arrival` | 544 | `id` entier sûr > 0 ; `site` (un bâtiment bâti) ; `name` (prénom, 2 à 16) ; `look` (choix de l'avatar, rien de gagné) | `{ settled, coins?, world }` | 400, 403, 404, 409 | (à venir : l'accueil) |
 | `/world/chest` | 470 | `source` /^(jour\|bouteille\|chapitre:[IVX]{1,4}\|quete:[a-z0-9-]{1,30}\|lieu:[a-z]{1,20})$/ | `{ chest, coins, world }` | 400, 403, 404, 409 | `WV/chests.js:46` |
 | `/world/chests/all` | 479 | — | `{ chests, coins, world }` | 409 | `WV/chests.js:67` |
 | `GET /world/brume` | 486 | — | `{ quest, done, total, acts, rested, people, anya, tutorial, skipped }` (`S/world.js:181-185`, `S/quests.js:278`) | 401, 402 | `App/story.js:323`, `App/account.js:79`, `App/achievements.js:51` |
