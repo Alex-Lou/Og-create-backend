@@ -9,9 +9,10 @@ const crafts = require('../../services/crafts');
 const bookTries = require('../../services/bookTries');
 const villagers = require('../../services/villagers');
 const anya = require('../../services/anya');
+const animals = require('../../services/animals');
 const { PAGE, playLimiter, withAccount } = require('./shared');
 const { INVALID } = require('../../texts/errors');
-const { RESTART_CONFIRM } = require('../../texts/world');
+const { RESTART_CONFIRM, ANIMAL_UNKNOWN } = require('../../texts/world');
 const { SAVOIR_LOCKED, SAVOIR_GIVEN } = require('../../texts/brume');
 
 const router = express.Router();
@@ -591,6 +592,15 @@ router.post('/world/scene', withAccount(async (req, res, owner) => {
     if (!/^[a-z]{1,20}$/.test(id)) return res.status(400).json({ message: INVALID.scene });
     const done = await world.seeScene(owner.id, id);
     if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json(done);
+}));
+
+// Un animal rencontré sur l'île (le premier toucher), retenu au Bestiaire du compte → { animal, at, new }
+router.post('/world/animal', withAccount(async (req, res, owner) => {
+    const id = String(req.body.id || '');
+    if (!/^[a-z-]{1,20}$/.test(id)) return res.status(400).json({ message: INVALID.animal });
+    const done = await animals.meetAnimal(owner.id, id);
+    if (done.status) return res.status(done.status).json({ message: ANIMAL_UNKNOWN });
     res.json(done);
 }));
 
