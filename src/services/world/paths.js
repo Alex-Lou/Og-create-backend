@@ -15,6 +15,14 @@ const T = require('../../texts/paths');
 
 const MARK = 'ile:sentiers';
 const PREFIX = 'chemin:';
+// Le pavé (choix de l'auteur, 16 oct.) : une case de chemin (tracée, du sentier, d'un parvis ou de la carte, pas un gué)
+// se pave une fois la Carrière bâtie, PAVE_STONE pierres la case, rendues quand on la dépave, qu'on l'efface ou qu'un
+// bâtiment qui grandit la recouvre (world.js : clearGrown). Une ligne de world_items « pave:x:y » (source 'pave') ; une
+// case qui n'est plus un chemin ne compte plus pour pavée
+const PAVE_PREFIX = 'pave:';
+const PAVE_STONE = 3;
+const PAVE_SITE = 'carriere';
+const paveOpen = levels => (levels[PAVE_SITE] || 0) >= 1;
 const FREE = 12;
 // Ce qu'un tracé peut faire d'un coup (cases posées, cases effacées)
 const MAX_CELLS = 80;
@@ -65,6 +73,14 @@ async function laidOf(userId, conn) {
         return { x, y, free: r.source === 'offert' };
     }).sort((a, b) => a.y - b.y || a.x - b.x);
 }
+// Les cases pavées d'un joueur (toutes, chemin ou non) : [{ x, y }]
+async function pavedOf(userId, conn) {
+    const { rows } = await conn.query('SELECT item FROM world_items WHERE user_id = $1 AND item LIKE $2', [userId, `${PAVE_PREFIX}%`]);
+    return rows.map(r => {
+        const [x, y] = r.item.slice(PAVE_PREFIX.length).split(':').map(Number);
+        return { x, y };
+    }).sort((a, b) => a.y - b.y || a.x - b.x);
+}
 // L'île part-elle de ses seuls sentiers ?
 // { fresh, beach } : l'île part de ses seuls sentiers ; son Feu brûle sur la plage
 async function newRoadsOf(userId, conn) {
@@ -99,27 +115,33 @@ function groundRows(fresh, laid, beach = false, parvis = []) {
     for (const c of parvis) rows[c.y][c.x] = 'p';
     return rows.map(row => row.join(''));
 }
-// Les chemins d'un joueur, lus une fois : { fresh, laid, rows, added, ground(x, y), key } (key : ce qui décide du sol)
+// Les chemins d'un joueur, lus une fois : { fresh, laid, paved, rows, added, ground(x, y), key } (key : ce qui décide du
+// sol)
 async function roadsOf(userId, conn) {
     const { fresh, beach } = await newRoadsOf(userId, conn);
-    const [laid, { places }, built] = await Promise.all([
+    const [laid, { places }, built, pavedAll] = await Promise.all([
         laidOf(userId, conn), placesOf(userId, conn),
-        conn.query('SELECT site, level FROM world_buildings WHERE user_id = $1 AND level > 0', [userId])
+        conn.query('SELECT site, level FROM world_buildings WHERE user_id = $1 AND level > 0', [userId]),
+        pavedOf(userId, conn)
     ]);
     const levels = Object.fromEntries(built.rows.map(r => [r.site, r.level]));
     const bare = groundRows(fresh, laid, beach);
     const parvis = parvisOf(places, levels, (x, y) => bare[y]?.[x]);
     const rows = groundRows(fresh, laid, beach, parvis);
     const drawn = [...laid, ...parvis];
-    const sum = drawn.length ? crypto.createHash('sha1').update(drawn.map(c => `${c.x},${c.y}`).join(';')).digest('hex').slice(0, 10) : '';
+    // (le pavé ne compte que sur un chemin : ni gué, ni case redevenue herbe)
+    const paved = pavedAll.filter(c => rows[c.y]?.[c.x] === 'p');
+    // (la clé change avec le pavé aussi : le jeu repeint ces cases)
+    const marks = [...drawn.map(c => `${c.x},${c.y}`), ...paved.map(c => `P${c.x},${c.y}`)];
+    const sum = marks.length ? crypto.createHash('sha1').update(marks.join(';')).digest('hex').slice(0, 10) : '';
     // Les cases de chemin en plus de la carte (le sentier d'une île neuve, les cases tracées, les parvis) : ni annexe ni
     // camp dessus
     const added = new Set();
     for (const c of fresh ? [...(beach ? SENTIER_BEACH : SENTIER), ...drawn] : drawn) if (!isPath(map.groundAt(c.x, c.y))) added.add(c.y * SIZE + c.x);
     return {
-        fresh, laid, rows, added,
+        fresh, laid, paved, rows, added,
         ground: (x, y) => (Number.isInteger(x) && Number.isInteger(y) ? rows[y]?.[x] : undefined),
-        key: `${fresh ? (beach ? 'b' : 'n') : 'v'}${drawn.length}${sum}`
+        key: `${fresh ? (beach ? 'b' : 'n') : 'v'}${drawn.length}${paved.length ? `p${paved.length}` : ''}${sum}`
     };
 }
 
@@ -162,15 +184,18 @@ function layBlock(x, y, ctx) {
     return null;
 }
 
-// Trace et efface (lay, erase : [[x, y]]). stock : la réserve du joueur (déjà verrouillée, ce qui attend encaissé) ;
-// ctx : layBlock, plus placedNeedingPath ([{ x, y, name }] : créations posées qui doivent rester au bord d'un chemin).
-// { add: [{ x, y, free }], remove: [{ x, y }], stone (pierres prises, moins celles rendues) } ou { status, message }
-function planOf(lay, erase, laid, stock, ctx) {
+// Trace, efface, pave et dépave (lay, erase, pave, unpave : [[x, y]]). stock : la réserve du joueur (déjà verrouillée,
+// ce qui attend encaissé) ; ctx : layBlock, plus placedNeedingPath ([{ x, y, name }] : créations posées qui doivent
+// rester au bord d'un chemin), paved ([{ x, y }] : les cases déjà pavées) et paveOpen (la Carrière est bâtie). Une case
+// pavée qu'on efface perd son pavé (rendu). { add: [{ x, y, free }], remove: [{ x, y }], pave: [{ x, y }],
+// unpave: [{ x, y }], stone (pierres prises, moins celles rendues) } ou { status, message }
+function planOf(lay, erase, laid, stock, ctx, pave = [], unpave = []) {
     const cells = list => (Array.isArray(list) ? list : []);
-    if (cells(lay).length + cells(erase).length === 0) return { status: 400, message: T.NOTHING };
-    if (cells(lay).length > MAX_CELLS || cells(erase).length > MAX_CELLS) return { status: 400, message: T.TOO_MANY(MAX_CELLS) };
+    const lists = [cells(lay), cells(erase), cells(pave), cells(unpave)];
+    if (lists.every(l => l.length === 0)) return { status: 400, message: T.NOTHING };
+    if (lists.some(l => l.length > MAX_CELLS)) return { status: 400, message: T.TOO_MANY(MAX_CELLS) };
     const ok = c => Array.isArray(c) && c.length === 2 && c.every(Number.isInteger);
-    if (![...cells(lay), ...cells(erase)].every(ok)) return { status: 400, message: T.CELL_INVALID };
+    if (!lists.flat().every(ok)) return { status: 400, message: T.CELL_INVALID };
     const mine = new Map(laid.map(c => [c.y * SIZE + c.x, c]));
     const remove = [];
     const gone = new Set();
@@ -202,7 +227,32 @@ function planOf(lay, erase, laid, stock, ctx) {
     const pay = add.filter(c => !c.free).length;
     const back = remove.filter(c => !c.free).length;
     if (pay > stock.stone + back) return { status: 409, message: T.STONE_COST(pay, stock.stone) };
-    return { add, remove, stone: pay - back };
+    // Le pavé : dépaver ce qui l'est (et ce qu'on efface), puis paver des cases de chemin, gués exceptés
+    const paved = new Set((ctx.paved || []).map(c => c.y * SIZE + c.x));
+    const off = new Map();
+    for (const [x, y] of cells(unpave)) {
+        const k = y * SIZE + x;
+        if (!paved.has(k)) return { status: 400, message: T.NOT_PAVED };
+        off.set(k, { x, y });
+    }
+    for (const c of remove) if (paved.has(c.y * SIZE + c.x)) off.set(c.y * SIZE + c.x, { x: c.x, y: c.y });
+    const on = new Map();
+    for (const [x, y] of cells(pave)) {
+        const k = y * SIZE + x;
+        if (on.has(k)) continue;
+        if (!ctx.paveOpen) return { status: 403, message: T.PAVE_LOCKED };
+        if (off.has(k)) return { status: 400, message: T.CELL_INVALID };
+        if (paved.has(k)) return { status: 400, message: T.ALREADY_PAVED };
+        if (!ctx.zones.has(map.zoneAt(x, y))) return { status: 400, message: T.OWN_ZONES };
+        if (after(x, y) !== 'p') return { status: 400, message: T.PAVE_ON_PATH };
+        on.set(k, { x, y });
+    }
+    const left = stock.stone - (pay - back) + PAVE_STONE * off.size;
+    if (PAVE_STONE * on.size > left) return { status: 409, message: T.PAVE_COST(PAVE_STONE * on.size, Math.max(0, left)) };
+    return { add, remove, pave: [...on.values()], unpave: [...off.values()], stone: pay - back + PAVE_STONE * (on.size - off.size) };
 }
 
-module.exports = { MARK, PREFIX, FREE, MAX_CELLS, SENTIER, MARCHES, FRESH, isPath, laidOf, newRoadsOf, parvisOf, groundRows, roadsOf, linked, layBlock, planOf };
+module.exports = {
+    MARK, PREFIX, PAVE_PREFIX, PAVE_STONE, FREE, MAX_CELLS, SENTIER, MARCHES, FRESH, isPath, paveOpen, laidOf, pavedOf, newRoadsOf, parvisOf, groundRows,
+    roadsOf, linked, layBlock, planOf
+};

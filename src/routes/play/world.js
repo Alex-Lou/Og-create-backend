@@ -9,9 +9,10 @@ const crafts = require('../../services/crafts');
 const bookTries = require('../../services/bookTries');
 const villagers = require('../../services/villagers');
 const anya = require('../../services/anya');
+const animals = require('../../services/animals');
 const { PAGE, playLimiter, withAccount } = require('./shared');
 const { INVALID } = require('../../texts/errors');
-const { RESTART_CONFIRM } = require('../../texts/world');
+const { RESTART_CONFIRM, ANIMAL_UNKNOWN } = require('../../texts/world');
 const { SAVOIR_LOCKED, SAVOIR_GIVEN } = require('../../texts/brume');
 
 const router = express.Router();
@@ -156,13 +157,13 @@ router.post('/world/craft/unpose', withAccount(async (req, res, owner, b) => {
     await craftDone(res, owner, b, done, done.refund ? { refund: done.refund } : {});
 }));
 
-// Chemins : tracer et effacer des cases ([[x, y]] : world/paths.js)
+// Chemins : tracer, effacer, paver et dépaver des cases ([[x, y]] : world/paths.js)
 router.post('/world/paths', withAccount(async (req, res, owner, b) => {
-    const { lay = [], erase = [] } = req.body || {};
-    if (!Array.isArray(lay) || !Array.isArray(erase)) return res.status(400).json({ message: INVALID.trace });
-    const done = await world.layPaths(owner.id, lay, erase);
+    const { lay = [], erase = [], pave = [], unpave = [] } = req.body || {};
+    if (![lay, erase, pave, unpave].every(Array.isArray)) return res.status(400).json({ message: INVALID.trace });
+    const done = await world.layPaths(owner.id, lay, erase, pave, unpave);
     if (done.status) return res.status(done.status).json({ message: done.message });
-    res.json({ laid: done.laid, erased: done.erased, world: await worldView(owner, b) });
+    res.json({ laid: done.laid, erased: done.erased, paved: done.paved, unpaved: done.unpaved, world: await worldView(owner, b) });
 }));
 
 router.post('/world/collect', withAccount(async (req, res, owner, b) => {
@@ -591,6 +592,15 @@ router.post('/world/scene', withAccount(async (req, res, owner) => {
     if (!/^[a-z]{1,20}$/.test(id)) return res.status(400).json({ message: INVALID.scene });
     const done = await world.seeScene(owner.id, id);
     if (done.status) return res.status(done.status).json({ message: done.message });
+    res.json(done);
+}));
+
+// Un animal rencontré sur l'île (le premier toucher), retenu au Bestiaire du compte → { animal, at, new }
+router.post('/world/animal', withAccount(async (req, res, owner) => {
+    const id = String(req.body.id || '');
+    if (!/^[a-z-]{1,20}$/.test(id)) return res.status(400).json({ message: INVALID.animal });
+    const done = await animals.meetAnimal(owner.id, id);
+    if (done.status) return res.status(done.status).json({ message: ANIMAL_UNKNOWN });
     res.json(done);
 }));
 

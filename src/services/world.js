@@ -24,6 +24,7 @@ const anya = require('./anya');
 const avatarChoices = require('./avatarChoices');
 const pickups = require('./pickups');
 const players = require('./players');
+const animals = require('./animals');
 const bookPages = require('./bookPages');
 const beastRules = require('./beasts');
 const {
@@ -34,7 +35,7 @@ const {
 } = require('./world/rules');
 const {
     itemsOf, skinsOf, signsOf, namesOf, avatarOf, friendsOf, needRowsOf, settlersOf, gamesOf, annexesOf, levelsOf, stockOf,
-    zonesOf, findsOf, depositsOf, blightsOf, foundOf, claimedOf, helianeOfUser, runsOf, countOf, discoveredOf, craftsOf,
+    zonesOf, findsOf, depositsOf, blightsOf, foundOf, claimedOf, claimedAtOf, helianeOfUser, runsOf, countOf, discoveredOf, craftsOf,
     placedOf, madeOf, addStock, balanceOf, writtenOf
 } = require('./world/reads');
 const { migrate } = require('./world/migrate');
@@ -236,6 +237,31 @@ async function tutorialOf(userId, conn = db) {
     const items = await itemsOf(userId, conn);
     return { tutorial: true, skipped: quests.firstNightDoneOf(await claimedOf(userId, conn)) && items.has(PROLOGUE_SKIP) };
 }
+// Le compteur de jours de l'île (le jeu le montre à côté de l'heure ; choix de l'auteur, 18 oct.) : pendant le tutoriel,
+// le jeu compte ses jours lui-même ; ensuite, un de plus à chaque minuit de l'île depuis qu'il a été quitté. D'où il
+// part : { at : l'instant (ms), quest : la quête du tutoriel où l'on en était (le jeu en connaît le jour), ou null (jour 1) }.
+// Fini : à sa dernière quête réclamée ; passé : quand il l'a été ; un compte d'avant le tutoriel : à sa création ;
+// null tant qu'il dure
+const TUTORIAL_IDS = quests.tutorialStepsOf(new Set()).map(step => step.id);
+async function daysStartOf(userId) {
+    const [claimedAt, { rows: skip }, { rows: user }] = await Promise.all([
+        claimedAtOf(userId, TUTORIAL_IDS),
+        db.query('SELECT bought_at FROM world_items WHERE user_id = $1 AND item = $2', [userId, PROLOGUE_SKIP]),
+        db.query('SELECT created_at FROM users WHERE id = $1', [userId])
+    ]);
+    return { claimedAt, skipAt: skip[0] ? new Date(skip[0].bought_at).getTime() : null, createdAt: user[0] ? new Date(user[0].created_at).getTime() : null };
+}
+function daysFrom({ claimedAt, skipAt, createdAt }, { skipped, quest }) {
+    const last = claimedAt[quests.TUTORIAL_LAST];
+    if (last) return { at: last, quest: quests.TUTORIAL_LAST };
+    // (passé : l'étape qui suivait la dernière réclamée avant)
+    if (skipped && skipAt) {
+        const reached = TUTORIAL_IDS.reduce((k, id, i) => (claimedAt[id] <= skipAt ? i + 1 : k), 0);
+        return { at: skipAt, quest: TUTORIAL_IDS[Math.min(reached, TUTORIAL_IDS.length - 1)] };
+    }
+    if ((quest && quests.inTutorial(quest.id)) || !createdAt) return null;
+    return { at: createdAt, quest: null };
+}
 // Les scènes de l'arc du Phare (choix de l'auteur, 15 oct. : une fois par compte, sur tous ses appareils ; le conseil
 // se rejoue depuis « Revoir le prologue ») : chacune vient avec sa quête (after : le conseil à la fin du tutoriel, la
 // traversée manquée au Bateau écrit, l'intérieur du phare à la clé trouvée, le navire des parents de Léo au Phare
@@ -310,8 +336,9 @@ async function restartIsland(userId) {
 }
 
 // Trace et efface des chemins (world/paths.js) : une pierre la case, les premières offertes ; une case effacée rend
-// sa pierre. lay, erase : [[x, y]]. {} ou { status, message }
-async function layPaths(userId, lay, erase) {
+// sa pierre. Pave et dépave (la Carrière bâtie : PAVE_STONE pierres la case, rendues). lay, erase, pave, unpave :
+// [[x, y]]. { laid, erased, paved, unpaved } ou { status, message }
+async function layPaths(userId, lay, erase, pave = [], unpave = []) {
     await migrate(userId);
     return db.transaction(async conn => {
         const { stock } = await payWith(userId, conn, await stockOf(userId, conn, true));
@@ -324,8 +351,9 @@ async function layPaths(userId, lay, erase) {
         const plan = paths.planOf(lay, erase, roads.laid, stock, {
             fresh: roads.fresh, ground: roads.ground, zones: await zonesOf(userId, conn), places: (await placesOf(userId, conn)).places, levels,
             taken: new Set([...annexRows.map(keyOf), ...placed.map(keyOf), ...camp]),
-            placedNeedingPath: placed.filter(r => crafts.CRAFT_BY_ID[r.craft]?.place.path).map(r => ({ x: r.x, y: r.y, name: crafts.CRAFT_BY_ID[r.craft].name }))
-        });
+            placedNeedingPath: placed.filter(r => crafts.CRAFT_BY_ID[r.craft]?.place.path).map(r => ({ x: r.x, y: r.y, name: crafts.CRAFT_BY_ID[r.craft].name })),
+            paved: roads.paved, paveOpen: paths.paveOpen(levels)
+        }, pave, unpave);
         if (plan.status) return db.rollback(plan);
         if (plan.remove.length) {
             await conn.query('DELETE FROM world_items WHERE user_id = $1 AND item = ANY($2)', [userId, plan.remove.map(c => `${paths.PREFIX}${c.x}:${c.y}`)]);
@@ -334,8 +362,15 @@ async function layPaths(userId, lay, erase) {
             await conn.query(`INSERT INTO world_items (user_id, item, source) SELECT $1, unnest($2::text[]), unnest($3::text[])`,
                 [userId, plan.add.map(c => `${paths.PREFIX}${c.x}:${c.y}`), plan.add.map(c => (c.free ? 'offert' : 'chemin'))]);
         }
+        if (plan.unpave.length) {
+            await conn.query('DELETE FROM world_items WHERE user_id = $1 AND item = ANY($2)', [userId, plan.unpave.map(c => `${paths.PAVE_PREFIX}${c.x}:${c.y}`)]);
+        }
+        if (plan.pave.length) {
+            await conn.query(`INSERT INTO world_items (user_id, item, source) SELECT $1, unnest($2::text[]), 'pave'`,
+                [userId, plan.pave.map(c => `${paths.PAVE_PREFIX}${c.x}:${c.y}`)]);
+        }
         if (plan.stone) await conn.query('UPDATE world_stock SET stone = stone - $2 WHERE user_id = $1', [userId, plan.stone]);
-        return { laid: plan.add.length, erased: plan.remove.length };
+        return { laid: plan.add.length, erased: plan.remove.length, paved: plan.pave.length, unpaved: plan.unpave.length };
     });
 }
 
@@ -465,9 +500,9 @@ async function view(userId, owned, book) {
     // (les actes finis : un feu de la Route peut en attendre un, landmarks.hasFire)
     const acts = quests.actsDoneOf(quests.doneOf(claimed));
     // (et ce que la vue montre plus bas, lu en même temps)
-    const [stagesNow, avatarNow, savoirNow, openedNow, helianeNow, anyaNow, nightsNow, beastsNow] = await Promise.all([
+    const [stagesNow, avatarNow, savoirNow, openedNow, helianeNow, anyaNow, nightsNow, beastsNow, daysStart, animalsNow] = await Promise.all([
         stars.starsOf(userId, db), avatarOf(userId), brumeSavoirOf(userId), openedOf(userId, Date.now()), helianeOfUser(userId),
-        anyaOf(userId), nightsView(userId), beastsView(userId)
+        anyaOf(userId), nightsView(userId), beastsView(userId), daysStartOf(userId), animals.animalsOf(userId)
     ]);
     const hidden = map.ZONES.filter(z => !isKnown(z, discovered)).map(z => z.code).sort();
     const veil = map.veiled(new Set(hidden), roads.rows);
@@ -542,7 +577,9 @@ async function view(userId, owned, book) {
         // qui reste offert
         roads: {
             laid: roads.laid.map(c => [c.x, c.y, c.free ? 1 : 0]), stone: 1, free: Math.max(0, paths.FREE - roads.laid.filter(c => c.free).length),
-            max: paths.MAX_CELLS
+            max: paths.MAX_CELLS,
+            // (le pavé : ses cases, ce qu'il coûte la case, s'il s'ouvre : la Carrière bâtie)
+            paved: roads.paved.map(c => [c.x, c.y]), pave: { stone: paths.PAVE_STONE, open: paths.paveOpen(levels) }
         },
         crafts: craftsView(craftRows, craftCtx({ levels, zones, annexRows, rows: craftRows, blocked: campCells, ground: roads.ground, places }), {
             owned: have, stock: paidStock, open: crafts.tiersOpen(book.openChapters || new Set(), epreuves, book.stars ?? 0), epreuves, stars: book.stars ?? 0, have: stockFinds, presence,
@@ -625,6 +662,8 @@ async function view(userId, owned, book) {
             if (out.quest && !out.quest.done && book.ariane) out.quest.ariane = { target: book.ariane.target, remaining: book.ariane.remaining };
             // Le tutoriel en cours : toutes ses étapes, pour le suivi des quêtes (faites, en cours, à venir)
             if (out.tutorial && !out.skipped && out.quest && quests.inTutorial(out.quest.id)) out.steps = quests.tutorialStepsOf(claimed);
+            // D'où part le compteur de jours de l'île, une fois le tutoriel quitté
+            out.days = daysFrom(daysStart, out);
             return out;
         })(),
         // Le Savoir de Brume, une fois le Phare allumé : { open, talked }
@@ -639,7 +678,9 @@ async function view(userId, owned, book) {
         // sort, le bâtiment embrumé et le prix de sa réparation
         nights: nightsNow,
         // Les bêtes de ferme (v6, § 6.16) : le prix d'un repas, et pour chacune, contente ou non, sa bulle
-        beasts: beastsNow
+        beasts: beastsNow,
+        // Le Bestiaire : les animaux rencontrés sur l'île ([{ id, at }])
+        animals: animalsNow
     };
 }
 
@@ -700,12 +741,13 @@ const BOAT_ELEMENT = 'Bateau';
 // Le Ponton à sa place de l'île à la plage (pas déplacé)
 const atBeachPlace = p => p.x === BEACH.ponton.x && p.y === BEACH.ponton.y;
 
-// Les chemins tracés dans l'emprise f { x, y, w, h } s'effacent ; leurs pierres (pas celles des cases offertes) reviennent
+// Les chemins tracés et le pavé dans l'emprise f { x, y, w, h } s'effacent ; leurs pierres (pas celles des cases offertes)
+// reviennent, et celles du pavé (paths.PAVE_STONE la case)
 async function clearGrown(userId, conn, f) {
     const items = [];
-    for (let y = f.y; y < f.y + f.h; y++) for (let x = f.x; x < f.x + f.w; x++) items.push(`${paths.PREFIX}${x}:${y}`);
+    for (let y = f.y; y < f.y + f.h; y++) for (let x = f.x; x < f.x + f.w; x++) items.push(`${paths.PREFIX}${x}:${y}`, `${paths.PAVE_PREFIX}${x}:${y}`);
     const { rows } = await conn.query('DELETE FROM world_items WHERE user_id = $1 AND item = ANY($2) RETURNING source', [userId, items]);
-    const back = rows.filter(r => r.source !== 'offert').length;
+    const back = rows.reduce((n, r) => n + (r.source === 'pave' ? paths.PAVE_STONE : r.source === 'offert' ? 0 : 1), 0);
     if (back) await conn.query('UPDATE world_stock SET stone = stone + $2 WHERE user_id = $1', [userId, back]);
 }
 
