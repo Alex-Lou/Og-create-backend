@@ -2076,6 +2076,8 @@ test('maisons : un visiteur comblé reste dans une maison libre et devient habit
   const settler = stayed.data.world.villagers.find(v => v.id === id);
   assert.deepEqual([settler.name, settler.role, settler.site, settler.seed, settler.home], [traveller.name, traveller.role, traveller.site, traveller.seed, { x: X(28), y: Y(31) }]);
   assert.deepEqual(settler.needs.map(n => n.id), ['manger', 'deco']);
+  // (depuis quand il est resté : le journal de l'île n'écrit de lui qu'à partir de là)
+  assert.ok(Math.abs(settler.since - Date.now()) < 60000);
   assert.equal((await settle(traveller.id)).status, 404);
   // Comme les autres habitants : on lui parle, on comble ses besoins
   const hello = await api('POST', '/play/world/villager/talk', { villager: id }, player);

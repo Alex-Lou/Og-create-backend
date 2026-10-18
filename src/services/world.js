@@ -598,14 +598,16 @@ async function view(userId, owned, book) {
                 const { needs, mood } = moods[v.id];
                 const produces = Boolean(SITES[v.site].produce);
                 const settled = v.seed !== undefined;
-                const home = settled ? houses[settlers.findIndex(row => `v${row.id}` === v.id)] : null;
+                const at = settled ? settlers.findIndex(row => `v${row.id}` === v.id) : -1;
+                const home = settled ? houses[at] : null;
                 return {
                     id: v.id, name: v.name, role: v.role, loves: v.loves, likes: v.likes, site: v.site, points: friend.points, hearts,
                     built: v.built, asleep: SLEEPERS.includes(v.id) && !v.built && !friend.points,
                     next: villagers.HEARTS[hearts] ?? null, talked: friend.talked === day, gifted: friend.gifted === day,
                     needs, mood, moodEffect: villagers.moodEffect(v.site, produces, mood), happyEffect: villagers.moodEffect(v.site, produces, 'heureux'),
-                    // (quand il est arrivé, ou s'est réveillé : le journal de l'île n'écrit de lui qu'à partir de là)
-                    ...(settled ? {} : { since: arrivals[v.id] ?? null }),
+                    // (quand il est arrivé, s'est réveillé, ou est resté : le journal de l'île n'écrit de lui qu'à
+                    // partir de là)
+                    since: settled ? (settlers[at] ? new Date(settlers[at].settled_at).getTime() : null) : arrivals[v.id] ?? null,
                     ...(settled ? { seed: v.seed, home: home ? { x: home.x, y: home.y } : null } : {})
                 };
             });
