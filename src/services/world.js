@@ -34,7 +34,7 @@ const {
 } = require('./world/rules');
 const {
     itemsOf, skinsOf, signsOf, namesOf, avatarOf, friendsOf, needRowsOf, settlersOf, gamesOf, annexesOf, levelsOf, stockOf,
-    zonesOf, findsOf, depositsOf, blightsOf, foundOf, claimedOf, helianeOfUser, runsOf, countOf, discoveredOf, craftsOf,
+    zonesOf, findsOf, depositsOf, blightsOf, foundOf, claimedOf, claimedAtOf, helianeOfUser, runsOf, countOf, discoveredOf, craftsOf,
     placedOf, madeOf, addStock, balanceOf, writtenOf
 } = require('./world/reads');
 const { migrate } = require('./world/migrate');
@@ -235,6 +235,31 @@ const PROLOGUE_SKIP = 'prologue:passe';
 async function tutorialOf(userId, conn = db) {
     const items = await itemsOf(userId, conn);
     return { tutorial: true, skipped: quests.firstNightDoneOf(await claimedOf(userId, conn)) && items.has(PROLOGUE_SKIP) };
+}
+// Le compteur de jours de l'île (le jeu le montre à côté de l'heure ; choix de l'auteur, 18 oct.) : pendant le tutoriel,
+// le jeu compte ses jours lui-même ; ensuite, un de plus à chaque minuit de l'île depuis qu'il a été quitté. D'où il
+// part : { at : l'instant (ms), quest : la quête du tutoriel où l'on en était (le jeu en connaît le jour), ou null (jour 1) }.
+// Fini : à sa dernière quête réclamée ; passé : quand il l'a été ; un compte d'avant le tutoriel : à sa création ;
+// null tant qu'il dure
+const TUTORIAL_IDS = quests.tutorialStepsOf(new Set()).map(step => step.id);
+async function daysStartOf(userId) {
+    const [claimedAt, { rows: skip }, { rows: user }] = await Promise.all([
+        claimedAtOf(userId, TUTORIAL_IDS),
+        db.query('SELECT bought_at FROM world_items WHERE user_id = $1 AND item = $2', [userId, PROLOGUE_SKIP]),
+        db.query('SELECT created_at FROM users WHERE id = $1', [userId])
+    ]);
+    return { claimedAt, skipAt: skip[0] ? new Date(skip[0].bought_at).getTime() : null, createdAt: user[0] ? new Date(user[0].created_at).getTime() : null };
+}
+function daysFrom({ claimedAt, skipAt, createdAt }, { skipped, quest }) {
+    const last = claimedAt[quests.TUTORIAL_LAST];
+    if (last) return { at: last, quest: quests.TUTORIAL_LAST };
+    // (passé : l'étape qui suivait la dernière réclamée avant)
+    if (skipped && skipAt) {
+        const reached = TUTORIAL_IDS.reduce((k, id, i) => (claimedAt[id] <= skipAt ? i + 1 : k), 0);
+        return { at: skipAt, quest: TUTORIAL_IDS[Math.min(reached, TUTORIAL_IDS.length - 1)] };
+    }
+    if ((quest && quests.inTutorial(quest.id)) || !createdAt) return null;
+    return { at: createdAt, quest: null };
 }
 // Les scènes de l'arc du Phare (choix de l'auteur, 15 oct. : une fois par compte, sur tous ses appareils ; le conseil
 // se rejoue depuis « Revoir le prologue ») : chacune vient avec sa quête (after : le conseil à la fin du tutoriel, la
@@ -474,9 +499,9 @@ async function view(userId, owned, book) {
     // (les actes finis : un feu de la Route peut en attendre un, landmarks.hasFire)
     const acts = quests.actsDoneOf(quests.doneOf(claimed));
     // (et ce que la vue montre plus bas, lu en même temps)
-    const [stagesNow, avatarNow, savoirNow, openedNow, helianeNow, anyaNow, nightsNow, beastsNow] = await Promise.all([
+    const [stagesNow, avatarNow, savoirNow, openedNow, helianeNow, anyaNow, nightsNow, beastsNow, daysStart] = await Promise.all([
         stars.starsOf(userId, db), avatarOf(userId), brumeSavoirOf(userId), openedOf(userId, Date.now()), helianeOfUser(userId),
-        anyaOf(userId), nightsView(userId), beastsView(userId)
+        anyaOf(userId), nightsView(userId), beastsView(userId), daysStartOf(userId)
     ]);
     const hidden = map.ZONES.filter(z => !isKnown(z, discovered)).map(z => z.code).sort();
     const veil = map.veiled(new Set(hidden), roads.rows);
@@ -636,6 +661,8 @@ async function view(userId, owned, book) {
             if (out.quest && !out.quest.done && book.ariane) out.quest.ariane = { target: book.ariane.target, remaining: book.ariane.remaining };
             // Le tutoriel en cours : toutes ses étapes, pour le suivi des quêtes (faites, en cours, à venir)
             if (out.tutorial && !out.skipped && out.quest && quests.inTutorial(out.quest.id)) out.steps = quests.tutorialStepsOf(claimed);
+            // D'où part le compteur de jours de l'île, une fois le tutoriel quitté
+            out.days = daysFrom(daysStart, out);
             return out;
         })(),
         // Le Savoir de Brume, une fois le Phare allumé : { open, talked }
