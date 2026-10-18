@@ -42,13 +42,13 @@ test('le camp : rien avant son personnage ; sur une île à la plage, chacun dan
   assert.deepEqual(ids(campOf({ met: new Set() })), ['hirondelle']);
   // Lorena arrive avec son camp
   assert.deepEqual(ids(campOf({ met: new Set(['ponton']) })), ['aster', 'caisses', 'filet', 'hirondelle', 'rondins', 'sos']);
-  // Sur une île à la plage : la cuisine d’Agathe sur la plage (sa zone), le camp de Lorena au sud-ouest, le coin de
+  // Sur une île à la plage : la cuisine d’Agathe dans la plage (sa zone), le camp de Lorena au sud-ouest, le coin de
   // Nathan au nord du Feu
   const beach = places.placesFrom({ beach: true });
   const camp = campOf({ met: new Set(['ponton', 'foyer', 'atelier']), places: beach, beach: true });
   const at = id => { const c = camp.find(e => e.id === id); return [c.x, c.y]; };
-  // (la cuisine d’Agathe sous l'enclos du Feu, sur le sable du rivage : choix de l'auteur, 16 oct.)
-  assert.deepEqual([at('cannelle'), at('aster'), at('rivet')], [[99, 97], [90, 95], [93, 86]]);
+  // (la cuisine d’Agathe à l'est du camp, entre le Feu et les palmiers : choix de l'auteur, 18 oct.)
+  assert.deepEqual([at('cannelle'), at('aster'), at('rivet')], [[102, 94], [90, 95], [93, 86]]);
   // La grande Hirondelle (choix de l'auteur, 15 oct.) : 6 × 3 cases en travers de l'anse à l'ouest (sa poupe arrachée n'est
   // plus à l'ancienne place : choix de l'auteur, 16 oct.) ; sur l'ancienne butte, deux palmiers et deux étoiles de mer
   const ship = camp.find(c => c.id === 'hirondelle');
@@ -59,7 +59,7 @@ test('le camp : rien avant son personnage ; sur une île à la plage, chacun dan
   assert.deepEqual(coin({}), []);
   assert.deepEqual(coin({ levels: { foyer: 1 } }), [['cloture', 96, 96], ['cloture', 97, 96]]);
   assert.deepEqual(coin({ levels: { foyer: 1 }, taken: new Set([96 * map.SIZE + 97]) }), [['cloture', 96, 96]]);
-  assert.deepEqual([at('palmier-1'), at('palmier-2'), at('etoile-1'), at('etoile-2')], [[103, 97], [104, 96], [102, 97], [103, 96]]);
+  assert.deepEqual([at('palmier-1'), at('palmier-2'), at('etoile-1'), at('etoile-2')], [[103, 97], [104, 97], [102, 97], [101, 97]]);
   // (sa végétation : un stade aux jours 3, 10 et 30 ; la lanterne de Lorena, une fois Lorena là)
   assert.deepEqual([0, 2, 3, 9, 10, 29, 30, 99].map(overgrowthOf), [0, 0, 1, 1, 2, 2, 3, 3]);
   assert.equal(campOf({ met: new Set(), places: beach, beach: true }).find(c => c.id === 'hirondelle').lanterne, false);
