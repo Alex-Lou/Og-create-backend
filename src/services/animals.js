@@ -1,7 +1,8 @@
-// Le Bestiaire des animaux rencontrés (choix de l'auteur, 18 oct.) : la première fois qu'on touche un animal sur l'île,
-// il entre au Bestiaire, pour tous les appareils du compte. Une ligne de world_items par animal (préfixe ANIMAL, sans
-// donnée nouvelle) ; sa date d'entrée est celle de la ligne. Le jeu sait où et quand chacun vit (world/creatures.js du
-// dépôt front) ; le serveur ne garde que la liste des animaux connus, pour refuser les autres.
+// Le Bestiaire des animaux rencontrés (choix de l'auteur, 18 oct.) : la première fois qu'on touche un animal sur l'île
+// (ou qu'on repousse un égaré, la nuit), il entre au Bestiaire, pour tous les appareils du compte. Une ligne de
+// world_items par animal (préfixe ANIMAL, sans donnée nouvelle) ; sa date d'entrée est celle de la ligne. Le jeu sait où
+// et quand chacun vit (world/creatures.js du dépôt front) ; le serveur ne garde que la liste des animaux connus, pour
+// refuser les autres.
 const db = require('../config/db');
 
 const ANIMAL = 'animal:';
@@ -10,8 +11,10 @@ const ANIMALS = [
     'lapin', 'ecureuil', 'mesange', 'renard', 'herisson', 'cerf', 'hibou',
     'papillon', 'papillon-lune', 'luciole', 'abeille',
     'grenouille', 'tortue', 'heron', 'koi', 'loutre',
-    'crabe', 'mouette', 'sardines', 'dauphin', 'baleine',
-    'macareux', 'poney', 'bouquetin', 'renard-polaire', 'chameau', 'fennec', 'toucan', 'cameleon', 'corbeau', 'salamandre'
+    'crabe', 'mouette', 'sardines', 'dauphin', 'baleine', 'geant', 'kraken',
+    'macareux', 'poney', 'bouquetin', 'renard-polaire', 'chameau', 'fennec', 'toucan', 'cameleon', 'corbeau', 'salamandre',
+    'fantome', 'zombie', 'noye', 'racine', 'esprit',
+    'lapin-de-brume', 'bouquetin-de-brume', 'poney-de-brume', 'grenouille-de-brume', 'fennec-de-brume', 'cameleon-de-brume', 'salamandre-de-brume'
 ];
 const known = new Set(ANIMALS);
 

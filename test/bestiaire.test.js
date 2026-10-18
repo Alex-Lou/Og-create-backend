@@ -23,8 +23,10 @@ test('un animal rencontré entre au Bestiaire, une seule fois ; les inconnus son
   assert.deepEqual(both.map(r => r.data.new).sort(), [false, true]);
   assert.equal(both[0].data.at, both[1].data.at);
   await meet(player, 'lapin');
+  // (un égaré repoussé, le Kraken : le nom le plus long passe)
+  for (const id of ['salamandre-de-brume', 'kraken']) assert.equal((await meet(player, id)).status, 200, id);
   // (dans l'ordre du livre, avec la date de la rencontre)
   const list = await animals(player);
-  assert.deepEqual(list.map(a => a.id), ['lapin', 'cerf']);
+  assert.deepEqual(list.map(a => a.id), ['lapin', 'cerf', 'kraken', 'salamandre-de-brume']);
   assert.ok(list.every(a => Math.abs(a.at - Date.now()) < 60000));
 });
