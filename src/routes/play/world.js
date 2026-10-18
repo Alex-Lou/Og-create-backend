@@ -539,19 +539,12 @@ router.post('/world/beasts/cage/break', withAccount(async (req, res, owner, b) =
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ gives: done.gives, world: await worldView(owner, b) });
 }));
-// Visiteur : combler sa demande (livrer, ou ses Récoltes faites) → { reward, coins, world }
-router.post('/world/visitor', withAccount(async (req, res, owner, b) => {
+// Accueillir l'arrivant qui attend au Ponton : { id, site (son métier), name (son prénom), look (son allure : les choix
+// de l'avatar) } ; il s'installe dans une maison libre → { settled, coins?, world }
+router.post('/world/arrival', withAccount(async (req, res, owner, b) => {
     const id = Number(req.body.id);
-    if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ message: INVALID.visitor });
-    const done = await world.satisfyVisitor(owner.id, id);
-    if (done.status) return res.status(done.status).json({ message: done.message });
-    res.json({ reward: done.reward, coins: done.coins, world: await worldView(owner, b) });
-}));
-// Visiteur comblé : il reste, dans une maison libre → { settled, coins?, world }
-router.post('/world/visitor/settle', withAccount(async (req, res, owner, b) => {
-    const id = Number(req.body.id);
-    if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ message: INVALID.visitor });
-    const done = await world.settleVisitor(owner.id, id);
+    if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ message: INVALID.arrival });
+    const done = await world.welcomeArrival(owner.id, id, { site: req.body.site, name: req.body.name, look: req.body.look });
     if (done.status) return res.status(done.status).json({ message: done.message });
     res.json({ settled: done.settled, ...coinsOf(done), world: await worldView(owner, b) });
 }));

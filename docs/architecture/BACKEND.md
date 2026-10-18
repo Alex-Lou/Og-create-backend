@@ -182,7 +182,7 @@ une variable à 0 rend le défaut, pas 0.
 | `worldMap`, `worldMapV2`, `worldMapV4` | carte v5 (144 × 144) ; anciennes cartes pour la migration |
 | `loot`, `quests` | coffres (rareté, lot) ; chaîne des quêtes de Brume |
 | `naming`, `signs` | règles des noms ; styles d'enseigne |
-| `villagers`, `visitors`, `worldShop` | habitants ; visiteurs ; boutique des ateliers |
+| `villagers`, `visitors`, `worldShop` | habitants ; arrivants (les moments du récit) ; boutique des ateliers |
 | `world/rules` | constantes, `SITES`, effets, production, charges |
 
 **Avec base** :
@@ -198,7 +198,7 @@ une variable à 0 rend le défaut, pas 0.
 | `ledger` | grand livre : `credit` idempotent, `debit`, `debitOnce` |
 | `world` (952 l.) | API de l'île : vue, quêtes, chantiers, Récolte, mini-jeux, boutique, noms, recommencer |
 | `world/reads`, `world/migrate` | lectures, dont `stockOf` (`:91`) ; cartes v1 → v5 et règlement des nuits |
-| `world/chests`, `people`, `produce` | coffres ; habitants et visiteurs ; production |
+| `world/chests`, `people`, `produce` | coffres ; habitants et arrivants ; production |
 | `world/lands`, `creations`, `annexPlots` | expéditions et gisements ; créations ; annexes posées |
 | `world/anyaBrume`, `nights`, `beasts` | Anya et Brume ; nuits ; bêtes |
 | `world/camp`, `paths`, `stars` | mixtes : règles pures + lectures par la connexion reçue |

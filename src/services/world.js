@@ -42,7 +42,7 @@ const { migrate } = require('./world/migrate');
 const { openedOf, chestsView, grant, openChest, openAll, CRATE_COMPLETE, completeCrate } = require('./world/chests');
 const {
     SLEEPERS, metOf, presenceOf, arrivalsOf, residentsOf, hungryOf, HUNGRY_AGO, moodsOf, withMoods, withLandmarks, withBlights, prodSteps,
-    runsSince, visitorNow, visitorView, befriend, fillNeeds, satisfyVisitor, settleVisitor
+    arrivalNow, arrivalView, befriend, fillNeeds, welcomeArrival
 } = require('./world/people');
 const { bonusesFor, gather, payWith, collect } = require('./world/produce');
 const { anyaOf, breathRefused, brumeSavoirOf, talkBrume, revealAnya, breatheAnya } = require('./world/anyaBrume');
@@ -87,7 +87,7 @@ async function factsOf(userId, owned, stars, conn = db, moods = null) {
     // (lectures indépendantes, ensemble ; dans une transaction, elles passent l'une après l'autre sur sa connexion)
     const count = (sql, params) => countOf(conn, sql, params);
     const [{ levels }, zones, craftRows, filled, lastRows, friends, runs, annexCount, houses, expeditions, found, gathered, pickupCount, hensFed,
-        visitors, settled, names, crateRows, hensFreed, coops] = await Promise.all([
+        settled, names, crateRows, hensFreed, coops] = await Promise.all([
         levelsOf(userId, conn), zonesOf(userId, conn), craftsOf(userId, conn), needRowsOf(userId, conn),
         conn.query('SELECT MAX(claimed_at) AS at FROM world_quests WHERE user_id = $1', [userId]), friendsOf(userId, conn), runsOf(userId, conn),
         count('SELECT COUNT(*)::int AS n FROM world_annexes WHERE user_id = $1', [userId]),
@@ -100,7 +100,7 @@ async function factsOf(userId, owned, stars, conn = db, moods = null) {
         // Les poules d’Agathe nourries, encore rassasiées (ouvrir la cage les laisse affamées : seul un repas compte)
         count(`SELECT COUNT(*)::int AS n FROM world_beasts WHERE user_id = $1 AND beast = ANY($2)
             AND fed_at > NOW() - make_interval(secs => $3)`, [userId, beastRules.HENS, beastRules.DAY_MS / 1000]),
-        count('SELECT COUNT(*)::int AS n FROM world_visitors WHERE user_id = $1 AND satisfied_at IS NOT NULL', [userId]),
+        // (les habitants venus d'ailleurs : les arrivants accueillis et les visiteurs installés d'avant)
         count('SELECT COUNT(*)::int AS n FROM world_visitors WHERE user_id = $1 AND settled_at IS NOT NULL', [userId]),
         namesOf(userId, conn),
         // Les caisses des personnages ouvertes (world/chests.js : CRATES)
@@ -142,7 +142,6 @@ async function factsOf(userId, owned, stars, conn = db, moods = null) {
         // Les abris bâtis (world/shelters.js) ; l'enclos autour d'un coin, une fois son abri bâti
         shelters,
         fences: shelters.has('cannelle') ? { cannelle: await fenceRingOf(userId, conn, 'cannelle') } : {},
-        visitors,
         settled,
         named: Boolean(names.peuple),
         // Les bâtiments reliés par un chemin (« puits-foyer »), quand ils sont bâtis
@@ -493,8 +492,8 @@ async function view(userId, owned, book) {
     const pendingStock = cash.stock;
     // Ce qui paie une création : les réserves et ce qui attend (encaissé d'abord à l'assemblage)
     const paidStock = { ...stock, ...Object.fromEntries(RESOURCES.map(r => [r, stock[r] + pendingStock[r]])) };
-    const [claimed, facts, visiting, epreuves, discovered, going, stockFinds, gathered] = await Promise.all([
-        claimedOf(userId), factsOf(userId, owned, book.stars ?? 0, db, moods), visitorNow(userId), epreuvesOf(userId),
+    const [claimed, facts, arriving, epreuves, discovered, going, stockFinds, gathered] = await Promise.all([
+        claimedOf(userId), factsOf(userId, owned, book.stars ?? 0, db, moods), arrivalNow(userId), epreuvesOf(userId),
         discoveredOf(userId), expeditionOf(userId), findsOf(userId), depositsOf(userId)
     ]);
     // (les actes finis : un feu de la Route peut en attendre un, landmarks.hasFire)
@@ -585,7 +584,7 @@ async function view(userId, owned, book) {
             owned: have, stock: paidStock, open: crafts.tiersOpen(book.openChapters || new Set(), epreuves, book.stars ?? 0), epreuves, stars: book.stars ?? 0, have: stockFinds, presence,
             pagesTo: book.pagesTo
         }, id => sites.find(site => site.id === id)?.name || id),
-        // Habitants (la troupe rencontrée, les visiteurs installés) : prénom, goûts, amitié, déjà vus ou gâtés
+        // Habitants (la troupe rencontrée, les arrivants accueillis) : prénom, goûts, amitié, déjà vus ou gâtés
         // aujourd'hui ; leurs besoins, leur humeur et ce qu'elle fait ; built : son bâtiment est bâti (sinon il vit au
         // camp, ou dort dans son quartier) ; asleep : un dormeur qu'on n'a pas encore réveillé (bible, § 6.7)
         villagers: (() => {
@@ -606,15 +605,15 @@ async function view(userId, owned, book) {
                     needs, mood, moodEffect: villagers.moodEffect(v.site, produces, mood), happyEffect: villagers.moodEffect(v.site, produces, 'heureux'),
                     // (quand il est arrivé, ou s'est réveillé : le journal de l'île n'écrit de lui qu'à partir de là)
                     ...(settled ? {} : { since: arrivals[v.id] ?? null }),
-                    ...(settled ? { seed: v.seed, home: home ? { x: home.x, y: home.y } : null } : {})
+                    ...(settled ? { seed: v.seed, look: v.look, home: home ? { x: home.x, y: home.y } : null } : {})
                 };
             });
         })(),
-        // Maisons du Foyer : posées, occupées par des visiteurs installés
+        // Maisons du Foyer : posées, occupées par les habitants venus d'ailleurs
         houses: { total: annexRows.filter(r => r.annex === 'maison').length, used: settlers.length },
         friendship: { talk: villagers.TALK, gift: villagers.GIFT, hearts: villagers.HEARTS, rewards: villagers.REWARDS },
-        // Visiteur arrivé en bateau au Ponton (ou null) : sa demande, son départ
-        visitor: visitorView(visiting, visiting ? await runsSince(userId, visiting.arrived_at) : 0),
+        // L'arrivant qui attend au Ponton (ou null) : son moment, sa graine, un prénom proposé, les métiers qu'il peut prendre
+        arrival: arrivalView(arriving, levels, zones),
         // Besoins : nom, durée et prix de chacun (se distraire : décorations, à tant de cases)
         needs: {
             kinds: Object.fromEntries(Object.entries(villagers.NEEDS).map(([id, n]) => [id, { label: n.label, ...(n.hours ? { hours: n.hours, cost: n.cost } : { decos: n.decos, reach: n.reach }) }]))
@@ -1154,7 +1153,7 @@ async function chooseSign(userId, siteId, styleId) {
 module.exports = {
     SIZE, CAP_HOURS, REGEN_MS, DECO_PRICES, SITES, effectOf, pendingOf, chargesAt, effectsOf, productionOf,
     view, build, buyZone, buyItem, undoItem, harvestCap, chooseSkin, startRun, finishRun, collect, migrate, claimQuest, sleep, board, openChest, openAll,
-    placeAnnex, startAnnexAssembly, moveAnnex, poseAnnex, annexSpotOk, siteSpots, moveSite, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, satisfyVisitor, settleVisitor, rename, namePeople, namePlayer, chooseAvatar, arianeTargets, elementHintOf, guidedInkOf, guidedPageOf, athanorOf, bookFor, restartIsland,
+    placeAnnex, startAnnexAssembly, moveAnnex, poseAnnex, annexSpotOk, siteSpots, moveSite, nameSigns, chooseSign, startGame, finishGame, befriend, fillNeeds, welcomeArrival, rename, namePeople, namePlayer, chooseAvatar, arianeTargets, elementHintOf, guidedInkOf, guidedPageOf, athanorOf, bookFor, restartIsland,
     refundDecorations, startCraft, finishCraft, placeCraft, placeLine, buildShelter, moveCraft, storeCraft, unposeCraft, turnCraft, placeDoor, lockDoor, startExpedition, findLandmark, lightFire, gatherDeposit, pickUp,
     anyaOf, breathRefused, revealAnya, breatheAnya, brumeSavoirOf, talkBrume, startNights, repelCreature, repairSite, skipPrologue, seeScene, layPaths,
     feedBeast, collectBeasts, openCage, breakCage

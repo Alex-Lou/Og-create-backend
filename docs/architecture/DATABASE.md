@@ -86,7 +86,7 @@ Toutes les FK `user_id` pointent vers `users(id)` avec **`ON DELETE CASCADE`**. 
 | `world_avatars` (`:390-397`) | avatar du joueur | `user_id` | `look` (`avatar-01`…`12` ou `perso`) ; `choices` JSONB |
 | `world_friends` (`:400-407`) | amitié des habitants | (user, `villager`) | `points` CHECK ≥ 0 ; `talked_on`, `gifted_on` DATE ; sert aussi à Anya et Brume (`anya.js:4`, `world/anyaBrume.js:61-92`) |
 | `world_needs` (`:502-508`) | besoins comblés | (user, villager, need) | `filled_at` |
-| `world_visitors` (`:409-421`) | visiteurs | `id` | `request` JSONB ; `leaves_at`, `satisfied_at`, `settled_at` ; index (user, arrived_at) |
+| `world_visitors` (`:409-433`) | visiteurs d'avant, puis arrivants (18 oct.) | `id` | `request` JSONB, `leaves_at`, `satisfied_at` (visiteurs d'avant) ; `moment`, `name`, `look` JSONB (arrivants) ; `site` (choisi à l'accueil) ; `settled_at` ; index (user, arrived_at), unique (user, moment) |
 | `world_expeditions` (`:451-457`) | expéditions, une par quartier | (user, `zone`) | `ends_at` |
 | `world_landmarks` (`:460-465`) | lieux remarquables découverts | (user, `landmark`) | — |
 | `world_finds` (`:467-472`) | réserve de trouvailles | (user, `find`) | `amount` CHECK ≥ 0 |
@@ -151,7 +151,8 @@ game_data, timer_questions : isolées (lues en mémoire par le serveur)
 | `world_stock.carry` | `{ coins, stone, wood, water, food }`, fractions restantes | `world/rules.js:288-301`, `world/produce.js:55` |
 | `world_runs.config` | `{ kinds, maxMoves, boosts, lvl }`, plus `played` à la fin | `world.js:635`, `:648` |
 | `world_chests.prize` | `{ kind: 'coins', amount }`, `{ kind: 'stock', stock: { ressource: n } }` ou `{ kind: 'tint'\|'rare', item, site, name }` | `loot.js:74-92`, `world/chests.js:54-62` |
-| `world_visitors.request` | `{ kind: 'livrer', resource, amount, reward }` ou `{ kind: 'recolter', count, reward }` | `visitors.js:43-51` |
+| `world_visitors.request` | visiteurs d'avant seulement : `{ kind: 'livrer', resource, amount, reward }` ou `{ kind: 'recolter', count, reward }` | (plus écrit) |
+| `world_visitors.look` | les choix de l'avatar de l'arrivant (`avatarChoices.cleanChoices`) ; null : l'allure de sa graine | `world/people.js`, `welcomeArrival` |
 | `world_avatars.choices` | choix validés, plus `accessoires: { place: { id, couleurs } }` | `avatarChoices.js:112-141` |
 | `world_nights.blights` / `repelled` | `[{ site, since, until, by }]` / `{ night, ids }` | `schema.sql:480-483`, `world/nights.js:69-145` |
 

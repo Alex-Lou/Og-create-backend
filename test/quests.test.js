@@ -13,7 +13,7 @@ const ACTS = ['T', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
 const facts = (extra = {}) => ({
   crafts: 0, placed: new Set(), placedCount: {}, runs: 0, stars: 0, elements: new Set(['Eau', 'Feu', 'Terre', 'Air']), zones: new Set(['coeur']),
   levels: { foyer: 1 }, annexes: 0, houses: 0, met: new Set(), awake: new Set(), hearts: 0, expeditions: 0, landmarks: new Set(),
-  gathered: 0, pickups: 0, hensFed: 0, crates: new Set(), visitors: 0, settled: 0, named: false, ...extra
+  gathered: 0, pickups: 0, hensFed: 0, crates: new Set(), settled: 0, named: false, ...extra
 });
 // Les 21 anciennes quêtes, dans leur ordre d'avant la bible
 const OLD = ['deco', 'recolte', 'source', 'puits', 'lisiere', 'cabane', 'livre5', 'colline', 'mine', 'livre12', 'jardins', 'serre', 'maison',
@@ -104,8 +104,8 @@ test('avancée de chaque objectif, plafonnée', () => {
   check({ kind: 'hens', need: 1 }, { hensFed: 3 }, 1);
   check({ kind: 'crate', crate: 'aster' }, {}, 0);
   check({ kind: 'crate', crate: 'aster' }, { crates: new Set(['aster']) }, 1);
-  check({ kind: 'visitor', need: 1 }, { visitors: 1 }, 1);
   check({ kind: 'settle', need: 1 }, { settled: 0 }, 0);
+  check({ kind: 'settle', need: 2 }, { settled: 1 }, 1, 2);
   check({ kind: 'name' }, { named: true }, 1);
 });
 

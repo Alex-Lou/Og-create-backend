@@ -12,7 +12,7 @@
 // - expedition : expéditions revenues ; landmark : lieux découverts (ou un lieu précis) ; gather : gisements ramassés ;
 // - pickup : trouvailles de la plage de Brumelune ramassées (bois flotté, galets, coquillages : services/pickups.js) ;
 // - hens : poules d’Agathe nourries et encore rassasiées ; crate : la caisse d'un personnage ouverte (world/chests.js) ;
-// - visitor : voyageurs comblés ; settle : voyageurs installés ; name : le peuple a un nom.
+// - settle : habitants venus d'ailleurs (arrivants accueillis, visiteurs installés d'avant) ; name : le peuple a un nom.
 // chest : la dernière quête des actes donne aussi un coffre de cette rareté (loot.js), à ouvrir une fois réclamée.
 //
 // Joueurs d'avant la chaîne de la bible : une quête placée avant la plus avancée déjà réclamée compte comme faite
@@ -117,14 +117,16 @@ const QUESTS = [
     // (le Ponton I se bâtit au jour de Lorena : l'acte IV en fait un port de pêche, choix de l'auteur, 11 oct.)
     q('ponton-aster', 'IV', { kind: 'level', site: 'ponton', need: 2 }, 80),
     q('bete', 'IV', { kind: 'element', any: BEASTS }, 50),
-    q('voyageur', 'IV', { kind: 'visitor', need: 1 }, 80),
+    // (la maison d'abord : le premier arrivant vient au Ponton II et s'installe dans une maison libre ; choix de l'auteur,
+    // 18 oct.)
+    q('une-maison', 'IV', { kind: 'house', need: 1 }, 100),
+    q('voyageur', 'IV', { kind: 'settle', need: 1 }, 80),
     q('coeur', 'IV', { kind: 'heart', need: 1 }, 60),
     q('trouvaille', 'IV', { kind: 'gather', need: 1 }, 60),
     q('serre', 'IV', { kind: 'level', site: 'potager', need: 2 }, 120, 'epique'),
     // Acte V : le foyer, se nommer (les voyageurs restent, le goût d’Agathe)
     q('maison', 'V', { kind: 'level', site: 'foyer', need: 3 }, 150),
-    q('une-maison', 'V', { kind: 'house', need: 1 }, 100),
-    q('installe', 'V', { kind: 'settle', need: 1 }, 120),
+    q('installe', 'V', { kind: 'settle', need: 2 }, 120),
     q('hameau', 'V', { kind: 'zone', zone: 'hameau' }, 220),
     // (le Remède, et non la Potion des Légendes : la clé de la Maison de l'alchimiste, choix de l'auteur, 12 oct.)
     q('potion', 'V', { kind: 'element', element: 'Remède' }, 80),
@@ -194,7 +196,7 @@ function currentOf(claimed) {
 // Ce que l'état fournit (services/world.js) : { crafts, runs, stars, zones: Set, levels: { site: palier },
 // elements: Set, placed: Set (créations posées), annexes, houses, met: Set ('habitant:besoin' comblés en ce moment ou
 // depuis la dernière quête réclamée), awake: Set, hearts (cœurs du meilleur ami), expeditions, landmarks: Set,
-// gathered, visitors, settled, named, links: Set ('puits-foyer' : bâtiments reliés par un chemin) }
+// gathered, settled, named, links: Set ('puits-foyer' : bâtiments reliés par un chemin) }
 // Quêtes du tutoriel qui passent par le Grimoire : la page que marque le ruban a son Encre offerte (le joueur, qui a
 // peu d'écus, n'est jamais bloqué devant une énigme) : le Puits de Léo, dont la Boue (Eau + Terre), la première
 // recette à deux ingrédients différents. Pas le Brasier (Feu + Feu : l'énigme suffit, choix de l'auteur, 12 oct.)
@@ -226,7 +228,6 @@ const HAVE = {
     shelter: (goal, facts) => (facts.shelters && facts.shelters.has(goal.who) ? 1 : 0),
     fence: (goal, facts) => (facts.fences && facts.fences[goal.who] ? facts.fences[goal.who].have : 0),
     crate: (goal, facts) => (facts.crates.has(goal.crate) ? 1 : 0),
-    visitor: (goal, facts) => facts.visitors,
     settle: (goal, facts) => facts.settled,
     // Dormir n'est pas un objectif à compter : la première nuit se passe par world.sleep, jamais par une réclamation
     sleep: () => 0,

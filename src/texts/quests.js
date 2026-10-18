@@ -218,7 +218,7 @@ const QUEST_TEXTS = {
         say: 'Maerys dit que les bêtes attendent qu’on se souvienne d’elles.'
     },
     voyageur: {
-        label: 'Comble un voyageur',
+        label: 'Accueille un arrivant',
         say: 'Une barque approche… et elle ne se brise pas. Ils ont vu nos lanternes.'
     },
     coeur: {
@@ -242,8 +242,8 @@ const QUEST_TEXTS = {
         say: 'Des voyageurs voudraient rester. Il leur faut un toit.'
     },
     installe: {
-        label: 'Garde un voyageur sur l’île',
-        say: 'Quelqu’un hésite à repartir. Une maison l’attend.'
+        label: 'Accueille un deuxième arrivant',
+        say: 'Une autre barque approche. Une maison l’attend.'
     },
     hameau: {
         label: 'Achète Le Hameau',
