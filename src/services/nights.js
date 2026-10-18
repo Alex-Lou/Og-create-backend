@@ -4,11 +4,13 @@
 // le plus proche :
 // - une clôture ou un muret barre sa case, même dans la lumière (choix de l'auteur, 13 oct. : la barrière d'abord, l'enclos
 //   du Feu sert vraiment) ;
-// - une lumière (le feu du Foyer, une lanterne, un brasero : 3 cases ; une torche : 2) change en luciole celui qui passe
-//   à sa portée ; sous la pluie (services/weather.js), le feu de camp ne porte qu'à RAIN_REACH case, sauf le Foyer à
-//   l'Abri (palier II) qui le couvre (choix de l'auteur, 14 oct.) ;
+// - une lumière (le feu du Foyer, une lanterne, un brasero : 3 cases ; une torche : 2) arrête celui qui arrive à sa
+//   portée : il s'arrête au bord, boude et rentre dans la brume ('repousse') ; les téméraires (BOLD) y entrent, s'y
+//   brûlent et se dissipent ('brule') (choix de l'auteur, 18 oct. : plus de lucioles) ; sous la pluie
+//   (services/weather.js), le feu de camp ne porte qu'à RAIN_REACH case, sauf le Foyer à l'Abri (palier II) qui le
+//   couvre (choix de l'auteur, 14 oct.) ;
 // - le coq (choix de l'auteur, 14 oct.) voit à COQ_SIGHT cases de son poulailler : le premier qui passerait (ni barré, ni
-//   luciole), il chante, le camp s'éveille et le chasse, une fois par nuit ;
+//   arrêté par une lumière), il chante, le camp s'éveille et le chasse, une fois par nuit ;
 // - un camarade content repousse celui qui vise son bâtiment, une fois par nuit ;
 // - un toucher du joueur en repousse un.
 // Chacun sa manière (choix de l'auteur, 14 oct. : HISTOIRE.md, § 6.15 ; KINDS) : le serveur décide qui sort.
@@ -50,7 +52,11 @@ const PACE = { zombie: 1.5, bete: 0.75 };
 const paceOf = kind => Math.round(MS_PER_CELL * (PACE[kind] || 1));
 // L'Esprit revient tant après l'instant où il serait arrivé ; ce qui le fait revenir
 const RETURN_MS = 3 * 60 * 1000;
-const RETURNS = new Set(['touche', 'barre', 'coq', 'camarade']);
+const RETURNS = new Set(['touche', 'barre', 'repousse', 'coq', 'camarade']);
+// Les téméraires, qui entrent dans la lumière et s'y brûlent (choix de l'auteur, 18 oct.) : les plus gros, la bête de
+// brume et le Noyé, toujours ; un Sans-Nom sur BOLD_ODDS, tiré de son identifiant (le même sur tous les appareils)
+const BOLD = new Set(['bete', 'noye']);
+const BOLD_ODDS = 4;
 // Les premières nuits, écrites (la n-ième nuit depuis la présentation) ; au-delà, des Sans-Nom
 const SCRIPT = [['fantome', 'fantome', 'fantome'], ['fantome', 'zombie', 'fantome'], ['fantome', 'zombie', 'esprit']];
 // Puis le rythme du long terme : un mélange pondéré par ce qui existe ; le Noyé, plus nombreux les nuits de pluie ; une
@@ -271,10 +277,12 @@ function barredAt(path, fences) {
     }
     return -1;
 }
-// Le sort d'un égaré sur son chemin : { end: 'luciole' | 'barre' | 'dort' | 'arrive', step, path? } (step : la case où il
-// s'arrête ; path : son chemin, s'il a dévié). La barrière d'abord : une clôture sur son chemin l'arrête (le Dormeur s'y
-// endort ; la Racine passe dessous), même s'il passe avant dans une lumière ; sinon, la première lumière à portée le
-// change en luciole (pas le Dormeur)
+// Un téméraire ? (BOLD)
+const boldOf = creature => BOLD.has(creature.kind) || (creature.kind === 'fantome' && Math.floor(randomOf(creature.id, 'temeraire')() * BOLD_ODDS) === 0);
+// Le sort d'un égaré sur son chemin : { end: 'repousse' | 'brule' | 'barre' | 'dort' | 'arrive', step, path? } (step : la
+// case où il s'arrête ; path : son chemin, s'il a dévié). La barrière d'abord : une clôture sur son chemin l'arrête (le
+// Dormeur s'y endort ; la Racine passe dessous), même s'il passe avant dans une lumière ; sinon, la première lumière à
+// portée l'arrête au bord (pas le Dormeur) ; un téméraire y fait encore un pas, et s'y brûle
 function fateOf(creature, defense) {
     const detour = creature.kind === 'fantome' ? detourOf(creature.path, defense) : null;
     const path = detour || creature.path;
@@ -285,7 +293,8 @@ function fateOf(creature, defense) {
     if (creature.kind !== 'zombie') {
         for (const [step, cell] of path.entries()) {
             const at = creature.at + step * pace;
-            if (defense.lights.some(light => distance(light, cell) <= reachAt(light, defense, at))) return out({ end: 'luciole', step });
+            if (!defense.lights.some(light => distance(light, cell) <= reachAt(light, defense, at))) continue;
+            return out(boldOf(creature) ? { end: 'brule', step: Math.min(step + 1, path.length - 1) } : { end: 'repousse', step });
         }
     }
     return out({ end: 'arrive', step: path.length - 1 });
@@ -308,7 +317,7 @@ function crowOf(plan, fates, watch) {
 // L'issue d'une nuit : le sort de chacun, et la panne (le premier arrivé embrume son bâtiment), ou null.
 // helpers : Set des bâtiments dont le camarade est content (il repousse un égaré, une fois) ; repelled : Set des égarés
 // repoussés d'un toucher ; watch : la place du coq ({ x, y }), ou null. { fates: { id: { end, step, path? } }, panne: { site, at } | null }
-// (l'Esprit qui ne revient pas, parce que sa première sortie a fini en luciole ou arrivée : end 'absent')
+// (l'Esprit qui ne revient pas, parce que sa première sortie a fini brûlée ou arrivée : end 'absent')
 function outcomeOf(plan, defense, helpers = new Set(), repelled = new Set(), watch = null) {
     const helping = new Set(helpers);
     const fates = {};
@@ -358,6 +367,6 @@ const repairOf = (site, level) => ({ resource: STONE_SITES.has(site) ? 'stone' :
 
 module.exports = {
     LIGHT_REACH, REACH, COQ_SIGHT, RAIN_REACH, SHELTER_LEVEL, MS_PER_CELL, LIGHTS, FENCES, countOf, anyaTimesOn, barredAt,
-    KINDS, SIGHT, RETURN_MS, SCRIPT, paceOf, indexOf, kindsOf, underFence,
+    KINDS, SIGHT, RETURN_MS, SCRIPT, BOLD_ODDS, paceOf, indexOf, kindsOf, underFence, boldOf,
     parisAt, dayOf, nextDay, boundsOf, nightAt, nightNear, endedBetween, borderOf, lineOf, planOf, defenseOf, fateOf, outcomeOf, repairOf
 };

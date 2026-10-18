@@ -96,12 +96,12 @@ test('ils sortent du bord de la brume et marchent droit vers le bâtiment le plu
   assert.deepEqual(nights.planOf(42, N(0), { ...island, sites: [] }), []);
 });
 
-test('la lumière les change en lucioles (3 cases, la torche 2), la clôture barre sa case d’abord, le feu du Foyer éclaire', () => {
+test('la lumière les arrête à son bord (3 cases, la torche 2), la clôture barre sa case d’abord, le feu du Foyer éclaire', () => {
   const walker = { id: 'n:0', site: 'puits', path: nights.lineOf({ x: 10, y: 10 }, { x: 20, y: 10 }), at: 0, arrives: 10 * nights.MS_PER_CELL };
   const none = nights.defenseOf([], {});
   assert.deepEqual(nights.fateOf(walker, none), { end: 'arrive', step: 10 });
-  // Une lanterne à 3 cases du chemin : luciole dès la première case à portée ; à 4, rien
-  assert.deepEqual(nights.fateOf(walker, nights.defenseOf([{ craft: 'lanterne', x: 15, y: 13 }], {})), { end: 'luciole', step: 2 });
+  // Une lanterne à 3 cases du chemin : arrêté dès la première case à portée ; à 4, rien
+  assert.deepEqual(nights.fateOf(walker, nights.defenseOf([{ craft: 'lanterne', x: 15, y: 13 }], {})), { end: 'repousse', step: 2 });
   assert.deepEqual(nights.fateOf(walker, nights.defenseOf([{ craft: 'lanterne', x: 15, y: 14 }], {})), { end: 'arrive', step: 10 });
   // Une clôture sur le chemin ; à côté, rien
   assert.deepEqual(nights.fateOf(walker, nights.defenseOf([{ craft: 'cloture', x: 14, y: 10 }], {})), { end: 'barre', step: 4 });
@@ -111,12 +111,12 @@ test('la lumière les change en lucioles (3 cases, la torche 2), la clôture bar
   // Le feu du Foyer : son emprise compte comme une lumière
   const foyer = map.footprintOf('foyer', 1);
   const toFoyer = { ...walker, path: nights.lineOf({ x: foyer.x - 6, y: foyer.y }, { x: foyer.x, y: foyer.y }) };
-  assert.deepEqual(nights.fateOf(toFoyer, nights.defenseOf([], { foyer: 1 })), { end: 'luciole', step: 3 });
+  assert.deepEqual(nights.fateOf(toFoyer, nights.defenseOf([], { foyer: 1 })), { end: 'repousse', step: 3 });
   // La barrière d'abord (choix de l'auteur, 13 oct.) : l'enclos du Feu, dans sa lumière, l'arrête
   const ring = { craft: 'cloture', x: foyer.x - 1, y: foyer.y };
   assert.deepEqual(nights.fateOf(toFoyer, nights.defenseOf([ring], { foyer: 1 })), { end: 'barre', step: 5 });
   // Une torche éclaire à 2 cases ; à 3, rien
-  assert.deepEqual(nights.fateOf(walker, nights.defenseOf([{ craft: 'torche', x: 15, y: 12 }], {})), { end: 'luciole', step: 3 });
+  assert.deepEqual(nights.fateOf(walker, nights.defenseOf([{ craft: 'torche', x: 15, y: 12 }], {})), { end: 'repousse', step: 3 });
   assert.deepEqual(nights.fateOf(walker, nights.defenseOf([{ craft: 'torche', x: 15, y: 13 }], {})), { end: 'arrive', step: 10 });
 });
 
@@ -124,12 +124,12 @@ test('sous la pluie, le feu de camp ne porte qu’à une case ; le Foyer à l’
   const foyer = map.footprintOf('foyer', 1);
   const toFoyer = { id: 'n:0', site: 'foyer', path: nights.lineOf({ x: foyer.x - 6, y: foyer.y }, { x: foyer.x, y: foyer.y }), at: 0, arrives: 0 };
   const wet = () => true;
-  assert.deepEqual(nights.fateOf(toFoyer, nights.defenseOf([], { foyer: 1 }, undefined, wet)), { end: 'luciole', step: 5 });
+  assert.deepEqual(nights.fateOf(toFoyer, nights.defenseOf([], { foyer: 1 }, undefined, wet)), { end: 'repousse', step: 5 });
   // (il ne pleut qu'à partir de la 2e case : à la 3e, le feu crachote déjà)
-  assert.deepEqual(nights.fateOf(toFoyer, nights.defenseOf([], { foyer: 1 }, undefined, at => at >= 2 * nights.MS_PER_CELL)), { end: 'luciole', step: 5 });
-  assert.deepEqual(nights.fateOf(toFoyer, nights.defenseOf([], { foyer: 2 }, undefined, wet)), { end: 'luciole', step: 3 });
+  assert.deepEqual(nights.fateOf(toFoyer, nights.defenseOf([], { foyer: 1 }, undefined, at => at >= 2 * nights.MS_PER_CELL)), { end: 'repousse', step: 5 });
+  assert.deepEqual(nights.fateOf(toFoyer, nights.defenseOf([], { foyer: 2 }, undefined, wet)), { end: 'repousse', step: 3 });
   const walker = { id: 'n:1', site: 'puits', path: nights.lineOf({ x: 10, y: 10 }, { x: 20, y: 10 }), at: 0, arrives: 0 };
-  assert.deepEqual(nights.fateOf(walker, nights.defenseOf([{ craft: 'lanterne', x: 15, y: 13 }], {}, undefined, wet)), { end: 'luciole', step: 2 });
+  assert.deepEqual(nights.fateOf(walker, nights.defenseOf([{ craft: 'lanterne', x: 15, y: 13 }], {}, undefined, wet)), { end: 'repousse', step: 2 });
 });
 
 test('la météo du serveur est celle du jeu (même vecteur que tests/sky.test.js) ; la pluie et l’orage mouillent', () => {
@@ -182,9 +182,9 @@ test('le coq chante une fois par nuit : le premier qui arriverait à sa vue (4 c
   const helped = nights.outcomeOf(plan, open, new Set(['puits']), new Set(), coop);
   assert.deepEqual([helped.fates['n:1'].end, helped.fates['n:0'].end, helped.fates['n:2'].end], ['camarade', 'coq', 'arrive']);
   assert.deepEqual(helped.panne, { site: 'puits', at: plan[2].arrives });
-  // Une lumière qui les change tous en lucioles : le coq n'a rien à faire
+  // Une lumière qui les arrête tous : le coq n'a rien à faire
   const lit = nights.defenseOf([{ craft: 'lanterne', x: 1, y: 1 }], {});
-  assert.deepEqual(Object.values(nights.outcomeOf(plan, lit, new Set(), new Set(), coop).fates).map(f => f.end), ['luciole', 'luciole', 'luciole']);
+  assert.deepEqual(Object.values(nights.outcomeOf(plan, lit, new Set(), new Set(), coop).fates).map(f => f.end), ['repousse', 'repousse', 'repousse']);
 });
 
 test('qui sort : les trois premières nuits écrites, puis un mélange de ce qui existe ; le premier Noyé, la première Racine', () => {
@@ -230,11 +230,13 @@ test('d’où ils sortent et à quel pas : le Noyé de la mer, la Racine de la l
 test('chacun sa manière : le Sans-Nom dévie vers la lumière, le Dormeur s’endort contre la clôture, la Racine passe dessous, l’Esprit revient', () => {
   const path = nights.lineOf({ x: 10, y: 10 }, { x: 20, y: 10 });
   const walker = kind => ({ id: 'n:0', kind, site: 'puits', path, at: 0, pace: nights.paceOf(kind), arrives: 10 * nights.paceOf(kind) });
-  // Une lanterne à 5 cases au-dessus du chemin (hors de portée : 3) : le Sans-Nom la voit, y va, devient luciole
+  // Une lanterne à 5 cases au-dessus du chemin (hors de portée : 3) : le Sans-Nom la voit, y va, s'arrête à son bord
+  // (celui-ci n'est pas un téméraire)
   const lamp = nights.defenseOf([{ craft: 'lanterne', x: 15, y: 15 }], {});
   assert.equal(nights.fateOf(walker('bete'), lamp).end, 'arrive');
+  assert.equal(nights.boldOf(walker('fantome')), false);
   const ghost = nights.fateOf(walker('fantome'), lamp);
-  assert.equal(ghost.end, 'luciole');
+  assert.equal(ghost.end, 'repousse');
   assert.deepEqual([ghost.path[0], ghost.path.at(-1)], [{ x: 10, y: 10 }, { x: 15, y: 15 }]);
   assert.equal(nights.fateOf(walker('fantome'), nights.defenseOf([], {})).path, undefined);
   // Le Dormeur : la lumière ne lui fait rien ; une clôture l'endort
@@ -242,20 +244,20 @@ test('chacun sa manière : le Sans-Nom dévie vers la lumière, le Dormeur s’e
   assert.equal(nights.fateOf(walker('zombie'), near).end, 'arrive');
   const fence = nights.defenseOf([{ craft: 'cloture', x: 14, y: 10 }], {});
   assert.deepEqual(nights.fateOf(walker('zombie'), fence), { end: 'dort', step: 4 });
-  // La Racine passe sous la clôture ; la lumière la change
+  // La Racine passe sous la clôture ; la lumière l'arrête
   assert.equal(nights.fateOf(walker('racine'), fence).end, 'arrive');
-  assert.equal(nights.fateOf(walker('racine'), near).end, 'luciole');
+  assert.equal(nights.fateOf(walker('racine'), near).end, 'repousse');
   // (au matin, Brume dit qu'elle est passée sous une clôture : seulement si une clôture était sur son chemin avant son arrêt)
   const under = defense => nights.underFence(walker('racine'), nights.fateOf(walker('racine'), defense), defense);
   const both = nights.defenseOf([{ craft: 'cloture', x: 14, y: 10 }, { craft: 'lanterne', x: 15, y: 12 }], {});
   assert.deepEqual([under(fence), under(near), under(both)], [true, false, false]);
   assert.equal(nights.underFence(walker('zombie'), nights.fateOf(walker('zombie'), fence), fence), false);
-  // L'Esprit : repoussé (clôture, toucher), il revient ; changé en luciole, jamais
+  // L'Esprit : repoussé (clôture, lumière, toucher), il revient (choix de l'auteur, 18 oct. : la lumière aussi)
   const spirit = walker('esprit');
   const back = { ...walker('esprit'), id: 'n:0:retour', back: 'n:0', at: spirit.arrives + nights.RETURN_MS, arrives: spirit.arrives + nights.RETURN_MS + 10 * nights.MS_PER_CELL };
   const plan = [spirit, back];
   assert.deepEqual(nights.outcomeOf(plan, fence).fates['n:0:retour'], { end: 'barre', step: 4 });
-  assert.deepEqual(nights.outcomeOf(plan, near).fates['n:0:retour'], { end: 'absent', step: null });
+  assert.deepEqual(nights.outcomeOf(plan, near).fates['n:0:retour'], { end: 'repousse', step: 2 });
   const touched = nights.outcomeOf(plan, nights.defenseOf([], {}), new Set(), new Set(['n:0']));
   assert.deepEqual(touched.fates['n:0:retour'], { end: 'arrive', step: 10 });
   assert.deepEqual(touched.panne, { site: 'puits', at: back.arrives });
@@ -269,4 +271,19 @@ test('réparer : de la pierre ou du bois, 3 au palier I puis 2 de plus par palie
   assert.deepEqual(nights.repairOf('puits', 2), { resource: 'stone', amount: 5 });
   assert.deepEqual(nights.repairOf('bosquet', 4), { resource: 'wood', amount: 9 });
   assert.deepEqual(nights.repairOf('foyer', 1), { resource: 'stone', amount: 3 });
+});
+
+test('les téméraires (choix de l’auteur, 18 oct.) : la bête de brume et le Noyé entrent dans la lumière et s’y brûlent ; un Sans-Nom sur quatre', () => {
+  const path = nights.lineOf({ x: 10, y: 10 }, { x: 20, y: 10 });
+  const walker = (kind, id = 'n:0') => ({ id, kind, site: 'puits', path, at: 0, pace: nights.paceOf(kind), arrives: 10 * nights.paceOf(kind) });
+  const near = nights.defenseOf([{ craft: 'lanterne', x: 15, y: 12 }], {});
+  // (arrêtés à la première case à portée, la 3e ; un téméraire fait encore un pas, et s'y brûle)
+  assert.deepEqual(['bete', 'noye', 'esprit', 'racine'].map(kind => nights.fateOf(walker(kind), near)),
+    [{ end: 'brule', step: 3 }, { end: 'brule', step: 3 }, { end: 'repousse', step: 2 }, { end: 'repousse', step: 2 }]);
+  // (un Sans-Nom sur quatre, environ, et toujours le même pour un même identifiant)
+  const bold = Array.from({ length: 400 }, (_, i) => nights.boldOf(walker('fantome', `n:${i}`))).filter(Boolean).length;
+  assert.ok(bold > 70 && bold < 130, String(bold));
+  assert.equal(nights.boldOf(walker('fantome', 'n:7')), nights.boldOf(walker('fantome', 'n:7')));
+  // Brûlé, l'Esprit ne revient pas : seul un téméraire se brûle, et l'Esprit n'en est pas un
+  assert.equal(nights.boldOf(walker('esprit')), false);
 });

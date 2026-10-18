@@ -12,7 +12,9 @@ const { MISSING_RESOURCES } = require('../../texts/errors');
 const PREFIX = 'abri:';
 // Ce que coûte chaque abri, et la quête faite avant laquelle il ne se bâtit pas
 const SHELTERS = {
-    cannelle: { after: 'poulailler', cost: { wood: 20, stone: 10 } }
+    cannelle: { after: 'poulailler', cost: { wood: 20, stone: 10 } },
+    // (le coin de Nathan, le matin de son jour : choix de l'auteur, 18 oct.)
+    rivet: { after: 'nuit-cannelle', cost: { wood: 20, stone: 10 } }
 };
 
 // Les abris bâtis : Set des « qui »

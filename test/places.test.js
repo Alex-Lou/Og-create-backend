@@ -135,7 +135,7 @@ test.describe('île', () => {
     await sql(`UPDATE world_items SET bought_at = now() - interval '12 days' WHERE user_id = $1 AND item = 'ile:plage'`, [player.userId]);
     assert.equal((await view()).camp.find(c => c.id === 'hirondelle').stade, 2);
     // Le suivi des quêtes montre tout le tutoriel : vingt-deux étapes, de la première page au premier chemin
-    assert.deepEqual([start.brume.steps.length, start.brume.steps[0].id, start.brume.steps.at(-1).id], [25, 'pages', 'chemin']);
+    assert.deepEqual([start.brume.steps.length, start.brume.steps[0].id, start.brume.steps.at(-1).id], [26, 'pages', 'chemin']);
     assert.ok(start.brume.steps.every(st => st.label && st.done === false));
     // Le feu fait : personne encore (la première nuit se passe seul) ; la nuit passée : Lorena arrive, son Ponton et
     // son camp avec elle

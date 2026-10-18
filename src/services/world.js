@@ -87,7 +87,7 @@ async function factsOf(userId, owned, stars, conn = db, moods = null) {
     // (lectures indépendantes, ensemble ; dans une transaction, elles passent l'une après l'autre sur sa connexion)
     const count = (sql, params) => countOf(conn, sql, params);
     const [{ levels }, zones, craftRows, filled, lastRows, friends, runs, annexCount, houses, expeditions, found, gathered, pickupCount, hensFed,
-        settled, names, crateRows, hensFreed, coops] = await Promise.all([
+        settled, names, crateRows, hensFreed, coops, itemRows] = await Promise.all([
         levelsOf(userId, conn), zonesOf(userId, conn), craftsOf(userId, conn), needRowsOf(userId, conn),
         conn.query('SELECT MAX(claimed_at) AS at FROM world_quests WHERE user_id = $1', [userId]), friendsOf(userId, conn), runsOf(userId, conn),
         count('SELECT COUNT(*)::int AS n FROM world_annexes WHERE user_id = $1', [userId]),
@@ -107,7 +107,9 @@ async function factsOf(userId, owned, stars, conn = db, moods = null) {
         conn.query(`SELECT source FROM world_chests WHERE user_id = $1 AND source LIKE 'caisse:%'`, [userId]),
         // La cage des poules ouverte (chacune a sa ligne : world/beasts.js) ; le poulailler d’Agathe posé
         count('SELECT COUNT(*)::int AS n FROM world_beasts WHERE user_id = $1 AND beast = ANY($2)', [userId, beastRules.HENS]),
-        count('SELECT COUNT(*)::int AS n FROM world_annexes WHERE user_id = $1 AND annex = $2', [userId, 'poulailler'])
+        count('SELECT COUNT(*)::int AS n FROM world_annexes WHERE user_id = $1 AND annex = $2', [userId, 'poulailler']),
+        // (les articles de boutique que demandent les quêtes, possédés)
+        conn.query('SELECT item FROM world_items WHERE user_id = $1 AND item = ANY($2)', [userId, quests.ITEMS])
     ]);
     const placed = placedOf(craftRows);
     const { places } = await placesOf(userId, conn);
@@ -138,6 +140,7 @@ async function factsOf(userId, owned, stars, conn = db, moods = null) {
         hensFed,
         hensFreed,
         coops,
+        items: new Set(itemRows.rows.map(r => r.item)),
         crates: new Set(crateRows.rows.map(r => r.source.slice('caisse:'.length))),
         // Les abris bâtis (world/shelters.js) ; l'enclos autour d'un coin, une fois son abri bâti
         shelters,
@@ -974,7 +977,10 @@ async function buyItem(userId, itemId) {
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
         const { levels } = await levelsOf(userId, conn);
-        if (!(await zonesOf(userId, conn)).has(map.siteZone(item.site)) || !(levels[item.site] || 0)) return db.rollback({ status: 403, message: W.BUILD_FIRST });
+        // (le Ponton bâti au tutoriel, sans son quartier : tutorialPonton ; sa boutique est ouverte, sa Canne à pêche est
+        // le premier outil du joueur, quête outil-rivet)
+        const owned = item.site === 'ponton' || (await zonesOf(userId, conn)).has(map.siteZone(item.site));
+        if (!owned || !(levels[item.site] || 0)) return db.rollback({ status: 403, message: W.BUILD_FIRST });
         if (levels[item.site] < item.minLevel) return db.rollback({ status: 403, message: W.NEED_TIER(CHAPTER_OF_LEVEL[item.minLevel - 1]) });
         // La production en attente est encaissée AVANT que l'article existe : son bonus ne vaut que pour la suite (sinon
         // il s'appliquait à toute la production accumulée, et acheter puis annuler la gonflait sans rien payer)

@@ -65,7 +65,7 @@ async function stowCrafts(userId, rows, levels, zones, annexRows, places = STATI
     return craftsOf(userId);
 }
 // Ce que le tutoriel fait fabriquer sans palier ni éléments (crafts.TUTORIAL_CRAFTS), pendant sa leçon seulement (la
-// lanterne de Nathan : la quête « deco » en cours). presence : people.presenceOf
+// quête « deco » en cours). presence : people.presenceOf
 const LESSON = 'deco';
 const questNow = presence => quests.QUESTS.find(q => !presence.done.has(q.id))?.id;
 const tutorialOf = presence => (questNow(presence) === LESSON ? crafts.TUTORIAL_CRAFTS : new Set());

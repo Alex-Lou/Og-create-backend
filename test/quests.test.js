@@ -7,20 +7,21 @@ const map = require('../src/services/worldMap');
 const { SITES } = require('../src/services/world');
 const { CRAFT_BY_ID } = require('../src/services/crafts');
 const { LANDMARKS } = require('../src/services/landmarks');
+const { ITEM_BY_ID } = require('../src/services/worldShop');
 const { VILLAGERS, NEEDS } = require('../src/services/villagers');
 
 const ACTS = ['T', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
 const facts = (extra = {}) => ({
   crafts: 0, placed: new Set(), placedCount: {}, runs: 0, stars: 0, elements: new Set(['Eau', 'Feu', 'Terre', 'Air']), zones: new Set(['coeur']),
   levels: { foyer: 1 }, annexes: 0, houses: 0, met: new Set(), awake: new Set(), hearts: 0, expeditions: 0, landmarks: new Set(),
-  gathered: 0, pickups: 0, hensFed: 0, crates: new Set(), settled: 0, named: false, ...extra
+  gathered: 0, pickups: 0, hensFed: 0, crates: new Set(), items: new Set(), settled: 0, named: false, ...extra
 });
 // Les 21 anciennes quêtes, dans leur ordre d'avant la bible
 const OLD = ['deco', 'recolte', 'source', 'puits', 'lisiere', 'cabane', 'livre5', 'colline', 'mine', 'livre12', 'jardins', 'serre', 'maison',
   'crique', 'ponton', 'livre45', 'hameau', 'deco10', 'phare', 'livre70', 'legendes'];
 
 test('chaque quête désigne un vrai quartier, palier, création, lieu ou habitant, avec un texte et une récompense', () => {
-  assert.equal(QUESTS.length, 73);
+  assert.equal(QUESTS.length, 74);
   assert.equal(new Set(QUESTS.map(q => q.id)).size, QUESTS.length);
   for (const q of QUESTS) {
     assert.match(q.id, /^[a-z0-9-]{1,30}$/);
@@ -42,6 +43,7 @@ test('chaque quête désigne un vrai quartier, palier, création, lieu ou habita
       assert.ok(q.id === 'feu' || q.label.toLowerCase().includes(tier.name.toLowerCase()), q.id);
     }
     if (goal.kind === 'craft') assert.ok(CRAFT_BY_ID[goal.craft], q.id);
+    if (goal.kind === 'item') assert.ok(ITEM_BY_ID[goal.item] && !ITEM_BY_ID[goal.item].rare, q.id);
     if (goal.kind === 'landmark' && goal.landmark) assert.ok(LANDMARKS.some(l => l.id === goal.landmark), q.id);
     if (['wake', 'need'].includes(goal.kind)) assert.ok(VILLAGERS[goal.villager], q.id);
     if (goal.kind === 'need') assert.ok(NEEDS[goal.what].cost, q.id);
@@ -51,7 +53,7 @@ test('chaque quête désigne un vrai quartier, palier, création, lieu ou habita
   const acts = QUESTS.map(q => ACTS.indexOf(q.act));
   assert.deepEqual(acts, [...acts].sort((a, b) => a - b));
   assert.deepEqual(QUESTS.filter(q => q.chest).map(q => q.act), ACTS);
-  assert.equal(QUESTS.reduce((sum, q) => sum + q.coins, 0), 5260);
+  assert.equal(QUESTS.reduce((sum, q) => sum + q.coins, 0), 5275);
   assert.ok(BEASTS.includes('Poisson') && !BEASTS.includes('Lapin'));
 });
 
@@ -104,6 +106,8 @@ test('avancée de chaque objectif, plafonnée', () => {
   check({ kind: 'hens', need: 1 }, { hensFed: 3 }, 1);
   check({ kind: 'crate', crate: 'aster' }, {}, 0);
   check({ kind: 'crate', crate: 'aster' }, { crates: new Set(['aster']) }, 1);
+  check({ kind: 'item', item: 'canne' }, {}, 0);
+  check({ kind: 'item', item: 'canne' }, { items: new Set(['canne']) }, 1);
   check({ kind: 'settle', need: 1 }, { settled: 0 }, 0);
   check({ kind: 'settle', need: 2 }, { settled: 1 }, 1, 2);
   check({ kind: 'name' }, { named: true }, 1);
@@ -113,13 +117,17 @@ test('la quête active est la première pas encore faite ; à la fin, Brume se r
   const first = active(new Set(), facts());
   assert.deepEqual(QUESTS.slice(0, 11).map(q => q.id), ['pages', 'ramasser', 'feu', 'nuit', 'caisse', 'recolte', 'premier-ponton', 'chemin-aster', 'clotures', 'portes', 'veille']);
   assert.match(QUESTS.find(q => q.id === 'feu').say, /Rallume-les/);
-  assert.deepEqual([first.id, first.act, first.step, first.total, first.kind, first.done], ['pages', 'T', 1, 73, 'element', false]);
+  assert.deepEqual([first.id, first.act, first.step, first.total, first.kind, first.done], ['pages', 'T', 1, 74, 'element', false]);
   assert.equal(active(new Set(), facts({ elements: new Set([...facts().elements, 'Vent']) })).done, true);
   // La lanterne de Nathan faite, on dort : Léo au matin, jamais le même jour (choix de l'auteur, 13 oct.)
   // (ses trois torches d'abord : choix de l'auteur, 13 oct.)
   const torches = active(new Set(['deco']), facts({ placedCount: { torche: 2 } }));
   assert.deepEqual([torches.id, torches.kind, torches.have, torches.need, torches.done], ['torches-rivet', 'craft', 2, 3, false]);
-  const night = active(new Set(['torches-rivet']), facts());
+  // (puis son premier outil : la Canne à pêche de la boutique du Ponton, choix de l'auteur, 18 oct.)
+  assert.equal(active(new Set(['torches-rivet']), facts()).id, 'outil-rivet');
+  const tool = active(new Set(['torches-rivet']), facts({ items: new Set(['canne']) }));
+  assert.deepEqual([tool.id, tool.kind, tool.coins, tool.done], ['outil-rivet', 'item', 15, true]);
+  const night = active(new Set(['outil-rivet']), facts());
   assert.deepEqual([night.id, night.kind, night.coins], ['nuit-rivet', 'sleep', 0]);
   const ondin = active(new Set(['nuit-rivet']), facts());
   assert.deepEqual([ondin.id, ondin.target], ['eveil-ondin', { villager: 'puits' }]);

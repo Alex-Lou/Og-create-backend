@@ -196,10 +196,10 @@ function tierLock(tier, open, stars = 0) {
     return T.TIER_LOCK.chapter(tier, missing);
 }
 
-// Les créations que le tutoriel fait fabriquer avant leur palier et leurs éléments (la lanterne de Nathan, sa première
-// leçon à l'établi, choix de l'auteur, 11 oct.) : world/creations.js les passe à blockOf (tutorial) tant qu'elle n'est
-// pas faite
-const TUTORIAL_CRAFTS = new Set(['lanterne']);
+// Les créations que le tutoriel fait fabriquer avant leur palier et leurs éléments : world/creations.js les passe à
+// blockOf (tutorial) pendant sa leçon. Aucune depuis le 18 oct. (choix de l'auteur : la lanterne de Nathan attendra
+// l'électricité ; ses torches, des créations « de début », n'en ont pas besoin)
+const TUTORIAL_CRAFTS = new Set();
 // Ce qui se pose en ligne, d'un glisser (choix de l'auteur, 13 oct.) : une pièce par case traversée, fabriquée et payée
 // en passant, une fois la première assemblée à la main ; au plus LINE_MAX cases d'un trait
 const LINE_CRAFTS = new Set(['cloture', 'muret']);

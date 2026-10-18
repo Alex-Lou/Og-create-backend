@@ -193,10 +193,11 @@ async function repairSite(userId, site, now = Date.now()) {
 // back?, end, step }] (leur sort avec l'île d'à présent ; path : celui qu'ils suivent ; l'Esprit qui ne reviendra pas
 // n'y est pas), panne (le bâtiment que la nuit embrumerait, ou null), blight: { site, since, repair: { resource, amount } }
 // | null, last : le bilan de la dernière nuit finie (lastOf) }
-// Le bilan de la dernière nuit finie (Brume le dit au matin) : { id, counts: { luciole, barre, dort, coq, camarade,
-// touche, arrive, revenu (les Esprits revenus) }, kinds: { espèce: nombre } (ceux sortis, sans les retours), lit:
-// { espèce: nombre } (ceux changés en lucioles), under (les Racines passées sous une clôture), panne (le bâtiment qu'elle
-// a embrumé, ou null) }, ou null avant la première nuit. Brume en tire une ligne par espèce (lot 03 d'écriture, § 7.2)
+// Le bilan de la dernière nuit finie (Brume le dit au matin) : { id, counts: { repousse, brule, barre, dort, coq,
+// camarade, touche, arrive, revenu (les Esprits revenus) }, kinds: { espèce: nombre } (ceux sortis, sans les retours),
+// burnt: { espèce: nombre } (ceux que la lumière a brûlés), under (les Racines passées sous une clôture), panne (le
+// bâtiment qu'elle a embrumé, ou null) }, ou null avant la première nuit. Brume en tire une ligne par espèce (lot 03
+// d'écriture, § 7.2)
 function lastOf(userId, row, first, { island, defense, helpersAt, watchAt }, now) {
     const night = nights.endedBetween(now - 2 * clock.CYCLE_MS, now).pop();
     if (!night) return null;
@@ -205,9 +206,9 @@ function lastOf(userId, row, first, { island, defense, helpersAt, watchAt }, now
     const repelled = new Set(row.repelled.night === night ? row.repelled.ids : []);
     const plan = nights.planOf(userId, night, { ...island, first });
     const { fates } = nights.outcomeOf(plan, defense, helpersAt(end), repelled, watchAt(start));
-    const counts = { luciole: 0, barre: 0, dort: 0, coq: 0, camarade: 0, touche: 0, arrive: 0, revenu: 0 };
+    const counts = { repousse: 0, brule: 0, barre: 0, dort: 0, coq: 0, camarade: 0, touche: 0, arrive: 0, revenu: 0 };
     const kinds = {};
-    const lit = {};
+    const burnt = {};
     let under = 0;
     for (const creature of plan) {
         const { end: fate } = fates[creature.id];
@@ -215,11 +216,11 @@ function lastOf(userId, row, first, { island, defense, helpersAt, watchAt }, now
         counts[fate] += 1;
         if (creature.back) counts.revenu += 1;
         else kinds[creature.kind] = (kinds[creature.kind] || 0) + 1;
-        if (fate === 'luciole') lit[creature.kind] = (lit[creature.kind] || 0) + 1;
+        if (fate === 'brule') burnt[creature.kind] = (burnt[creature.kind] || 0) + 1;
         if (nights.underFence(creature, fates[creature.id], defense)) under += 1;
     }
     const blight = row.blights.find(b => msOf(b.since) >= start && msOf(b.since) <= end);
-    return { id: night, counts, kinds, lit, under, panne: blight ? blight.site : null };
+    return { id: night, counts, kinds, burnt, under, panne: blight ? blight.site : null };
 }
 
 async function nightsView(userId, conn = db, now = Date.now()) {

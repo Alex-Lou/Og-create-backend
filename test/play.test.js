@@ -656,9 +656,9 @@ test('créations d’île : assembler (pièces vérifiées), payer à la réussi
   assert.equal((await api('POST', '/play/world/craft/store', bench, player)).status, 200);
   assert.deepEqual([await move(lamp, away), await move(away, lamp)], [200, 200]);
   assert.equal((await place('banc', bench.x, bench.y)).status, 200);
-  // Les créations comptent pour les quêtes de Brume (la quête « deco » du prologue) ; entrées invalides ; compte requis
-  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'nuit-cannelle')`, [player.userId]);
-  assert.deepEqual([(await view()).brume.quest.id, (await view()).brume.quest.done], ['deco', true]);
+  // Les créations comptent pour les quêtes de Brume (la quête « lanterne » de l'acte I) ; entrées invalides ; compte requis
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'lumiere')`, [player.userId]);
+  assert.deepEqual([(await view()).brume.quest.id, (await view()).brume.quest.done], ['lanterne', true]);
   assert.equal((await start('inconnue')).status, 404);
   assert.equal((await start('DROP')).status, 400);
   assert.equal((await finish('x', [])).status, 400);
@@ -2499,7 +2499,7 @@ test('quêtes de Brume : la quête active se réclame une fois, son objectif att
   assert.equal(start.status, 200);
   assert.deepEqual([start.data.brume.quest.id, start.data.brume.quest.kind, start.data.brume.quest.done], ['pages', 'element', false]);
   assert.equal(start.data.brume.done, 0);
-  assert.equal(start.data.brume.total, 73);
+  assert.equal(start.data.brume.total, 74);
   // Objectif pas encore atteint ; quête qui n'est pas l'active ; identifiant invalide
   assert.equal((await api('POST', '/play/world/quest', { id: 'pages' }, player)).status, 403);
   assert.equal((await api('POST', '/play/world/quest', { id: 'recolte' }, player)).status, 409);
@@ -2721,12 +2721,14 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Lorena ouvre 
   assert.equal((await claim('enclos-cannelle')).status, 200);
   assert.equal(who(await view(), 'atelier'), undefined);
   assert.equal((await api('POST', '/play/world/sleep', {}, player)).status, 200);
-  // Nathan est là ; sa lanterne (au tutoriel, sans palier ni éléments) posée
+  // Nathan est là ; il s'installe dans son coin (choix de l'auteur, 18 oct.) : son abri, bâti et payé comme celui
+  // d’Agathe ; sa lanterne attendra l'électricité (plus de leçon qui la fasse fabriquer avant son palier)
   const rivet = await view();
-  assert.deepEqual(who(rivet, 'atelier').built, false);
-  const lantern = rivet.crafts.catalog.find(c => c.id === 'lanterne');
-  assert.ok(!/Palier|savoir faire/.test(lantern.block || ''), lantern.block);
-  await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'lanterne', $2, $3)`, [player.userId, X(31), Y(35)]);
+  assert.deepEqual([who(rivet, 'atelier').built, rivet.brume.quest.id, rivet.camp.find(c => c.id === 'rivet').art], [false, 'deco', 'rivet_debris']);
+  assert.match(rivet.crafts.catalog.find(c => c.id === 'lanterne').block || '', /Palier|savoir faire/);
+  await sql('UPDATE world_stock SET wood = wood + 20, stone = stone + 10 WHERE user_id = $1', [player.userId]);
+  const nest = await api('POST', '/play/world/shelter', { who: 'rivet' }, player);
+  assert.deepEqual([nest.status, nest.data.world.brume.quest.done, nest.data.world.camp.find(c => c.id === 'rivet').art], [200, true, 'rivet_abri'], JSON.stringify(nest.data.message || ''));
   assert.equal((await claim('deco')).status, 200);
   assert.equal(await coinsOf(player), 220);
   // Ses trois torches (choix de l'auteur, 13 oct.) : une création « de début », 2 bois, le Feu suffit
@@ -2734,6 +2736,15 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Lorena ouvre 
   assert.deepEqual([torch.open, torch.cost, torch.block], [true, { wood: 2 }, null]);
   for (const x of [X(20), X(21), X(22)]) await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'torche', $2, $3)`, [player.userId, x, Y(20)]);
   assert.equal((await claim('torches-rivet')).status, 200);
+  // Son premier outil (choix de l'auteur, 18 oct.) : la Canne à pêche du Ponton, bâti au tutoriel sans son quartier (sa
+  // boutique est ouverte) ; pas réclamable avant l'achat
+  const tool = await view();
+  assert.deepEqual([tool.brume.quest.id, tool.brume.quest.done], ['outil-rivet', false]);
+  assert.equal((await claim('outil-rivet')).status, 403);
+  const bought = await api('POST', '/play/world/item', { item: 'canne' }, player);
+  assert.deepEqual([bought.status, bought.data.world.brume.quest.done], [200, true], JSON.stringify(bought.data.message || ''));
+  assert.equal((await claim('outil-rivet')).status, 200);
+  assert.equal(await coinsOf(player), 220 + 15 - 80 + 15);
   // Le jour de Nathan finit : Léo n'est pas encore là ; la quatrième nuit (choix de l'auteur, 13 oct. : chaque
   // personnage son jour), puis Léo dort au Puits (plus de quartier à acheter) : on le réveille en lui parlant
   const rivetNight = await view();
@@ -2758,8 +2769,9 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Lorena ouvre 
   assert.deepEqual(who(built.data.world, 'foyer').needs.map(n => n.id), ['manger', 'deco']);
   // (puis le premier chemin, du Puits au Feu : l'île neuve n'a que son sentier)
   assert.deepEqual([who(built.data.world, 'puits').built, built.data.world.brume.quest.id], [true, 'chemin']);
-  // (210 à la lanterne, les torches de Nathan 15, puis Léo : son réveil, sa Pluie, son Puits)
-  assert.equal(await coinsOf(player), 220 + 15 + 10 + 20 + 40);
+  // (220 à la lanterne, les torches de Nathan 15, sa canne payée 80 et réclamée 15, puis Léo : son réveil, sa Pluie,
+  // son Puits)
+  assert.equal(await coinsOf(player), 220 + 15 - 80 + 15 + 10 + 20 + 40);
   // Lorena est là depuis le matin qui suit le premier feu ; le chemin ne conditionne plus son arrivée (son Ponton bâti
   // hors de La Crique ne l'y installe pas encore : people.livesHere)
   assert.equal(who(built.data.world, 'ponton').built, false);

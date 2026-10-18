@@ -51,11 +51,11 @@ const has = (at, act) => at.acts.includes(act);
 const foyer = at => at.levels.foyer || 0;
 // Le camp de Lorena (et ce que la mer a laissé autour) arrive avec elle
 const aster = at => at.here('ponton');
-// Un coin de maître, une fois arrivé et tant que son bâtiment n'est pas bâti : débris, abri (acte I), cabanon (acte II,
-// et le Foyer à l'Abri)
+// Un coin de maître, une fois arrivé et tant que son bâtiment n'est pas bâti : débris, abri (acte I, ou bâti par le
+// joueur : world/shelters.js, celui de Nathan), cabanon (acte II, et le Foyer à l'Abri)
 const corner = (who, site) => at => {
     if (at.levels[site] || !at.here(site)) return null;
-    return `${who}_${has(at, 'II') && foyer(at) >= ABRI ? 'cabanon' : has(at, 'I') ? 'abri' : 'debris'}`;
+    return `${who}_${has(at, 'II') && foyer(at) >= ABRI ? 'cabanon' : has(at, 'I') || at.shelters.has(who) ? 'abri' : 'debris'}`;
 };
 // La végétation qui gagne la grande Hirondelle (choix de l'auteur, 15 oct.) : un stade par seuil de jours depuis le
 // début de l'île (herbes et mousse, lianes et fleurs, jeunes palmiers sur le pont)

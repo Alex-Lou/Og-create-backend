@@ -25,7 +25,7 @@ const settle = (userId, now) => db.transaction(async conn => worldNights.settleN
 const view = (userId, now) => worldNights.nightsView(userId, db, now);
 const blightsOf = async userId => (await sql('SELECT blights FROM world_nights WHERE user_id = $1', [userId]))[0].blights;
 // Le bilan d'une nuit (ce que Brume dit au matin) : combien de chaque sort
-const countsOf = ({ fates }) => Object.values(fates).reduce((out, f) => ({ ...out, [f.end]: out[f.end] + 1 }), { luciole: 0, barre: 0, dort: 0, coq: 0, camarade: 0, touche: 0, arrive: 0, revenu: 0 });
+const countsOf = ({ fates }) => Object.values(fates).reduce((out, f) => ({ ...out, [f.end]: out[f.end] + 1 }), { repousse: 0, brule: 0, barre: 0, dort: 0, coq: 0, camarade: 0, touche: 0, arrive: 0, revenu: 0 });
 
 // Une île : Brumelune et la Source, le Puits bâti ; sans défense posée ; ses habitants tristes, sans repas depuis un mois
 // (aucun camarade content : un habitant sans ligne de besoins arrive comblé, donc content). Le Puits est posé loin du
@@ -93,14 +93,14 @@ test('pas de nuit avant que Brume les présente, puis un jour de grâce ; ensuit
   assert.deepEqual(morning.blight, { site: panne.site, since: panne.at, repair: nights.repairOf(panne.site, 1) });
   // Brume en fait le bilan au matin : le sort de chacun, le bâtiment embrumé
   const counts = countsOf(nights.outcomeOf(plan, FIRE));
-  assert.deepEqual(morning.last, { id: night, counts, kinds: { fantome: 3 }, lit: counts.luciole ? { fantome: counts.luciole } : {}, under: 0, panne: panne.site });
+  assert.deepEqual(morning.last, { id: night, counts, kinds: { fantome: 3 }, burnt: counts.brule ? { fantome: counts.brule } : {}, under: 0, panne: panne.site });
   // Les nuits suivantes n'en embrument pas un second tant qu'il n'est pas réparé
   await settle(id, end + 6 * DAY);
   assert.equal((await blightsOf(id)).length, 1);
   assert.equal((await view(id, end + 6 * DAY)).panne, null);
 });
 
-test('une lumière près du Puits change en lucioles ceux qui y vont : aucune panne', async () => {
+test('une lumière près du Puits arrête ceux qui y vont (au bord, ou brûlés) : aucune panne', async () => {
   const player = await islandPlayer();
   const id = player.userId;
   await worldNights.startNights(id);
@@ -110,7 +110,7 @@ test('une lumière près du Puits change en lucioles ceux qui y vont : aucune pa
   // La lanterne au coin de la grande emprise du Puits, à côté de sa petite (2 × 2 cases)
   await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'lanterne', $2, $3)`, [id, PLACES.puits.x, PLACES.puits.y]);
   const evening = await view(id, start - HOUR);
-  assert.ok(evening.creatures.filter(c => c.site === 'puits').every(c => c.end === 'luciole'));
+  assert.ok(evening.creatures.filter(c => c.site === 'puits').every(c => ['repousse', 'brule'].includes(c.end)));
   assert.equal(evening.panne, null);
   await settle(id, end + 10 * MINUTE);
   assert.equal((await view(id, end + 10 * MINUTE)).blight, null);
@@ -179,10 +179,10 @@ test('la troisième nuit, un Esprit : repoussé d’un toucher, il revient par u
   const spirit = plan.find(c => c.kind === 'esprit' && !c.back);
   const back = plan.find(c => c.back === spirit.id);
   // (touchés une demi-case après leur sortie : un égaré marche une case toutes les 20 s, il peut s'arrêter très tôt)
-  // Pas encore repoussé (luciole ou arrivée) : son retour n'est pas dehors, ni à toucher
+  // Pas encore repoussé (brûlé ou arrivé) : son retour n'est pas dehors, ni à toucher
   const evening = await view(id, start - HOUR);
   assert.ok(evening.creatures.every(c => c.kind && c.pace));
-  assert.ok(!evening.creatures.some(c => c.id === back.id) || ['barre', 'coq', 'camarade'].includes(evening.creatures.find(c => c.id === spirit.id).end));
+  assert.ok(!evening.creatures.some(c => c.id === back.id) || ['barre', 'repousse', 'coq', 'camarade'].includes(evening.creatures.find(c => c.id === spirit.id).end));
   if (!evening.creatures.some(c => c.id === back.id)) assert.equal((await worldNights.repelCreature(id, back.id, back.at + back.pace / 2)).status, 409);
   // Un toucher : il boude, puis revient
   assert.deepEqual(await worldNights.repelCreature(id, spirit.id, spirit.at + spirit.pace / 2), { id: spirit.id, night });

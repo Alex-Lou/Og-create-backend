@@ -70,11 +70,13 @@ const QUESTS = [
     q('abri-cannelle', 'T', { kind: 'shelter', who: 'cannelle', villager: 'foyer' }, 15),
     q('enclos-cannelle', 'T', { kind: 'fence', who: 'cannelle', villager: 'foyer' }, 15),
     q('nuit-cannelle', 'T', { kind: 'sleep', site: 'foyer' }, 0),
-    // (sa première création : une lanterne, la suite des clôtures ; au tutoriel, sans palier ni éléments : crafts.js,
-    // TUTORIAL_CRAFTS)
-    q('deco', 'T', { kind: 'craft', craft: 'lanterne' }, 15),
+    // (il s'installe d'abord dans son coin : son abri, bâti et payé comme celui d’Agathe, world/shelters.js ; choix de
+    // l'auteur, 18 oct. : la lanterne attendra l'électricité. L'identifiant « deco » reste : LEGACY, creations.js)
+    q('deco', 'T', { kind: 'shelter', who: 'rivet', villager: 'atelier' }, 15),
     // (ses trois torches, une par côté d'où venaient les égarés de la veillée : choix de l'auteur, 13 oct.)
     q('torches-rivet', 'T', { kind: 'craft', craft: 'torche', need: 3 }, 15),
+    // (son premier outil, choix de l'auteur, 18 oct. : la Canne à pêche de la boutique du Ponton, qui produit plus)
+    q('outil-rivet', 'T', { kind: 'item', item: 'canne' }, 15),
     // La quatrième nuit (choix de l'auteur, 13 oct. : chaque personnage son jour, le suivant quand le joueur choisit de
     // dormir) : le jour de Nathan finit autour du feu ; Léo sera trouvé au matin
     q('nuit-rivet', 'T', { kind: 'sleep', site: 'foyer' }, 0),
@@ -145,6 +147,8 @@ const QUESTS = [
     q('phare-brume', 'VII', { kind: 'level', site: 'foyer', need: 7 }, 500, 'legendaire')
 ];
 const INDEX = new Map(QUESTS.map((quest, i) => [quest.id, i]));
+// Les articles de boutique que demandent les quêtes (objectif « item ») : ce que l'état en lit (services/world.js)
+const ITEMS = QUESTS.filter(quest => quest.goal.kind === 'item').map(quest => quest.goal.item);
 
 // Anciennes quêtes (avant la chaîne de la bible) : où elles se rangent dans la nouvelle chaîne (les mêmes identifiants
 // s'y rangent tout seuls), et leurs coffres. Une ancienne quête réclamée vaut celle-ci comme « plus avancée ».
@@ -196,7 +200,8 @@ function currentOf(claimed) {
 // Ce que l'état fournit (services/world.js) : { crafts, runs, stars, zones: Set, levels: { site: palier },
 // elements: Set, placed: Set (créations posées), annexes, houses, met: Set ('habitant:besoin' comblés en ce moment ou
 // depuis la dernière quête réclamée), awake: Set, hearts (cœurs du meilleur ami), expeditions, landmarks: Set,
-// gathered, settled, named, links: Set ('puits-foyer' : bâtiments reliés par un chemin) }
+// gathered, settled, named, items: Set (articles de boutique possédés : ITEMS), links: Set ('puits-foyer' : bâtiments reliés
+// par un chemin) }
 // Quêtes du tutoriel qui passent par le Grimoire : la page que marque le ruban a son Encre offerte (le joueur, qui a
 // peu d'écus, n'est jamais bloqué devant une énigme) : le Puits de Léo, dont la Boue (Eau + Terre), la première
 // recette à deux ingrédients différents. Pas le Brasier (Feu + Feu : l'énigme suffit, choix de l'auteur, 12 oct.)
@@ -228,6 +233,8 @@ const HAVE = {
     shelter: (goal, facts) => (facts.shelters && facts.shelters.has(goal.who) ? 1 : 0),
     fence: (goal, facts) => (facts.fences && facts.fences[goal.who] ? facts.fences[goal.who].have : 0),
     crate: (goal, facts) => (facts.crates.has(goal.crate) ? 1 : 0),
+    // Un article de boutique possédé (facts.items : ceux que nomment les quêtes, ITEMS)
+    item: (goal, facts) => (facts.items.has(goal.item) ? 1 : 0),
     settle: (goal, facts) => facts.settled,
     // Dormir n'est pas un objectif à compter : la première nuit se passe par world.sleep, jamais par une réclamation
     sleep: () => 0,
@@ -318,7 +325,7 @@ function actStartsOf(rows) {
 const { RESTED } = require('../texts/brume');
 
 module.exports = {
-    QUESTS, ENCLOS, ENCLOS_DOORS, LEGACY, QUEST_CHESTS, BEASTS, GUIDED_INK, FIRST_NIGHT_DONE,
+    QUESTS, ITEMS, ENCLOS, ENCLOS_DOORS, LEGACY, QUEST_CHESTS, BEASTS, GUIDED_INK, FIRST_NIGHT_DONE,
     TUTORIAL_LAST, reachOf, doneOf, firstNightDoneOf, currentOf, progressOf, active, boardOf, goalOf, actsDoneOf, actStartsOf, tutorialStepsOf,
     inTutorial
 };

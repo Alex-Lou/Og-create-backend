@@ -78,12 +78,16 @@ const QUEST_TEXTS = {
         say: 'Trois, ce soir, autour du feu. Dors : je veille.'
     },
     deco: {
-        label: 'Assemble ta première lanterne',
+        label: 'Installe Nathan dans son coin',
         say: 'Nathan a monté un établi : une porte de cabine, deux caisses. Il dit que c’est un début.'
     },
     'torches-rivet': {
         label: 'Plante les trois torches de Nathan',
         say: 'Ils sont venus de trois côtés, hier soir. Nathan a compté. Il compte tout.'
+    },
+    'outil-rivet': {
+        label: 'Achète ton premier outil',
+        say: 'Nathan dit qu’un bon outil fait la moitié du travail. L’autre moitié, c’est lui.'
     },
     'nuit-rivet': {
         label: 'Passe ta quatrième nuit',
