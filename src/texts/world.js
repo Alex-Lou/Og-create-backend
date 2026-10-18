@@ -18,6 +18,7 @@ const NAME_RULE = max => `Un nom de 2 à ${max} lettres ou chiffres (espace, tir
 const SKIP_TOO_EARLY = 'Bâtis d’abord le camp et termine la première Récolte avec Lorena.';
 // Une scène de l'histoire (l'arc du Phare) inconnue, ou pas encore venue
 const SCENE_UNKNOWN = 'Scène inconnue.';
+const ANIMAL_UNKNOWN = 'Animal inconnu.';
 const SCENE_TOO_EARLY = 'Cette scène n’est pas encore venue.';
 const RESTART_CONFIRM = 'Écris RECOMMENCER pour confirmer.';
 const RESTARTED_ONCE = 'Ton île a déjà été recommencée une fois.';
@@ -62,5 +63,5 @@ module.exports = {
     ZONE_UNKNOWN, BUILDING_UNKNOWN, BUY_ZONE_FIRST, BUILD_FIRST, NEED_TIER, OPEN_CHAPTER_FIRST, NAME_RULE, SKIP_TOO_EARLY,
     RESTART_CONFIRM, RESTARTED_ONCE, RESTARTED, QUEST_NOT_CURRENT, QUEST_NOT_DONE, REWARD_TAKEN, NOT_SLEEP_TIME, ALREADY_SLEPT,
     EXPLORE_FIRST, ZONE_OWNED, WORKSITE_UNKNOWN, WORKSITE_DONE, PLAN_FIRST, RENAME_TOO_EARLY, RENAME_BUY_ZONE, RENAME_ZONE_BUY,
-    MOVE, SHELTER, SCENE_UNKNOWN, SCENE_TOO_EARLY
+    MOVE, SHELTER, SCENE_UNKNOWN, SCENE_TOO_EARLY, ANIMAL_UNKNOWN
 };

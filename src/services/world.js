@@ -24,6 +24,7 @@ const anya = require('./anya');
 const avatarChoices = require('./avatarChoices');
 const pickups = require('./pickups');
 const players = require('./players');
+const animals = require('./animals');
 const bookPages = require('./bookPages');
 const beastRules = require('./beasts');
 const {
@@ -499,9 +500,9 @@ async function view(userId, owned, book) {
     // (les actes finis : un feu de la Route peut en attendre un, landmarks.hasFire)
     const acts = quests.actsDoneOf(quests.doneOf(claimed));
     // (et ce que la vue montre plus bas, lu en même temps)
-    const [stagesNow, avatarNow, savoirNow, openedNow, helianeNow, anyaNow, nightsNow, beastsNow, daysStart] = await Promise.all([
+    const [stagesNow, avatarNow, savoirNow, openedNow, helianeNow, anyaNow, nightsNow, beastsNow, daysStart, animalsNow] = await Promise.all([
         stars.starsOf(userId, db), avatarOf(userId), brumeSavoirOf(userId), openedOf(userId, Date.now()), helianeOfUser(userId),
-        anyaOf(userId), nightsView(userId), beastsView(userId), daysStartOf(userId)
+        anyaOf(userId), nightsView(userId), beastsView(userId), daysStartOf(userId), animals.animalsOf(userId)
     ]);
     const hidden = map.ZONES.filter(z => !isKnown(z, discovered)).map(z => z.code).sort();
     const veil = map.veiled(new Set(hidden), roads.rows);
@@ -677,7 +678,9 @@ async function view(userId, owned, book) {
         // sort, le bâtiment embrumé et le prix de sa réparation
         nights: nightsNow,
         // Les bêtes de ferme (v6, § 6.16) : le prix d'un repas, et pour chacune, contente ou non, sa bulle
-        beasts: beastsNow
+        beasts: beastsNow,
+        // Le Bestiaire : les animaux rencontrés sur l'île ([{ id, at }])
+        animals: animalsNow
     };
 }
 

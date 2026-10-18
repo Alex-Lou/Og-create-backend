@@ -41,6 +41,7 @@ const INVALID = {
     site: 'Bâtiment invalide',
     landmark: 'Lieu invalide',
     scene: 'Scène invalide',
+    animal: 'Animal invalide',
     deposit: 'Gisement invalide',
     find: 'Trouvaille invalide',
     worksite: 'Chantier invalide',
