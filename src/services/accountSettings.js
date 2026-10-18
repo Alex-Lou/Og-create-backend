@@ -22,6 +22,17 @@ const SECRET_TABLES = new Set(['auth_sessions', 'password_resets', 'email_change
 const userOf = async (userId, conn = db) => (await conn.query('SELECT * FROM users WHERE id = $1', [userId])).rows[0] || null;
 const passwordOk = (user, password) => bcrypt.compare(String(password || ''), user.password_hash);
 
+// Le mode debug (choix de l'auteur, 18 oct. : temporaire) : les comptes dont l'adresse est dans DEBUG_ACCOUNTS (réglage du
+// VPS, adresses séparées par des virgules) ont, dans le jeu, le bouton qui recommence l'île d'un appui long (le même
+// « Recommencer l'île » que Mon compte, sans menu ni mot à écrire). Aucune adresse : personne
+const debugEmails = () => String(process.env.DEBUG_ACCOUNTS || '').split(',').map(email => email.trim().toLowerCase()).filter(Boolean);
+async function debugOf(userId) {
+    const list = debugEmails();
+    if (!list.length) return false;
+    const user = await userOf(userId);
+    return Boolean(user && user.email && list.includes(user.email.toLowerCase()));
+}
+
 // Ce que montre « Mon compte »
 async function profileOf(userId) {
     const user = await userOf(userId);
@@ -180,6 +191,6 @@ async function exportOf(userId) {
 }
 
 module.exports = {
-    GRACE_DAYS, profileOf, changePassword, requestEmailChange, confirmEmailChange, suspend, scheduleDeletion, welcomeBack,
+    GRACE_DAYS, debugOf, profileOf, changePassword, requestEmailChange, confirmEmailChange, suspend, scheduleDeletion, welcomeBack,
     sweepDeleted, exportOf
 };

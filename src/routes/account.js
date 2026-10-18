@@ -28,6 +28,15 @@ router.get('/', authMiddleware, async (req, res) => {
     }
 });
 
+// Le mode debug de ce compte (services/accountSettings.js : debugOf) → { debug }
+router.get('/debug', authMiddleware, async (req, res) => {
+    try {
+        res.json({ debug: await settings.debugOf(req.user.id) });
+    } catch (error) {
+        failure(res, T.PROFILE_FAILED, error);
+    }
+});
+
 // Nouveau mot de passe : les autres appareils sont déconnectés, celui-ci reçoit une session neuve
 router.post('/password', authMiddleware, guarded, async (req, res) => {
     try {
