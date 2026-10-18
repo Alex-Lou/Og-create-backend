@@ -30,3 +30,19 @@ test('un animal rencontré entre au Bestiaire, une seule fois ; les inconnus son
   assert.deepEqual(list.map(a => a.id), ['lapin', 'cerf', 'kraken', 'salamandre-de-brume']);
   assert.ok(list.every(a => Math.abs(a.at - Date.now()) < 60000));
 });
+
+test('une catégorie complète rapporte 25 écus par animal, une seule fois', async () => {
+  const player = await newPlayer();
+  // (les Êtres de légende : deux animaux)
+  const first = await meet(player, 'cerf-blanc');
+  assert.deepEqual(first.data.rewards, []);
+  assert.equal(first.data.coins, undefined);
+  const last = await meet(player, 'phenix');
+  assert.deepEqual(last.data.rewards, [{ category: 'legendes', coins: 50 }]);
+  assert.equal(typeof last.data.coins, 'number');
+  // (redit, ou une autre rencontre ensuite : rien de plus)
+  assert.deepEqual((await meet(player, 'phenix')).data.rewards, []);
+  const other = await meet(player, 'lapin');
+  assert.deepEqual(other.data.rewards, []);
+  assert.equal(other.data.coins, undefined);
+});
