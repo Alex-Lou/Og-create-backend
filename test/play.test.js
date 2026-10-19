@@ -7,6 +7,7 @@ const minigames = require('../src/services/minigames');
 // Cases du cœur : coordonnées de la grande île (v3) + décalage dans la très grande île (v4), passées à la grande carte
 // (× 1,5, v5)
 const places = require('../src/services/world/places');
+const { BEACH_PLACES } = require('../src/services/world/camp');
 const worldMap = require('../src/services/worldMap');
 const { OFFSET } = require('../src/services/worldMapV4');
 const X = x => worldMap.fromV4(x + OFFSET.x);
@@ -1206,21 +1207,24 @@ test('le Monde : une île de la carte v2 passe à la grande île ; ses décorati
   assert.equal((await sql('SELECT COUNT(*)::int AS n FROM world_tiles WHERE user_id = $1', [player.userId]))[0].n, 0);
 });
 
-test('le Monde : une île v5 passe en v6 (le camp respire, choix de l’auteur, 19 oct.) : les enclos du tutoriel d’avant rentrent en réserve, une fois ; la barrière du nord et le reste restent', async () => {
+test('le Monde : une île v5 passe en v6 (le camp respire, choix de l’auteur, 19 oct.) : les enclos du tutoriel d’avant, et une torche sur la place de la cuisine d’Agathe, rentrent en réserve, une fois ; la barrière du nord et le reste restent', async () => {
   const player = await newPlayer();
   await api('GET', '/play/world', null, player);
   const feu = (await api('GET', '/play/world', null, player)).data.sites.find(s => s.id === 'foyer');
   // (la grande emprise du Feu, 3 × 3 : son coin haut-gauche ; sur une île neuve, il est au palier 0, à sa place)
   const big = feu.w >= 3 ? { x: feu.x, y: feu.y } : { x: feu.x - 1, y: feu.y - 1 };
   await sql('UPDATE world_stock SET map_version = 5 WHERE user_id = $1', [player.userId]);
-  // L'anneau d'avant (un piquet au sud, une porte à l'ouest), la barrière du nord, une clôture loin du camp, une lanterne près du Feu
+  // L'anneau d'avant (un piquet au sud, une porte à l'ouest), la barrière du nord, une clôture loin du camp, une lanterne près du Feu,
+  // une torche sur la place de la cuisine d’Agathe, une autre au nord
+  const cuisine = BEACH_PLACES.cannelle;
   await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'cloture', $2, $3), ($1, 'porte', $4, $5), ($1, 'cloture', $6, $7),
-    ($1, 'cloture', $8, $9), ($1, 'lanterne', $10, $11)`,
-  [player.userId, big.x + 1, big.y + 4, big.x - 2, big.y + 1, big.x + 1, big.y - 2, big.x - 5, big.y + 1, big.x + 3, big.y + 1]);
+    ($1, 'cloture', $8, $9), ($1, 'lanterne', $10, $11), ($1, 'torche', $12, $13), ($1, 'torche', $14, $15)`,
+  [player.userId, big.x + 1, big.y + 4, big.x - 2, big.y + 1, big.x + 1, big.y - 2, big.x - 5, big.y + 1, big.x + 3, big.y + 1,
+    cuisine.x + 1, cuisine.y, big.x + 1, big.y - 3]);
   await api('GET', '/play/world', null, player);
   const placed = await sql('SELECT craft, x - $2 AS dx, y - $3 AS dy FROM world_crafts WHERE user_id = $1 AND x IS NOT NULL ORDER BY craft, x', [player.userId, big.x, big.y]);
-  assert.deepEqual(placed.map(r => [r.craft, r.dx, r.dy]), [['cloture', -5, 1], ['cloture', 1, -2], ['lanterne', 3, 1]]);
-  assert.equal((await sql('SELECT COUNT(*)::int AS n FROM world_crafts WHERE user_id = $1 AND x IS NULL', [player.userId]))[0].n, 2);
+  assert.deepEqual(placed.map(r => [r.craft, r.dx, r.dy]), [['cloture', -5, 1], ['cloture', 1, -2], ['lanterne', 3, 1], ['torche', 1, -3]]);
+  assert.equal((await sql('SELECT COUNT(*)::int AS n FROM world_crafts WHERE user_id = $1 AND x IS NULL', [player.userId]))[0].n, 3);
   assert.equal((await sql('SELECT map_version FROM world_stock WHERE user_id = $1', [player.userId]))[0].map_version, 6);
   // Une seule fois : ce qu'on repose ensuite près du Feu y reste
   await sql(`UPDATE world_crafts SET x = $2, y = $3 WHERE user_id = $1 AND craft = 'porte'`, [player.userId, big.x - 2, big.y + 1]);

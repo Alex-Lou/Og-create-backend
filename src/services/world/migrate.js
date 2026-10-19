@@ -8,8 +8,10 @@ const { MAP_VERSION, OLD_DECO_RATE, SITES, pendingOf } = require('./rules');
 const { levelsOf, stockOf, tilesOf } = require('./reads');
 const { placesOf } = require('./places');
 
-// Les nuits de créatures (world/nights.js, qui passe lui-même par migrate) : chargé à l'appel
+// Les nuits de créatures (world/nights.js, qui passe lui-même par migrate) : chargé à l'appel ; de même, les places du
+// camp (world/camp.js, par beasts.js)
 const settleNights = (...args) => require('./nights').settleNights(...args);
+const beachPlaces = () => require('./camp').BEACH_PLACES;
 
 // Passage aux cartes suivantes, une fois par joueur, au premier passage, verrouillé (deux requêtes ne migrent pas
 // deux fois) et d'un seul tenant (tout ou rien) : v1 → v2 → v3 → v4 → v5 selon l'île du joueur. Chaque passage règle
@@ -109,10 +111,11 @@ async function toV5(userId, conn) {
 // autour du Feu (ses enclos du tutoriel d'avant : celui du Feu, celui de la cuisine d’Agathe, à CAMP_REACH cases au plus
 // de sa grande emprise, 3 × 3) retournent dans la réserve de l'établi, sauf la barrière du nord (une rangée à deux cases
 // au-dessus de lui, de deux cases à sa gauche à quatre à sa droite : game/prologue.js, barrierOf). Rien n'est perdu ;
-// celles posées plus loin ne bougent pas
+// celles posées plus loin ne bougent pas. De même, sur une île à la plage, une torche posée là où va maintenant la
+// cuisine d’Agathe (camp.js, BEACH_PLACES : là où visait la torche est de Nathan ; choix de l'auteur, 19 oct.)
 const CAMP_REACH = 4;
 async function toV6(userId, conn) {
-    const { places } = await placesOf(userId, conn);
+    const { places, beach } = await placesOf(userId, conn);
     const feu = places.foyer;
     if (!feu) return;
     await conn.query(
@@ -120,6 +123,12 @@ async function toV6(userId, conn) {
          AND x BETWEEN $3::int - $5::int AND $3::int + 2 + $5::int AND y BETWEEN $4::int - $5::int AND $4::int + 2 + $5::int
          AND NOT (y = $4::int - 2 AND x BETWEEN $3::int - 2 AND $3::int + 4)`,
         [userId, ['cloture', 'porte'], feu.x, feu.y, CAMP_REACH]);
+    if (!beach) return;
+    const cuisine = beachPlaces().cannelle;
+    await conn.query(
+        `UPDATE world_crafts SET x = NULL, y = NULL WHERE user_id = $1 AND craft = 'torche'
+         AND x BETWEEN $2::int AND $2::int + 1 AND y BETWEEN $3::int AND $3::int + 1`,
+        [userId, cuisine.x, cuisine.y]);
 }
 
 module.exports = { migrate, toV2, toV3, toV4, toV5, toV6 };

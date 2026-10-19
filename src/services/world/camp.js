@@ -160,4 +160,4 @@ async function campOfUser(userId, conn, { levels, annexRows, craftRows } = {}) {
     return campOf({ acts, levels: lv, taken, cage: await cageOf(userId, conn), met, places, beach, shelters: await sheltersOf(userId, conn), days });
 }
 
-module.exports = { PLACES, OVERGROWTH_DAYS, overgrowthOf, campOf, cellsOfCamp, campOfUser };
+module.exports = { PLACES, BEACH_PLACES, OVERGROWTH_DAYS, overgrowthOf, campOf, cellsOfCamp, campOfUser };
