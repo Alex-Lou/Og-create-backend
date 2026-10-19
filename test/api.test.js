@@ -1,7 +1,8 @@
 // Tests de l'API sur une vraie base : le serveur est le seul juge des écus et des succès
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { startServer, api, sql, whileHeld, newPlayer, coinsOf } = require('./helpers');
+const net = require('node:net');
+const { startServer, baseUrl, api, sql, whileHeld, newPlayer, coinsOf } = require('./helpers');
 
 let server;
 test.before(async () => { server = await startServer(); });
@@ -72,4 +73,20 @@ test('la déconnexion d’un autre joueur est impossible', async () => {
 test('le formulaire de contact refuse une adresse invalide', async () => {
   const response = await api('POST', '/contact/send', { email: 'pas-une-adresse', message: '<b>salut</b>' });
   assert.equal(response.status, 400);
+});
+
+// Express 5 laisse req.body indéfini quand la requête n'a ni corps ni longueur annoncée (app.js le remet à vide) : refus
+// net, pas une panne. (fetch annonce toujours une longueur : la requête part brute, sur une socket)
+test('une connexion sans corps est refusée (400), pas une panne (500)', async () => {
+  const { hostname, port } = new URL(baseUrl());
+  const reply = await new Promise((resolve, reject) => {
+    const socket = net.connect(Number(port), hostname, () => {
+      socket.end('POST /api/auth/login HTTP/1.1\r\nHost: localhost\r\nX-Requested-With: origins\r\nConnection: close\r\n\r\n');
+    });
+    let data = '';
+    socket.on('data', chunk => (data += chunk));
+    socket.on('end', () => resolve(data));
+    socket.on('error', reject);
+  });
+  assert.match(reply, /^HTTP\/1\.1 400 /);
 });

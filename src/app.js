@@ -63,6 +63,11 @@ const bodyLimit = process.env.REQUEST_BODY_SIZE_LIMIT || '10kb';
 app.use('/api', require('./middleware/compress').compressJson);
 app.use(express.json({ limit: bodyLimit, strict: true }));
 app.use(express.urlencoded({ extended: true, limit: bodyLimit }));
+// Express 5 laisse req.body indéfini quand la requête n'a pas de corps : les routes le lisent vide, comme avant
+app.use((req, res, next) => {
+    req.body ??= {};
+    next();
+});
 
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/auth', require('./routes/passwordReset'));
