@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const { log } = require('./logger');
 
 // Longueur minimale du secret, quelle que soit sa source (environnement ou .env) : 32 caractères.
 // Le generateValue de Render (256 bits en base64) en fait ~44 ; un secret généré ici en fait 128.
@@ -46,7 +47,7 @@ function ensureJWTSecret(envPath = path.resolve(process.cwd(), '.env')) {
     fs.writeFileSync(envPath, envContent);
     process.env.JWT_SECRET = newSecret;
 
-    console.log('Nouvelle clé JWT sécurisée générée et sauvegardée');
+    log('warn', 'Nouvelle clé JWT générée et écrite dans .env');
 }
 
 module.exports = { ensureJWTSecret, MIN_LENGTH };

@@ -5,34 +5,28 @@ require('dotenv').config({ path: path.resolve(process.cwd(), '.env') });
 // Avant tout require qui journalise : le niveau est lu au chargement de utils/logger.js
 process.env.LOG_LEVEL = process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'warn' : 'info');
 
+const { log } = require('./utils/logger');
 require('./utils/jwt').ensureJWTSecret();
 const app = require('./app');
 
 const PORT = process.env.PORT || 3000;
 const server = app.listen(PORT, () => {
-    console.log(`
-    🚀 Serveur démarré
-    • Port: ${PORT}
-    • Environnement: ${process.env.NODE_ENV}
-    • Niveau de log: ${process.env.LOG_LEVEL}
-    • Heure: ${new Date().toLocaleString()}
-    `);
-    // Les tests attendent cette ligne pour savoir que le serveur écoute (test/helpers.js)
-    console.log('Tout roule! :)');
+    log('info', `Serveur prêt sur le port ${PORT} (${process.env.NODE_ENV || 'development'}, journal : ${process.env.LOG_LEVEL})`);
 });
 
 // Les comptes dont les sept jours de grâce sont passés s'effacent : au démarrage, puis toutes les heures
 const { sweepDeleted } = require('./services/accountSettings');
-const sweep = () => sweepDeleted().catch(error => console.error('Effacement des comptes supprimés :', error.message));
+const sweep = () => sweepDeleted().catch(error => log('error', 'Effacement des comptes supprimés', error.stack));
 sweep();
 setInterval(sweep, 3600 * 1000).unref();
 
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+// Une erreur que rien n'a attrapée : journalisée avec sa pile, puis le serveur s'arrête (l'hébergeur le relance)
+process.on('unhandledRejection', reason => {
+    log('error', 'Promesse rejetée sans traitement', reason instanceof Error ? reason.stack : reason);
     server.close(() => process.exit(1));
 });
 
 process.on('uncaughtException', error => {
-    console.error('Uncaught Exception:', error);
+    log('error', 'Exception non attrapée', error.stack);
     server.close(() => process.exit(1));
 });

@@ -41,15 +41,35 @@ async function startServer() {
       stdio: ['ignore', 'pipe', 'pipe']
     });
     let output = '';
-    const timer = setTimeout(() => reject(new Error(`Le serveur ne démarre pas\n${output}`)), 20000);
+    let finished = false;
+    const timer = setTimeout(() => {
+      finished = true;
+      reject(new Error(`Le serveur ne démarre pas\n${output}`));
+    }, 20000);
     child.stderr.on('data', chunk => (output += chunk));
-    child.stdout.on('data', chunk => {
-      if (String(chunk).includes('Tout roule')) {
-        clearTimeout(timer);
-        resolve(child);
-      }
+    // (la sortie standard est vidée au fil de l'eau : un tuyau plein bloquerait le serveur)
+    child.stdout.resume();
+    child.on('exit', code => {
+      finished = true;
+      reject(new Error(`Serveur arrêté (code ${code})\n${output.slice(-2000)}`));
     });
-    child.on('exit', code => reject(new Error(`Serveur arrêté (code ${code})\n${output.slice(-2000)}`)));
+    // Le serveur est prêt quand sa route de santé répond (aucun lien avec le texte d'un journal)
+    const poll = async () => {
+      while (!finished) {
+        try {
+          if ((await fetch(`${BASE}/health`)).ok) {
+            finished = true;
+            clearTimeout(timer);
+            resolve(child);
+            return;
+          }
+        } catch {
+          // (pas encore à l'écoute)
+        }
+        await new Promise(r => setTimeout(r, 50));
+      }
+    };
+    poll();
   });
 }
 
