@@ -9,7 +9,7 @@
 // que Brume est seule avec le joueur ; le camp de Lorena (son coin, le SOS, les caisses, le filet, les rondins) avec
 // Lorena ; la cuisine avec Agathe ; le coin de Nathan avec Nathan. Sur une île à la plage (world/places.js : une zone par
 // personnage), le camp de Lorena et ce que la mer a laissé autour sont dans sa zone, au sud-ouest, le coin de Nathan dans
-// la sienne, au nord du Feu ; la cuisine d’Agathe reste sur la plage, sa zone, près de son Feu.
+// la sienne, au nord du Feu ; la cuisine d’Agathe reste dans la plage, sa zone, à l'est de son Feu.
 const map = require('../worldMap');
 const landmarks = require('../landmarks');
 const finds = require('../finds');
@@ -37,9 +37,9 @@ const BEACH_PLACES = {
     rivet: { x: 93, y: 86 },
     // (la cage des poules, échouée par la mer au bout de la plage, dans le coin d’Agathe : choix de l'auteur, 11 oct.)
     cage: { x: 101, y: 98 },
-    // (sa cuisine, sous l'enclos du Feu, sur le sable du rivage : choix de l'auteur, 16 oct. ; c'est là que l'enclos de
-    // Lorena, planté avant qu'elle n'arrive, la laissait déjà)
-    cannelle: { x: 99, y: 97 }
+    // (sa cuisine, à l'est du camp, entre le Feu et les palmiers, dans l'herbe : choix de l'auteur, 18 oct. ; son enclos
+    // l'entoure sans toucher aux palmiers ; sur le sable du rivage, sous l'enclos du Feu, s'échoue la planche de Léo)
+    cannelle: { x: 102, y: 94 }
 };
 
 // Place prévue (coin haut-gauche), taille (2 : 2 × 2 cases, sinon 1), fixe (à sa place, ou pas du tout), dessin selon l'avancée (null : pas encore, ou
@@ -87,11 +87,11 @@ const PLACES = [
     { id: 'rondins', x: 95, y: 92, art: at => (aster(at) ? 'rondins' : null) },
     { id: 'cage', x: 98, y: 94, art: at => (at.cage ? `cage_${at.cage}` : null) },
     // (sur l'ancienne butte devant le Feu, aplatie : deux palmiers, deux étoiles de mer ; choix de l'auteur, 15 oct. ;
-    // hors de l'anneau de l'enclos du Feu)
+    // hors de l'anneau de l'enclos du Feu, et de celui de la cuisine d’Agathe : en rang sur le sable, sous lui, 18 oct.)
     { id: 'palmier-1', x: 103, y: 97, art: at => (at.beach ? 'palmier' : null) },
-    { id: 'palmier-2', x: 104, y: 96, art: at => (at.beach ? 'palmier' : null) },
+    { id: 'palmier-2', x: 104, y: 97, art: at => (at.beach ? 'palmier' : null) },
     { id: 'etoile-1', x: 102, y: 97, art: at => (at.beach ? 'etoile_de_mer' : null) },
-    { id: 'etoile-2', x: 103, y: 96, art: at => (at.beach ? 'etoile_de_mer' : null) }
+    { id: 'etoile-2', x: 101, y: 97, art: at => (at.beach ? 'etoile_de_mer' : null) }
 ];
 
 // Case où le camp peut se poser : sol constructible de la plage, hors des grandes emprises, des lieux remarquables et
