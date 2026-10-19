@@ -8,7 +8,6 @@ const bookLetters = require('../../services/bookLetters');
 const achievementService = require('../../services/achievementService');
 const { verifyAccess, readCookie } = require('../../services/authSession');
 const { limiter } = require('../../middleware/rateLimit');
-const { log } = require('../../utils/logger');
 const T = require('../../texts/play');
 const { NEED_COINS } = require('../../texts/errors');
 
@@ -28,20 +27,12 @@ const playLimiter = limiter({ minutes: 1, max: 120, key: playerKey, message: SLO
 const addressLimiter = limiter({ minutes: 1, max: Number(process.env.PLAY_ADDRESS_RATE_LIMIT) || 600, key: req => req.ip, message: SLOW_DOWN });
 const guestLimiter = limiter({ minutes: 60, max: 20, key: req => req.ip, message: SLOW_DOWN });
 
-const fail = (res, error, what) => {
-    log('error', what, { errorMessage: error.message });
-    res.status(500).json({ message: T.SERVER_DOWN });
-};
-
-// Joueur obligatoire : sans compte ni carnet invité, 401 NO_PLAYER (le front crée alors un carnet)
+// Joueur obligatoire : sans compte ni carnet invité, 401 NO_PLAYER (le front crée alors un carnet). Une panne remonte
+// au dernier recours d'app.js (message : routes/play/index.js, failsWith)
 const withPlayer = handler => async (req, res) => {
-    try {
-        const owner = await players.resolve(req);
-        if (!owner) return res.status(401).json({ message: T.NO_PLAYER, code: 'NO_PLAYER' });
-        await handler(req, res, owner, await book.load());
-    } catch (error) {
-        fail(res, error, `Jeu ${req.path}`);
-    }
+    const owner = await players.resolve(req);
+    if (!owner) return res.status(401).json({ message: T.NO_PLAYER, code: 'NO_PLAYER' });
+    await handler(req, res, owner, await book.load());
 };
 
 // Compte obligatoire (le Monde : ses ressources et ses écus sont gardés par le serveur)
@@ -77,4 +68,4 @@ async function discovered(owner, b, owned, name) {
     return book.unexplored(b, [...owned, name]);
 }
 
-module.exports = { NAME, PAGE, playLimiter, addressLimiter, guestLimiter, fail, withPlayer, withAccount, pay, payOnce, discovered };
+module.exports = { NAME, PAGE, playLimiter, addressLimiter, guestLimiter, withPlayer, withAccount, pay, payOnce, discovered };

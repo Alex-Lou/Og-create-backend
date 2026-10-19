@@ -9,7 +9,7 @@ const achievementService = require('../services/achievementService');
 const authMiddleware = require('../middleware/auth');
 const { limiter } = require('../middleware/rateLimit');
 const { log } = require('../utils/logger');
-const { failure } = require('../utils/failure');
+const { failsWith } = require('../utils/failure');
 const T = require('../texts/account');
 
 const router = express.Router();
@@ -41,111 +41,78 @@ async function adoptGuest(req, res, userId) {
     }
 }
 
-router.post('/register', registerLimiter, async (req, res) => {
+// (deux inscriptions en même temps avec la même adresse : la seconde bute sur l'unicité, services/accounts.js)
+router.post('/register', registerLimiter, failsWith(T.REGISTER_FAILED), async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ message: T.EMAIL_PASSWORD_REQUIRED });
     // L'adresse réservée aux comptes provisoires ne s'inscrit pas : le compte serait pris pour provisoire, puis effacé
     if (!isEmail(email) || accounts.isProvisional(email)) return res.status(400).json({ message: T.EMAIL_FORMAT });
     const problem = accounts.passwordProblem(password);
     if (problem) return res.status(400).json({ message: problem });
-    try {
-        const user = await accounts.register(email, password);
-        if (!user) return res.status(400).json({ message: T.EMAIL_TAKEN });
-        const session = await authSession.issue(res, user);
-        await adoptGuest(req, res, session.userId);
-        log('info', 'Inscription réussie', { userId: session.userId });
-        res.status(201).json({ message: T.REGISTERED, ...session });
-    } catch (error) {
-        // Deux inscriptions en même temps avec la même adresse : la seconde bute sur l'unicité (comme /claim)
-        if (error.code === '23505') return res.status(400).json({ message: T.EMAIL_TAKEN });
-        failure(res, T.REGISTER_FAILED, error);
-    }
+    const user = await accounts.register(email, password);
+    if (!user) return res.status(400).json({ message: T.EMAIL_TAKEN });
+    const session = await authSession.issue(res, user);
+    await adoptGuest(req, res, session.userId);
+    log('info', 'Inscription réussie', { userId: session.userId });
+    res.status(201).json({ message: T.REGISTERED, ...session });
 });
 
 // Compte provisoire (bible v6, § 9 ; V20) : créé en coulisse quand l'île sert au tutoriel, avant le compte. Ni adresse
 // ni mot de passe connus : seule la session de l'appareil l'ouvre. Le carnet invité le rejoint.
-router.post('/provisional', registerLimiter, async (req, res) => {
+router.post('/provisional', registerLimiter, failsWith(T.CREATE_FAILED), async (req, res) => {
     if (authSession.verifyAccess(req)) return res.status(409).json({ message: T.ALREADY_ACCOUNT });
-    try {
-        await accounts.sweepProvisional();
-        const user = await accounts.registerProvisional();
-        const session = await authSession.issue(res, user);
-        await adoptGuest(req, res, session.userId);
-        log('info', 'Compte provisoire créé', { userId: session.userId });
-        res.status(201).json({ ...session, provisional: true });
-    } catch (error) {
-        failure(res, T.CREATE_FAILED, error);
-    }
+    await accounts.sweepProvisional();
+    const user = await accounts.registerProvisional();
+    const session = await authSession.issue(res, user);
+    await adoptGuest(req, res, session.userId);
+    log('info', 'Compte provisoire créé', { userId: session.userId });
+    res.status(201).json({ ...session, provisional: true });
 });
 
 // Signer la page de garde (étape 6) : le compte provisoire prend l'adresse et le mot de passe du joueur, une fois
-router.post('/claim', registerLimiter, authMiddleware, async (req, res) => {
+router.post('/claim', registerLimiter, authMiddleware, failsWith(T.CREATE_FAILED), async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ message: T.EMAIL_PASSWORD_REQUIRED });
     if (!isEmail(email) || accounts.isProvisional(email)) return res.status(400).json({ message: T.EMAIL_FORMAT });
     const problem = accounts.passwordProblem(password);
     if (problem) return res.status(400).json({ message: problem });
-    try {
-        const done = await accounts.claim(req.user.id, email, password);
-        if (done.status) return res.status(done.status).json({ message: done.message });
-        // Le nom du compte change avec l'adresse : une session neuve le porte
-        const session = await authSession.issue(res, done.user);
-        log('info', 'Compte provisoire signé', { userId: session.userId });
-        res.status(200).json({ message: T.CREATED, ...session, provisional: false });
-    } catch (error) {
-        // Deux signatures en même temps avec la même adresse : la seconde bute sur l'unicité
-        if (error.code === '23505') return res.status(400).json({ message: T.EMAIL_TAKEN });
-        failure(res, T.CREATE_FAILED, error);
-    }
+    const done = await accounts.claim(req.user.id, email, password);
+    if (done.status) return res.status(done.status).json({ message: done.message });
+    // Le nom du compte change avec l'adresse : une session neuve le porte
+    const session = await authSession.issue(res, done.user);
+    log('info', 'Compte provisoire signé', { userId: session.userId });
+    res.status(200).json({ message: T.CREATED, ...session, provisional: false });
 });
 
-router.post('/login', loginLimiter, accountLimiter, async (req, res) => {
+router.post('/login', loginLimiter, accountLimiter, failsWith(T.LOGIN_FAILED), async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password || typeof email !== 'string') return res.status(400).json({ message: T.EMAIL_PASSWORD_REQUIRED });
-    try {
-        const user = await accounts.login(email, password);
-        if (!user) return res.status(401).json({ message: T.LOGIN_REFUSED });
-        // Un compte en pause est réactivé, une suppression prévue est annulée (back : ce qu'il faut en dire)
-        const back = await accountSettings.welcomeBack(user.id);
-        const session = await authSession.issue(res, user);
-        await adoptGuest(req, res, user.id);
-        log('info', 'Connexion réussie', { userId: user.id });
-        res.status(200).json({ ...session, ...(back ? { back } : {}) });
-    } catch (error) {
-        failure(res, T.LOGIN_FAILED, error);
-    }
+    const user = await accounts.login(email, password);
+    if (!user) return res.status(401).json({ message: T.LOGIN_REFUSED });
+    // Un compte en pause est réactivé, une suppression prévue est annulée (back : ce qu'il faut en dire)
+    const back = await accountSettings.welcomeBack(user.id);
+    const session = await authSession.issue(res, user);
+    await adoptGuest(req, res, user.id);
+    log('info', 'Connexion réussie', { userId: user.id });
+    res.status(200).json({ ...session, ...(back ? { back } : {}) });
 });
 
 // Renouvellement de session : le jeton de rafraîchissement (cookie) est changé à chaque usage
-router.post('/refresh', refreshLimiter, async (req, res) => {
-    try {
-        const result = await authSession.rotate(req, res);
-        if (result.error) return res.status(result.status).json({ message: result.error, code: result.code });
-        res.status(200).json(result.user);
-    } catch (error) {
-        log('error', 'Erreur lors du renouvellement de session', { errorMessage: error.message });
-        res.status(500).json({ message: T.REFRESH_FAILED });
-    }
+router.post('/refresh', refreshLimiter, failsWith(T.REFRESH_FAILED), async (req, res) => {
+    const result = await authSession.rotate(req, res);
+    if (result.error) return res.status(result.status).json({ message: result.error, code: result.code });
+    res.status(200).json(result.user);
 });
 
 // Qui suis-je : l'interface vérifie ainsi qu'une session est valable
-router.get('/me', authMiddleware, async (req, res) => {
-    try {
-        res.status(200).json({ userId: req.user.id, username: req.user.username, provisional: await accounts.provisionalOf(req.user.id) });
-    } catch (error) {
-        failure(res, T.CHECK_FAILED, error);
-    }
+router.get('/me', authMiddleware, failsWith(T.CHECK_FAILED), async (req, res) => {
+    res.status(200).json({ userId: req.user.id, username: req.user.username, provisional: await accounts.provisionalOf(req.user.id) });
 });
 
 // Déconnexion : la session du cookie présenté est révoquée, les cookies effacés
-router.post('/logout', async (req, res) => {
-    try {
-        await authSession.revoke(req, res);
-        res.status(200).json({ message: T.LOGGED_OUT });
-    } catch (error) {
-        log('error', 'Erreur lors de la déconnexion', { errorMessage: error.message });
-        res.status(500).json({ message: T.LOGOUT_FAILED });
-    }
+router.post('/logout', failsWith(T.LOGOUT_FAILED), async (req, res) => {
+    await authSession.revoke(req, res);
+    res.status(200).json({ message: T.LOGGED_OUT });
 });
 
 module.exports = router;
