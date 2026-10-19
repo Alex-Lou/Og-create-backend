@@ -2,7 +2,15 @@
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const db = require('../config/db');
+const { HttpError } = require('../utils/failure');
 const T = require('../texts/account');
+
+// Deux inscriptions (ou signatures) en même temps avec la même adresse : la seconde bute sur l'unicité (users.email,
+// users.username), et le joueur lit que l'adresse est prise
+const UNIQUE_VIOLATION = '23505';
+const emailTaken = error => {
+    throw error.code === UNIQUE_VIOLATION ? new HttpError(400, T.EMAIL_TAKEN) : error;
+};
 
 const BCRYPT_COST = 12;
 // Empreinte sans compte associé (même coût), comparée quand l'adresse est inconnue
@@ -31,7 +39,7 @@ async function register(email, password) {
     if (taken.rows.length) return null;
     const { rows } = await db.query(
         'INSERT INTO users (email, password_hash, username, created_at) VALUES ($1, $2, $3, NOW()) RETURNING id, email, username',
-        [email, await hashPassword(password), username]);
+        [email, await hashPassword(password), username]).catch(emailTaken);
     return rows[0];
 }
 
@@ -86,7 +94,7 @@ async function claim(userId, email, password) {
         if (taken.rows.length) return db.rollback({ status: 400, message: T.EMAIL_TAKEN });
         const updated = await conn.query(
             'UPDATE users SET email = $1, password_hash = $2, username = $3 WHERE id = $4 RETURNING id, email, username',
-            [email, await hashPassword(password), username, userId]);
+            [email, await hashPassword(password), username, userId]).catch(emailTaken);
         return { user: updated.rows[0] };
     });
 }

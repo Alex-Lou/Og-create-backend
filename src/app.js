@@ -5,7 +5,8 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const { limiter } = require('./middleware/rateLimit');
 const { log } = require('./utils/logger');
-const { TOO_MANY_REQUESTS, TOO_MANY_WAIT, REQUEST_REFUSED, ROUTE_NOT_FOUND, SERVER_ERROR } = require('./texts/errors');
+const { lastResort } = require('./utils/failure');
+const { TOO_MANY_REQUESTS, TOO_MANY_WAIT, REQUEST_REFUSED, ROUTE_NOT_FOUND } = require('./texts/errors');
 
 const app = express();
 // Render place le serveur derrière un proxy (et le site relaie /api : un saut de plus) : l'adresse du joueur,
@@ -88,13 +89,7 @@ app.use((req, res) => {
     res.status(404).json({ message: ROUTE_NOT_FOUND, path: req.path });
 });
 
-// Dernier recours : une panne (5xx) est journalisée avec sa pile ; le joueur ne reçoit qu'un message clair, jamais de
-// détail interne
-// eslint-disable-next-line no-unused-vars
-app.use((err, req, res, next) => {
-    const status = err.status || 500;
-    log(status >= 500 ? 'error' : 'debug', `${req.method} ${req.path}`, err.stack);
-    res.status(status).json({ message: SERVER_ERROR });
-});
+// Dernier recours : erreurs attendues et pannes (utils/failure.js)
+app.use(lastResort);
 
 module.exports = app;

@@ -9,20 +9,18 @@ const bookTries = require('../../services/bookTries');
 const world = require('../../services/world');
 const { INVALID } = require('../../texts/errors');
 const T = require('../../texts/play');
-const { NAME, PAGE, playLimiter, addressLimiter, guestLimiter, fail, withPlayer, discovered } = require('./shared');
+const { failsWith } = require('../../utils/failure');
+const { NAME, PAGE, playLimiter, addressLimiter, guestLimiter, withPlayer, discovered } = require('./shared');
 
 const router = express.Router();
-router.use(addressLimiter);
+// (une panne d'une route de jeu, de ce fichier ou des suivants, dit au joueur que le serveur ne répond pas)
+router.use(addressLimiter, failsWith(T.SERVER_DOWN));
 
 const MODES = ['infinite', 'timer'];
 
 router.post('/guest', guestLimiter, async (req, res) => {
-    try {
-        const owner = (await players.resolve(req)) || (await players.createGuest(res));
-        res.json({ kind: owner.kind });
-    } catch (error) {
-        fail(res, error, 'Création du carnet invité');
-    }
+    const owner = (await players.resolve(req)) || (await players.createGuest(res));
+    res.json({ kind: owner.kind });
 });
 
 // Carnet de l'Infini, avec ce qu'il faut pour l'afficher ; les familles ne livrent que leur taille

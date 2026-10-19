@@ -121,3 +121,15 @@ test('un compte provisoire signe d’abord sa page de garde', async () => {
   assert.equal((await api('GET', '/account', null, player)).data.provisional, true);
   assert.match((await api('POST', '/account/suspend', {}, player)).data.message, /page de garde/);
 });
+
+// Cinq inscriptions en même temps avec la même adresse : le hachage du mot de passe passe entre la vérification et
+// l'écriture, elles butent donc sur l'unicité (services/accounts.js : HttpError). Une seule passe, les autres lisent que
+// l'adresse est prise ; aucune panne
+test('des inscriptions simultanées à la même adresse : une seule passe, jamais une panne', async () => {
+  const { EMAIL_TAKEN } = require('../src/texts/account');
+  const email = `course-${Date.now()}@test.fr`;
+  const replies = await Promise.all(Array.from({ length: 5 }, () => api('POST', '/auth/register', { email, password: randomPassword() })));
+  const statuses = replies.map(r => r.status).sort();
+  assert.deepEqual(statuses, [201, 400, 400, 400, 400]);
+  for (const reply of replies.filter(r => r.status === 400)) assert.equal(reply.data.message, EMAIL_TAKEN);
+});

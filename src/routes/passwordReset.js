@@ -5,6 +5,7 @@ const { passwordProblem } = require('../services/accounts');
 const { limiter } = require('../middleware/rateLimit');
 const { isToken } = require('../utils/crypto');
 const { log } = require('../utils/logger');
+const { failsWith } = require('../utils/failure');
 const T = require('../texts/account');
 
 const router = express.Router();
@@ -27,18 +28,13 @@ router.post('/forgot-password', tooMany(5), async (req, res) => {
     res.status(200).json(GENERIC_REPLY);
 });
 
-router.post('/reset-password', tooMany(10), async (req, res) => {
+router.post('/reset-password', tooMany(10), failsWith(T.RESET_FAILED), async (req, res) => {
     const { token, password } = req.body;
     if (!isToken(token)) return res.status(400).json(INVALID_LINK);
     const problem = passwordProblem(password);
     if (problem) return res.status(400).json({ message: problem });
-    try {
-        if (!(await passwordReset.reset(token, password))) return res.status(400).json(INVALID_LINK);
-        res.status(200).json({ message: T.RESET_DONE });
-    } catch (error) {
-        log('error', 'Échec de la réinitialisation', { errorMessage: error.message });
-        res.status(500).json({ message: T.RESET_FAILED });
-    }
+    if (!(await passwordReset.reset(token, password))) return res.status(400).json(INVALID_LINK);
+    res.status(200).json({ message: T.RESET_DONE });
 });
 
 module.exports = router;
