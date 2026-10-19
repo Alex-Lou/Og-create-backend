@@ -191,4 +191,7 @@ async function coinsOf(player) {
   return (await api('GET', '/coins/balance', null, player)).data.coins;
 }
 
-module.exports = { startServer, api, sql, whileHeld, newPlayer, discover, ownCore, coinsOf, randomPassword };
+// L'adresse de l'API du serveur de test (pour une requête hors de api())
+const baseUrl = () => BASE;
+
+module.exports = { startServer, baseUrl, api, sql, whileHeld, newPlayer, discover, ownCore, coinsOf, randomPassword };
