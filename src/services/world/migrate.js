@@ -6,13 +6,14 @@ const v4 = require('../worldMapV4');
 const legacy = require('../worldMapV2');
 const { MAP_VERSION, OLD_DECO_RATE, SITES, pendingOf } = require('./rules');
 const { levelsOf, stockOf, tilesOf } = require('./reads');
+const { placesOf } = require('./places');
 
 // Les nuits de créatures (world/nights.js, qui passe lui-même par migrate) : chargé à l'appel
 const settleNights = (...args) => require('./nights').settleNights(...args);
 
 // Passage aux cartes suivantes, une fois par joueur, au premier passage, verrouillé (deux requêtes ne migrent pas
 // deux fois) et d'un seul tenant (tout ou rien) : v1 → v2 → v3 → v4 → v5 selon l'île du joueur. Chaque passage règle
-// aussi les nuits finies depuis le précédent (v6), avant tout changement de l'île
+// aussi les nuits finies depuis le précédent (v6), avant tout changement de l'île. v6 : le camp respire
 function migrate(userId) {
     return db.transaction(async conn => {
         const stock = await stockOf(userId, conn, true);
@@ -21,7 +22,8 @@ function migrate(userId) {
         if (stock.map_version < 2) await toV2(userId, stock, conn);
         if (stock.map_version < 3) await toV3(userId, conn);
         if (stock.map_version < 4) await toV4(userId, conn);
-        await toV5(userId, conn);
+        if (stock.map_version < 5) await toV5(userId, conn);
+        await toV6(userId, conn);
         await conn.query('UPDATE world_stock SET map_version = $2 WHERE user_id = $1', [userId, MAP_VERSION]);
         return true;
     });
@@ -103,4 +105,21 @@ async function toV5(userId, conn) {
     await conn.query(`UPDATE world_nights SET repelled = '{}'::jsonb WHERE user_id = $1`, [userId]);
 }
 
-module.exports = { migrate, toV2, toV3, toV4, toV5 };
+// v5 → v6 (choix de l'auteur, 19 oct. : une barrière, pas un enclos ; le camp respire) : les clôtures et les portes
+// autour du Feu (ses enclos du tutoriel d'avant : celui du Feu, celui de la cuisine d’Agathe, à CAMP_REACH cases au plus
+// de sa grande emprise, 3 × 3) retournent dans la réserve de l'établi, sauf la barrière du nord (une rangée à deux cases
+// au-dessus de lui, de deux cases à sa gauche à quatre à sa droite : game/prologue.js, barrierOf). Rien n'est perdu ;
+// celles posées plus loin ne bougent pas
+const CAMP_REACH = 4;
+async function toV6(userId, conn) {
+    const { places } = await placesOf(userId, conn);
+    const feu = places.foyer;
+    if (!feu) return;
+    await conn.query(
+        `UPDATE world_crafts SET x = NULL, y = NULL WHERE user_id = $1 AND craft = ANY($2) AND x IS NOT NULL
+         AND x BETWEEN $3::int - $5::int AND $3::int + 2 + $5::int AND y BETWEEN $4::int - $5::int AND $4::int + 2 + $5::int
+         AND NOT (y = $4::int - 2 AND x BETWEEN $3::int - 2 AND $3::int + 4)`,
+        [userId, ['cloture', 'porte'], feu.x, feu.y, CAMP_REACH]);
+}
+
+module.exports = { migrate, toV2, toV3, toV4, toV5, toV6 };

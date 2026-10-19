@@ -27,10 +27,9 @@ const BEASTS = ['Poisson', 'Méduse', 'Grenouille', 'Oiseau', 'Tortue', 'Papillo
 
 // (son titre et ce qu'en dit Brume : texts/quests.js)
 const q = (id, act, goal, coins, chest) => ({ id, act, goal, coins, ...QUEST_TEXTS[id], ...(chest ? { chest } : {}) });
-// Les piquets de l'enclos de Lorena, à deux cases du Feu (quête des clôtures ; choix de l'auteur, 15 oct. : une rangée
-// libre dedans, pour y mettre ce qu'on défend), et ses portes, une sur chaque sentier qui le traverse (quête des portes)
-const ENCLOS = 20;
-const ENCLOS_DOORS = 2;
+// Les piquets de la barrière du nord, en travers du passage des égarés, à deux cases du Feu (choix de l'auteur, 19 oct. :
+// une barrière, pas un enclos ; un hameau, pas un silo)
+const BARRIER = 7;
 const QUESTS = [
     // Prologue : Brume accompagne une action à la fois jusqu'à la première nuit. Lorena ouvre ensuite sa propre leçon
     // par la Récolte.
@@ -50,10 +49,6 @@ const QUESTS = [
     // (le premier chemin, entre son camp et le nôtre : se rapprocher pour s'entraider ; les premières pierres offertes,
     // world/paths.js : FREE)
     q('chemin-aster', 'T', { kind: 'link', from: 'ponton', to: 'foyer' }, 15),
-    // (l'enclos du camp, choix de l'auteur, 13 oct. : ses piquets, dans sa caisse (world/chests.js, CRATES), un par case
-    // autour de la grande emprise du Feu, le sentier de Lorena laissé libre ; une clôture barre la route d'un égaré, nights.js)
-    q('clotures', 'T', { kind: 'craft', craft: 'cloture', need: ENCLOS }, 15),
-    q('portes', 'T', { kind: 'craft', craft: 'porte', need: ENCLOS_DOORS }, 10),
     // La deuxième nuit (choix de l'auteur, 10 oct. : un personnage par jour) : la journée de Lorena finit autour du feu ;
     // Agathe arrivera au matin
     q('veille', 'T', { kind: 'sleep', site: 'foyer' }, 0),
@@ -64,11 +59,12 @@ const QUESTS = [
     q('cage', 'T', { kind: 'cage' }, 10),
     q('poules', 'T', { kind: 'hens', need: 3 }, 10),
     q('poulailler', 'T', { kind: 'coop' }, 15),
-    // L'abri d’Agathe, puis son enclos (choix de l'auteur, 13 oct.) : son coin passe des débris à l'abri (payé :
-    // world/shelters.js), puis le joueur fabrique et paie les piquets qui l'entourent (son anneau, du moment :
-    // world/creations.js, fenceRingOf)
+    // L'abri d’Agathe (choix de l'auteur, 13 oct.) : son coin passe des débris à l'abri (payé : world/shelters.js). Puis
+    // la barrière du nord (choix de l'auteur, 19 oct.) : la nuit d'avant, le Dormeur, que la lumière n'arrête pas, est
+    // venu dormir contre le feu, et les poules filent vers la brume ; ses piquets, dans la caisse de Lorena
+    // (world/chests.js, CRATES) ; une clôture barre la route d'un égaré (nights.js)
     q('abri-cannelle', 'T', { kind: 'shelter', who: 'cannelle', villager: 'foyer' }, 15),
-    q('enclos-cannelle', 'T', { kind: 'fence', who: 'cannelle', villager: 'foyer' }, 15),
+    q('barriere', 'T', { kind: 'craft', craft: 'cloture', need: BARRIER }, 15),
     q('nuit-cannelle', 'T', { kind: 'sleep', site: 'foyer' }, 0),
     // (il s'installe d'abord dans son coin : son abri, bâti et payé comme celui d’Agathe, world/shelters.js ; choix de
     // l'auteur, 18 oct. : la lanterne attendra l'électricité. L'identifiant « deco » reste : LEGACY, creations.js)
@@ -155,6 +151,11 @@ const ITEMS = QUESTS.filter(quest => quest.goal.kind === 'item').map(quest => qu
 const LEGACY = {
     // (à la quatrième nuit, ajoutée après elle le 13 oct. : ces comptes trouvent Léo comme avant, sans dormir de plus)
     source: { at: 'nuit-rivet', label: LEGACY_LABELS.source, chest: 'rare' },
+    // (l'enclos du Feu et ses portes, au jour de Lorena ; l'enclos d’Agathe : retirés le 19 oct., la barrière du nord les
+    // remplace, au jour d’Agathe)
+    clotures: { at: 'chemin-aster', label: LEGACY_LABELS.clotures },
+    portes: { at: 'chemin-aster', label: LEGACY_LABELS.portes },
+    'enclos-cannelle': { at: 'abri-cannelle', label: LEGACY_LABELS['enclos-cannelle'] },
     puits: { at: 'puits-ondin', label: LEGACY_LABELS.puits },
     livre5: { at: 'cabane', label: LEGACY_LABELS.livre5 },
     mine: { at: 'cabane', label: LEGACY_LABELS.mine, chest: 'epique' },
@@ -229,9 +230,8 @@ const HAVE = {
     // La cage ouverte (ses poules libérées) ; le poulailler d’Agathe posé
     cage: (goal, facts) => (facts.hensFreed ? 1 : 0),
     coop: (goal, facts) => (facts.coops ? 1 : 0),
-    // L'abri d'un coin bâti ; les piquets posés autour de lui (son anneau : facts.fences[qui] = { have, need })
+    // L'abri d'un coin bâti
     shelter: (goal, facts) => (facts.shelters && facts.shelters.has(goal.who) ? 1 : 0),
-    fence: (goal, facts) => (facts.fences && facts.fences[goal.who] ? facts.fences[goal.who].have : 0),
     crate: (goal, facts) => (facts.crates.has(goal.crate) ? 1 : 0),
     // Un article de boutique possédé (facts.items : ceux que nomment les quêtes, ITEMS)
     item: (goal, facts) => (facts.items.has(goal.item) ? 1 : 0),
@@ -244,8 +244,7 @@ const HAVE = {
 
 // Avancée d'un objectif : { have, need } (have plafonné à need)
 function progressOf(goal, facts) {
-    // (un enclos : autant de piquets que son anneau a de cases, ce qui peut changer avec l'île)
-    const need = goal.kind === 'fence' ? (facts.fences && facts.fences[goal.who] ? facts.fences[goal.who].need : 0) : goal.need ?? 1;
+    const need = goal.need ?? 1;
     return { have: Math.min(need, HAVE[goal.kind](goal, facts)), need };
 }
 
@@ -325,7 +324,7 @@ function actStartsOf(rows) {
 const { RESTED } = require('../texts/brume');
 
 module.exports = {
-    QUESTS, ITEMS, ENCLOS, ENCLOS_DOORS, LEGACY, QUEST_CHESTS, BEASTS, GUIDED_INK, FIRST_NIGHT_DONE,
+    QUESTS, ITEMS, BARRIER, LEGACY, QUEST_CHESTS, BEASTS, GUIDED_INK, FIRST_NIGHT_DONE,
     TUTORIAL_LAST, reachOf, doneOf, firstNightDoneOf, currentOf, progressOf, active, boardOf, goalOf, actsDoneOf, actStartsOf, tutorialStepsOf,
     inTutorial
 };

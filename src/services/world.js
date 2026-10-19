@@ -50,7 +50,7 @@ const {
     isKnown, coreMissing, expeditionCost, expeditionOf, startExpedition, findLandmark, lightFire, craftBonusOf, gatherDeposit, pickUp
 } = require('./world/lands');
 const {
-    craftCtx, stowCrafts, epreuvesOf, craftsView, startCraft, finishCraft, placeCraft, placeLine, fenceRingOf, moveCraft, storeCraft, unposeCraft, turnCraft, placeDoor, lockDoor
+    craftCtx, stowCrafts, epreuvesOf, craftsView, startCraft, finishCraft, placeCraft, placeLine, moveCraft, storeCraft, unposeCraft, turnCraft, placeDoor, lockDoor
 } = require('./world/creations');
 const { sheltersOf, sheltersView, buildShelter } = require('./world/shelters');
 const { annexSpotOk, annexSpots, annexesView, placeAnnex, startAnnexAssembly, moveAnnex, poseAnnex } = require('./world/annexPlots');
@@ -142,9 +142,8 @@ async function factsOf(userId, owned, stars, conn = db, moods = null) {
         coops,
         items: new Set(itemRows.rows.map(r => r.item)),
         crates: new Set(crateRows.rows.map(r => r.source.slice('caisse:'.length))),
-        // Les abris bâtis (world/shelters.js) ; l'enclos autour d'un coin, une fois son abri bâti
+        // Les abris bâtis (world/shelters.js)
         shelters,
-        fences: shelters.has('cannelle') ? { cannelle: await fenceRingOf(userId, conn, 'cannelle') } : {},
         settled,
         named: Boolean(names.peuple),
         // Les bâtiments reliés par un chemin (« puits-foyer »), quand ils sont bâtis

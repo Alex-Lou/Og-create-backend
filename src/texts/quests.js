@@ -35,15 +35,6 @@ const QUEST_TEXTS = {
         label: 'Relie le Ponton au feu',
         say: 'Deux camps, un seul feu. Il leur faut un chemin.'
     },
-    clotures: {
-        label: 'Entoure le feu d’un enclos',
-        say: 'La nuit, des égarés sortent de ma brume. Une clôture autour du feu… et ils s’arrêtent, je crois.'
-    },
-    // (choix de l'auteur, 15 oct. : les sentiers traversent l'enclos ; texte validé)
-    portes: {
-        label: 'Pose les portes de l’enclos',
-        say: 'Les sentiers passent toujours. Lorena a deux portes, avec leurs verrous.'
-    },
     veille: {
         label: 'Passe ta deuxième nuit',
         say: 'Deux, ce soir, autour du feu. Dors : je veille.'
@@ -69,9 +60,10 @@ const QUEST_TEXTS = {
         label: 'Un abri pour Agathe',
         say: 'Elle dort sur une marmite renversée. Elle ne se plaint pas. Enfin, un peu.'
     },
-    'enclos-cannelle': {
-        label: 'Entoure le coin d’Agathe',
-        say: 'Une cuisine brille toute la nuit. Les égarés le savent aussi.'
+    // (la barrière du nord, au jour d’Agathe : choix de l'auteur, 19 oct., texte validé)
+    barriere: {
+        label: 'Barre le passage du nord',
+        say: 'Le feu en repousse la plupart. Pas celui qui dort debout. Une barrière, au nord.'
     },
     'nuit-cannelle': {
         label: 'Passe ta troisième nuit',
@@ -313,7 +305,11 @@ const LEGACY_LABELS = {
     livre45: 'Inscris 45 découvertes au Grimoire',
     deco10: 'Pose 10 créations sur l’île',
     livre70: 'Inscris 70 découvertes au Grimoire',
-    legendes: 'Achète L’Île des Légendes'
+    legendes: 'Achète L’Île des Légendes',
+    // (le tutoriel d'avant le 19 oct.)
+    clotures: 'Entoure le feu d’un enclos',
+    portes: 'Pose les portes de l’enclos',
+    'enclos-cannelle': 'Entoure le coin d’Agathe'
 };
 
 // L'objectif de fond (l'arc du Phare, choix de l'auteur, 15 oct. : ecriture/arc_phare.md § 3) : son titre, l'étape de

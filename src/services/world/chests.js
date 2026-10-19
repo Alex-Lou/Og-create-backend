@@ -74,14 +74,12 @@ async function grant(userId, source, rarity, conn, { wanted = null, streak = nul
 // La caisse d'un personnage, échouée près du camp (choix de l'auteur, 11 oct.) : elle s'ouvre une fois, le jour de son
 // arrivée (after : la quête faite avant), et donne toujours la même chose : des ressources, et ce qu'elle garde (keepsakes,
 // ce que le coffre montre). Celle de Lorena : sa longue-vue, son filet, son carnet de quart (le plan de son Ponton)
-// crafts : des créations prêtes, mises en réserve (les piquets de l'enclos du camp : la quête des clôtures)
+// crafts : des créations prêtes, mises en réserve (les piquets de la barrière du nord : sa quête, au jour d’Agathe)
 const CRATES = {
     aster: {
         after: 'nuit',
-        prize: { kind: 'stock', stock: { wood: 5 }, keepsakes: T.LORENA_KEEPSAKES(quests.ENCLOS, quests.ENCLOS_DOORS) },
-        crafts: { cloture: quests.ENCLOS, porte: quests.ENCLOS_DOORS },
-        // (ses portes ont leur verrou : une ligne de world_items « verrou:<id> », comme une porte verrouillée à l'établi)
-        locked: new Set(['porte'])
+        prize: { kind: 'stock', stock: { wood: 5 }, keepsakes: T.LORENA_KEEPSAKES(quests.BARRIER) },
+        crafts: { cloture: quests.BARRIER }
     }
 };
 async function openCrate(userId, id) {
@@ -110,10 +108,9 @@ async function giveCrafts(userId, crafts, locked, conn) {
     }
 }
 
-// La caisse de Lorena ouverte avant qu'elle donne l'enclos entier (13 piquets, sans portes ; choix de l'auteur, 15 oct. :
-// le serveur complète, plutôt que de faire payer 56 bois et deux portes à qui suivait le tutoriel) : une fois par
-// compte, tant que l'enclos n'est pas fini (la quête des portes), ce qui manque pour atteindre ce qu'elle donne
-// aujourd'hui. Un drapeau dans world_items, posé au premier passage de chaque compte (la vue le lit déjà : rien de plus
+// La caisse de Lorena ouverte avant qu'elle donne tout ce qu'il faut (choix de l'auteur, 15 oct. : le serveur complète,
+// plutôt que de faire payer à qui suivait le tutoriel) : une fois par compte, tant que la barrière n'est pas finie, ce
+// qui manque pour atteindre ce qu'elle donne aujourd'hui. Un drapeau dans world_items, posé au premier passage de chaque compte (la vue le lit déjà : rien de plus
 // ensuite). Rend ce qui a été donné ({ craft: nombre }), ou null
 const CRATE_COMPLETE = 'caisse-complete:aster';
 async function completeCrate(userId) {
@@ -122,7 +119,7 @@ async function completeCrate(userId) {
             [userId, CRATE_COMPLETE]);
         if (!flagged.rows.length) return null;
         const opened = await conn.query(`SELECT 1 FROM world_chests WHERE user_id = $1 AND source = 'caisse:aster'`, [userId]);
-        if (!opened.rows.length || quests.doneOf(await claimedOf(userId, conn)).has('portes')) return null;
+        if (!opened.rows.length || quests.doneOf(await claimedOf(userId, conn)).has('barriere')) return null;
         const { crafts, locked } = CRATES.aster;
         const { rows } = await conn.query('SELECT craft, COUNT(*)::int AS n FROM world_crafts WHERE user_id = $1 AND craft = ANY($2) GROUP BY craft',
             [userId, Object.keys(crafts)]);

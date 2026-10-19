@@ -1125,17 +1125,18 @@ test('créations et annexes de climat : payées en trouvailles, posées dans leu
 test('le Monde : une île de la carte v3 devient le cœur de la très grande île ; tout ce qui est posé glisse', async () => {
   const player = await newPlayer();
   await api('GET', '/play/world', null, player);
-  // Île v3 simulée : une maison et deux créations (une posée, une en réserve) aux coordonnées de la grande île
+  // Île v3 simulée : une maison et des créations (posées, une en réserve) aux coordonnées de la grande île (des
+  // lanternes : les clôtures près du Feu rentrent en réserve au passage en v6, toV6)
   await sql('UPDATE world_stock SET map_version = 3 WHERE user_id = $1', [player.userId]);
   await sql(`INSERT INTO world_annexes (user_id, x, y, annex) VALUES ($1, 28, 31, 'maison')`, [player.userId]);
-  await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'cloture', 31, 35), ($1, 'cloture', 32, 35), ($1, 'massif', NULL, NULL)`, [player.userId]);
+  await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'lanterne', 31, 35), ($1, 'lanterne', 32, 35), ($1, 'massif', NULL, NULL)`, [player.userId]);
   const [a, b] = await Promise.all([api('GET', '/play/world', null, player), api('GET', '/play/world', null, player)]);
   for (const world of [a.data, b.data]) {
     assert.deepEqual(world.annexes.map(r => [r.x, r.y, r.annex]), [[X(28), Y(31), 'maison']]);
     assert.deepEqual(world.crafts.placed.map(r => [r.x, r.y]).sort(), [[X(31), Y(35)], [X(32), Y(35)]]);
     assert.equal(world.crafts.catalog.find(c => c.id === 'massif').reserve, 1);
   }
-  assert.equal((await sql('SELECT map_version FROM world_stock WHERE user_id = $1', [player.userId]))[0].map_version, 5);
+  assert.equal((await sql('SELECT map_version FROM world_stock WHERE user_id = $1', [player.userId]))[0].map_version, 6);
 });
 
 test('le Monde : les calques de la carte ne voyagent que si le navigateur ne les a pas (X-Map-Key)', async () => {
@@ -1179,7 +1180,7 @@ test('le Monde : une île v4 passe à la grande carte (× 1,5) ; tout ce qui est
   // Une seule fois : le passage suivant ne déplace plus rien
   await api('GET', '/play/world', null, player);
   assert.deepEqual((await sql('SELECT x, y FROM world_annexes WHERE user_id = $1', [player.userId])).map(r => [r.x, r.y]), [[V5(62), V5(60)]]);
-  assert.equal((await sql('SELECT map_version FROM world_stock WHERE user_id = $1', [player.userId]))[0].map_version, 5);
+  assert.equal((await sql('SELECT map_version FROM world_stock WHERE user_id = $1', [player.userId]))[0].map_version, 6);
   assert.deepEqual((await sql('SELECT repelled FROM world_nights WHERE user_id = $1', [player.userId]))[0].repelled, {});
 });
 
@@ -1201,8 +1202,30 @@ test('le Monde : une île de la carte v2 passe à la grande île ; ses décorati
   // Une seule migration ; les cinq décorations remboursées une fois (Eau, Feu, Terre, Air : 10 ; Boue : 15)
   await api('GET', '/play/world', null, player);
   assert.equal(await coinsOf(player), before + 55);
-  assert.equal((await sql('SELECT map_version FROM world_stock WHERE user_id = $1', [player.userId]))[0].map_version, 5);
+  assert.equal((await sql('SELECT map_version FROM world_stock WHERE user_id = $1', [player.userId]))[0].map_version, 6);
   assert.equal((await sql('SELECT COUNT(*)::int AS n FROM world_tiles WHERE user_id = $1', [player.userId]))[0].n, 0);
+});
+
+test('le Monde : une île v5 passe en v6 (le camp respire, choix de l’auteur, 19 oct.) : les enclos du tutoriel d’avant rentrent en réserve, une fois ; la barrière du nord et le reste restent', async () => {
+  const player = await newPlayer();
+  await api('GET', '/play/world', null, player);
+  const feu = (await api('GET', '/play/world', null, player)).data.sites.find(s => s.id === 'foyer');
+  // (la grande emprise du Feu, 3 × 3 : son coin haut-gauche ; sur une île neuve, il est au palier 0, à sa place)
+  const big = feu.w >= 3 ? { x: feu.x, y: feu.y } : { x: feu.x - 1, y: feu.y - 1 };
+  await sql('UPDATE world_stock SET map_version = 5 WHERE user_id = $1', [player.userId]);
+  // L'anneau d'avant (un piquet au sud, une porte à l'ouest), la barrière du nord, une clôture loin du camp, une lanterne près du Feu
+  await sql(`INSERT INTO world_crafts (user_id, craft, x, y) VALUES ($1, 'cloture', $2, $3), ($1, 'porte', $4, $5), ($1, 'cloture', $6, $7),
+    ($1, 'cloture', $8, $9), ($1, 'lanterne', $10, $11)`,
+  [player.userId, big.x + 1, big.y + 4, big.x - 2, big.y + 1, big.x + 1, big.y - 2, big.x - 5, big.y + 1, big.x + 3, big.y + 1]);
+  await api('GET', '/play/world', null, player);
+  const placed = await sql('SELECT craft, x - $2 AS dx, y - $3 AS dy FROM world_crafts WHERE user_id = $1 AND x IS NOT NULL ORDER BY craft, x', [player.userId, big.x, big.y]);
+  assert.deepEqual(placed.map(r => [r.craft, r.dx, r.dy]), [['cloture', -5, 1], ['cloture', 1, -2], ['lanterne', 3, 1]]);
+  assert.equal((await sql('SELECT COUNT(*)::int AS n FROM world_crafts WHERE user_id = $1 AND x IS NULL', [player.userId]))[0].n, 2);
+  assert.equal((await sql('SELECT map_version FROM world_stock WHERE user_id = $1', [player.userId]))[0].map_version, 6);
+  // Une seule fois : ce qu'on repose ensuite près du Feu y reste
+  await sql(`UPDATE world_crafts SET x = $2, y = $3 WHERE user_id = $1 AND craft = 'porte'`, [player.userId, big.x - 2, big.y + 1]);
+  await api('GET', '/play/world', null, player);
+  assert.equal((await sql(`SELECT COUNT(*)::int AS n FROM world_crafts WHERE user_id = $1 AND craft = 'porte' AND x IS NOT NULL`, [player.userId]))[0].n, 1);
 });
 
 // Première chaîne jouable d'un plateau (recherche en profondeur), pour jouer comme un joueur
@@ -2401,24 +2424,24 @@ test('butins : chapitres ouverts, quêtes réclamées et bouteille donnent leur 
   assert.equal((await api('POST', '/play/world/chest', { source: 'jour' }, await guest())).status, 402);
 });
 
-test('l’enclos d’Agathe se trace même sans clôture jamais assemblée (un compte d’avant les clôtures de Lorena n’est pas lâché)', async () => {
+test('la barrière du nord se trace même sans clôture jamais assemblée (un compte sans les piquets de Lorena n’est pas lâché)', async () => {
   const player = await newPlayer();
   const view = async () => (await api('GET', '/play/world', null, player)).data;
   await view();
   await sql(`INSERT INTO world_buildings (user_id, site, level) VALUES ($1, 'foyer', 1) ON CONFLICT (user_id, site) DO UPDATE SET level = 1`, [player.userId]);
   await sql('UPDATE world_stock SET wood = 200 WHERE user_id = $1', [player.userId]);
-  // Avant l'enclos (la cage) : sans clôture assemblée, pas de trait
+  // Avant la barrière (la soupe) : sans clôture assemblée, pas de trait
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'soupe')`, [player.userId]);
   const before = (await view()).crafts.catalog.find(c => c.id === 'cloture');
   assert.deepEqual([before.made, before.traceable, before.spots.length], [0, false, 0]);
   assert.equal((await api('POST', '/play/world/craft/line', { craft: 'cloture', cells: [[93, 93]] }, player)).status, 409);
   // (hors d'une leçon des clôtures, un piquet ne se défait pas)
   assert.equal((await api('POST', '/play/world/craft/unpose', { x: 93, y: 93 }, player)).status, 409);
-  // À l'enclos d’Agathe : le trait est permis, ses piquets fabriqués et payés en passant
+  // À la barrière du nord (choix de l'auteur, 19 oct.) : le trait est permis, ses piquets fabriqués et payés en passant
   await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'abri-cannelle')`, [player.userId]);
   const yard = await view();
   const fence = yard.crafts.catalog.find(c => c.id === 'cloture');
-  assert.deepEqual([yard.brume.quest.id, fence.made, fence.traceable, fence.spots.length > 0], ['enclos-cannelle', 0, true, true]);
+  assert.deepEqual([yard.brume.quest.id, fence.made, fence.traceable, fence.spots.length > 0], ['barriere', 0, true, true]);
   const line = await api('POST', '/play/world/craft/line', { craft: 'cloture', cells: [[fence.spots[0].x, fence.spots[0].y]] }, player);
   assert.deepEqual([line.status, line.data.placed, line.data.world.stock.wood], [200, 1, 192], JSON.stringify(line.data));
   // Défait pendant la leçon : le piquet payé disparaît, ses 8 bois sont rendus (choix de l'auteur, 15 oct.)
@@ -2499,7 +2522,7 @@ test('quêtes de Brume : la quête active se réclame une fois, son objectif att
   assert.equal(start.status, 200);
   assert.deepEqual([start.data.brume.quest.id, start.data.brume.quest.kind, start.data.brume.quest.done], ['pages', 'element', false]);
   assert.equal(start.data.brume.done, 0);
-  assert.equal(start.data.brume.total, 74);
+  assert.equal(start.data.brume.total, 72);
   // Objectif pas encore atteint ; quête qui n'est pas l'active ; identifiant invalide
   assert.equal((await api('POST', '/play/world/quest', { id: 'pages' }, player)).status, 403);
   assert.equal((await api('POST', '/play/world/quest', { id: 'recolte' }, player)).status, 409);
@@ -2573,11 +2596,11 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Lorena ouvre 
   assert.ok(who(morning, 'ponton'));
   assert.equal(who(morning, 'foyer'), undefined);
   assert.equal(morning.brume.quest.id, 'caisse');
-  // Le jour de Lorena : sa caisse (toujours la même : 5 bois, sa longue-vue, son filet, son carnet de quart, les piquets
-  // de son enclos et ses deux portes à verrou, en réserve), une fois
+  // Le jour de Lorena : sa caisse (toujours la même : 5 bois, sa longue-vue, son filet, son carnet de quart, et les
+  // piquets de la barrière du nord, en réserve : choix de l'auteur, 19 oct.), une fois
   const opened = await crate();
-  assert.deepEqual([opened.status, opened.data.chest.prize.stock, opened.data.chest.prize.keepsakes.length, opened.data.world.stock.wood], [200, { wood: 5 }, 5, 5]);
-  assert.equal(opened.data.world.crafts.catalog.find(c => c.id === 'cloture').reserve, 20);
+  assert.deepEqual([opened.status, opened.data.chest.prize.stock, opened.data.chest.prize.keepsakes.length, opened.data.world.stock.wood], [200, { wood: 5 }, 4, 5]);
+  assert.equal(opened.data.world.crafts.catalog.find(c => c.id === 'cloture').reserve, 7);
   assert.equal(opened.data.world.brume.quest.done, true);
   assert.equal((await crate()).status, 409);
   assert.equal((await api('POST', '/play/world/chest', { source: 'caisse:rivet' }, player)).status, 404);
@@ -2604,45 +2627,6 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Lorena ouvre 
   await sql(`INSERT INTO world_items (user_id, item, source) SELECT $1, unnest($2::text[]), 'offert'`, [player.userId, trail.map(([x, y]) => `chemin:${x}:${y}`)]);
   assert.equal((await view()).brume.quest.done, true);
   assert.equal((await claim('chemin-aster')).status, 200);
-  // L'enclos du camp (choix de l'auteur, 15 oct. : à deux cases du Feu, une rangée libre dedans) : la quête compte les
-  // clôtures posées ; deux à la main, puis le reste d'un trait, la réserve d'abord. Deux sentiers le traversent, et
-  // l'épave en ferme le coin : vingt cases
-  const fences = await view();
-  assert.deepEqual([fences.brume.quest.id, fences.brume.quest.have, fences.brume.quest.need], ['clotures', 0, 20]);
-  const fence = fences.crafts.catalog.find(c => c.id === 'cloture');
-  assert.deepEqual([fence.reserve, fence.line], [20, true]);
-  const ring = [[96, 90], [97, 90], [98, 90], [99, 90], [100, 90], [101, 90], [102, 90], [102, 91], [102, 92], [102, 93], [102, 94], [102, 95],
-    [102, 96], [101, 96], [100, 96], [99, 96], [98, 96], [96, 94], [96, 93], [96, 91]];
-  for (const [x, y] of ring.slice(0, 2)) assert.equal((await api('POST', '/play/world/craft/place', { craft: 'cloture', x, y }, player)).status, 200);
-  // (un piquet de sa caisse, défait pendant la leçon : il retourne dans la réserve, rien n'est rendu ; puis reposé)
-  const back = await api('POST', '/play/world/craft/unpose', { x: 97, y: 90 }, player);
-  assert.deepEqual([back.status, back.data.refund, back.data.world.crafts.catalog.find(c => c.id === 'cloture').reserve, back.data.world.stock.wood],
-    [200, undefined, 19, fences.stock.wood], JSON.stringify(back.data));
-  assert.equal((await api('POST', '/play/world/craft/unpose', { x: 97, y: 90 }, player)).status, 404);
-  assert.equal((await api('POST', '/play/world/craft/place', { craft: 'cloture', x: 97, y: 90 }, player)).status, 200);
-  // (un tracé mal formé, une création qui ne se trace pas : refusés)
-  assert.equal((await api('POST', '/play/world/craft/line', { craft: 'cloture', cells: [[97, 91.5]] }, player)).status, 400);
-  assert.equal((await api('POST', '/play/world/craft/line', { craft: 'lanterne', cells: [[97, 92]] }, player)).status, 400);
-  const line = await api('POST', '/play/world/craft/line', { craft: 'cloture', cells: ring.slice(2) }, player);
-  assert.deepEqual([line.status, line.data.placed, line.data.stopped, line.data.world.brume.quest.done], [200, 18, undefined, true], JSON.stringify(line.data));
-  // Plus rien en réserve : chaque pièce se fabrique et se paie en passant (8 bois), et le trait s'arrête quand le bois manque
-  await sql('UPDATE world_stock SET wood = 12 WHERE user_id = $1', [player.userId]);
-  const paid = await api('POST', '/play/world/craft/line', { craft: 'cloture', cells: [[93, 93], [93, 94], [93, 95]] }, player);
-  assert.deepEqual([paid.status, paid.data.placed, Boolean(paid.data.stopped), paid.data.world.stock.wood], [200, 1, true, 4], JSON.stringify(paid.data));
-  assert.equal((await api('POST', '/play/world/craft/line', { craft: 'cloture', cells: [[93, 94]] }, player)).status, 400);
-  assert.equal((await claim('clotures')).status, 200);
-  // Ses deux portes, une sur chaque sentier qui traverse l'enclos ; elles ont leur verrou (sa caisse) : rien à payer
-  const doors = await view();
-  const card = doors.crafts.catalog.find(c => c.id === 'porte');
-  assert.deepEqual([doors.brume.quest.id, doors.brume.quest.need, card.reserve, card.lock.ready], ['portes', 2, 2, 2]);
-  const stone = doors.stock.stone;
-  for (const [x, y] of [[96, 92], [96, 95]]) {
-    const placed = await api('POST', '/play/world/craft/door', { x, y, lock: true }, player);
-    assert.equal(placed.status, 200, JSON.stringify(placed.data));
-  }
-  const shut = await view();
-  assert.deepEqual([shut.brume.quest.done, shut.stock.stone, shut.crafts.placed.filter(c => c.craft === 'porte').every(c => c.locked)], [true, stone, true]);
-  assert.equal((await claim('portes')).status, 200);
   // Sa journée finit par une deuxième nuit (un personnage par jour), et Agathe arrive au matin, dans sa propre séquence
   const evening = await view();
   assert.deepEqual([evening.brume.quest.id, who(evening, 'foyer')], ['veille', undefined]);
@@ -2697,7 +2681,7 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Lorena ouvre 
   const [kept] = await sql('SELECT wood, stone FROM world_stock WHERE user_id = $1', [player.userId]);
   await sql('UPDATE world_stock SET wood = 0, stone = 0 WHERE user_id = $1', [player.userId]);
   assert.equal((await api('POST', '/play/world/shelter', { who: 'cannelle' }, player)).status, 409);
-  // (ce qu'il avait, et de quoi payer l'abri et son enclos)
+  // (ce qu'il avait, et de quoi payer l'abri)
   await sql('UPDATE world_stock SET wood = $2, stone = $3 WHERE user_id = $1', [player.userId, kept.wood + 200, kept.stone + 10]);
   const roof = await api('POST', '/play/world/shelter', { who: 'cannelle' }, player);
   const roofed = roof.data.world;
@@ -2705,20 +2689,32 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Lorena ouvre 
     [200, 'abri-cannelle', true, 'cannelle_abri', true, kept.wood + 180], JSON.stringify(roof.data.message || ''));
   assert.equal((await api('POST', '/play/world/shelter', { who: 'cannelle' }, player)).status, 409);
   assert.equal((await claim('abri-cannelle')).status, 200);
-  // Son enclos : les cases à une case de son coin, sauf celles qui bordent le Feu (son enclos à lui) ; celles qu'il
-  // partage avec l'enclos de Lorena ont déjà leur piquet ; les autres, fabriqués et payés en passant, d'un trait
-  const yard = await view();
-  const corner = yard.camp.find(c => c.id === 'cannelle');
-  const gap = (v, a, w) => Math.max(a - v, 0, v - (a + w - 1));
-  const yardRing = yard.crafts.catalog.find(c => c.id === 'cloture').spots
-    .filter(c => Math.max(gap(c.x, corner.x, corner.w), gap(c.y, corner.y, corner.h)) === 1 && Math.max(gap(c.x, 98, 3), gap(c.y, 92, 3)) > 1);
-  const shared = yard.crafts.placed.filter(c => c.craft === 'cloture' && Math.max(gap(c.x, corner.x, corner.w), gap(c.y, corner.y, corner.h)) === 1
-    && Math.max(gap(c.x, 98, 3), gap(c.y, 92, 3)) > 1).length;
-  assert.deepEqual([yard.brume.quest.id, yard.brume.quest.have, yard.brume.quest.need], ['enclos-cannelle', shared, shared + yardRing.length]);
-  assert.ok(yardRing.length >= 3, String(yardRing.length));
-  const fenced = await api('POST', '/play/world/craft/line', { craft: 'cloture', cells: yardRing.map(c => [c.x, c.y]) }, player);
-  assert.deepEqual([fenced.status, fenced.data.placed, fenced.data.world.brume.quest.done, fenced.data.world.stock.wood], [200, yardRing.length, true, kept.wood + 180 - 8 * yardRing.length]);
-  assert.equal((await claim('enclos-cannelle')).status, 200);
+  // La barrière du nord (choix de l'auteur, 19 oct. : une barrière, pas un enclos ; au jour d’Agathe, après la nuit où le
+  // Dormeur est venu dormir contre le feu) : la quête compte les clôtures posées ; deux à la main, puis le reste d'un
+  // trait, la réserve d'abord (les piquets de la caisse de Lorena)
+  const fences = await view();
+  assert.deepEqual([fences.brume.quest.id, fences.brume.quest.have, fences.brume.quest.need], ['barriere', 0, 7]);
+  const fence = fences.crafts.catalog.find(c => c.id === 'cloture');
+  assert.deepEqual([fence.reserve, fence.line], [7, true]);
+  const barrier = [[96, 90], [97, 90], [98, 90], [99, 90], [100, 90], [101, 90], [102, 90]];
+  for (const [x, y] of barrier.slice(0, 2)) assert.equal((await api('POST', '/play/world/craft/place', { craft: 'cloture', x, y }, player)).status, 200);
+  // (un piquet de sa caisse, défait pendant la leçon : il retourne dans la réserve, rien n'est rendu ; puis reposé)
+  const back = await api('POST', '/play/world/craft/unpose', { x: 97, y: 90 }, player);
+  assert.deepEqual([back.status, back.data.refund, back.data.world.crafts.catalog.find(c => c.id === 'cloture').reserve, back.data.world.stock.wood],
+    [200, undefined, 6, fences.stock.wood], JSON.stringify(back.data));
+  assert.equal((await api('POST', '/play/world/craft/unpose', { x: 97, y: 90 }, player)).status, 404);
+  assert.equal((await api('POST', '/play/world/craft/place', { craft: 'cloture', x: 97, y: 90 }, player)).status, 200);
+  // (un tracé mal formé, une création qui ne se trace pas : refusés)
+  assert.equal((await api('POST', '/play/world/craft/line', { craft: 'cloture', cells: [[97, 91.5]] }, player)).status, 400);
+  assert.equal((await api('POST', '/play/world/craft/line', { craft: 'lanterne', cells: [[97, 92]] }, player)).status, 400);
+  const line = await api('POST', '/play/world/craft/line', { craft: 'cloture', cells: barrier.slice(2) }, player);
+  assert.deepEqual([line.status, line.data.placed, line.data.stopped, line.data.world.brume.quest.done], [200, 5, undefined, true], JSON.stringify(line.data));
+  // Plus rien en réserve : chaque pièce se fabrique et se paie en passant (8 bois), et le trait s'arrête quand le bois manque
+  await sql('UPDATE world_stock SET wood = 12 WHERE user_id = $1', [player.userId]);
+  const paid = await api('POST', '/play/world/craft/line', { craft: 'cloture', cells: [[93, 93], [93, 94], [93, 95]] }, player);
+  assert.deepEqual([paid.status, paid.data.placed, Boolean(paid.data.stopped), paid.data.world.stock.wood], [200, 1, true, 4], JSON.stringify(paid.data));
+  assert.equal((await api('POST', '/play/world/craft/line', { craft: 'cloture', cells: [[93, 94]] }, player)).status, 400);
+  assert.equal((await claim('barriere')).status, 200);
   assert.equal(who(await view(), 'atelier'), undefined);
   assert.equal((await api('POST', '/play/world/sleep', {}, player)).status, 200);
   // Nathan est là ; il s'installe dans son coin (choix de l'auteur, 18 oct.) : son abri, bâti et payé comme celui
@@ -2730,7 +2726,7 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Lorena ouvre 
   const nest = await api('POST', '/play/world/shelter', { who: 'rivet' }, player);
   assert.deepEqual([nest.status, nest.data.world.brume.quest.done, nest.data.world.camp.find(c => c.id === 'rivet').art], [200, true, 'rivet_abri'], JSON.stringify(nest.data.message || ''));
   assert.equal((await claim('deco')).status, 200);
-  assert.equal(await coinsOf(player), 220);
+  assert.equal(await coinsOf(player), 195);
   // Ses trois torches (choix de l'auteur, 13 oct.) : une création « de début », 2 bois, le Feu suffit
   const torch = (await view()).crafts.catalog.find(c => c.id === 'torche');
   assert.deepEqual([torch.open, torch.cost, torch.block], [true, { wood: 2 }, null]);
@@ -2744,7 +2740,7 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Lorena ouvre 
   const bought = await api('POST', '/play/world/item', { item: 'canne' }, player);
   assert.deepEqual([bought.status, bought.data.world.brume.quest.done], [200, true], JSON.stringify(bought.data.message || ''));
   assert.equal((await claim('outil-rivet')).status, 200);
-  assert.equal(await coinsOf(player), 220 + 15 - 80 + 15);
+  assert.equal(await coinsOf(player), 195 + 15 - 80 + 15);
   // Le jour de Nathan finit : Léo n'est pas encore là ; la quatrième nuit (choix de l'auteur, 13 oct. : chaque
   // personnage son jour), puis Léo dort au Puits (plus de quartier à acheter) : on le réveille en lui parlant
   const rivetNight = await view();
@@ -2769,9 +2765,8 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Lorena ouvre 
   assert.deepEqual(who(built.data.world, 'foyer').needs.map(n => n.id), ['manger', 'deco']);
   // (puis le premier chemin, du Puits au Feu : l'île neuve n'a que son sentier)
   assert.deepEqual([who(built.data.world, 'puits').built, built.data.world.brume.quest.id], [true, 'chemin']);
-  // (220 à la lanterne, les torches de Nathan 15, sa canne payée 80 et réclamée 15, puis Léo : son réveil, sa Pluie,
-  // son Puits)
-  assert.equal(await coinsOf(player), 220 + 15 - 80 + 15 + 10 + 20 + 40);
+  // (195 à l'abri de Nathan, ses torches 15, sa canne payée 80 et réclamée 15, puis Léo : son réveil, sa Pluie, son Puits)
+  assert.equal(await coinsOf(player), 195 + 15 - 80 + 15 + 10 + 20 + 40);
   // Lorena est là depuis le matin qui suit le premier feu ; le chemin ne conditionne plus son arrivée (son Ponton bâti
   // hors de La Crique ne l'y installe pas encore : people.livesHere)
   assert.equal(who(built.data.world, 'ponton').built, false);

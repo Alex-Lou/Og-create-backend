@@ -1,5 +1,5 @@
 // Les coffres de l'île (services/world/chests.js) : d'où vient un coffre qui attend (LABELS), ce que garde la caisse
-// de Lorena (LORENA_KEEPSAKES : enclos, le nombre de piquets ; doors, celui de ses portes), et ce que répond l'île quand on en ouvre un.
+// de Lorena (LORENA_KEEPSAKES : piquets, le nombre de piquets de la barrière), et ce que répond l'île quand on en ouvre un.
 
 const LABELS = {
     chapter: chapter => `Chapitre ${chapter} du Grimoire`,
@@ -7,7 +7,7 @@ const LABELS = {
     landmark: name => `Lieu : ${name}`
 };
 
-const LORENA_KEEPSAKES = (enclos, doors) => ['Longue-vue', 'Filet', 'Carnet de quart (le plan du Ponton)', `${enclos} piquets de clôture`, `${doors} portes à verrou`];
+const LORENA_KEEPSAKES = piquets => ['Longue-vue', 'Filet', 'Carnet de quart (le plan du Ponton)', `${piquets} piquets de clôture`];
 
 const CRATE_NOT_YET = 'Cette caisse n’a pas encore échoué.';
 const CRATE_OPEN = 'Cette caisse est déjà ouverte.';

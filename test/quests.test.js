@@ -21,7 +21,7 @@ const OLD = ['deco', 'recolte', 'source', 'puits', 'lisiere', 'cabane', 'livre5'
   'crique', 'ponton', 'livre45', 'hameau', 'deco10', 'phare', 'livre70', 'legendes'];
 
 test('chaque quête désigne un vrai quartier, palier, création, lieu ou habitant, avec un texte et une récompense', () => {
-  assert.equal(QUESTS.length, 74);
+  assert.equal(QUESTS.length, 72);
   assert.equal(new Set(QUESTS.map(q => q.id)).size, QUESTS.length);
   for (const q of QUESTS) {
     assert.match(q.id, /^[a-z0-9-]{1,30}$/);
@@ -53,7 +53,7 @@ test('chaque quête désigne un vrai quartier, palier, création, lieu ou habita
   const acts = QUESTS.map(q => ACTS.indexOf(q.act));
   assert.deepEqual(acts, [...acts].sort((a, b) => a - b));
   assert.deepEqual(QUESTS.filter(q => q.chest).map(q => q.act), ACTS);
-  assert.equal(QUESTS.reduce((sum, q) => sum + q.coins, 0), 5275);
+  assert.equal(QUESTS.reduce((sum, q) => sum + q.coins, 0), 5250);
   assert.ok(BEASTS.includes('Poisson') && !BEASTS.includes('Lapin'));
 });
 
@@ -115,9 +115,14 @@ test('avancée de chaque objectif, plafonnée', () => {
 
 test('la quête active est la première pas encore faite ; à la fin, Brume se repose', () => {
   const first = active(new Set(), facts());
-  assert.deepEqual(QUESTS.slice(0, 11).map(q => q.id), ['pages', 'ramasser', 'feu', 'nuit', 'caisse', 'recolte', 'premier-ponton', 'chemin-aster', 'clotures', 'portes', 'veille']);
+  // (la barrière du nord au jour d’Agathe, plus d'enclos ni de portes au jour de Lorena : choix de l'auteur, 19 oct.)
+  assert.deepEqual(QUESTS.slice(0, 11).map(q => q.id), ['pages', 'ramasser', 'feu', 'nuit', 'caisse', 'recolte', 'premier-ponton', 'chemin-aster', 'veille', 'soupe', 'cage']);
+  assert.deepEqual(QUESTS.slice(13, 17).map(q => q.id), ['abri-cannelle', 'barriere', 'nuit-cannelle', 'deco']);
+  // (un compte qui avait l'enclos, les portes ou l'enclos d’Agathe : à leur place d'avant, jamais plus loin)
+  assert.equal(active(new Set(['portes']), facts()).id, 'veille');
+  assert.equal(active(new Set(['enclos-cannelle']), facts()).id, 'barriere');
   assert.match(QUESTS.find(q => q.id === 'feu').say, /Rallume-les/);
-  assert.deepEqual([first.id, first.act, first.step, first.total, first.kind, first.done], ['pages', 'T', 1, 74, 'element', false]);
+  assert.deepEqual([first.id, first.act, first.step, first.total, first.kind, first.done], ['pages', 'T', 1, 72, 'element', false]);
   assert.equal(active(new Set(), facts({ elements: new Set([...facts().elements, 'Vent']) })).done, true);
   // La lanterne de Nathan faite, on dort : Léo au matin, jamais le même jour (choix de l'auteur, 13 oct.)
   // (ses trois torches d'abord : choix de l'auteur, 13 oct.)

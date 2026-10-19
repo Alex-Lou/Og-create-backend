@@ -47,19 +47,21 @@ test('le camp : rien avant son personnage ; sur une île à la plage, chacun dan
   const beach = places.placesFrom({ beach: true });
   const camp = campOf({ met: new Set(['ponton', 'foyer', 'atelier']), places: beach, beach: true });
   const at = id => { const c = camp.find(e => e.id === id); return [c.x, c.y]; };
-  // (la cuisine d’Agathe à l'est du camp, entre le Feu et les palmiers : choix de l'auteur, 18 oct.)
-  assert.deepEqual([at('cannelle'), at('aster'), at('rivet')], [[102, 94], [90, 95], [93, 86]]);
+  // (la cuisine d’Agathe à l'est du camp, entre le Feu et les palmiers : choix de l'auteur, 18 oct. ; deux cases libres
+  // entre elle et le Feu, 19 oct.)
+  assert.deepEqual([at('cannelle'), at('aster'), at('rivet')], [[103, 93], [90, 95], [93, 86]]);
   // La grande Hirondelle (choix de l'auteur, 15 oct.) : 6 × 3 cases en travers de l'anse à l'ouest (sa poupe arrachée n'est
   // plus à l'ancienne place : choix de l'auteur, 16 oct.) ; sur l'ancienne butte, deux palmiers et deux étoiles de mer
   const ship = camp.find(c => c.id === 'hirondelle');
   assert.deepEqual([ship.art, ship.x, ship.y, ship.w, ship.h, ship.stade, ship.lanterne], ['hirondelle', 86, 97, 6, 3, 0, true]);
   assert.ok(!camp.some(c => c.id === 'poupe'));
-  // (à sa place, le coin de l'enclos du Feu : deux pièces de clôture, une fois le Feu bâti, à leur place ou pas du tout)
-  const coin = over => campOf({ met: new Set(['ponton', 'foyer', 'atelier']), places: beach, beach: true, ...over }).filter(c => c.id.startsWith('coin-')).map(c => [c.art, c.x, c.y]);
-  assert.deepEqual(coin({}), []);
-  assert.deepEqual(coin({ levels: { foyer: 1 } }), [['cloture', 96, 96], ['cloture', 97, 96]]);
-  assert.deepEqual(coin({ levels: { foyer: 1 }, taken: new Set([96 * map.SIZE + 97]) }), [['cloture', 96, 96]]);
-  assert.deepEqual([at('palmier-1'), at('palmier-2'), at('etoile-1'), at('etoile-2')], [[103, 97], [104, 97], [102, 97], [101, 97]]);
+  // Le camp respire (choix de l'auteur, 19 oct.) : plus de pièces de clôture fixes ; les palmiers et les étoiles de mer
+  // répartis sur le sable, hors des trouvailles de la plage ; entre deux choses du camp, au moins une case libre
+  assert.ok(!camp.some(c => c.id.startsWith('coin-')));
+  assert.deepEqual([at('palmier-1'), at('palmier-2'), at('etoile-1'), at('etoile-2')], [[102, 96], [98, 96], [100, 96], [96, 96]]);
+  const spread = campOf({ met: new Set(['ponton', 'foyer', 'atelier']), places: beach, beach: true, levels: { foyer: 1, ponton: 1 } });
+  const gap = (a, b) => Math.max(Math.max(a.x - (b.x + b.w - 1), b.x - (a.x + a.w - 1)), Math.max(a.y - (b.y + b.h - 1), b.y - (a.y + a.h - 1)));
+  for (const a of spread) for (const b of spread) if (a !== b && a.id !== 'hirondelle' && b.id !== 'hirondelle') assert.ok(gap(a, b) >= 2, `${a.id} contre ${b.id}`);
   // (sa végétation : un stade aux jours 3, 10 et 30 ; la lanterne de Lorena, une fois Lorena là)
   assert.deepEqual([0, 2, 3, 9, 10, 29, 30, 99].map(overgrowthOf), [0, 0, 1, 1, 2, 2, 3, 3]);
   assert.equal(campOf({ met: new Set(), places: beach, beach: true }).find(c => c.id === 'hirondelle').lanterne, false);
@@ -135,7 +137,7 @@ test.describe('île', () => {
     await sql(`UPDATE world_items SET bought_at = now() - interval '12 days' WHERE user_id = $1 AND item = 'ile:plage'`, [player.userId]);
     assert.equal((await view()).camp.find(c => c.id === 'hirondelle').stade, 2);
     // Le suivi des quêtes montre tout le tutoriel : vingt-deux étapes, de la première page au premier chemin
-    assert.deepEqual([start.brume.steps.length, start.brume.steps[0].id, start.brume.steps.at(-1).id], [26, 'pages', 'chemin']);
+    assert.deepEqual([start.brume.steps.length, start.brume.steps[0].id, start.brume.steps.at(-1).id], [24, 'pages', 'chemin']);
     assert.ok(start.brume.steps.every(st => st.label && st.done === false));
     // Le feu fait : personne encore (la première nuit se passe seul) ; la nuit passée : Lorena arrive, son Ponton et
     // son camp avec elle

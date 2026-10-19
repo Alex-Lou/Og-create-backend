@@ -27,19 +27,19 @@ const ZONE = 'coeur';
 const ABRI = 2;
 // Les places du camp sur une île à la plage (world/places.js) : dans la zone de chacun
 const BEACH_PLACES = {
-    // (le camp de Lorena serré autour de son Ponton, contre l'épave : sa zone est petite)
-    aster: { x: 90, y: 95 }, sos: { x: 90, y: 94 }, caisses: { x: 91, y: 94 }, filet: { x: 90, y: 100 }, rondins: { x: 92, y: 94 },
+    // (le camp de Lorena autour de son Ponton, contre l'épave : sa zone est petite ; une case libre entre chaque chose,
+    // les rondins près du Feu : choix de l'auteur, 19 oct., le camp respire)
+    aster: { x: 90, y: 95 }, sos: { x: 89, y: 93 }, caisses: { x: 91, y: 93 }, filet: { x: 90, y: 100 }, rondins: { x: 96, y: 94 },
     // (la grande Hirondelle, couchée en travers de l'anse à l'ouest du camp, entre le bout sud des rochers et le Ponton ;
-    // le camp de Lorena se serre derrière elle, son filet devant. Sa poupe arrachée, qui restait à l'ancienne place, n'y
-    // est plus : choix de l'auteur, 16 oct. ; deux pièces de clôture ferment à sa place le coin de l'enclos du Feu,
-    // PLACES : coin-1, coin-2)
+    // le camp de Lorena derrière elle, son filet devant. Sa poupe arrachée, qui restait à l'ancienne place, n'y est plus :
+    // choix de l'auteur, 16 oct.)
     hirondelle: { x: 86, y: 97, w: 6, h: 3 },
     rivet: { x: 93, y: 86 },
     // (la cage des poules, échouée par la mer au bout de la plage, dans le coin d’Agathe : choix de l'auteur, 11 oct.)
     cage: { x: 101, y: 98 },
-    // (sa cuisine, à l'est du camp, entre le Feu et les palmiers, dans l'herbe : choix de l'auteur, 18 oct. ; son enclos
-    // l'entoure sans toucher aux palmiers ; sur le sable du rivage, sous l'enclos du Feu, s'échoue la planche de Léo)
-    cannelle: { x: 102, y: 94 }
+    // (sa cuisine, à l'est du camp, entre le Feu et les palmiers, dans l'herbe : choix de l'auteur, 18 oct. ; deux cases
+    // libres entre elle et le Feu, 19 oct. ; sur le sable du rivage, sous le Feu, s'échoue la planche de Léo)
+    cannelle: { x: 103, y: 93 }
 };
 
 // Place prévue (coin haut-gauche), taille (2 : 2 × 2 cases, sinon 1), fixe (à sa place, ou pas du tout), dessin selon l'avancée (null : pas encore, ou
@@ -68,11 +68,6 @@ const PLACES = [
     // (l'épave : sur une île à la plage, la grande Hirondelle (6 × 3, BEACH_PLACES) ; sur une île d'avant, la petite épave
     // d'origine. extra : ce que le jeu dessine en plus, la végétation et la lanterne de Lorena)
     { id: 'hirondelle', x: 96, y: 96, size: 2, art: at => (at.beach ? 'hirondelle' : 'hirondelle_petite'), extra: at => (at.beach ? { stade: overgrowthOf(at.days), lanterne: at.here('ponton'), sillon: SILLON } : {}) },
-    // (le coin de l'enclos du Feu que fermait la poupe de l'Hirondelle, à deux cases de la grande emprise du Feu : deux
-    // pièces de clôture, une fois le Feu bâti, sur l'île à la plage ; le jeu les dessine comme une clôture, raccordée aux
-    // piquets du joueur. fixe : à leur place ou pas du tout ; choix de l'auteur, 16 oct.)
-    { id: 'coin-1', x: 96, y: 96, fixe: true, art: at => (at.beach && foyer(at) ? 'cloture' : null) },
-    { id: 'coin-2', x: 97, y: 96, fixe: true, art: at => (at.beach && foyer(at) ? 'cloture' : null) },
     // (sa cuisine de l'épave, puis son abri, bâti par le joueur : world/shelters.js ; le Foyer à l'Abri, son cabanon :
     // choix de l'auteur, 14 oct.)
     { id: 'cannelle', x: 99, y: 96, size: 2, art: at => (!at.here('foyer') ? null : foyer(at) >= ABRI ? 'cannelle_cabanon' : at.shelters.has('cannelle') ? 'cannelle_abri' : 'cannelle_debris') },
@@ -87,11 +82,11 @@ const PLACES = [
     { id: 'rondins', x: 95, y: 92, art: at => (aster(at) ? 'rondins' : null) },
     { id: 'cage', x: 98, y: 94, art: at => (at.cage ? `cage_${at.cage}` : null) },
     // (sur l'ancienne butte devant le Feu, aplatie : deux palmiers, deux étoiles de mer ; choix de l'auteur, 15 oct. ;
-    // hors de l'anneau de l'enclos du Feu, et de celui de la cuisine d’Agathe : en rang sur le sable, sous lui, 18 oct.)
-    { id: 'palmier-1', x: 103, y: 97, art: at => (at.beach ? 'palmier' : null) },
-    { id: 'palmier-2', x: 104, y: 97, art: at => (at.beach ? 'palmier' : null) },
-    { id: 'etoile-1', x: 102, y: 97, art: at => (at.beach ? 'etoile_de_mer' : null) },
-    { id: 'etoile-2', x: 101, y: 97, art: at => (at.beach ? 'etoile_de_mer' : null) }
+    // répartis sur le sable, une case libre autour de chacun, hors des trouvailles de la plage (pickups.js), 19 oct.)
+    { id: 'palmier-1', x: 102, y: 96, art: at => (at.beach ? 'palmier' : null) },
+    { id: 'palmier-2', x: 98, y: 96, art: at => (at.beach ? 'palmier' : null) },
+    { id: 'etoile-1', x: 100, y: 96, art: at => (at.beach ? 'etoile_de_mer' : null) },
+    { id: 'etoile-2', x: 96, y: 96, art: at => (at.beach ? 'etoile_de_mer' : null) }
 ];
 
 // Case où le camp peut se poser : sol constructible de la plage, hors des grandes emprises, des lieux remarquables et
