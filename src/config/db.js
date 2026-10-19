@@ -2,9 +2,7 @@
 const { Pool } = require('pg');
 const { AsyncLocalStorage } = require('node:async_hooks');
 require('dotenv').config();
-
-// Journal des requêtes : ERROR par défaut (seules les erreurs), INFO ou DEBUG à la demande
-const LOG_LEVEL = process.env.DB_LOG_LEVEL || 'ERROR';
+const { log } = require('../utils/logger');
 
 // DATABASE_URL (Neon, Render...) prioritaire ; sinon variables DB_* séparées (local).
 // Le SSL est piloté par l'URL (ex. ?sslmode=require).
@@ -19,7 +17,7 @@ const pool = new Pool(process.env.DATABASE_URL
     });
 
 pool.on('error', error => {
-    console.error('Erreur inattendue sur le client PostgreSQL', error);
+    log('error', 'Client PostgreSQL', error.stack);
 });
 
 // Lectures mémorisées le temps d'un calcul (cached(fn), la vue de l'île) : une même lecture (SELECT, ni FOR UPDATE ni
@@ -47,17 +45,16 @@ async function query(text, params) {
     return run(text, params);
 }
 
+// Chaque requête, en debug seulement (LOG_LEVEL=debug), sans ses paramètres (e-mails, empreintes de mots de passe…).
+// Une requête en échec remonte telle quelle : celui qui l'attrape la journalise, une seule fois
 async function run(text, params) {
-    if (LOG_LEVEL === 'DEBUG') console.log('Requête SQL :', text, params || '');
-    else if (LOG_LEVEL === 'INFO') console.log(`Exécution ${text.trim().split(' ')[0]}${params ? ` avec ${params.length} paramètres` : ''}`);
+    const start = Date.now();
     try {
-        const start = Date.now();
         const result = await pool.query(text, params);
-        if (LOG_LEVEL !== 'ERROR') console.log(`Requête exécutée en ${Date.now() - start}ms, ${result.rowCount} lignes affectées`);
+        log('debug', `SQL ${Date.now() - start} ms, ${result.rowCount} lignes`, text.trim());
         return result;
     } catch (error) {
-        console.error('Erreur lors de l\'exécution de la requête :', error.message);
-        if (LOG_LEVEL === 'DEBUG') console.error('Requête en échec :', text, params);
+        log('debug', `SQL en échec après ${Date.now() - start} ms`, text.trim());
         throw error;
     }
 }

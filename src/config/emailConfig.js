@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const { log } = require('../utils/logger');
 
 const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -8,13 +9,9 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-// Vérifier la configuration
-transporter.verify(function(error, success) {
-    if (error) {
-        console.error('Erreur de configuration email:', error);
-    } else {
-        
-    }
+// Sans compte d'envoi valable, le serveur tourne quand même : seuls les e-mails (contact, mot de passe oublié) échouent
+transporter.verify(error => {
+    if (error) log('warn', 'Envoi des e-mails indisponible', error.message);
 });
 
 module.exports = transporter;

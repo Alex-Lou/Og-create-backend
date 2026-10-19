@@ -4,6 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const { limiter } = require('./middleware/rateLimit');
+const { log } = require('./utils/logger');
 const { TOO_MANY_REQUESTS, TOO_MANY_WAIT, REQUEST_REFUSED, ROUTE_NOT_FOUND, SERVER_ERROR } = require('./texts/errors');
 
 const app = express();
@@ -45,6 +46,10 @@ const tooMany = (req, res) => {
 };
 const globalLimiter = limiter({ minutes: Number(process.env.RATE_LIMIT_WINDOW_MINUTES) || 15, max: Number(process.env.RATE_LIMIT_MAX_REQUESTS) || 1000, handler: tooMany });
 const gameLimiter = limiter({ minutes: 1, max: Number(process.env.GAME_RATE_LIMIT_MAX_REQUESTS) || 200, handler: tooMany });
+// La sonde de santé (hébergeur, démarrage des tests) passe avant les limites : elle ne lit rien et ne compte pour personne
+app.get('/api/health', (req, res) => {
+    res.status(200).json({ status: 'OK', environment: process.env.NODE_ENV, timestamp: new Date().toISOString() });
+});
 app.use(globalLimiter);
 
 // Anti-CSRF : toute requête d'écriture porte l'en-tête de l'application (en plus des cookies SameSite=Strict)
@@ -72,23 +77,19 @@ app.use('/api/play', require('./routes/play'));
 app.use('/api/game-data', gameLimiter, require('./routes/gameData'));
 app.use('/api/timer', require('./routes/timer'));
 
-app.get('/api/health', (req, res) => {
-    res.status(200).json({ status: 'OK', environment: process.env.NODE_ENV, timestamp: new Date().toISOString() });
-});
-
+// (une route inconnue n'est pas une panne : un robot qui sonde le site ne remplit pas le journal)
 app.use((req, res) => {
-    if (req.path !== '/favicon.ico') console.log(`Route non trouvée: ${req.method} ${req.path}`);
+    log('debug', `Route introuvable : ${req.method} ${req.path}`);
     res.status(404).json({ message: ROUTE_NOT_FOUND, path: req.path });
 });
 
+// Dernier recours : une panne (5xx) est journalisée avec sa pile ; le joueur ne reçoit qu'un message clair, jamais de
+// détail interne
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
-    console.error('Erreur serveur:', err.message);
-    if (process.env.LOG_LEVEL === 'debug') console.error('Détails:', err.stack);
-    res.status(err.status || 500).json({
-        message: SERVER_ERROR,
-        error: process.env.NODE_ENV === 'development' ? err.message : {}
-    });
+    const status = err.status || 500;
+    log(status >= 500 ? 'error' : 'debug', `${req.method} ${req.path}`, err.stack);
+    res.status(status).json({ message: SERVER_ERROR });
 });
 
 module.exports = app;
