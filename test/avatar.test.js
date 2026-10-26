@@ -28,6 +28,10 @@ test('choix : complétés par défaut ; inconnus, mal formés ou pas encore gagn
   assert.equal(cleanChoices({}).choices.expression, 'neutre');
   assert.equal(cleanChoices({ expression: 'triste' }).choices.expression, 'triste');
   assert.equal(cleanChoices({ expression: 'rire' }).status, 400);
+  // L'algue du naufragé (25 oct.) : mise par défaut, qu'on peut enlever ; rien d'autre
+  assert.equal(cleanChoices({}).choices.algue, 'oui');
+  assert.equal(cleanChoices({ algue: 'non' }).choices.algue, 'non');
+  assert.equal(cleanChoices({ algue: 'peut-etre' }).status, 400);
   // Les coupes de femme ajoutées (pixie, demi-queue, tresse sur le côté, puffs, locks longues) sont acceptées
   for (const coupe of ['pixie', 'demiQueue', 'tresseCote', 'puffs', 'locksLongues']) assert.equal(cleanChoices({ genre: 'femme', coupe }).choices.coupe, coupe);
   const refused = [

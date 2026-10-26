@@ -46,19 +46,21 @@ const FORMES = {
     formeChaussures: ['souliers', 'baskets', 'bottines', 'sandales', 'ballerines', 'bottes', 'sabots'],
     // un habit uni, ou en dégradé de sa couleur vers une seconde
     motifHaut: ['uni', 'degrade', 'raye', 'pois'],
-    motifBas: ['uni', 'degrade', 'raye', 'pois']
+    motifBas: ['uni', 'degrade', 'raye', 'pois'],
+    // l'algue du naufragé dans les cheveux (choix de l'auteur, 25 oct.) : mise par défaut, au joueur de l'enlever
+    algue: ['oui', 'non']
 };
 // Chaque choix et ce dans quoi il se prend : une forme, ou un nuancier
 const CHOIX = {
     genre: 'formes', menton: 'formes', age: 'formes', cicatrice: 'formes', taille: 'formes', silhouette: 'formes', peau: 'peau', visage: 'formes', yeux: 'yeux', formeYeux: 'formes', cils: 'formes',
     sourcils: 'formes', barbe: 'formes', moustache: 'formes', bouche: 'formes', expression: 'formes', levres: 'levres', rousseur: 'formes', joues: 'formes', grain: 'formes',
     coupe: 'formes', cheveux: 'cheveux', meches: 'formes', couleurMeches: 'cheveux', haut: 'formes', couleurHaut: 'tissus', motifHaut: 'formes', couleurHaut2: 'tissus',
-    bas: 'formes', couleurBas: 'tissus', motifBas: 'formes', couleurBas2: 'tissus', chaussures: 'tissus', formeChaussures: 'formes'
+    bas: 'formes', couleurBas: 'tissus', motifBas: 'formes', couleurBas2: 'tissus', chaussures: 'tissus', formeChaussures: 'formes', algue: 'formes'
 };
 const DEFAUT = {
     genre: 'femme', menton: 'doux', age: 'adulte', cicatrice: 'sans', taille: 'moyenne', silhouette: 'moyenne', peau: 'peche', visage: 'rond', yeux: 'brun', formeYeux: 'ronds', cils: 'sans', sourcils: 'fins',
     barbe: 'sans', moustache: 'sans', bouche: 'douce', expression: 'neutre', levres: 'naturelles', rousseur: 'non', joues: 'roses', grain: 'non', coupe: 'milongue', cheveux: 'brun', meches: 'sans',
-    couleurMeches: 'blond', haut: 'tshirt', couleurHaut: 'corail', motifHaut: 'uni', couleurHaut2: 'soleil', bas: 'pantalon', couleurBas: 'jean', motifBas: 'uni', couleurBas2: 'marine', chaussures: 'cuir', formeChaussures: 'souliers'
+    couleurMeches: 'blond', haut: 'tshirt', couleurHaut: 'corail', motifHaut: 'uni', couleurHaut2: 'soleil', bas: 'pantalon', couleurBas: 'jean', motifBas: 'uni', couleurBas2: 'marine', chaussures: 'cuir', formeChaussures: 'souliers', algue: 'oui'
 };
 // Les accessoires : [emplacement, zones de couleur (t : tissu, m : métal), couleurs par défaut, gratuit]
 const ACCESSOIRES = {
