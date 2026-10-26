@@ -198,3 +198,28 @@ test('la première nuit est faite une fois la Récolte de Lorena réclamée (pas
   // Une ancienne quête située après la Récolte confirme aussi que le joueur a dépassé cette étape.
   assert.equal(firstNightDoneOf(new Set(['source'])), true);
 });
+
+test('le tutoriel en huit jours (choix de l’auteur, 26 oct.) : sa chaîne, avec sa marque ; sans elle, l’ancienne, intacte', () => {
+  const { QUESTS_J8, LONG_TUTORIAL, currentOf, tutorialLastOf, tutorialStepsOf, actsDoneOf, doneOf, goalOf, inTutorial, reachOf } = require('../src/services/quests');
+  const at = id => QUESTS_J8.findIndex(q => q.id === id);
+  // Après le chemin du Puits : la cinquième nuit, puis un jour pour Maerys, Robby et Maggy, chacun fini par une nuit
+  assert.deepEqual(QUESTS_J8.slice(at('chemin'), at('potager') + 2).map(q => q.id), ['chemin', 'nuit-ondin', 'lisiere', 'eveil-sylve', 'vie',
+    'souvenir-sylve', 'bosquet', 'nuit-sylve', 'colline', 'eveil-galet', 'souvenir-galet', 'carriere', 'nuit-galet', 'jardins', 'eveil-melisse',
+    'potager', 'lumiere']);
+  assert.ok(QUESTS_J8.slice(0, at('potager') + 1).every(q => q.act === 'T'));
+  // (les actes gardent le reste, dans le même ordre)
+  assert.deepEqual(QUESTS_J8.slice(at('lumiere'), at('lumiere') + 5).map(q => `${q.id}:${q.act}`), ['lumiere:I', 'lanterne:I', 'bois:II', 'cabane:II', 'annexe:III']);
+  const long = ids => new Set([...ids, LONG_TUTORIAL]);
+  assert.deepEqual(['chemin', 'bosquet', 'carriere', 'potager'].map(id => currentOf(long([id])).id), ['nuit-ondin', 'nuit-sylve', 'nuit-galet', 'lumiere']);
+  assert.deepEqual([tutorialLastOf(long([])), tutorialStepsOf(long([])).length], ['potager', at('potager') + 1]);
+  assert.ok(inTutorial('jardins', long([])) && !inTutorial('jardins', new Set()));
+  // (l'objectif du phare attend la fin du tutoriel ; l'acte I finit à la lanterne)
+  assert.equal(goalOf(doneOf(long(['carriere']))), null);
+  assert.equal(goalOf(doneOf(long(['potager']))).act, 'I');
+  assert.deepEqual(actsDoneOf(doneOf(long(['lanterne']))), ['T', 'I']);
+  // (une ancienne quête se range à sa place dans cette chaîne aussi)
+  assert.equal(reachOf(long(['source'])), at('nuit-rivet'));
+  // Sans la marque : la chaîne d'avant, rien de sauté (un compte à la lanterne retrouve la Colline et Robby)
+  assert.deepEqual(['chemin', 'lanterne'].map(id => currentOf(new Set([id])).id), ['lisiere', 'colline']);
+  assert.equal(tutorialLastOf(new Set(['chemin'])), 'chemin');
+});

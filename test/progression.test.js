@@ -7,14 +7,15 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const recipeBook = require('../src/services/recipeBook');
 const bookPages = require('../src/services/bookPages');
-const { QUESTS } = require('../src/services/quests');
+const { QUESTS, QUESTS_J8 } = require('../src/services/quests');
 const { SITES, CHAPTER_OF_LEVEL, WATER_KEY } = require('../src/services/world/rules');
 const { ZONE_BY_ID } = require('../src/services/worldMap');
 const crafts = require('../src/services/crafts');
 const db = require('../src/config/db');
 
-// Toute la chaîne : le tutoriel et les sept actes
-const ACTS = [...new Set(QUESTS.map(q => q.act))];
+// Toute la chaîne : le tutoriel et les sept actes ; celle d'avant le 26 oct. (les comptes qui l'avaient finie la
+// gardent), et celle du tutoriel en huit jours (Maerys, Robby et Maggy dans le tutoriel)
+const CHAINS = [['la chaîne d’avant le tutoriel en huit jours', QUESTS], ['le tutoriel en huit jours', QUESTS_J8]];
 // L'Athanor grandit avec l'histoire (services/world.js : ATHANOR)
 const ATHANOR = [['eveil-sylve', 4], ['puits-ondin', 3]];
 // Le palier I du Ponton se bâtit sans plan pendant le tutoriel (world.tutorialPonton)
@@ -24,7 +25,7 @@ const TUTORIAL_CRAFT = (quest, craft) => quest.act === 'T' && craft === 'lantern
 
 test.after(() => db.pool.end());
 
-test('jamais d’impasse : toute la chaîne des quêtes, chaque clé dans un chapitre ouvert, chaque recette dans l’Athanor', async () => {
+for (const [name, chain] of CHAINS) test(`jamais d’impasse (${name}) : toute la chaîne des quêtes, chaque clé dans un chapitre ouvert, chaque recette dans l’Athanor`, async () => {
   const b = await recipeBook.load();
   const owned = new Set(recipeBook.BASE_ELEMENTS);
   const done = new Set();
@@ -58,7 +59,7 @@ test('jamais d’impasse : toute la chaîne des quêtes, chaque clé dans un cha
     }
     assert.ok(owned.has(key), `${why} : « ${key} » jamais écrit`);
   };
-  for (const quest of QUESTS.filter(q => ACTS.includes(q.act))) {
+  for (const quest of chain) {
     const { goal } = quest;
     const why = `quête ${quest.id} (acte ${quest.act})`;
     // (une bête du Bestiaire au choix : la plus proche, comme le ruban)

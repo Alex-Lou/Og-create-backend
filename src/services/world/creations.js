@@ -67,7 +67,7 @@ async function stowCrafts(userId, rows, levels, zones, annexRows, places = STATI
 // Ce que le tutoriel fait fabriquer sans palier ni éléments (crafts.TUTORIAL_CRAFTS), pendant sa leçon seulement (la
 // quête « deco » en cours). presence : people.presenceOf
 const LESSON = 'deco';
-const questNow = presence => quests.QUESTS.find(q => !presence.done.has(q.id))?.id;
+const questNow = presence => quests.chainOf(presence.done).quests.find(q => !presence.done.has(q.id))?.id;
 const tutorialOf = presence => (questNow(presence) === LESSON ? crafts.TUTORIAL_CRAFTS : new Set());
 // La barrière du nord (choix de l'auteur, 19 oct.) : sa clôture se trace même sans en avoir jamais assemblé une (un
 // compte sans les piquets de la caisse de Lorena y arrive quand même : il n'est jamais lâché) ; un piquet posé pendant

@@ -106,6 +106,26 @@ test('la quête du premier chemin : relier le Puits au Feu', async () => {
     assert.equal(linked.data.world.brume.quest.done, true);
     const claim = await api('POST', '/play/world/quest', { id: 'chemin' }, player);
     assert.equal(claim.status, 200, JSON.stringify(claim.data));
+    // Réclamé (choix de l'auteur, 26 oct.) : le compte suit désormais le tutoriel en huit jours. La cinquième nuit, puis
+    // le jour de Maerys ; le conseil attend le soir du jour de Maggy
+    const night = await view(player);
+    assert.deepEqual([night.brume.quest.id, night.brume.quest.act, night.brume.tutorialLast, night.brume.scenes.due],
+      ['nuit-ondin', 'T', 'potager', []]);
+    assert.ok(night.brume.steps.some(step => step.id === 'potager'));
+    assert.equal((await api('POST', '/play/world/sleep', {}, player)).status, 200);
+    const maerys = await view(player);
+    assert.deepEqual([maerys.brume.quest.id, maerys.brume.quest.act, maerys.brume.goal], ['lisiere', 'T', null]);
+    // (le Potager de Maggy réclamé : le tutoriel fini, le conseil dû, l'objectif du phare et l'acte I commencent)
+    await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'potager')`, [player.userId]);
+    const council = await view(player);
+    assert.deepEqual([council.brume.quest.id, council.brume.quest.act, council.brume.scenes.due, council.brume.goal.act], ['lumiere', 'I', ['conseil'], 'I']);
+    // Un compte qui avait fini l'ancien tutoriel (son chemin réclamé avant, sans la marque) le garde : la Lisière ensuite,
+    // et le conseil tout de suite
+    const before26 = await newPlayer();
+    await view(before26);
+    await sql(`INSERT INTO world_quests (user_id, quest) SELECT $1, unnest($2::text[])`, [before26.userId, [...done, 'chemin']]);
+    const kept = await view(before26);
+    assert.deepEqual([kept.brume.quest.id, kept.brume.quest.act, kept.brume.tutorialLast, kept.brume.scenes.due], ['lisiere', 'I', 'chemin', ['conseil']]);
     // Une île d'avant (toutes ses routes) : le Puits, remonté contre le Feu, retombe sur la grande route, qui les relie
     // déjà ; elle n'a donc plus ce chemin à tracer
     const old = await newPlayer();
