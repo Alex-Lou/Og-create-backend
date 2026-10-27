@@ -60,7 +60,7 @@ const QUEST_TEXTS = {
         label: 'Un abri pour Agathe',
         say: 'Elle dort sur une marmite renversée. Elle ne se plaint pas. Enfin, un peu.'
     },
-    // (la barrière du nord, au jour de Nathan depuis le 26 oct. : choix de l'auteur, 19 oct., texte validé)
+    // (la barrière du nord, au jour d’Agathe : choix de l'auteur, 19 oct., texte validé)
     barriere: {
         label: 'Barre le passage du nord',
         say: 'Le feu en repousse la plupart. Pas celui qui dort debout. Une barrière, au nord.'

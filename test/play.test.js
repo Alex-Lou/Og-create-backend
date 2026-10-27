@@ -2462,9 +2462,8 @@ test('la barrière du nord se trace même sans clôture jamais assemblée (un co
   assert.equal((await api('POST', '/play/world/craft/line', { craft: 'cloture', cells: [[93, 93]] }, player)).status, 409);
   // (hors d'une leçon des clôtures, un piquet ne se défait pas)
   assert.equal((await api('POST', '/play/world/craft/unpose', { x: 93, y: 93 }, player)).status, 409);
-  // À la barrière du nord (choix de l'auteur, 19 oct. ; après l'abri de Nathan depuis le 26 oct.) : le trait est permis,
-  // ses piquets fabriqués et payés en passant
-  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'deco')`, [player.userId]);
+  // À la barrière du nord (choix de l'auteur, 19 oct.) : le trait est permis, ses piquets fabriqués et payés en passant
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, 'abri-cannelle')`, [player.userId]);
   const yard = await view();
   const fence = yard.crafts.catalog.find(c => c.id === 'cloture');
   assert.deepEqual([yard.brume.quest.id, fence.made, fence.traceable, fence.spots.length > 0], ['barriere', 0, true, true]);
@@ -2715,20 +2714,8 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Lorena ouvre 
     [200, 'abri-cannelle', true, 'cannelle_abri', true, kept.wood + 180], JSON.stringify(roof.data.message || ''));
   assert.equal((await api('POST', '/play/world/shelter', { who: 'cannelle' }, player)).status, 409);
   assert.equal((await claim('abri-cannelle')).status, 200);
-  assert.equal(who(await view(), 'atelier'), undefined);
-  assert.equal((await api('POST', '/play/world/sleep', {}, player)).status, 200);
-  // Nathan est là ; il s'installe dans son coin (choix de l'auteur, 18 oct.) : son abri, bâti et payé comme celui
-  // d’Agathe ; sa lanterne attendra l'électricité (plus de leçon qui la fasse fabriquer avant son palier)
-  const rivet = await view();
-  assert.deepEqual([who(rivet, 'atelier').built, rivet.brume.quest.id, rivet.camp.find(c => c.id === 'rivet').art], [false, 'deco', 'rivet_debris']);
-  assert.match(rivet.crafts.catalog.find(c => c.id === 'lanterne').block || '', /Palier|savoir faire/);
-  await sql('UPDATE world_stock SET wood = wood + 20, stone = stone + 10 WHERE user_id = $1', [player.userId]);
-  const nest = await api('POST', '/play/world/shelter', { who: 'rivet' }, player);
-  assert.deepEqual([nest.status, nest.data.world.brume.quest.done, nest.data.world.camp.find(c => c.id === 'rivet').art], [200, true, 'rivet_abri'], JSON.stringify(nest.data.message || ''));
-  assert.equal((await claim('deco')).status, 200);
-  assert.equal(await coinsOf(player), 180);
-  // La barrière du nord (choix de l'auteur, 19 oct. : une barrière, pas un enclos ; au jour de Nathan depuis le 26 oct.,
-  // après la nuit où le Dormeur est venu dormir contre le feu) : la quête compte les clôtures posées ; deux à la main, puis le reste d'un
+  // La barrière du nord (choix de l'auteur, 19 oct. : une barrière, pas un enclos ; au jour d’Agathe, après la nuit où le
+  // Dormeur est venu dormir contre le feu) : la quête compte les clôtures posées ; deux à la main, puis le reste d'un
   // trait, la réserve d'abord (les piquets de la caisse de Lorena)
   const fences = await view();
   assert.deepEqual([fences.brume.quest.id, fences.brume.quest.have, fences.brume.quest.need], ['barriere', 0, 7]);
@@ -2753,6 +2740,17 @@ test('le prologue d’un nouveau compte : Brume mène au feu, puis Lorena ouvre 
   assert.deepEqual([paid.status, paid.data.placed, Boolean(paid.data.stopped), paid.data.world.stock.wood], [200, 1, true, 4], JSON.stringify(paid.data));
   assert.equal((await api('POST', '/play/world/craft/line', { craft: 'cloture', cells: [[93, 94]] }, player)).status, 400);
   assert.equal((await claim('barriere')).status, 200);
+  assert.equal(who(await view(), 'atelier'), undefined);
+  assert.equal((await api('POST', '/play/world/sleep', {}, player)).status, 200);
+  // Nathan est là ; il s'installe dans son coin (choix de l'auteur, 18 oct.) : son abri, bâti et payé comme celui
+  // d’Agathe ; sa lanterne attendra l'électricité (plus de leçon qui la fasse fabriquer avant son palier)
+  const rivet = await view();
+  assert.deepEqual([who(rivet, 'atelier').built, rivet.brume.quest.id, rivet.camp.find(c => c.id === 'rivet').art], [false, 'deco', 'rivet_debris']);
+  assert.match(rivet.crafts.catalog.find(c => c.id === 'lanterne').block || '', /Palier|savoir faire/);
+  await sql('UPDATE world_stock SET wood = wood + 20, stone = stone + 10 WHERE user_id = $1', [player.userId]);
+  const nest = await api('POST', '/play/world/shelter', { who: 'rivet' }, player);
+  assert.deepEqual([nest.status, nest.data.world.brume.quest.done, nest.data.world.camp.find(c => c.id === 'rivet').art], [200, true, 'rivet_abri'], JSON.stringify(nest.data.message || ''));
+  assert.equal((await claim('deco')).status, 200);
   assert.equal(await coinsOf(player), 195);
   // Ses trois torches (choix de l'auteur, 13 oct.) : une création « de début », 2 bois, le Feu suffit
   const torch = (await view()).crafts.catalog.find(c => c.id === 'torche');

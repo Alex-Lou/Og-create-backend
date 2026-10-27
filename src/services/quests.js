@@ -59,17 +59,16 @@ const QUESTS = [
     q('cage', 'T', { kind: 'cage' }, 10),
     q('poules', 'T', { kind: 'hens', need: 3 }, 10),
     q('poulailler', 'T', { kind: 'coop' }, 15),
-    // L'abri d’Agathe (choix de l'auteur, 13 oct.) : son coin passe des débris à l'abri (payé : world/shelters.js)
+    // L'abri d’Agathe (choix de l'auteur, 13 oct.) : son coin passe des débris à l'abri (payé : world/shelters.js). Puis
+    // la barrière du nord (choix de l'auteur, 19 oct.) : la nuit d'avant, le Dormeur, que la lumière n'arrête pas, est
+    // venu dormir contre le feu, et les poules filent vers la brume ; ses piquets, dans la caisse de Lorena
+    // (world/chests.js, CRATES) ; une clôture barre la route d'un égaré (nights.js)
     q('abri-cannelle', 'T', { kind: 'shelter', who: 'cannelle', villager: 'foyer' }, 15),
+    q('barriere', 'T', { kind: 'craft', craft: 'cloture', need: BARRIER }, 15),
     q('nuit-cannelle', 'T', { kind: 'sleep', site: 'foyer' }, 0),
     // (il s'installe d'abord dans son coin : son abri, bâti et payé comme celui d’Agathe, world/shelters.js ; choix de
     // l'auteur, 18 oct. : la lanterne attendra l'électricité. L'identifiant « deco » reste : LEGACY, creations.js)
     q('deco', 'T', { kind: 'shelter', who: 'rivet', villager: 'atelier' }, 15),
-    // La barrière du nord (choix de l'auteur, 19 oct. ; au jour de Nathan depuis le 26 oct., avec ses torches : les
-    // défenses qu'on fabrique, et le jour d’Agathe allégé) : la nuit d'avant, le Dormeur, que la lumière n'arrête pas,
-    // est venu dormir contre le feu, et les poules filent vers la brume ; ses piquets, dans la caisse de Lorena
-    // (world/chests.js, CRATES) ; une clôture barre la route d'un égaré (nights.js)
-    q('barriere', 'T', { kind: 'craft', craft: 'cloture', need: BARRIER }, 15),
     // (ses trois torches, une par côté d'où venaient les égarés de la veillée : choix de l'auteur, 13 oct.)
     q('torches-rivet', 'T', { kind: 'craft', craft: 'torche', need: 3 }, 15),
     // (son premier outil, choix de l'auteur, 18 oct. : la Canne à pêche de la boutique du Ponton, qui produit plus)
