@@ -687,6 +687,33 @@ test('le Monde : un quartier s’achète avec des écus et un chapitre ouvert, u
   assert.equal(await coinsOf(player), 50);
 });
 
+test('le Monde : au tutoriel en huit jours, La Colline coûte 200 écus et Les Jardins 150, le jour de leur quête ; à un ancien compte, 400', async () => {
+  const { QUESTS, QUESTS_J8, LONG_TUTORIAL } = require('../src/services/quests');
+  const before = (chain, id = 'jardins') => chain[chain.findIndex(q => q.id === id) - 1].id;
+  const zoneOf = async (player, id) => (await api('GET', '/play/world', null, player)).data.map.zones.find(z => z.id === id);
+  const jardinsOf = player => zoneOf(player, 'jardins');
+  const buy = player => api('POST', '/play/world/zone', { zone: 'jardins' }, player);
+  // (le jour de Robby : La Colline à 200, Les Jardins encore à leur prix)
+  const robby = await newPlayer({ settled: true });
+  await discover(robby, 5);
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, $2), ($1, $3)`, [robby.userId, LONG_TUTORIAL, before(QUESTS_J8, 'colline')]);
+  assert.deepEqual([(await zoneOf(robby, 'colline')).price, (await jardinsOf(robby)).price], [200, 400]);
+  // Le compte du tutoriel en huit jours, sa septième nuit passée : Les Jardins, quête active du tutoriel, à 150
+  const player = await newPlayer({ settled: true, coins: 150 });
+  await discover(player, 5);
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, $2), ($1, $3)`, [player.userId, LONG_TUTORIAL, before(QUESTS_J8)]);
+  assert.equal((await jardinsOf(player)).price, 150);
+  const bought = await buy(player);
+  assert.equal(bought.status, 200, JSON.stringify(bought.data));
+  assert.equal(await coinsOf(player), 0);
+  // Un compte d'avant (l'acte III, hors du tutoriel) : 400
+  const old = await newPlayer({ settled: true, coins: 150 });
+  await discover(old, 5);
+  await sql(`INSERT INTO world_quests (user_id, quest) VALUES ($1, $2)`, [old.userId, before(QUESTS)]);
+  assert.equal((await jardinsOf(old)).price, 400);
+  assert.match((await buy(old)).data.message, /400 écus/);
+});
+
 test('le Monde : les bâtiments produisent ressources et écus, encaissés une seule fois', async () => {
   const player = await newPlayer({ coins: 0 });
   await api('GET', '/play/world', null, player);

@@ -8,8 +8,10 @@ const { QUEST_TEXTS } = require('../src/texts/quests');
 const real = text => typeof text === 'string' && text.trim().length > 3;
 
 test('chaque quête a son titre et sa réplique de Brume ; aucun texte orphelin', () => {
-    for (const quest of quests.QUESTS) assert.ok(real(quest.label) && real(quest.say), quest.id);
-    assert.deepEqual(Object.keys(QUEST_TEXTS).sort(), quests.QUESTS.map(q => q.id).sort());
+    // (les deux chaînes : celle d'avant le tutoriel en huit jours, et la sienne, avec ses trois nuits de plus)
+    const all = [...quests.QUEST_BY_ID.values()];
+    for (const quest of all) assert.ok(real(quest.label) && real(quest.say), quest.id);
+    assert.deepEqual(Object.keys(QUEST_TEXTS).sort(), all.map(q => q.id).sort());
 });
 
 test('chaque quête à coffre, nouvelle ou ancienne, a son titre', () => {

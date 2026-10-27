@@ -172,19 +172,59 @@ const QUEST_CHESTS = [
     ...Object.entries(LEGACY).filter(([, old]) => old.chest).map(([id, old]) => ({ id, label: old.label, chest: old.chest }))
 ];
 
-// Place de la quête la plus avancée parmi celles réclamées (−1 : aucune)
+// Le tutoriel en huit jours (choix de l'auteur, 26 oct. : ecriture/fil_rouge.md du dépôt front) : après le chemin du
+// Puits et le Campement, la cinquième nuit ; puis un jour pour Maerys, un pour Robby, un pour Maggy, chacun fini par une
+// nuit (Maggy : par le conseil, le soir). Leurs quêtes passent de leurs actes au tutoriel (acte T) ; les actes I à III
+// gardent le reste, dans le même ordre. C'est une seconde chaîne : un compte la suit dès qu'il réclame le chemin du
+// Puits avec elle (sa marque, LONG_TUTORIAL, s'écrit alors dans world_quests) ; un compte qui avait fini l'ancien
+// tutoriel avant elle garde la première, telle quelle, et ne recule ni ne saute rien (choix de l'auteur, 26 oct.).
+// Les deux chaînes sont les mêmes jusqu'au chemin du Puits
+const LONG_TUTORIAL = 'tutoriel-j8';
+const night = id => q(id, 'T', { kind: 'sleep', site: 'foyer' }, 0);
+const DAYS_6_TO_8 = [
+    night('nuit-ondin'),
+    // (le jour de Maerys : la lueur dans les arbres, l'apprivoiser, la Vie, son souvenir l'Arbre, son Bosquet)
+    'lisiere', 'eveil-sylve', 'vie', 'souvenir-sylve', 'bosquet', night('nuit-sylve'),
+    // (le jour de Robby : la Colline, lui, son souvenir la Pierre, sa Carrière)
+    'colline', 'eveil-galet', 'souvenir-galet', 'carriere', night('nuit-galet'),
+    // (le jour de Maggy : les Jardins, elle, son Potager ; le soir, le conseil)
+    'jardins', 'eveil-melisse', 'potager'
+];
+const MOVED = new Set(DAYS_6_TO_8.filter(id => typeof id === 'string'));
+const asTutorial = quest => ({ ...quest, act: 'T' });
+const QUESTS_J8 = [
+    ...QUESTS.slice(0, INDEX.get('chemin') + 1).map(asTutorial),
+    ...DAYS_6_TO_8.map(id => (typeof id === 'string' ? asTutorial(QUESTS[INDEX.get(id)]) : id)),
+    ...QUESTS.slice(INDEX.get('chemin') + 1).filter(quest => !MOVED.has(quest.id))
+];
+// Une chaîne : ses quêtes, leur place, ses actes dans l'ordre, la dernière quête du tutoriel et ses étapes
+const chainFrom = (list, last) => {
+    const index = new Map(list.map((quest, i) => [quest.id, i]));
+    return { quests: list, index, acts: [...new Set(list.map(quest => quest.act))], last, tutorial: list.slice(0, index.get(last) + 1) };
+};
+const CHAINS = { court: chainFrom(QUESTS, 'chemin'), long: chainFrom(QUESTS_J8, 'potager') };
+// La chaîne d'un compte : ids, ses quêtes réclamées (ou faites : doneOf y garde la marque)
+const chainOf = ids => (ids && ids.has(LONG_TUTORIAL) ? CHAINS.long : CHAINS.court);
+// Une quête par son identifiant, quelle que soit la chaîne (son objectif est le même dans les deux)
+const QUEST_BY_ID = new Map([...QUESTS, ...QUESTS_J8].map(quest => [quest.id, quest]));
+
+// Place de la quête la plus avancée parmi celles réclamées (−1 : aucune), dans la chaîne du compte
 function reachOf(claimed) {
+    const { index } = chainOf(claimed);
     let reach = -1;
     for (const id of claimed) {
-        const at = INDEX.has(id) ? INDEX.get(id) : LEGACY[id] ? INDEX.get(LEGACY[id].at) : -1;
+        const at = index.has(id) ? index.get(id) : LEGACY[id] ? index.get(LEGACY[id].at) : -1;
         reach = Math.max(reach, at);
     }
     return reach;
 }
-// Quêtes faites : réclamées, ou placées avant la plus avancée réclamée. Set des identifiants
+// Quêtes faites : réclamées, ou placées avant la plus avancée réclamée. Set des identifiants (avec la marque du
+// tutoriel en huit jours, si le compte la porte : ce qui ne lit que les quêtes faites y retrouve sa chaîne)
 function doneOf(claimed) {
     const reach = reachOf(claimed);
-    return new Set(QUESTS.filter((quest, i) => i <= reach || claimed.has(quest.id)).map(quest => quest.id));
+    const done = new Set(chainOf(claimed).quests.filter((quest, i) => i <= reach || claimed.has(quest.id)).map(quest => quest.id));
+    if (claimed.has(LONG_TUTORIAL)) done.add(LONG_TUTORIAL);
+    return done;
 }
 
 // La première nuit est validée côté serveur quand la Récolte de Lorena a été réclamée : le feu a donc été bâti,
@@ -195,7 +235,7 @@ const firstNightDoneOf = claimed => doneOf(claimed).has(FIRST_NIGHT_DONE);
 // La quête active (la première pas encore faite), telle que la chaîne la définit, ou null
 function currentOf(claimed) {
     const done = doneOf(claimed);
-    return QUESTS.find(quest => !done.has(quest.id)) || null;
+    return chainOf(claimed).quests.find(quest => !done.has(quest.id)) || null;
 }
 
 // Ce que l'état fournit (services/world.js) : { crafts, runs, stars, zones: Set, levels: { site: palier },
@@ -253,15 +293,16 @@ function progressOf(goal, facts) {
 // (un bâtiment, un quartier, un habitant ou un lieu), pour y placer Brume ; element : l'élément à écrire (fil d'Ariane)
 function active(claimed, facts) {
     const done = doneOf(claimed);
-    const step = QUESTS.findIndex(quest => !done.has(quest.id));
+    const chain = chainOf(claimed).quests;
+    const step = chain.findIndex(quest => !done.has(quest.id));
     if (step < 0) return null;
-    const quest = QUESTS[step];
+    const quest = chain[step];
     const { have, need } = progressOf(quest.goal, facts);
     const { site, zone, villager, landmark, element, craft, from } = quest.goal;
     // (un chemin à tracer : Brume attend au bâtiment d'où il part)
     const target = site ? { site } : zone ? { zone } : villager ? { villager } : landmark ? { landmark } : from ? { site: from } : null;
     return {
-        id: quest.id, act: quest.act, step: step + 1, total: QUESTS.length, say: quest.say, label: quest.label, kind: quest.goal.kind,
+        id: quest.id, act: quest.act, step: step + 1, total: chain.length, say: quest.say, label: quest.label, kind: quest.goal.kind,
         coins: quest.coins, chest: quest.chest || null, have, need, done: have >= need, target,
         ...(element ? { element } : {}), ...(craft ? { craft } : {})
     };
@@ -272,33 +313,39 @@ function active(claimed, facts) {
 // (bible, § 6.8 et § 6.10), rien n'est stocké
 const ACTS = [...new Set(QUESTS.map(quest => quest.act))];
 function actsDoneOf(done) {
-    return ACTS.filter(act => done.has(QUESTS.filter(quest => quest.act === act).pop().id));
+    const { acts, quests: list } = chainOf(done);
+    return acts.filter(act => done.has(list.filter(quest => quest.act === act).pop().id));
 }
 
-// Les étapes du tutoriel (de la première page au premier chemin : le prologue du jeu, game/prologue.js), pour le suivi
-// des quêtes : [{ id, label, done }] (done : réclamée)
+// Les étapes du tutoriel (de la première page au dernier jour du tutoriel du compte : le prologue du jeu,
+// game/prologue.js), pour le suivi des quêtes : [{ id, label, done }] (done : réclamée)
 const TUTORIAL_LAST = 'chemin';
-const TUTORIAL = QUESTS.slice(0, INDEX.get(TUTORIAL_LAST) + 1);
+// La dernière quête du tutoriel d'un compte (ids : ses quêtes réclamées ou faites) : le chemin du Puits, ou le Potager
+// de Maggy pour le tutoriel en huit jours
+const tutorialLastOf = ids => chainOf(ids).last;
 function tutorialStepsOf(claimed) {
     const done = doneOf(claimed);
-    return TUTORIAL.map(quest => ({ id: quest.id, label: quest.label, done: done.has(quest.id) }));
+    return chainOf(claimed).tutorial.map(quest => ({ id: quest.id, label: quest.label, done: done.has(quest.id) }));
 }
-const inTutorial = id => TUTORIAL.some(quest => quest.id === id);
+// Toutes les quêtes que l'un ou l'autre tutoriel compte (le plus long contient l'autre)
+const TUTORIAL_IDS = CHAINS.long.tutorial.map(quest => quest.id);
+const inTutorial = (id, ids) => chainOf(ids).tutorial.some(quest => quest.id === id);
 
 // L'objectif de fond (l'arc du Phare, choix de l'auteur, 15 oct.) : « Rallumer le phare », dès la fin du tutoriel, avec
 // l'étape de l'acte en cours (le premier qui n'est pas fini), puis atteint ; rien n'est stocké. { label, act, step } (act
 // null une fois atteint), ou null pendant le tutoriel
 function goalOf(done) {
-    if (!done.has(TUTORIAL_LAST)) return null;
+    if (!done.has(tutorialLastOf(done))) return null;
     const finished = actsDoneOf(done);
-    const act = ACTS.find(a => a !== 'T' && !finished.includes(a)) || null;
+    const act = chainOf(done).acts.find(a => a !== 'T' && !finished.includes(a)) || null;
     return { label: PHARE_GOAL.label, act, step: act ? PHARE_GOAL.steps[act] : PHARE_GOAL.done };
 }
 
 function boardOf(claimed, facts) {
     const done = doneOf(claimed);
+    const chain = chainOf(claimed).quests;
     return {
-        quest: active(claimed, facts), done: QUESTS.filter(quest => done.has(quest.id)).length, total: QUESTS.length, acts: actsDoneOf(done), rested: RESTED,
+        quest: active(claimed, facts), done: chain.filter(quest => done.has(quest.id)).length, total: chain.length, acts: actsDoneOf(done), rested: RESTED,
         goal: goalOf(done)
     };
 }
@@ -306,14 +353,16 @@ function boardOf(claimed, facts) {
 // réclamée (0 si rien n'a été réclamé avant lui). rows : [{ quest, at (ms) }]. { acte: ms } pour les actes I à VII
 // commencés, dans l'ordre. Une ancienne quête (LEGACY) compte dans l'acte de la quête où elle se range
 function actStartsOf(rows) {
-    const done = actsDoneOf(doneOf(new Set(rows.map(r => r.quest))));
+    const claimed = new Set(rows.map(r => r.quest));
+    const done = actsDoneOf(doneOf(claimed));
+    const { quests: list, index, acts } = chainOf(claimed);
     const actOf = new Map([
-        ...QUESTS.map(quest => [quest.id, quest.act]),
-        ...Object.entries(LEGACY).map(([id, old]) => [id, QUESTS[INDEX.get(old.at)].act])
+        ...list.map(quest => [quest.id, quest.act]),
+        ...Object.entries(LEGACY).map(([id, old]) => [id, list[index.get(old.at)].act])
     ]);
     const out = {};
-    ACTS.forEach((act, i) => {
-        const before = ACTS.slice(0, i);
+    acts.forEach((act, i) => {
+        const before = acts.slice(0, i);
         if (act === 'T' || !before.every(a => done.includes(a))) return;
         out[act] = Math.max(0, ...rows.filter(r => before.includes(actOf.get(r.quest))).map(r => r.at));
     });
@@ -324,7 +373,7 @@ function actStartsOf(rows) {
 const { RESTED } = require('../texts/brume');
 
 module.exports = {
-    QUESTS, ITEMS, BARRIER, LEGACY, QUEST_CHESTS, BEASTS, GUIDED_INK, FIRST_NIGHT_DONE,
-    TUTORIAL_LAST, reachOf, doneOf, firstNightDoneOf, currentOf, progressOf, active, boardOf, goalOf, actsDoneOf, actStartsOf, tutorialStepsOf,
-    inTutorial
+    QUESTS, QUESTS_J8, QUEST_BY_ID, LONG_TUTORIAL, ITEMS, BARRIER, LEGACY, QUEST_CHESTS, BEASTS, GUIDED_INK, FIRST_NIGHT_DONE,
+    TUTORIAL_LAST, TUTORIAL_IDS, chainOf, tutorialLastOf, reachOf, doneOf, firstNightDoneOf, currentOf, progressOf, active, boardOf,
+    goalOf, actsDoneOf, actStartsOf, tutorialStepsOf, inTutorial
 };

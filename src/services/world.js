@@ -216,7 +216,7 @@ function boardWith(claimed, facts, openChapters) {
     const out = quests.boardOf(claimed, facts);
     const quest = out.quest;
     if (!quest || quest.done) return out;
-    const { goal } = quests.QUESTS[quest.step - 1];
+    const { goal } = quests.QUEST_BY_ID.get(quest.id);
     const next = goal.kind === 'level' && (facts.levels[goal.site] || 0) === goal.need - 1 ? SITES[goal.site].levels[goal.need - 1] : null;
     const chapter = goal.kind === 'zone' ? map.ZONE_BY_ID[goal.zone].chapter : next?.chapter;
     if (chapter && !openChapters.has(chapter)) quest.chapter = chapter;
@@ -236,14 +236,16 @@ const PROLOGUE_SKIP = 'prologue:passe';
 // Le tutoriel du compte (chaque île le suit) : « Passer » ne vaut qu'une fois la Récolte de Lorena validée
 async function tutorialOf(userId, conn = db) {
     const items = await itemsOf(userId, conn);
-    return { tutorial: true, skipped: quests.firstNightDoneOf(await claimedOf(userId, conn)) && items.has(PROLOGUE_SKIP) };
+    const claimed = await claimedOf(userId, conn);
+    return { tutorial: true, skipped: quests.firstNightDoneOf(claimed) && items.has(PROLOGUE_SKIP), tutorialLast: quests.tutorialLastOf(claimed) };
 }
 // Le compteur de jours de l'île (le jeu le montre à côté de l'heure ; choix de l'auteur, 18 oct.) : pendant le tutoriel,
 // le jeu compte ses jours lui-même ; ensuite, un de plus à chaque minuit de l'île depuis qu'il a été quitté. D'où il
 // part : { at : l'instant (ms), quest : la quête du tutoriel où l'on en était (le jeu en connaît le jour), ou null (jour 1) }.
 // Fini : à sa dernière quête réclamée ; passé : quand il l'a été ; un compte d'avant le tutoriel : à sa création ;
 // null tant qu'il dure
-const TUTORIAL_IDS = quests.tutorialStepsOf(new Set()).map(step => step.id);
+// (toutes les quêtes de l'un ou l'autre tutoriel, et la marque du tutoriel en huit jours : sa chaîne s'y lit)
+const TUTORIAL_IDS = [...quests.TUTORIAL_IDS, quests.LONG_TUTORIAL];
 async function daysStartOf(userId) {
     const [claimedAt, { rows: skip }, { rows: user }] = await Promise.all([
         claimedAtOf(userId, TUTORIAL_IDS),
@@ -253,14 +255,18 @@ async function daysStartOf(userId) {
     return { claimedAt, skipAt: skip[0] ? new Date(skip[0].bought_at).getTime() : null, createdAt: user[0] ? new Date(user[0].created_at).getTime() : null };
 }
 function daysFrom({ claimedAt, skipAt, createdAt }, { skipped, quest }) {
-    const last = claimedAt[quests.TUTORIAL_LAST];
-    if (last) return { at: last, quest: quests.TUTORIAL_LAST };
+    // (le tutoriel du compte : jusqu'au chemin du Puits, ou en huit jours)
+    const ids = new Set(Object.keys(claimedAt));
+    const tutorialLast = quests.tutorialLastOf(ids);
+    const steps = quests.tutorialStepsOf(new Set(ids.has(quests.LONG_TUTORIAL) ? [quests.LONG_TUTORIAL] : [])).map(step => step.id);
+    const last = claimedAt[tutorialLast];
+    if (last) return { at: last, quest: tutorialLast };
     // (passé : l'étape qui suivait la dernière réclamée avant)
     if (skipped && skipAt) {
-        const reached = TUTORIAL_IDS.reduce((k, id, i) => (claimedAt[id] <= skipAt ? i + 1 : k), 0);
-        return { at: skipAt, quest: TUTORIAL_IDS[Math.min(reached, TUTORIAL_IDS.length - 1)] };
+        const reached = steps.reduce((k, id, i) => (claimedAt[id] <= skipAt ? i + 1 : k), 0);
+        return { at: skipAt, quest: steps[Math.min(reached, steps.length - 1)] };
     }
-    if ((quest && quests.inTutorial(quest.id)) || !createdAt) return null;
+    if ((quest && quests.inTutorial(quest.id, ids)) || !createdAt) return null;
     return { at: createdAt, quest: null };
 }
 // Les scènes de l'arc du Phare (choix de l'auteur, 15 oct. : une fois par compte, sur tous ses appareils ; le conseil
@@ -269,24 +275,28 @@ function daysFrom({ claimedAt, skipAt, createdAt }, { skipped, quest }) {
 // de Brume allumé), et n'est plus due une fois son acte fini (until : la traversée, l'acte IV ; le phare, l'acte VI) ;
 // vue, une ligne de world_items (SCENE_PREFIX + id). Elles ne donnent ni ne retirent rien
 const STORY_SCENES = {
-    conseil: { after: quests.TUTORIAL_LAST },
+    // (à la fin du tutoriel du compte : le chemin du Puits, ou le Potager de Maggy pour le tutoriel en huit jours)
+    conseil: { after: quests.tutorialLastOf },
     traversee: { after: 'souvenir-aster', until: 'IV' },
     phare: { after: 'cle', until: 'VI' },
     navire: { after: 'phare-brume' }
 };
 const SCENE_PREFIX = 'scene:';
+// La quête après laquelle une scène vient (done : les quêtes faites, qui disent la chaîne du compte)
+const afterOf = (scene, done) => (typeof scene.after === 'function' ? scene.after(done) : scene.after);
 // { seen, due } : les scènes vues par le compte, celles à jouer maintenant (dans l'ordre de l'histoire)
 function scenesOf(items, claimed) {
     const done = quests.doneOf(claimed);
     const acts = quests.actsDoneOf(done);
     const seen = Object.keys(STORY_SCENES).filter(id => items.has(`${SCENE_PREFIX}${id}`));
     const due = Object.entries(STORY_SCENES)
-        .filter(([id, s]) => !seen.includes(id) && done.has(s.after) && !(s.until && acts.includes(s.until))).map(([id]) => id);
+        .filter(([id, s]) => !seen.includes(id) && done.has(afterOf(s, done)) && !(s.until && acts.includes(s.until))).map(([id]) => id);
     return { seen, due };
 }
 async function seeScene(userId, id) {
     if (!Object.hasOwn(STORY_SCENES, id)) return { status: 404, message: W.SCENE_UNKNOWN };
-    if (!quests.doneOf(await claimedOf(userId)).has(STORY_SCENES[id].after)) return { status: 409, message: W.SCENE_TOO_EARLY };
+    const done = quests.doneOf(await claimedOf(userId));
+    if (!done.has(afterOf(STORY_SCENES[id], done))) return { status: 409, message: W.SCENE_TOO_EARLY };
     await db.query(`INSERT INTO world_items (user_id, item, source) VALUES ($1, $2, 'histoire') ON CONFLICT DO NOTHING`, [userId, `${SCENE_PREFIX}${id}`]);
     return { scene: id };
 }
@@ -528,7 +538,7 @@ async function view(userId, owned, book) {
             // (voisin d'un quartier à soi), en combien d'heures, et ce qu'emporte l'expédition
             zones: map.ZONES.map(z => (isKnown(z, discovered) ? {
                 id: z.id, name: named[`zone:${z.id}`] || z.name, baseName: z.name, renamed: Boolean(named[`zone:${z.id}`]),
-                price: z.price, chapter: z.chapter, code: z.code, anchor: map.ANCHORS[z.id], climate: z.climate, known: true,
+                price: zonePriceOf(z, claimed), chapter: z.chapter, code: z.code, anchor: map.ANCHORS[z.id], climate: z.climate, known: true,
                 owned: zones.has(z.id), open: !z.chapter || book.openChapters.has(z.chapter)
             } : {
                 id: z.id, name: null, code: z.code, anchor: map.ANCHORS[z.id], known: false, owned: false, open: false,
@@ -654,6 +664,8 @@ async function view(userId, owned, book) {
                 ...boardWith(claimed, facts, book.openChapters),
                 tutorial: true,
                 skipped: firstNightDone && items.has(PROLOGUE_SKIP),
+                // La dernière quête du tutoriel du compte (le jeu guide jusqu'à elle) : le chemin du Puits, ou le Potager
+                tutorialLast: quests.tutorialLastOf(claimed),
                 // Les scènes de l'arc du Phare : vues par le compte (seeScene), et à jouer maintenant
                 scenes: scenesOf(items, claimed),
                 // Les emplacements que l'histoire donne à l'Athanor (le jeu garde le plus grand, avec ceux des familles)
@@ -662,7 +674,7 @@ async function view(userId, owned, book) {
             // Le fil d'Ariane de la quête active : la cible et les pages qui restent (le Grimoire montre la page marquée)
             if (out.quest && !out.quest.done && book.ariane) out.quest.ariane = { target: book.ariane.target, remaining: book.ariane.remaining };
             // Le tutoriel en cours : toutes ses étapes, pour le suivi des quêtes (faites, en cours, à venir)
-            if (out.tutorial && !out.skipped && out.quest && quests.inTutorial(out.quest.id)) out.steps = quests.tutorialStepsOf(claimed);
+            if (out.tutorial && !out.skipped && out.quest && quests.inTutorial(out.quest.id, claimed)) out.steps = quests.tutorialStepsOf(claimed);
             // D'où part le compteur de jours de l'île, une fois le tutoriel quitté
             out.days = daysFrom(daysStart, out);
             return out;
@@ -695,6 +707,10 @@ async function claimQuest(userId, questId, owned, stars) {
         if (!quest.done) return db.rollback({ status: 403, message: W.QUEST_NOT_DONE(quest.label.toLowerCase(), quest.have, quest.need) });
         const added = await conn.query('INSERT INTO world_quests (user_id, quest) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING quest', [userId, questId]);
         if (!added.rows.length) return db.rollback({ status: 409, message: W.REWARD_TAKEN });
+        // Le chemin du Puits réclamé : le compte suit désormais le tutoriel en huit jours (sa marque ; quests.js)
+        if (questId === quests.TUTORIAL_LAST) {
+            await conn.query('INSERT INTO world_quests (user_id, quest) VALUES ($1, $2) ON CONFLICT DO NOTHING', [userId, quests.LONG_TUTORIAL]);
+        }
         const { coins } = await ledger.credit(userId, quest.coins, 'quete', questId, conn);
         return { gained: quest.coins, coins };
     });
@@ -713,6 +729,16 @@ async function sleep(userId) {
     });
 }
 
+// Au tutoriel en huit jours, le joueur n'a pas les 400 écus des Jardins le jour de Maggy (choix de l'auteur, 27 oct.),
+// et La Colline, le jour de Robby, ne lui laissait que 5 écus (au banc) : tant que l'achat d'un quartier est la quête
+// active du tutoriel, il coûte ce prix ; ensuite, et pour un ancien compte, le sien
+const TUTORIAL_ZONE_PRICE = { colline: 200, jardins: 150 };
+function zonePriceOf(zone, claimed) {
+    const quest = quests.currentOf(claimed);
+    const now = quest && quest.goal.kind === 'zone' && quest.goal.zone === zone.id && quests.inTutorial(quest.id, claimed);
+    return now && TUTORIAL_ZONE_PRICE[zone.id] ? TUTORIAL_ZONE_PRICE[zone.id] : zone.price;
+}
+
 // Achat d'un quartier : chapitre ouvert, écus débités une fois (même en double clic) ; { status, message } si refus
 async function buyZone(userId, zoneId, openChapters) {
     const zone = map.ZONE_BY_ID[zoneId];
@@ -727,8 +753,9 @@ async function buyZone(userId, zoneId, openChapters) {
         if (!added.rows.length) return db.rollback({ status: 409, message: W.ZONE_OWNED });
         // Les écus qui attendent dans les bâtiments sont encaissés d'abord : ils comptent pour payer
         await payWith(userId, conn, stock);
-        const coins = await ledger.debit(userId, zone.price, `quartier:${zone.id}`, conn);
-        if (coins === null) return db.rollback({ status: 400, message: NEED_COINS(zone.price) });
+        const price = zonePriceOf(zone, await claimedOf(userId, conn));
+        const coins = await ledger.debit(userId, price, `quartier:${zone.id}`, conn);
+        if (coins === null) return db.rollback({ status: 400, message: NEED_COINS(price) });
         return { bought: zone.name, coins };
     });
 }

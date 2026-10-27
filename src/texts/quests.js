@@ -101,6 +101,19 @@ const QUEST_TEXTS = {
         label: 'Relie le Puits au feu',
         say: 'Léo porte l’eau dans l’herbe mouillée. Les seaux arrivent à moitié vides.'
     },
+    // Les nuits du tutoriel en huit jours (choix de l'auteur, 26 oct., textes validés) : le compte du soir de Brume
+    'nuit-ondin': {
+        label: 'Passe ta cinquième nuit',
+        say: 'Cinq, ce soir, autour du feu. Dors : je veille.'
+    },
+    'nuit-sylve': {
+        label: 'Passe ta sixième nuit',
+        say: 'Six, ce soir, autour du feu. Dors : je veille.'
+    },
+    'nuit-galet': {
+        label: 'Passe ta septième nuit',
+        say: 'Sept, ce soir, autour du feu. Dors : je veille.'
+    },
     lisiere: {
         label: 'Achète La Lisière',
         say: 'Le bois flotté ne suffira pas. À l’ouest, des arbres dorment sous la brume. Et une lueur, entre eux.'
