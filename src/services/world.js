@@ -729,9 +729,10 @@ async function sleep(userId) {
     });
 }
 
-// Au tutoriel en huit jours, le jour de Maggy, le joueur n'a pas les 400 écus des Jardins (choix de l'auteur, 27 oct.) :
-// tant que leur achat est la quête active du tutoriel, ils coûtent ce prix ; ensuite, et pour un ancien compte, le leur
-const TUTORIAL_ZONE_PRICE = { jardins: 150 };
+// Au tutoriel en huit jours, le joueur n'a pas les 400 écus des Jardins le jour de Maggy (choix de l'auteur, 27 oct.),
+// et La Colline, le jour de Robby, ne lui laissait que 5 écus (au banc) : tant que l'achat d'un quartier est la quête
+// active du tutoriel, il coûte ce prix ; ensuite, et pour un ancien compte, le sien
+const TUTORIAL_ZONE_PRICE = { colline: 200, jardins: 150 };
 function zonePriceOf(zone, claimed) {
     const quest = quests.currentOf(claimed);
     const now = quest && quest.goal.kind === 'zone' && quest.goal.zone === zone.id && quests.inTutorial(quest.id, claimed);
