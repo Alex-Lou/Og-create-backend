@@ -538,7 +538,7 @@ async function view(userId, owned, book) {
             // (voisin d'un quartier à soi), en combien d'heures, et ce qu'emporte l'expédition
             zones: map.ZONES.map(z => (isKnown(z, discovered) ? {
                 id: z.id, name: named[`zone:${z.id}`] || z.name, baseName: z.name, renamed: Boolean(named[`zone:${z.id}`]),
-                price: z.price, chapter: z.chapter, code: z.code, anchor: map.ANCHORS[z.id], climate: z.climate, known: true,
+                price: zonePriceOf(z, claimed), chapter: z.chapter, code: z.code, anchor: map.ANCHORS[z.id], climate: z.climate, known: true,
                 owned: zones.has(z.id), open: !z.chapter || book.openChapters.has(z.chapter)
             } : {
                 id: z.id, name: null, code: z.code, anchor: map.ANCHORS[z.id], known: false, owned: false, open: false,
@@ -729,6 +729,15 @@ async function sleep(userId) {
     });
 }
 
+// Au tutoriel en huit jours, le jour de Maggy, le joueur n'a pas les 400 écus des Jardins (choix de l'auteur, 27 oct.) :
+// tant que leur achat est la quête active du tutoriel, ils coûtent ce prix ; ensuite, et pour un ancien compte, le leur
+const TUTORIAL_ZONE_PRICE = { jardins: 150 };
+function zonePriceOf(zone, claimed) {
+    const quest = quests.currentOf(claimed);
+    const now = quest && quest.goal.kind === 'zone' && quest.goal.zone === zone.id && quests.inTutorial(quest.id, claimed);
+    return now && TUTORIAL_ZONE_PRICE[zone.id] ? TUTORIAL_ZONE_PRICE[zone.id] : zone.price;
+}
+
 // Achat d'un quartier : chapitre ouvert, écus débités une fois (même en double clic) ; { status, message } si refus
 async function buyZone(userId, zoneId, openChapters) {
     const zone = map.ZONE_BY_ID[zoneId];
@@ -743,8 +752,9 @@ async function buyZone(userId, zoneId, openChapters) {
         if (!added.rows.length) return db.rollback({ status: 409, message: W.ZONE_OWNED });
         // Les écus qui attendent dans les bâtiments sont encaissés d'abord : ils comptent pour payer
         await payWith(userId, conn, stock);
-        const coins = await ledger.debit(userId, zone.price, `quartier:${zone.id}`, conn);
-        if (coins === null) return db.rollback({ status: 400, message: NEED_COINS(zone.price) });
+        const price = zonePriceOf(zone, await claimedOf(userId, conn));
+        const coins = await ledger.debit(userId, price, `quartier:${zone.id}`, conn);
+        if (coins === null) return db.rollback({ status: 400, message: NEED_COINS(price) });
         return { bought: zone.name, coins };
     });
 }
